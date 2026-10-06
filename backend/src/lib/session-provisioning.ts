@@ -45,9 +45,15 @@ export interface ProvisionResult {
  * Note both profile tables key back to `User.id`, which IS the Firebase Auth
  * UID (see prisma/schema.prisma) — so `userId` is exactly what
  * `request.auth.uid` will hold.
+ *
+ * `opts.extraUids` adds one-off uids — used by the guest invite flow, where
+ * the browser's anonymous Firebase uid is not the guest User row's id. On
+ * re-provisioning, uids are UNIONED (not overwritten) so a guest rejoining
+ * from a second device (a new anonymous uid) does not lose the first one.
  */
 export async function provisionSessionDocs(
-  sessionId: string
+  sessionId: string,
+  opts?: { extraUids?: string[] }
 ): Promise<ProvisionResult | null> {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
@@ -55,7 +61,7 @@ export async function provisionSessionDocs(
   })
   if (!session) return null
 
-  const allowedUids = [session.therapist.userId, session.client.userId].filter(
+  const allowedUids = [session.therapist.userId, session.client.userId, ...(opts?.extraUids ?? [])].filter(
     (uid): uid is string => typeof uid === 'string' && uid.length > 0
   )
   if (allowedUids.length === 0) return null
@@ -83,8 +89,10 @@ export async function provisionSessionDocs(
     // Re-provision: assert entitlement ONLY. Touching activeModuleId,
     // participants or whiteboard state here would reset a call in progress —
     // the second participant joining must not kick the first out of a module.
+    // Uids are unioned rather than replaced so guest rejoins from other
+    // devices (new anonymous uids) keep earlier ones valid.
     await liveRef.update({
-      allowedUids,
+      allowedUids: FieldValue.arrayUnion(...allowedUids),
       'timestamps.updatedAt': FieldValue.serverTimestamp(),
     })
   }

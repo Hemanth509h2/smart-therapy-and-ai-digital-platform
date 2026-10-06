@@ -373,7 +373,9 @@ export function AddClientDialog({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not create the invite.');
-      const inviteLink = `${window.location.origin}/auth?invite=${data.token}`;
+      // Guests land on the no-login join page; /auth?invite= still works for
+      // parents who want a full account.
+      const inviteLink = `${window.location.origin}/join/${data.token}`;
       setLink(inviteLink);
       if (phone.trim()) void sendWhatsApp(inviteLink);
       onCreated?.();

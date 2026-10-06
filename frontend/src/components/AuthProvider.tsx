@@ -18,8 +18,17 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       if (firebaseUser) {
         setAuthUser(firebaseUser.uid, firebaseUser.email);
 
+        // Guest joining via an invite link: signed in anonymously, so there
+        // is no Postgres profile to fetch and onboarding must never trigger.
+        // They get a client-shaped view of the session room and nothing else.
+        if (firebaseUser.isAnonymous) {
+          setRoleAndProfile('CLIENT', null);
+          setLoading(false);
+          return;
+        }
+
         // Skip profile fetch on pages that handle their own auth flow
-        if (pathname === '/auth' || pathname === '/onboarding') {
+        if (pathname === '/auth' || pathname === '/onboarding' || pathname.startsWith('/join')) {
           setLoading(false);
           return;
         }
@@ -53,7 +62,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         // so it must not be bounced to /auth. It 404s in production anyway.
         const devPreview =
           process.env.NODE_ENV !== 'production' && pathname === '/session/preview';
-        if (pathname !== '/auth' && pathname !== '/onboarding' && !devPreview) {
+        // /join/<token> is the public guest invite page — no session needed.
+        const guestInvite = pathname.startsWith('/join');
+        if (pathname !== '/auth' && pathname !== '/onboarding' && !devPreview && !guestInvite) {
           router.push('/auth');
         }
       }

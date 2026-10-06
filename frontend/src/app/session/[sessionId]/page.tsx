@@ -118,6 +118,16 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   const [screenSharing, setScreenSharing] = useState(false);
   const [shareWhiteboardAsk, setShareWhiteboardAsk] = useState(false);
   const whiteboardPromptedRef = useRef(false);
+
+  /* Guest joining via an invite link (anonymous Firebase sign-in) has no
+     profile row — the /join page stashed the invite's display name for us. */
+  const [guestName, setGuestName] = useState<string | null>(null);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('guest') === '1') {
+      setGuestName(sessionStorage.getItem('guestName') || 'Guest');
+    }
+  }, []);
+  const displayName = profile ? `${profile.firstName} ${profile.lastName}` : (guestName || 'User');
   // Whiteboard collaboration state lives in liveSessions alongside
   // activeModuleId/therapistControl, so the client can mirror the board the same
   // way it mirrors a launched module. `shared` is the "Share Whiteboard?" answer.
@@ -267,7 +277,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       await updateDoc(doc(db, 'liveSessions', sessionId), {
         [`participants.${uid}`]: {
           uid,
-          name: profile ? `${profile.firstName} ${profile.lastName}` : 'User',
+          name: displayName,
           role: isTherapist ? 'therapist' : 'client',
           isOnline: true,
           lastSeen: new Date().toISOString(),
@@ -276,24 +286,34 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     };
 
     const sessionRef = doc(db, 'liveSessions', sessionId);
-    const unsubscribe = onSnapshot(sessionRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data() as SessionState & { therapistControl?: boolean };
-        setSessionState(data);
-        setActiveModule(data.activeModuleId);
-        if (typeof data.therapistControl === 'boolean') {
-          setIsLocked(data.therapistControl);
+    const unsubscribe = onSnapshot(
+      sessionRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as SessionState & { therapistControl?: boolean };
+          setSessionState(data);
+          setActiveModule(data.activeModuleId);
+          if (typeof data.therapistControl === 'boolean') {
+            setIsLocked(data.therapistControl);
+          }
+          const wb = (data as { whiteboard?: { active?: boolean; shared?: boolean } }).whiteboard;
+          setWhiteboardShared(wb?.shared === true);
+          setWhiteboardOpenRemote(wb?.active === true);
+          if (!isTherapist && data.participants) {
+            const therapist = Object.values(data.participants).find(p => p.role === 'therapist');
+            setTherapistControl(therapist?.isOnline || false);
+          }
         }
-        const wb = (data as { whiteboard?: { active?: boolean; shared?: boolean } }).whiteboard;
-        setWhiteboardShared(wb?.shared === true);
-        setWhiteboardOpenRemote(wb?.active === true);
-        if (!isTherapist && data.participants) {
-          const therapist = Object.values(data.participants).find(p => p.role === 'therapist');
-          setTherapistControl(therapist?.isOnline || false);
-        }
+        setLoading(false);
+      },
+      // Firestore denial (rules/provisioning, e.g. no Google access from the
+      // server on a broken network) must not wedge the room on the loading
+      // screen — the LiveKit call itself doesn't depend on Firestore.
+      (err) => {
+        console.error('Live session listener failed:', err);
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    );
 
     // Provision server-side, then register as a participant. This also
     // promotes the Prisma session SCHEDULED -> ACTIVE, which is why the
@@ -302,7 +322,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     joinSession();
 
     return () => unsubscribe();
-  }, [sessionId, uid, role, profile, router, setActiveSessionId, setTherapistControl, isTherapist]);
+  }, [sessionId, uid, role, profile, router, setActiveSessionId, setTherapistControl, isTherapist, displayName]);
 
   useEffect(() => {
     setIsModuleActive(activeModule !== null);
@@ -584,7 +604,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   // Both canvas takeovers hide the thumbnail strip; the feeds move inside them.
   const canvasTakeover = whiteboardMode || moduleMode;
   const sidebarOpen = sidebarPanel !== null && !whiteboardMode;
-  const selfName = profile ? `${profile.firstName} ${profile.lastName}` : 'You';
+  const selfName = profile || guestName ? displayName : 'You';
 
   if (loading) {
     return (
@@ -600,7 +620,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   return (
     <StaadVideo
       sessionId={sessionId}
-      userName={profile ? `${profile.firstName} ${profile.lastName}` : 'User'}
+      userName={displayName}
       role={isTherapist ? 'therapist' : 'client'}
       // Signed into the access token as participant attributes; this is how the
       // translation agent knows which STT model to run on this person's audio
@@ -639,7 +659,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
           <SkillDevLayout
             sessionId={sessionId}
             userRole={userRole}
-            selfName={profile ? `${profile.firstName} ${profile.lastName}` : 'You'}
+            selfName={selfName}
             otherName={participantName}
             onExit={handleModuleClose}
             onEndCall={() => setShowConfirm(true)}
