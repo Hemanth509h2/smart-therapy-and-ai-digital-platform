@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
+import { adminAuth } from '@/lib/firebaseAdmin';
 import { provisionSessionDocs } from '@/lib/session-provisioning';
 
 export const dynamic = 'force-dynamic';
@@ -22,10 +23,8 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request, { params }: { params: { token: string } }) {
   try {
     const body = await request.json().catch(() => ({}));
-    const guestUid = typeof body.guestUid === 'string' ? body.guestUid : '';
-    if (guestUid.length < 8 || guestUid.length > 128) {
-      return NextResponse.json({ error: 'guestUid is required' }, { status: 400 });
-    }
+    // Server-generated guest id — never trust a client-supplied uid.
+    const guestUid = `guest:${randomUUID()}`;
 
     const invite = await prisma.invite.findUnique({
       where: { token: params.token },
@@ -113,6 +112,10 @@ export async function POST(request: Request, { params }: { params: { token: stri
       sessionId,
       clientName: `${invite.firstName} ${invite.lastName}`.trim() || 'Guest',
       therapistName: `${invite.therapist.firstName} ${invite.therapist.lastName}`.trim(),
+      guestUid,
+      // Custom token lets the patient sign in with signInWithCustomToken —
+      // no Anonymous auth provider needed in the Firebase console.
+      guestToken: await adminAuth().createCustomToken(guestUid),
     });
   } catch (error: any) {
     console.error('[invites/join]', error);

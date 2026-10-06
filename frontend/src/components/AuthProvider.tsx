@@ -21,7 +21,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         // Guest joining via an invite link: signed in anonymously, so there
         // is no Postgres profile to fetch and onboarding must never trigger.
         // They get a client-shaped view of the session room and nothing else.
-        if (firebaseUser.isAnonymous) {
+        if (firebaseUser.uid.startsWith('guest:')) {
           setRoleAndProfile('CLIENT', null);
           setLoading(false);
           return;

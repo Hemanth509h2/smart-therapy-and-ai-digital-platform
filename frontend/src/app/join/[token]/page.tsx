@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInAnonymously } from 'firebase/auth';
+import { signInWithCustomToken } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { apiFetch } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -42,19 +42,16 @@ export default function GuestJoinPage({ params }: { params: { token: string } })
     setJoining(true);
     setError(null);
     try {
-      // Invisible sign-in: gives Firestore/LiveKit a stable identity without
-      // asking the patient for any credentials.
-      if (!auth.currentUser) {
-        await signInAnonymously(auth);
-      }
-      const guestUid = auth.currentUser?.uid;
+      // Claim the invite first — the backend generates a guest identity and
+      // mints a custom token for it (no anonymous sign-in provider needed).
       const res = await apiFetch(`/api/invites/${token}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guestUid }),
+        body: JSON.stringify({}),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not join the session.');
+      await signInWithCustomToken(auth, data.guestToken);
       sessionStorage.setItem('guestName', data.clientName || 'Guest');
       router.push(`/session/${data.sessionId}?guest=1`);
     } catch (e: any) {
