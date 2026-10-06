@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { provisionSessionDocs } from '@/lib/session-provisioning';
+import { markSessionEnded } from '@/lib/session-provisioning';
 
 // GET /api/sessions/[sessionId] — fetch a single session (with client + therapist).
 export async function GET(
@@ -127,7 +128,8 @@ export async function PATCH(
     });
 
     // When the therapist ends the call, expire the invite link(s) that led to
-    // this client so the link can never be used to rejoin after the session.
+    // this client so the link can never be used to rejoin after the session,
+    // and flag the room as ended so the other participant's screen exits too.
     if (action === 'end') {
       await prisma.invite
         .updateMany({
@@ -139,6 +141,10 @@ export async function PATCH(
           data: { status: 'EXPIRED', expiresAt: now },
         })
         .catch((e) => console.warn('Invite expiry on session end failed:', e));
+
+      if (existing.status !== 'COMPLETED') {
+        await markSessionEnded(params.sessionId);
+      }
     }
 
     return NextResponse.json({ session });

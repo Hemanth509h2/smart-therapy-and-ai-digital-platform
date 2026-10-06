@@ -41,6 +41,7 @@ import { apiFetch } from '@/lib/api';
 interface SessionState {
   sessionId: string;
   activeModuleId: string | null;
+  status?: string;
   participants: Record<string, { uid: string; name: string; role: string; isOnline: boolean }>;
   timestamps: { createdAt: string; updatedAt: string };
 }
@@ -106,6 +107,10 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
   const [activeModule, setActiveModule] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionEnded, setSessionEnded] = useState(false);
+  const [endedSession, setEndedSession] = useState<{
+    clientName: string; therapistName: string; scheduledAt?: string; startedAt?: string; endedAt?: string;
+  } | null>(null);
   const [reactionBarOpen, setReactionBarOpen] = useState(false);
   const [isLocked, setIsLocked] = useState(true);
   const [elapsed, setElapsed] = useState(0);
@@ -292,6 +297,10 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
         if (snapshot.exists()) {
           const data = snapshot.data() as SessionState & { therapistControl?: boolean };
           setSessionState(data);
+          // The other participant ended the call → leave the room and show details.
+          if (data.status === 'ended' && !isTherapist) {
+            setSessionEnded(true);
+          }
           setActiveModule(data.activeModuleId);
           if (typeof data.therapistControl === 'boolean') {
             setIsLocked(data.therapistControl);
@@ -517,7 +526,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     if (typeof window !== 'undefined') {
       // Guests (anonymous sign-in via invite link) have no dashboard to go
       // back to — sign the throwaway account out and land on the login page.
-      if (auth.currentUser?.isAnonymous) {
+      if (auth.currentUser?.uid?.startsWith('guest:')) {
         auth.signOut().catch(() => {});
         window.location.href = '/auth';
       } else {
@@ -612,12 +621,69 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   const sidebarOpen = sidebarPanel !== null && !whiteboardMode;
   const selfName = profile || guestName ? displayName : 'You';
 
+  // When the doctor ends the session, pull the session row once to show details.
+  useEffect(() => {
+    if (!sessionEnded) return;
+    apiFetch(`/api/sessions/${sessionId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d?.session) return;
+        const s = d.session;
+        setEndedSession({
+          clientName: s.client ? `${s.client.firstName ?? ''} ${s.client.lastName ?? ''}`.trim() : 'Client',
+          therapistName: s.therapist ? `${s.therapist.firstName ?? ''} ${s.therapist.lastName ?? ''}`.trim() : 'Therapist',
+          scheduledAt: s.scheduledAt,
+          startedAt: s.startedAt,
+          endedAt: s.endedAt,
+        });
+      })
+      .catch(() => {});
+  }, [sessionEnded, sessionId]);
+
   if (loading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center" style={{ background: '#0d1614' }}>
         <div className="text-center">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-t-transparent mx-auto" style={{ borderColor: 'var(--sage-mid)', borderTopColor: 'transparent' }} />
           <p className="mt-4 font-medium" style={{ color: 'var(--ink-muted)', fontSize: 14 }}>Joining session room...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (sessionEnded) {
+    const mins =
+      endedSession?.startedAt && endedSession?.endedAt
+        ? Math.max(0, Math.round((new Date(endedSession.endedAt).getTime() - new Date(endedSession.startedAt).getTime()) / 60000))
+        : null;
+    const done = () => {
+      if (auth.currentUser?.uid?.startsWith('guest:')) {
+        auth.signOut().catch(() => {});
+        window.location.href = '/auth';
+      } else {
+        window.location.href = '/';
+      }
+    };
+    return (
+      <div className="flex h-screen w-screen items-center justify-center px-4" style={{ background: '#0d1614' }}>
+        <div className="w-full max-w-md rounded-2xl p-8 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <h1 className="text-xl font-semibold" style={{ color: '#fff' }}>Session ended</h1>
+          <p className="mt-2 text-sm" style={{ color: 'var(--ink-muted)' }}>
+            The therapist has ended the session. Here are the details:
+          </p>
+          <dl className="mt-6 space-y-3 text-left text-sm" style={{ color: 'var(--ink-muted)' }}>
+            <div className="flex justify-between"><dt>Client</dt><dd style={{ color: '#fff' }}>{endedSession?.clientName ?? '—'}</dd></div>
+            <div className="flex justify-between"><dt>Therapist</dt><dd style={{ color: '#fff' }}>{endedSession?.therapistName ?? '—'}</dd></div>
+            <div className="flex justify-between"><dt>Date</dt><dd style={{ color: '#fff' }}>{endedSession?.scheduledAt ? new Date(endedSession.scheduledAt).toLocaleString() : '—'}</dd></div>
+            <div className="flex justify-between"><dt>Duration</dt><dd style={{ color: '#fff' }}>{mins != null ? `${mins} min` : '—'}</dd></div>
+          </dl>
+          <button
+            onClick={done}
+            className="mt-8 w-full rounded-xl py-3 font-semibold"
+            style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}
+          >
+            Done
+          </button>
         </div>
       </div>
     );
