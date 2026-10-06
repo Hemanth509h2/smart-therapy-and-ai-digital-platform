@@ -30,15 +30,38 @@ export async function requireAuth(request: Request) {
     };
   }
 
-  try {
-    const decoded = await adminAuth().verifyIdToken(token);
-    return {
-      ok: true as const,
-      uid: decoded.uid,
-      email: decoded.email ?? null,
-      decoded,
-    };
-  } catch (err: any) {
+  // verifyIdToken fetches Google's signing certs on first use; on slow/flaky
+  // networks that fetch can time out, so retry network-looking failures a
+  // couple of times before rejecting. Genuinely invalid tokens fail fast.
+  let lastErr: any = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const decoded = await adminAuth().verifyIdToken(token);
+      return {
+        ok: true as const,
+        uid: decoded.uid,
+        email: decoded.email ?? null,
+        decoded,
+      };
+    } catch (err: any) {
+      lastErr = err;
+      const code = String(err?.errorInfo?.code || err?.code || '');
+      const msg = String(err?.message || '');
+      const isNetwork =
+        code.includes('network') ||
+        msg.includes('fetch failed') ||
+        msg.includes('ETIMEDOUT') ||
+        msg.includes('ECONNRESET') ||
+        msg.includes('ENETUNREACH') ||
+        msg.includes('EAI_AGAIN');
+      if (!isNetwork) break;
+      console.warn(`[auth] token verification attempt ${attempt} failed (${code || msg}); retrying…`);
+      await new Promise((r) => setTimeout(r, 1000 * attempt));
+    }
+  }
+
+  {
+    const err = lastErr;
     console.warn(`[auth] 401 ${request.url} — token verification failed: ${err?.code || err?.message}`);
     return {
       ok: false as const,
