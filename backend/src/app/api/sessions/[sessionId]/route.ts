@@ -126,6 +126,21 @@ export async function PATCH(
       include: { client: true, therapist: true },
     });
 
+    // When the therapist ends the call, expire the invite link(s) that led to
+    // this client so the link can never be used to rejoin after the session.
+    if (action === 'end') {
+      await prisma.invite
+        .updateMany({
+          where: {
+            therapistId: existing.therapistId,
+            claimedClientId: existing.clientId,
+            status: 'CLAIMED',
+          },
+          data: { status: 'EXPIRED', expiresAt: now },
+        })
+        .catch((e) => console.warn('Invite expiry on session end failed:', e));
+    }
+
     return NextResponse.json({ session });
   } catch (error: any) {
     console.error('Session PATCH error:', error);

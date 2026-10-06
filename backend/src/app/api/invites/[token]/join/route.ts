@@ -83,10 +83,18 @@ export async function POST(request: Request, { params }: { params: { token: stri
       const session = await prisma.session.findFirst({
         where: { clientId: invite.claimedClientId ?? '__none__', therapistId: invite.therapistId },
         orderBy: { createdAt: 'desc' },
-        select: { id: true },
+        select: { id: true, status: true },
       });
       if (!session) {
         return NextResponse.json({ error: 'Session for this invite no longer exists' }, { status: 409 });
+      }
+      // Call already ended (or cancelled) — the invite link is dead.
+      if (session.status === 'COMPLETED' || session.status === 'CANCELLED') {
+        await prisma.invite.update({
+          where: { id: invite.id },
+          data: { status: 'EXPIRED', expiresAt: new Date() },
+        });
+        return NextResponse.json({ error: 'This invite has expired. Ask your therapist for a new link.' }, { status: 410 });
       }
       sessionId = session.id;
     }
