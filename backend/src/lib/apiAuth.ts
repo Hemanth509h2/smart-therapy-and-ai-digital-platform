@@ -16,6 +16,26 @@ import { adminAuth } from '@/lib/firebaseAdmin';
  *   const { uid } = auth;
  */
 export async function requireAuth(request: Request) {
+  // DEV-ONLY bypass: when AUTH_DISABLED=true in .env, token verification is
+  // skipped and identity is taken from the x-dev-uid header (sent by the
+  // frontend's apiFetch). Needed when the local network blocks Node's access
+  // to Google APIs. NEVER enable in production — routes then trust
+  // client-supplied identity again.
+  if (process.env.AUTH_DISABLED === 'true') {
+    const uid = request.headers.get('x-dev-uid') || new URL(request.url).searchParams.get('uid');
+    const email = request.headers.get('x-dev-email');
+    if (!uid) {
+      return {
+        ok: false as const,
+        response: NextResponse.json(
+          { error: 'AUTH_DISABLED: missing x-dev-uid header' },
+          { status: 401 }
+        ),
+      };
+    }
+    return { ok: true as const, uid, email, decoded: null };
+  }
+
   const header = request.headers.get('authorization');
   const token = header?.startsWith('Bearer ') ? header.slice(7).trim() : null;
 

@@ -19,11 +19,20 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
   if (typeof input === 'string' && input.startsWith('/')) {
     const headers = new Headers(init?.headers);
-    if (!headers.has('Authorization')) {
-      const token = await auth.currentUser?.getIdToken();
-      if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
+    const user = auth.currentUser;
+    if (user) {
+      if (!headers.has('Authorization')) {
+        // Tolerate token-refresh failures on flaky networks; the backend
+        // decides whether a token is required (AUTH_DISABLED bypass) or not.
+        const token = await user.getIdToken().catch(() => null);
+        if (token) {
+          headers.set('Authorization', `Bearer ${token}`);
+        }
       }
+      // Only honored by the backend when AUTH_DISABLED=true (local dev);
+      // ignored otherwise — identity comes from the verified token.
+      headers.set('x-dev-uid', user.uid);
+      if (user.email) headers.set('x-dev-email', user.email);
     }
     return fetch(`${API_URL}${input}`, { ...init, headers });
   }

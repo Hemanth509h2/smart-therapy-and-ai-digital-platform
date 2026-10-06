@@ -51,6 +51,10 @@ const port = parseInt(process.env.PORT || '4000', 10)
 const app = next({ dev })
 const handle = app.getRequestHandler()
 
+if (process.env.AUTH_DISABLED === 'true') {
+  console.warn('⚠️  [auth] AUTH_DISABLED=true — API routes trust client-supplied identity (x-dev-uid). DEV ONLY, never deploy like this.')
+}
+
 const SARVAM_WS = 'wss://api.sarvam.ai/speech-to-text/ws'
 // Query params we forward through to Sarvam (everything except our own).
 const PASS_PARAMS = ['model', 'mode', 'high_vad_sensitivity', 'vad_signals', 'language_code']
