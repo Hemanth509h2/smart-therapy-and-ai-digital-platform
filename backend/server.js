@@ -114,8 +114,11 @@ app.prepare().then(() => {
     res.on('finish', () => {
       const url = req.url || ''
       if (url.startsWith('/_next/') || url.startsWith('/favicon')) return
+      // Log the path only: query strings can carry credentials (e.g. the STT
+      // token on the WebSocket upgrade) and must not land in server logs.
+      const path = url.split('?')[0]
       const ms = Date.now() - start
-      console.log(`[api] ${req.method} ${url} → ${res.statusCode} (${ms}ms)`)
+      console.log(`[api] ${req.method} ${path} → ${res.statusCode} (${ms}ms)`)
     })
     handle(req, res, parse(req.url, true))
   })

@@ -16,15 +16,13 @@ export function middleware(request: NextRequest) {
   }
   return response;
 }
-
 function corsHeaders(request: NextRequest): Record<string, string> {
-  const origin = request.headers.get('origin') || '*';
   return {
-    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,PATCH,PUT,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Cron-Secret,x-dev-uid,x-dev-email',
+    'Access-Control-Allow-Headers':
+      'Content-Type,Authorization,X-Cron-Secret,x-dev-uid,x-dev-email',
     'Access-Control-Max-Age': '86400',
-    Vary: 'Origin',
   };
 }
 
