@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireAdmin } from '@/lib/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules';
 import { addMonths } from '@/lib/subscriptions';
 
@@ -10,6 +11,8 @@ import { addMonths } from '@/lib/subscriptions';
 // — unlimited plans grant all tools.
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.ok) return auth.response;
     const { action, modules, months } = await request.json();
 
     const req = await prisma.subscriptionRequest.findUnique({

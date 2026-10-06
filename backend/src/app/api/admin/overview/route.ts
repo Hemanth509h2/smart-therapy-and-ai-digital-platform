@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireAdmin } from '@/lib/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules';
 
 // GET /api/admin/overview — per-therapist resource usage for the admin dashboard.
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.ok) return auth.response;
     const therapists = await prisma.profileTherapist.findMany({
       include: { user: { select: { email: true } } },
       orderBy: { createdAt: 'asc' },

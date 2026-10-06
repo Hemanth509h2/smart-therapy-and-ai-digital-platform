@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireAdmin } from '@/lib/apiAuth';
 
 // GET /api/admin/plans — list all plans (active + inactive) for catalog mgmt.
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.ok) return auth.response;
     const plans = await prisma.plan.findMany({
       orderBy: [{ sortOrder: 'asc' }, { priceMonthly: 'asc' }],
     });
@@ -19,6 +22,8 @@ export async function GET() {
 // toolQuota null/empty ⇒ unlimited (all tools).
 export async function POST(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.ok) return auth.response;
     const body = await request.json();
     const name = String(body.name || '').trim();
     if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 });

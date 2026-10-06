@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireAdmin } from '@/lib/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules';
 
 // PATCH /api/admin/therapists/[id]/access — set a therapist's module access.
@@ -9,6 +10,8 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.ok) return auth.response;
     const { allModulesAllowed, moduleAccess } = await request.json();
 
     const therapist = await prisma.profileTherapist.findUnique({ where: { id: params.id } });

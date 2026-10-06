@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireAdmin } from '@/lib/apiAuth';
 import { resolveCurrent, serializeSubscription } from '@/lib/subscriptions';
 
 // GET /api/admin/subscriptions — every professional with their current plan
 // (months / period end / renewed) plus all pending plan requests to review.
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.ok) return auth.response;
     const [therapists, requests] = await Promise.all([
       prisma.profileTherapist.findMany({
         include: {

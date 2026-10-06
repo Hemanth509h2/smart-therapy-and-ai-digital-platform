@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireAdmin } from '@/lib/apiAuth';
 import { adminAuth } from '@/lib/firebaseAdmin';
 
 // GET /api/admin/admins — list all admin accounts.
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.ok) return auth.response;
     const admins = await prisma.profileAdmin.findMany({
       include: { user: { select: { email: true } } },
       orderBy: { createdAt: 'asc' },
@@ -30,19 +33,21 @@ export async function GET() {
 // password, when provided, is applied. Otherwise a new Firebase user is created.
 export async function POST(request: Request) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.ok) return auth.response;
     const { email, password, firstName, lastName } = await request.json();
     if (!email) {
       return NextResponse.json({ error: 'email is required' }, { status: 400 });
     }
 
-    const auth = adminAuth();
+    const firebaseAdminAuth = adminAuth();
 
     let uid: string;
     try {
-      const existing = await auth.getUserByEmail(email);
+      const existing = await firebaseAdminAuth.getUserByEmail(email);
       uid = existing.uid;
       if (password) {
-        await auth.updateUser(uid, { password });
+        await firebaseAdminAuth.updateUser(uid, { password });
       }
     } catch {
       if (!password || String(password).length < 6) {
@@ -51,7 +56,7 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
-      const created = await auth.createUser({ email, password });
+      const created = await firebaseAdminAuth.createUser({ email, password });
       uid = created.uid;
     }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
+import { prisma } from '@/lib/db';
 
 /**
  * Verifies the Firebase ID token sent by the client in the
@@ -91,4 +92,29 @@ export async function requireAuth(request: Request) {
       ),
     };
   }
+}
+
+/**
+ * requireAuth + DB role check: only users whose User row has role 'ADMIN'
+ * may proceed. Use for every /api/admin/* handler.
+ */
+export async function requireAdmin(request: Request) {
+  const auth = await requireAuth(request);
+  if (!auth.ok) return auth;
+
+  const user = await prisma.user.findUnique({
+    where: { id: auth.uid },
+    select: { role: true },
+  });
+  if (user?.role !== 'ADMIN') {
+    console.warn(`[auth] 403 ${request.url} — uid ${auth.uid} is not an ADMIN`);
+    return {
+      ok: false as const,
+      response: NextResponse.json(
+        { error: 'Admin access required' },
+        { status: 403 }
+      ),
+    };
+  }
+  return { ok: true as const, uid: auth.uid, email: auth.email };
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireAdmin } from '@/lib/apiAuth';
 import { addMonths } from '@/lib/subscriptions';
 
 // PATCH /api/admin/subscriptions/[id] — manage an existing term.
@@ -7,6 +8,8 @@ import { addMonths } from '@/lib/subscriptions';
 // renew: extends currentPeriodEnd by `months`, bumps renewalCount, marks renewed.
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
+    const auth = await requireAdmin(request);
+    if (!auth.ok) return auth.response;
     const { action, months } = await request.json();
 
     const sub = await prisma.subscription.findUnique({ where: { id: params.id } });
