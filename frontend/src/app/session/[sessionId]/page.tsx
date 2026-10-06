@@ -5,7 +5,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { useRouter } from 'next/navigation';
 import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import {
   Mic, MicOff, Camera, CameraOff, PhoneOff, Settings, Smile,
   Maximize2, Minimize2,
@@ -471,52 +471,58 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     } catch {}
   };
 
-  const handleLeaveSession = async () => {
+  const handleLeaveSession = () => {
+    // Leave FIRST, clean up in the background. Every call below is
+    // fire-and-forget: on slow/offline networks awaiting them can hang for a
+    // long time (Firestore queues writes while offline; the PATCH hits Prisma
+    // + Google provisioning), which made the End call button look dead.
     if (uid) {
-      try {
-        await updateDoc(doc(db, 'liveSessions', sessionId), {
-          [`participants.${uid}.isOnline`]: false,
-          status: 'ended',
-          'timestamps.updatedAt': new Date().toISOString(),
-        });
-      } catch {}
+      updateDoc(doc(db, 'liveSessions', sessionId), {
+        [`participants.${uid}.isOnline`]: false,
+        status: 'ended',
+        'timestamps.updatedAt': new Date().toISOString(),
+      }).catch(() => {});
     }
     // Mark the scheduled session as COMPLETED in the database so it moves into
-    // the client's session history once the call is cut.
-    try {
-      await apiFetch(`/api/sessions/${sessionId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'end' }),
-      });
-    } catch {}
+    // the client's session history once the call is cut. `keepalive` lets the
+    // request finish even while the browser navigates away below.
+    apiFetch(`/api/sessions/${sessionId}`, {
+      method: 'PATCH',
+      keepalive: true,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'end' }),
+    }).catch(() => {});
     // Log transcription volume for the admin dashboard (therapist side, best-effort).
     if (isTherapist && profile?.id && transcription.chunkCount > 0) {
-      try {
-        await apiFetch('/api/usage', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ therapistId: profile.id, type: 'TRANSCRIPTION', count: transcription.chunkCount, sessionId }),
-        });
-      } catch {}
+      apiFetch('/api/usage', {
+        method: 'POST',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ therapistId: profile.id, type: 'TRANSCRIPTION', count: transcription.chunkCount, sessionId }),
+      }).catch(() => {});
     }
     // Kick off the end-of-session AI report while the transcript is still fresh
     // in Firestore (the cleanup cron clears transcripts after 24h). `keepalive`
     // lets the request outlive the imminent redirect; the server route runs the
     // LLM generation to completion independently of this page.
     if (isTherapist) {
-      try {
-        apiFetch('/api/session-report', {
-          method: 'POST',
-          keepalive: true,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId }),
-        });
-      } catch {}
+      apiFetch('/api/session-report', {
+        method: 'POST',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      }).catch(() => {});
     }
     setActiveSessionId(null);
     if (typeof window !== 'undefined') {
-      window.location.href = '/';
+      // Guests (anonymous sign-in via invite link) have no dashboard to go
+      // back to — sign the throwaway account out and land on the login page.
+      if (auth.currentUser?.isAnonymous) {
+        auth.signOut().catch(() => {});
+        window.location.href = '/auth';
+      } else {
+        window.location.href = '/';
+      }
     }
   };
 
