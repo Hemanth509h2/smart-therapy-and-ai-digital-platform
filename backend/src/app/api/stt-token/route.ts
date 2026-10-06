@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { adminAuth } from '@/lib/firebaseAdmin';
+import { requireAuth } from '@/lib/apiAuth';
 import { prisma } from '@/lib/db';
 import { mintSttToken } from '@/lib/stt-token';
 
@@ -7,13 +7,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const authorization = request.headers.get('authorization');
-    const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
-    if (!token) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
 
-    const decoded = await adminAuth().verifyIdToken(token);
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('sessionId');
 
@@ -27,7 +23,7 @@ export async function GET(request: Request) {
       include: { therapist: true },
     });
 
-    if (!session || session.therapist.userId !== decoded.uid) {
+    if (!session || session.therapist.userId !== auth.uid) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

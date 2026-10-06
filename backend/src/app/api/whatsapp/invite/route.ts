@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
-import { adminAuth } from '@/lib/firebaseAdmin'
+import { requireAuth } from '@/lib/apiAuth'
 import { prisma } from '@/lib/db'
 import { sendWhatsAppInvite } from '@/lib/whatsapp-bot'
 
@@ -8,13 +8,9 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
   try {
-    const authorization = request.headers.get('authorization')
-    const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]
-    if (!token) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-    }
+    const auth = await requireAuth(request)
+    if (!auth.ok) return auth.response
 
-    const decoded = await adminAuth().verifyIdToken(token)
     const { therapistId, patientName, inviteLink } = await request.json()
 
     if (!therapistId || !inviteLink) {
@@ -28,7 +24,7 @@ export async function POST(request: Request) {
       where: { id: String(therapistId) },
       select: { userId: true, firstName: true, lastName: true },
     })
-    if (!therapist || therapist.userId !== decoded.uid) {
+    if (!therapist || therapist.userId !== auth.uid) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
-import { adminAuth } from '@/lib/firebaseAdmin';
+import { requireAuth } from '@/lib/apiAuth';
 import { normalizeWhatsAppNumber } from '@/lib/twilio-whatsapp';
 
 // POST /api/invites — therapist creates a patient invite (name + diagnosis only).
@@ -10,12 +10,8 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const authorization = request.headers.get('authorization');
-    const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
-    if (!token) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
-    const decoded = await adminAuth().verifyIdToken(token);
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
     const { therapistId, firstName, lastName, diagnosis, scheduledAt, phoneNumber } = await request.json();
 
     if (!therapistId || !firstName) {
@@ -27,7 +23,7 @@ export async function POST(request: Request) {
       where: { id: therapistId },
       select: { userId: true },
     });
-    if (!therapist || therapist.userId !== decoded.uid) {
+    if (!therapist || therapist.userId !== auth.uid) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
