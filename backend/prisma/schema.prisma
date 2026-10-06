@@ -98,6 +98,7 @@ model ProfileTherapist {
   notes                TherapistNote[]
   bookings             Booking[]
   invites              Invite[]
+  clients              ProfileClient[]
   usageEvents          UsageEvent[]
   subscriptions        Subscription[]
   subscriptionRequests SubscriptionRequest[]
@@ -118,6 +119,8 @@ model ProfileClient {
   diagnosis        String[]
   parentEmail      String?
   phoneNumber      String? // E.164; used as the patient's WhatsApp recipient
+  therapistId      String? // set when the therapist adds the client directly
+  therapist        ProfileTherapist? @relation(fields: [therapistId], references: [id])
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   bookings         Booking[]
@@ -128,6 +131,8 @@ model ProfileClient {
   progressMetrics ProgressMetric[]
   progressReports ProgressReport[]
   progressNotes   ProgressNote[]
+
+  @@index([therapistId])
 }
 
 model DocumentChunk {

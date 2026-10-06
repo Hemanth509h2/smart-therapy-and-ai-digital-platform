@@ -1,7 +1,62 @@
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
+import { requireAuth } from '@/lib/apiAuth';
+import { normalizeWhatsAppNumber } from '@/lib/twilio-whatsapp';
 
 export const dynamic = 'force-dynamic';
+
+// POST /api/clients — therapist adds a client directly (name + diagnosis +
+// phone). No invite link, no session/video room is created — the therapist
+// books or starts a session explicitly later.
+export async function POST(request: Request) {
+  try {
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
+
+    const { therapistId, firstName, lastName, diagnosis, phoneNumber, dateOfBirth } = await request.json();
+    if (!therapistId || !firstName) {
+      return NextResponse.json({ error: 'therapistId and firstName are required' }, { status: 400 });
+    }
+
+    const therapist = await prisma.profileTherapist.findUnique({
+      where: { id: therapistId },
+      select: { userId: true },
+    });
+    if (!therapist || therapist.userId !== auth.uid) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const client = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          id: `client:${randomUUID()}`,
+          email: `client-${randomUUID()}@client.staad.local`,
+          role: 'CLIENT',
+        },
+      });
+      return tx.profileClient.create({
+        data: {
+          userId: user.id,
+          therapistId,
+          firstName: String(firstName).trim(),
+          lastName: String(lastName || '').trim(),
+          diagnosis: Array.isArray(diagnosis) ? diagnosis : [],
+          phoneNumber:
+            typeof phoneNumber === 'string' && phoneNumber.trim()
+              ? normalizeWhatsAppNumber(phoneNumber)
+              : null,
+          dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : new Date(),
+        },
+      });
+    });
+
+    return NextResponse.json({ client }, { status: 201 });
+  } catch (error: any) {
+    console.error('Client create error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
 
 export async function GET(request: Request) {
   try {
@@ -9,13 +64,17 @@ export async function GET(request: Request) {
     const therapistId = searchParams.get('therapistId');
 
     if (therapistId) {
-      // Find all clients who have sessions with this therapist
+      // Clients of this therapist: directly added ones PLUS any linked via sessions.
       const sessions = await prisma.session.findMany({
         where: { therapistId },
         select: { clientId: true },
         distinct: ['clientId'],
       });
-      const clientIds = sessions.map((s) => s.clientId);
+      const directClients = await prisma.profileClient.findMany({
+        where: { therapistId },
+        select: { id: true },
+      });
+      const clientIds = [...new Set([...sessions.map((s) => s.clientId), ...directClients.map((c) => c.id)])];
 
       const clients = await prisma.profileClient.findMany({
         where: { id: { in: clientIds } },

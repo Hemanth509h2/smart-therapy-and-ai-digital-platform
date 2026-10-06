@@ -357,7 +357,7 @@ export function AddClientDialog({
     setSaving(true);
     setError('');
     try {
-      const res = await apiFetch('/api/invites', {
+      const res = await apiFetch('/api/clients', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -372,13 +372,9 @@ export function AddClientDialog({
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not create the invite.');
-      // Guests land on the no-login join page; /auth?invite= still works for
-      // parents who want a full account.
-      const inviteLink = `${window.location.origin}/join/${data.token}`;
-      setLink(inviteLink);
-      if (phone.trim()) void sendWhatsApp(inviteLink);
+      if (!res.ok) throw new Error(data.error || 'Could not add the client.');
       onCreated?.();
+      onOpenChange(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create the invite.');
     } finally {
@@ -476,7 +472,6 @@ export function AddClientDialog({
           </Field>
           {error && <ErrorText>{error}</ErrorText>}
         </div>
-      )}
     </DsDialog>
   );
 }
