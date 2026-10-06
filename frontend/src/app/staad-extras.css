@@ -1,0 +1,399 @@
+/* Small additions on top of the ported STAAD design system.
+ *
+ * The exported artboards only ever showed ONE sample of each repeating element,
+ * and a few of them were drawn as dashed placeholders because the mockup had no
+ * real content to put there. These rules add the "filled" counterparts, reusing
+ * the design's own shapes, radii, spacing and tokens — nothing new is invented.
+ * The original dashed styles are kept and now serve as real empty states.
+ */
+
+/* ---- Fixes for two bugs in the exported stylesheet ---------------------- */
+
+/* The export declares `.panel__glow{position:absolute}`, but the later
+   `.panel > *{position:relative}` rule has identical specificity and so wins.
+   That turns the glow into a real flex item 372px tall, which pushes every
+   panel's content (Client Focus, Notes Queue, Talk to Us…) far down the column
+   and leaves a large empty space at the top. Put it back in its own layer. */
+.staad-ui .panel > .panel__glow {
+  position: absolute;
+}
+
+/* With the glow out of flow, panel content starts at the top. A long list then
+   scrolls inside the panel instead of stretching it past the left column. */
+.staad-ui .panel {
+  justify-content: flex-start;
+}
+.staad-ui .panel__rows {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* The artboard only ever drew the .sch session card in its lime state, so the
+   card's text, tile and pills are hardcoded near-black. A non-lime .sch (an
+   upcoming session, a past one) then put black text on a dark card. Give the
+   plain variant theme-aware colours; the lime variant is untouched. */
+.staad-ui .sch:not(.card--lime) .sch__name,
+.staad-ui .sch:not(.card--lime) .sch__h {
+  color: var(--ink);
+}
+.staad-ui .sch:not(.card--lime) .sch__meta {
+  color: var(--muted);
+}
+.staad-ui .sch:not(.card--lime) .sch__rule {
+  background: var(--line-2);
+}
+.staad-ui .sch:not(.card--lime) .sch__tile,
+.staad-ui .sch:not(.card--lime) .sch__timer,
+.staad-ui .sch:not(.card--lime) .sch__status {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* Therapy Toolkit: the artboard drew dashed skeleton tiles. This is the same
+   tile with actual content in it. */
+.staad-ui .tile--filled {
+  border-style: solid;
+  border-color: var(--line);
+  background: var(--surface-2);
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform .25s cubic-bezier(.2, .7, .2, 1), border-color .2s;
+}
+.staad-ui .tile--filled:hover {
+  transform: translateY(-3px);
+  border-color: var(--line-2);
+}
+.staad-ui .tile--filled:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+.staad-ui .tile__ic {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: var(--lime);
+  color: #0b0b0b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.staad-ui .tile__label {
+  display: block;
+  font-size: 13.5px;
+  line-height: 18px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.staad-ui .tile__sub {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* Loading skeletons, in the design's own idiom (the dashed/grey bar language
+   already used by .tile__bar) rather than spinners. */
+@keyframes staad-pulse { 0%,100% { opacity: 1 } 50% { opacity: .45 } }
+.staad-ui .sk {
+  background: var(--line);
+  border-radius: 8px;
+  animation: staad-pulse 1.4s ease-in-out infinite;
+}
+.staad-ui .sk--card {
+  border-radius: 32px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  animation: staad-pulse 1.4s ease-in-out infinite;
+}
+
+/* Inline error, shown on the affected card only so one failed request cannot
+   take the whole page down. */
+.staad-ui .inline-err {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: var(--red-soft);
+  color: var(--red);
+  font-size: 13px;
+  line-height: 19px;
+  font-weight: 700;
+}
+
+/* The artboard drew every FAQ expanded, so it has no "open" state for the sign.
+   Real accordions need one — this reuses the design's own rotate language. */
+.staad-ui .faq__sign.on {
+  background: var(--strong-bg);
+  color: var(--strong-fg);
+  transform: rotate(45deg);
+}
+.staad-ui .faq__q .as-button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+
+/* Overflow menu. The artboards drew the trigger (the round .nbtn) but never an
+   open menu, so the surface borrows the card's own radius, border and tokens. */
+.staad-menu {
+  padding: 6px;
+  border-radius: 20px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  box-shadow: 0 18px 40px rgba(11, 11, 11, .16);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.staad-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  transition: background .18s;
+}
+.staad-menu__item:hover:not(:disabled) { background: var(--line); }
+.staad-menu__item:disabled { opacity: .45; cursor: not-allowed; }
+.staad-menu__item:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+
+/* Phone dock: the artboard hides the whole sidebar footer at ≤640px, and that
+   footer is what holds Theme and Logout — so on a phone there was no way to
+   sign out at all. Bring it back as trailing items in the dock, pinned to the
+   end so they stay reachable while the nav itself scrolls horizontally.
+   Collapse stays hidden (the ≤900px rule), since it means nothing here. */
+@media (max-width: 640px) {
+  /* .sb-nav is flex:1 and will not shrink past its content, which shoves the
+     footer off the end of the dock. Let it shrink and scroll instead. */
+  .staad-ui .sb-nav {
+    min-width: 0;
+  }
+  .staad-ui .sb-foot {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    flex: none;
+    border-top: 0;
+    padding-top: 0;
+    padding-left: 8px;
+    margin-left: 2px;
+    border-left: 1px solid var(--line);
+  }
+  .staad-ui .sb-foot .nav-item {
+    width: auto;
+    justify-content: center;
+    gap: 0;
+    padding: 5px;
+  }
+  .staad-ui .sb-foot .nav-label {
+    opacity: 0;
+    max-width: 0;
+  }
+  /* Six circles do not fit across a 390px phone at the desktop icon size, and
+     the overflow pushed Logout off the end. Trim the circle a little so the
+     nav plus Theme/Logout all fit; longer navs still scroll, with the footer
+     pinned at the end so signing out never requires scrolling. */
+  .staad-ui .sb .nav-ic {
+    width: 38px;
+    height: 38px;
+  }
+  .staad-ui .sb-nav {
+    gap: 6px;
+  }
+}
+
+/* ---- Dialogs & drawers ------------------------------------------------- */
+/* The dialogs (Add Client, Book Session, Notes…) were built against the older
+   `ds-*` system, so they arrived in the old cream/clay palette and squared-off
+   shapes. Rather than rewrite every dialog, the `ds-*` tokens are remapped onto
+   the STAAD tokens and the few component classes are reshaped to match. Radix
+   portals these to <body>, so the surfaces carry `staad-ui` themselves. */
+.staad-ui.ds-dialog,
+.staad-ui .ds-dialog {
+  --ds-ink: var(--ink);
+  --ds-muted: var(--muted);
+  --ds-faint: var(--muted);
+  --ds-border: var(--line);
+  --ds-border-strong: var(--line-2);
+  --ds-bg: var(--bg);
+  --ds-surface: var(--surface);
+  --ds-surface-2: var(--surface-2);
+  --ds-clay: var(--strong-bg);
+  --ds-clay-hover: var(--strong-bg);
+  --ds-clay-ink: var(--strong-fg);
+  --ds-clay-soft: var(--line);
+  --ds-forest: var(--strong-bg);
+  --ds-forest-hover: var(--strong-bg);
+  --ds-green: var(--ok);
+  --ds-green-soft: var(--ok-soft);
+  --ds-red: var(--red);
+  --ds-red-soft: var(--red-soft);
+}
+
+/* The dialog surface. Background and colour come through the remapped
+   --ds-surface / --ds-ink above (globals sets those with !important, so they
+   must be re-pointed rather than overridden); the radius is a hard 20px there,
+   hence the !important to bring it up to the design's card radius. */
+.staad-ui.ds-dialog {
+  --ds-surface: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 32px !important;
+  font-family: var(--font-text);
+  overflow: hidden;
+}
+.staad-ui.ds-dialog .ds-title,
+.staad-ui .ds-dialog .ds-title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.24px;
+  color: var(--ink);
+}
+
+/* buttons inside dialogs adopt the pill shape and the strong/ghost pairing */
+.staad-ui .ds-btn {
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-family: var(--font-text);
+  font-size: 13px;
+  font-weight: 700;
+  transition: transform .2s, background .2s, border-color .2s, color .2s;
+}
+.staad-ui .ds-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.staad-ui .ds-btn-clay,
+.staad-ui .ds-btn-primary {
+  background: var(--strong-bg);
+  color: var(--strong-fg);
+}
+.staad-ui .ds-btn-ghost,
+.staad-ui .ds-btn-outline {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink);
+}
+.staad-ui .ds-btn-ghost:hover:not(:disabled),
+.staad-ui .ds-btn-outline:hover:not(:disabled) {
+  border-color: var(--line-2);
+}
+.staad-ui .ds-btn-sm {
+  height: 38px;
+  padding: 0 16px;
+  font-size: 12.5px;
+}
+.staad-ui .ds-btn:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* inputs match the pill fields used on Profile */
+.staad-ui .ds-input {
+  height: 48px;
+  padding: 0 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.staad-ui textarea.ds-input {
+  height: auto;
+  min-height: 104px;
+  padding: 14px 18px;
+  border-radius: 24px;
+  line-height: 20px;
+}
+.staad-ui .ds-input:focus {
+  border-color: var(--line-2);
+  background: var(--surface-2);
+  box-shadow: none;
+}
+.staad-ui .ds-input::placeholder {
+  color: var(--muted);
+  font-weight: 500;
+}
+.staad-ui .ds-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.staad-ui .ds-icon-btn {
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.staad-ui .ds-icon-btn:hover:not(:disabled) {
+  background: var(--strong-bg);
+  color: var(--strong-fg);
+  border-color: transparent;
+}
+.staad-ui .ds-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: none;
+}
+
+/* the slide-over (session notes) */
+.staad-ui.animate-fade-in {
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: var(--font-text);
+  border-left: 1px solid var(--line);
+}
+
+/* Brand mark. The artboard put a generic glyph on a lime disc; the real STAAD
+   emblem carries its own teal, which would go muddy on lime — so the disc
+   becomes a neutral surface and the emblem keeps its brand colour. */
+.staad-ui .sb-mark--logo {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.staad-ui .sb-mark--logo img {
+  width: 30px;
+  height: 30px;
+  display: block;
+  object-fit: contain;
+}
+.staad-ui .sb-brand {
+  text-decoration: none;
+  border-radius: 999px;
+}
+.staad-ui .sb-brand:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* A plain unstyled button that still lines up with the design's link pills. */
+.staad-ui .as-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}

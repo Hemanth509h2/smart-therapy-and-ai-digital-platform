@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="220" viewBox="0 0 420 220">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFD95A"/>
+      <stop offset="0.5" stop-color="#F7B51B"/>
+      <stop offset="1" stop-color="#E89A00"/>
+    </linearGradient>
+    <linearGradient id="gold2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFF1A8"/>
+      <stop offset="1" stop-color="#F6B51D"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#C88600" flood-opacity=".20"/>
+    </filter>
+  </defs>
+
+  <!-- Left laurel -->
+  <g fill="none" stroke="url(#gold)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M84 174 C50 157 43 122 58 84 C66 63 78 48 93 37"/>
+    <path d="M61 146 C48 144 36 138 27 127"/>
+    <path d="M55 125 C42 120 31 111 25 99"/>
+    <path d="M55 104 C45 96 39 86 37 73"/>
+    <path d="M65 83 C59 71 59 59 63 48"/>
+    <path d="M77 62 C75 50 79 39 86 29"/>
+    <path d="M73 157 C61 154 50 157 43 164"/>
+    <path d="M61 135 C51 133 42 136 35 142"/>
+  </g>
+
+  <!-- Right laurel -->
+  <g fill="none" stroke="url(#gold)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M336 174 C370 157 377 122 362 84 C354 63 342 48 327 37"/>
+    <path d="M359 146 C372 144 384 138 393 127"/>
+    <path d="M365 125 C378 120 389 111 395 99"/>
+    <path d="M365 104 C375 96 381 86 383 73"/>
+    <path d="M355 83 C361 71 361 59 357 48"/>
+    <path d="M343 62 C345 50 341 39 334 29"/>
+    <path d="M347 157 C359 154 370 157 377 164"/>
+    <path d="M359 135 C369 133 378 136 385 142"/>
+  </g>
+
+  <!-- Badge medallion -->
+  <g filter="url(#shadow)">
+    <circle cx="210" cy="103" r="66" fill="#FFF9E7" stroke="#F4C33D" stroke-width="4"/>
+    <circle cx="210" cy="103" r="55" fill="url(#gold2)" stroke="#E6A20A" stroke-width="3"/>
+    <circle cx="210" cy="103" r="43" fill="url(#gold)" stroke="#FFF0A0" stroke-width="3"/>
+
+    <!-- Star -->
+    <path d="M210 70
+             L218 91
+             L241 92
+             L223 106
+             L229 129
+             L210 116
+             L191 129
+             L197 106
+             L179 92
+             L202 91 Z"
+          fill="#FFF8D2" stroke="#D98C00" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="210" cy="103" r="4" fill="#F1B51B"/>
+  </g>
+
+  <!-- Small sparkle accents -->
+  <g fill="#F4B51B">
+    <path d="M128 38 l4 10 10 4-10 4-4 10-4-10-10-4 10-4z"/>
+    <path d="M292 38 l3 8 8 3-8 3-3 8-3-8-8-3 8-3z"/>
+  </g>
+
+  <!-- Text -->
+  <text x="210" y="188" text-anchor="middle"
+        font-family="Inter, Arial, sans-serif" font-size="18" font-weight="800"
+        fill="#8A4D08">Achievement Unlocked!</text>
+  <text x="210" y="211" text-anchor="middle"
+        font-family="Inter, Arial, sans-serif" font-size="21" font-weight="800"
+        fill="#9A3F00">Focus Explorer</text>
+</svg>

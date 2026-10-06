@@ -1,0 +1,19 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="accuracyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#93C5FD"/>
+      <stop offset="100%" stop-color="#60A5FA"/>
+    </linearGradient>
+    <filter id="accuracyShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#60A5FA" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Circular badge -->
+  <circle cx="32" cy="32" r="26" fill="url(#accuracyGradient)" filter="url(#accuracyShadow)"/>
+
+  <!-- Target rings -->
+  <circle cx="32" cy="32" r="15" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+  <circle cx="32" cy="32" r="9" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+  <circle cx="32" cy="32" r="3" fill="#FFFFFF"/>
+</svg>

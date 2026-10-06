@@ -1,0 +1,35 @@
+--- Page 1 ---
+STAAD — Product Requirements Document
+ (Updated)
+ 
+Firebase SDK Configuration
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+const firebaseConfig = {
+  apiKey: "AIzaSyBwMuFR8DnpTVVqHD7TVjYVh50_e9FNaiE",
+  authDomain: "staad-edtech.firebaseapp.com",
+  databaseURL: "https://staad-edtech-default-rtdb.firebaseio.com",
+  projectId: "staad-edtech",
+  storageBucket: "staad-edtech.firebasestorage.app",
+  messagingSenderId: "951372940788",
+  appId: "1:951372940788:web:51ae0f6cef8e7df7db25a1"
+};
+const app = initializeApp(firebaseConfig);
+Firebase Services Used
+- Firebase Authentication
+- Firestore Database
+- Firebase Realtime Database
+- Firebase Cloud Messaging
+Recommended Firebase Architecture
+Firestore → live therapy sessions and module sync
+Realtime Database → presence and typing indicators
+Authentication → therapist/client login
+FCM → push notifications
+
+--- Page 2 ---
+Production Notes
+Use Firebase only where realtime synchronization is needed.
+Use Neon PostgreSQL for structured relational data.
+Use Cloudflare R2 for file storage.
+Use Daily.co for video conferencing.
+

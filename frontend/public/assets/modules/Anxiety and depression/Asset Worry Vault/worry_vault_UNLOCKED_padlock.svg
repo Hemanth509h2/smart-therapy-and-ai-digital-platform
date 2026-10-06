@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5ACB86"/>
+      <stop offset="1" stop-color="#159653"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ECFFF2"/>
+      <stop offset="1" stop-color="#A8E6BB"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-opacity=".15"/>
+    </filter>
+  </defs>
+
+  <!-- UNLOCKED padlock: shackle is clearly swung open to the RIGHT -->
+
+  <!-- Lock body -->
+  <rect x="48" y="104" width="160" height="116" rx="27"
+        fill="url(#body)" stroke="#20A35F" stroke-width="5" filter="url(#shadow)"/>
+
+  <rect x="64" y="119" width="128" height="88" rx="17"
+        fill="#DFFFF0" opacity=".75"/>
+
+  <!-- Open shackle, hinged on LEFT and swung outward -->
+  <path d="M82 112
+           V79
+           C82 51 103 30 130 30
+           C151 30 169 42 177 60
+           C183 73 182 88 177 101"
+        fill="none"
+        stroke="#0D7D4A"
+        stroke-width="24"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <path d="M82 112
+           V79
+           C82 51 103 30 130 30
+           C151 30 169 42 177 60
+           C183 73 182 88 177 101"
+        fill="none"
+        stroke="url(#green)"
+        stroke-width="16"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Visible gap between shackle end and lock body -->
+  <circle cx="177" cy="101" r="7" fill="#E8FFF0"/>
+
+  <!-- Keyhole -->
+  <circle cx="128" cy="151" r="15" fill="#168B52"/>
+  <path d="M120 159h16l-4 32h-8z" fill="#168B52"/>
+
+  <!-- Soft highlight -->
+  <path d="M73 132c0-5 4-9 9-9h43"
+        fill="none" stroke="#FFFFFF" stroke-width="6"
+        stroke-linecap="round" opacity=".75"/>
+
+  <!-- Small unlock sparkle -->
+  <path d="M211 45l3.5 9 9 3.5-9 3.5-3.5 9-3.5-9-9-3.5 9-3.5z"
+        fill="#D7C75D"/>
+</svg>

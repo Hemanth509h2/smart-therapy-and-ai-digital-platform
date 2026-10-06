@@ -1,0 +1,785 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1052" height="614" viewBox="0 0 1052 614">
+<rect width="100%" height="100%" fill="#FFFFFF"/>
+<symbol id="tile-A" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-A" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F7FFF8"/>
+      <stop offset="100%" stop-color="#E7F7E8"/>
+    </linearGradient>
+    <filter id="shadow-A" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#BFD8C1" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#BFD8C1" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-A)" stroke="#D0EAD2" stroke-width="2"
+        filter="url(#shadow-A)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0A6D2B">A</text>
+</symbol><symbol id="tile-B" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-B" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFDF6"/>
+      <stop offset="100%" stop-color="#FFF0BE"/>
+    </linearGradient>
+    <filter id="shadow-B" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#E2C36E" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#E2C36E" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-B)" stroke="#F1D58A" stroke-width="2"
+        filter="url(#shadow-B)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#9A6700">B</text>
+</symbol><symbol id="tile-C" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-C" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F8FBFF"/>
+      <stop offset="100%" stop-color="#E6EEFF"/>
+    </linearGradient>
+    <filter id="shadow-C" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#B8C9E8" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#B8C9E8" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-C)" stroke="#CBD9F3" stroke-width="2"
+        filter="url(#shadow-C)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0F397A">C</text>
+</symbol><symbol id="tile-D" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-D" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F7FFF8"/>
+      <stop offset="100%" stop-color="#E7F7E8"/>
+    </linearGradient>
+    <filter id="shadow-D" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#BFD8C1" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#BFD8C1" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-D)" stroke="#D0EAD2" stroke-width="2"
+        filter="url(#shadow-D)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0A6D2B">D</text>
+</symbol><symbol id="tile-E" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-E" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFDF6"/>
+      <stop offset="100%" stop-color="#FFF0BE"/>
+    </linearGradient>
+    <filter id="shadow-E" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#E2C36E" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#E2C36E" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-E)" stroke="#F1D58A" stroke-width="2"
+        filter="url(#shadow-E)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#9A6700">E</text>
+</symbol><symbol id="tile-F" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-F" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F8FBFF"/>
+      <stop offset="100%" stop-color="#E6EEFF"/>
+    </linearGradient>
+    <filter id="shadow-F" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#B8C9E8" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#B8C9E8" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-F)" stroke="#CBD9F3" stroke-width="2"
+        filter="url(#shadow-F)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0F397A">F</text>
+</symbol><symbol id="tile-G" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-G" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F7FFF8"/>
+      <stop offset="100%" stop-color="#E7F7E8"/>
+    </linearGradient>
+    <filter id="shadow-G" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#BFD8C1" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#BFD8C1" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-G)" stroke="#D0EAD2" stroke-width="2"
+        filter="url(#shadow-G)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0A6D2B">G</text>
+</symbol><symbol id="tile-H" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-H" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFDF6"/>
+      <stop offset="100%" stop-color="#FFF0BE"/>
+    </linearGradient>
+    <filter id="shadow-H" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#E2C36E" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#E2C36E" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-H)" stroke="#F1D58A" stroke-width="2"
+        filter="url(#shadow-H)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#9A6700">H</text>
+</symbol><symbol id="tile-I" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-I" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F8FBFF"/>
+      <stop offset="100%" stop-color="#E6EEFF"/>
+    </linearGradient>
+    <filter id="shadow-I" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#B8C9E8" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#B8C9E8" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-I)" stroke="#CBD9F3" stroke-width="2"
+        filter="url(#shadow-I)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0F397A">I</text>
+</symbol><symbol id="tile-J" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-J" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F7FFF8"/>
+      <stop offset="100%" stop-color="#E7F7E8"/>
+    </linearGradient>
+    <filter id="shadow-J" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#BFD8C1" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#BFD8C1" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-J)" stroke="#D0EAD2" stroke-width="2"
+        filter="url(#shadow-J)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0A6D2B">J</text>
+</symbol><symbol id="tile-K" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-K" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFDF6"/>
+      <stop offset="100%" stop-color="#FFF0BE"/>
+    </linearGradient>
+    <filter id="shadow-K" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#E2C36E" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#E2C36E" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-K)" stroke="#F1D58A" stroke-width="2"
+        filter="url(#shadow-K)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#9A6700">K</text>
+</symbol><symbol id="tile-L" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-L" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F8FBFF"/>
+      <stop offset="100%" stop-color="#E6EEFF"/>
+    </linearGradient>
+    <filter id="shadow-L" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#B8C9E8" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#B8C9E8" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-L)" stroke="#CBD9F3" stroke-width="2"
+        filter="url(#shadow-L)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0F397A">L</text>
+</symbol><symbol id="tile-M" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-M" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F7FFF8"/>
+      <stop offset="100%" stop-color="#E7F7E8"/>
+    </linearGradient>
+    <filter id="shadow-M" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#BFD8C1" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#BFD8C1" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-M)" stroke="#D0EAD2" stroke-width="2"
+        filter="url(#shadow-M)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0A6D2B">M</text>
+</symbol><symbol id="tile-N" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-N" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFDF6"/>
+      <stop offset="100%" stop-color="#FFF0BE"/>
+    </linearGradient>
+    <filter id="shadow-N" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#E2C36E" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#E2C36E" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-N)" stroke="#F1D58A" stroke-width="2"
+        filter="url(#shadow-N)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#9A6700">N</text>
+</symbol><symbol id="tile-O" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-O" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F8FBFF"/>
+      <stop offset="100%" stop-color="#E6EEFF"/>
+    </linearGradient>
+    <filter id="shadow-O" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#B8C9E8" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#B8C9E8" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-O)" stroke="#CBD9F3" stroke-width="2"
+        filter="url(#shadow-O)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0F397A">O</text>
+</symbol><symbol id="tile-P" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-P" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F7FFF8"/>
+      <stop offset="100%" stop-color="#E7F7E8"/>
+    </linearGradient>
+    <filter id="shadow-P" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#BFD8C1" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#BFD8C1" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-P)" stroke="#D0EAD2" stroke-width="2"
+        filter="url(#shadow-P)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0A6D2B">P</text>
+</symbol><symbol id="tile-Q" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-Q" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFDF6"/>
+      <stop offset="100%" stop-color="#FFF0BE"/>
+    </linearGradient>
+    <filter id="shadow-Q" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#E2C36E" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#E2C36E" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-Q)" stroke="#F1D58A" stroke-width="2"
+        filter="url(#shadow-Q)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#9A6700">Q</text>
+</symbol><symbol id="tile-R" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-R" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F8FBFF"/>
+      <stop offset="100%" stop-color="#E6EEFF"/>
+    </linearGradient>
+    <filter id="shadow-R" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#B8C9E8" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#B8C9E8" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-R)" stroke="#CBD9F3" stroke-width="2"
+        filter="url(#shadow-R)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0F397A">R</text>
+</symbol><symbol id="tile-S" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-S" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F7FFF8"/>
+      <stop offset="100%" stop-color="#E7F7E8"/>
+    </linearGradient>
+    <filter id="shadow-S" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#BFD8C1" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#BFD8C1" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-S)" stroke="#D0EAD2" stroke-width="2"
+        filter="url(#shadow-S)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0A6D2B">S</text>
+</symbol><symbol id="tile-T" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-T" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFDF6"/>
+      <stop offset="100%" stop-color="#FFF0BE"/>
+    </linearGradient>
+    <filter id="shadow-T" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#E2C36E" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#E2C36E" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-T)" stroke="#F1D58A" stroke-width="2"
+        filter="url(#shadow-T)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#9A6700">T</text>
+</symbol><symbol id="tile-U" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-U" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F8FBFF"/>
+      <stop offset="100%" stop-color="#E6EEFF"/>
+    </linearGradient>
+    <filter id="shadow-U" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#B8C9E8" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#B8C9E8" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-U)" stroke="#CBD9F3" stroke-width="2"
+        filter="url(#shadow-U)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0F397A">U</text>
+</symbol><symbol id="tile-V" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-V" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F7FFF8"/>
+      <stop offset="100%" stop-color="#E7F7E8"/>
+    </linearGradient>
+    <filter id="shadow-V" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#BFD8C1" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#BFD8C1" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-V)" stroke="#D0EAD2" stroke-width="2"
+        filter="url(#shadow-V)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0A6D2B">V</text>
+</symbol><symbol id="tile-W" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-W" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFDF6"/>
+      <stop offset="100%" stop-color="#FFF0BE"/>
+    </linearGradient>
+    <filter id="shadow-W" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#E2C36E" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#E2C36E" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-W)" stroke="#F1D58A" stroke-width="2"
+        filter="url(#shadow-W)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#9A6700">W</text>
+</symbol><symbol id="tile-X" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-X" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F8FBFF"/>
+      <stop offset="100%" stop-color="#E6EEFF"/>
+    </linearGradient>
+    <filter id="shadow-X" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#B8C9E8" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#B8C9E8" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-X)" stroke="#CBD9F3" stroke-width="2"
+        filter="url(#shadow-X)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0F397A">X</text>
+</symbol><symbol id="tile-Y" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-Y" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F7FFF8"/>
+      <stop offset="100%" stop-color="#E7F7E8"/>
+    </linearGradient>
+    <filter id="shadow-Y" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#BFD8C1" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#BFD8C1" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-Y)" stroke="#D0EAD2" stroke-width="2"
+        filter="url(#shadow-Y)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#0A6D2B">Y</text>
+</symbol><symbol id="tile-Z" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg-Z" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFDF6"/>
+      <stop offset="100%" stop-color="#FFF0BE"/>
+    </linearGradient>
+    <filter id="shadow-Z" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="3.2" flood-color="#98A2B3" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="1.2" flood-color="#E2C36E" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- lower lip / depth -->
+  <rect x="18" y="24" width="92" height="90" rx="18" fill="#E2C36E" opacity="0.55"/>
+
+  <!-- tile face -->
+  <rect x="18" y="17" width="92" height="90" rx="18"
+        fill="url(#bg-Z)" stroke="#F1D58A" stroke-width="2"
+        filter="url(#shadow-Z)"/>
+
+  <!-- soft inner highlight -->
+  <rect x="22" y="21" width="84" height="82" rx="15"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="2"/>
+
+  <text x="64" y="76"
+        text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="58"
+        font-weight="700"
+        fill="#9A6700">Z</text>
+</symbol>
+<use href="#tile-A" x="24" y="24" width="128" height="128"/><use href="#tile-B" x="170" y="24" width="128" height="128"/><use href="#tile-C" x="316" y="24" width="128" height="128"/><use href="#tile-D" x="462" y="24" width="128" height="128"/><use href="#tile-E" x="608" y="24" width="128" height="128"/><use href="#tile-F" x="754" y="24" width="128" height="128"/><use href="#tile-G" x="900" y="24" width="128" height="128"/><use href="#tile-H" x="24" y="170" width="128" height="128"/><use href="#tile-I" x="170" y="170" width="128" height="128"/><use href="#tile-J" x="316" y="170" width="128" height="128"/><use href="#tile-K" x="462" y="170" width="128" height="128"/><use href="#tile-L" x="608" y="170" width="128" height="128"/><use href="#tile-M" x="754" y="170" width="128" height="128"/><use href="#tile-N" x="900" y="170" width="128" height="128"/><use href="#tile-O" x="24" y="316" width="128" height="128"/><use href="#tile-P" x="170" y="316" width="128" height="128"/><use href="#tile-Q" x="316" y="316" width="128" height="128"/><use href="#tile-R" x="462" y="316" width="128" height="128"/><use href="#tile-S" x="608" y="316" width="128" height="128"/><use href="#tile-T" x="754" y="316" width="128" height="128"/><use href="#tile-U" x="900" y="316" width="128" height="128"/><use href="#tile-V" x="24" y="462" width="128" height="128"/><use href="#tile-W" x="170" y="462" width="128" height="128"/><use href="#tile-X" x="316" y="462" width="128" height="128"/><use href="#tile-Y" x="462" y="462" width="128" height="128"/><use href="#tile-Z" x="608" y="462" width="128" height="128"/>
+</svg>

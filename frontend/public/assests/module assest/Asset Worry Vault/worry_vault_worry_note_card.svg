@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 430">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F5FBF7"/>
+    </linearGradient>
+    <linearGradient id="header" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#E7F8ED"/>
+      <stop offset="100%" stop-color="#D7F2E1"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="9" flood-opacity=".13"/>
+    </filter>
+  </defs>
+
+  <!-- Worry-note card: clean editable note dropped into the Worry Vault -->
+  <g filter="url(#shadow)">
+    <rect x="55" y="35" width="610" height="360" rx="26"
+          fill="url(#paper)" stroke="#B8DCC5" stroke-width="3"/>
+
+    <!-- note header -->
+    <rect x="55" y="35" width="610" height="76" rx="26" fill="url(#header)"/>
+    <rect x="55" y="84" width="610" height="27" fill="url(#header)"/>
+
+    <!-- small vault/lock indicator -->
+    <circle cx="99" cy="73" r="25" fill="#FFFFFF" stroke="#35A96A" stroke-width="3"/>
+    <path d="M91 72v-7c0-5 3.5-9 8-9s8 4 8 9v7"
+          fill="none" stroke="#168B52" stroke-width="5" stroke-linecap="round"/>
+    <rect x="87" y="70" width="24" height="22" rx="5" fill="#35B66D"/>
+    <circle cx="99" cy="80" r="3" fill="#FFFFFF"/>
+    <path d="M99 82v5" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- title -->
+    <text x="140" y="68" font-family="Arial, sans-serif" font-size="25"
+          font-weight="700" fill="#17252A">Worry Note</text>
+    <text x="140" y="92" font-family="Arial, sans-serif" font-size="15"
+          fill="#6B7E76">A thought to lock away for later</text>
+
+    <!-- editable note area -->
+    <rect x="87" y="135" width="546" height="185" rx="18"
+          fill="#FFFFFF" stroke="#C8DDD0" stroke-width="2"/>
+
+    <!-- editable text placeholder -->
+    <text x="113" y="174" font-family="Arial, sans-serif" font-size="20"
+          fill="#8B9B95">What's on your mind?</text>
+    <path d="M113 194H607" stroke="#E3ECE7" stroke-width="2"/>
+
+    <text x="113" y="233" font-family="Arial, sans-serif" font-size="17"
+          fill="#A0ADA8">Write your worry here...</text>
+    <text x="113" y="264" font-family="Arial, sans-serif" font-size="17"
+          fill="#A0ADA8">You can come back to it later.</text>
+
+    <!-- writing/edit icon -->
+    <path d="M570 272l27-27 12 12-27 27-16 4z"
+          fill="none" stroke="#35A96A" stroke-width="4"
+          stroke-linejoin="round"/>
+    <path d="M591 245l12 12" stroke="#35A96A" stroke-width="4"/>
+
+    <!-- bottom status -->
+    <circle cx="104" cy="354" r="9" fill="#35B66D"/>
+    <path d="M100 354l3 3 6-7" fill="none" stroke="#FFFFFF"
+          stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="125" y="360" font-family="Arial, sans-serif" font-size="16"
+          fill="#5D7168">Ready to lock in the vault</text>
+
+    <!-- small decorative sparkle -->
+    <path d="M605 52l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"
+          fill="#D8C96B"/>
+  </g>
+</svg>

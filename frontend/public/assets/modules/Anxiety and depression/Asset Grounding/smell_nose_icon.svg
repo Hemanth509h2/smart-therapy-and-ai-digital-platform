@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 220" width="180" height="220">
+  <title>Smell Sense Nose Icon</title>
+  <desc>Vector recreation of the coral nose icon from the provided grounding exercise reference.</desc>
+
+  <!-- Nose silhouette -->
+  <path
+    d="M90 20
+       C72 20 61 31 59 48
+       L52 104
+       C50 117 44 127 34 134
+       C24 141 20 153 22 166
+       C24 180 34 190 48 193
+       C58 195 67 191 75 185
+       C82 194 98 194 105 185
+       C113 191 122 195 132 193
+       C146 190 156 180 158 166
+       C160 153 156 141 146 134
+       C136 127 130 117 128 104
+       L121 48
+       C119 31 108 20 90 20 Z"
+    fill="#FF8F88"
+    stroke="#F44336"
+    stroke-width="7"
+    stroke-linejoin="round"
+  />
+
+  <!-- Left nostril -->
+  <path
+    d="M36 163
+       C39 151 48 147 58 151
+       C64 154 68 160 68 167
+       C64 174 56 178 48 176
+       C41 174 37 169 36 163 Z"
+    fill="#F44336"
+  />
+
+  <!-- Right nostril -->
+  <path
+    d="M144 163
+       C141 151 132 147 122 151
+       C116 154 112 160 112 167
+       C116 174 124 178 132 176
+       C139 174 143 169 144 163 Z"
+    fill="#F44336"
+  />
+
+  <!-- Small center nose curve -->
+  <path
+    d="M68 167
+       C73 178 81 184 90 184
+       C99 184 107 178 112 167"
+    fill="none"
+    stroke="#F44336"
+    stroke-width="7"
+    stroke-linecap="round"
+  />
+</svg>

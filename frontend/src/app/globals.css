@@ -1,0 +1,521 @@
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=DM+Serif+Display:ital@0;1&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Warm cream background with a calming Sage Green accent */
+  --background: 40 38% 96%;
+  --foreground: 36 18% 16%;
+
+  /* Warm cream page with a subtle repeating dot texture (28px grid).
+     Used directly as `background: var(--page-bg)` on full-page containers. */
+  --page-bg:
+    radial-gradient(rgba(196, 168, 130, 0.18) 1px, transparent 1px) 0 0 / 28px 28px,
+    #F5EFE4;
+
+  --card: 42 56% 99%;
+  --card-foreground: 36 18% 16%;
+
+  --popover: 42 56% 99%;
+  --popover-foreground: 36 18% 16%;
+
+  /* Primary accent #8B6340 ≈ hsl(28 37% 40%) */
+  --primary: 28 37% 40%;
+  --primary-foreground: 40 30% 98%;
+
+  --secondary: 40 30% 90%;
+  --secondary-foreground: 36 20% 28%;
+
+  --muted: 40 25% 92%;
+  --muted-foreground: 36 12% 45%;
+
+  --accent: 40 30% 88%;
+  --accent-foreground: 36 22% 24%;
+
+  --destructive: 0 72% 55%;
+  --destructive-foreground: 40 30% 98%;
+
+  /* Borders #D4C4A8 ≈ hsl(38 34% 75%) */
+  --border: 38 34% 75%;
+  --input: 38 34% 75%;
+  --ring: 28 37% 40%;
+
+  --radius: 14px;
+
+  /* Glass / surface tokens (warm creamy) */
+  --glass-bg: rgba(255, 251, 244, 0.75);
+  --glass-border: #D4C4A8;
+  --glass-strong: rgba(255, 251, 244, 0.92);
+  --nav-bg: rgba(245, 239, 228, 0.7);
+  --ink: #2C1F0E;
+  --ink-muted: #8B7355;
+  --ink-faint: rgba(139, 115, 85, 0.4);
+  --glass-shadow: 0 1px 3px rgba(139, 99, 64, 0.07), 0 6px 18px rgba(139, 99, 64, 0.06);
+  --glass-shadow-lg: 0 10px 24px rgba(139, 99, 64, 0.14);
+  /* `--sage` = primary accent #8B6340 (variable name kept for compatibility) */
+  --sage: #8B6340;
+  --sage-light: #F0E8D8;
+  --sage-mid: #A87A4F;
+  /* `--c-accent` = secondary accent #C4784A (highlights, tags, live dot) */
+  --c-accent: #C4784A;
+  --c-accent-bg: rgba(196, 120, 74, 0.14);
+  --accent: #C4784A;
+  --accent-bg: rgba(196, 120, 74, 0.14);
+}
+
+.dark {
+  --background: 120 10% 10%;
+  --foreground: 120 10% 95%;
+  --page-bg:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E") repeat,
+    radial-gradient(135% 110% at 50% 0%, #1a2a25 0%, #14211d 60%, #101b18 100%);
+
+  --card: 120 10% 13%;
+  --card-foreground: 120 10% 95%;
+
+  --popover: 120 10% 13%;
+  --popover-foreground: 120 10% 95%;
+
+  --primary: 120 15% 45%;
+  --primary-foreground: 120 10% 10%;
+
+  --secondary: 120 10% 20%;
+  --secondary-foreground: 120 10% 90%;
+
+  --muted: 120 10% 18%;
+  --muted-foreground: 120 10% 65%;
+
+  --accent: 120 10% 22%;
+  --accent-foreground: 120 10% 90%;
+
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 120 10% 95%;
+
+  --border: 120 10% 20%;
+  --input: 120 10% 20%;
+  --ring: 120 15% 45%;
+
+  /* Dark mode glass */
+  --glass-bg: rgba(26, 40, 36, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-strong: rgba(18, 28, 25, 0.92);
+  --ink: #ffffff;
+  --ink-muted: rgba(255, 255, 255, 0.5);
+  --ink-faint: rgba(255, 255, 255, 0.18);
+  --glass-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --glass-shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.4);
+  --nav-bg: rgba(18, 28, 25, 0.92);
+
+  /* Keep dark mode's existing warm accents (don't inherit the light values) */
+  --sage: #9c7d59;
+  --sage-light: rgba(156, 125, 89, 0.08);
+  --sage-mid: #b39873;
+  --c-accent: #d6814f;
+  --c-accent-bg: rgba(214, 129, 79, 0.18);
+}
+
+* {
+  @apply border-border;
+}
+
+body {
+  @apply antialiased;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--page-bg);
+  color: hsl(var(--foreground));
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'DM Serif Display', serif;
+}
+
+/* Custom Scrollbars to be subtle */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 150, 120, 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 150, 120, 0.5);
+}
+
+/* Select dropdown z-index fix.
+   This project uses Base UI (not Radix), so the popup is the [data-slot]
+   element below — the old [data-radix-popper-content-wrapper] selector never
+   matched and dropdowns rendered under the Dialog backdrop (z-50), making their
+   options unclickable. The z-index is set on the Positioner in select.tsx; this
+   rule is a CSS safety net for both the select and dialog popups. */
+[data-slot="select-content"] {
+  z-index: 9999 !important;
+}
+
+/* Session Room Animations */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@keyframes floatUp {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-120px) scale(1.4); }
+}
+
+.animate-pulse-slow {
+  animation: pulse 1.4s ease infinite;
+}
+
+.animate-float-up {
+  animation: floatUp 1.8s ease forwards;
+}
+
+@keyframes toastInOut {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ── Tasteful entrance + hover motion ───────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+.animate-fade-up { animation: fadeUp 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+.animate-fade-in { animation: fadeIn 0.55s ease both; }
+.animate-scale-in { animation: scaleIn 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+
+/* Stagger helpers for lists/grids */
+.stagger-1 { animation-delay: 0.06s; }
+.stagger-2 { animation-delay: 0.12s; }
+.stagger-3 { animation-delay: 0.18s; }
+.stagger-4 { animation-delay: 0.24s; }
+
+/* Gentle lift on interactive surfaces */
+.hover-lift {
+  transition: transform 0.25s cubic-bezier(0.22, 0.61, 0.36, 1),
+              box-shadow 0.25s ease;
+  will-change: transform;
+}
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--glass-shadow-lg);
+}
+
+/* Soft floating background blobs (decorative, behind content) */
+@keyframes blobFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(3%, -4%) scale(1.08); }
+  66%      { transform: translate(-3%, 3%) scale(0.94); }
+}
+
+.blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(70px);
+  will-change: transform;
+}
+.animate-blob { animation: blobFloat 22s ease-in-out infinite; }
+
+/* Button press feedback */
+.btn-press { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.btn-press:hover { transform: translateY(-1px); }
+.btn-press:active { transform: scale(0.97); }
+
+/* Stat card hover — gentle lift + soft warm shadow */
+.stat-hover { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+.stat-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(139, 99, 64, 0.14);
+}
+
+/* ── Practice design system (therapist dashboard pages) ─────────────
+   Tokens + a handful of component classes shared by the redesigned
+   Dashboard / Clients / Sessions / Schedule / Modules / Plans / Profile /
+   Help pages. Light values first; `.dark` swaps them. */
+:root {
+  --ds-bg: #F6F2EA;
+  --ds-surface: #FFFFFF;
+  --ds-surface-2: #FAF7F1;
+  --ds-border: #EAE2D5;
+  --ds-border-strong: #DCD0BD;
+  --ds-ink: #1C2A25;
+  --ds-muted: #66706B;
+  --ds-faint: #9AA19D;
+  --ds-forest: #1F4136;
+  --ds-forest-hover: #16332A;
+  --ds-forest-soft: #E4EEE8;
+  --ds-side: #1D3B31;
+  --ds-side-ink: #E8EFEA;
+  --ds-side-muted: rgba(232, 239, 234, 0.74);
+  --ds-side-active: rgba(255, 255, 255, 0.11);
+  --ds-side-border: rgba(255, 255, 255, 0.09);
+  --ds-clay: #B07B4F;
+  --ds-clay-hover: #986640;
+  --ds-clay-soft: #F5E9DD;
+  --ds-clay-ink: #8A5A33;
+  --ds-green: #2E7D57;
+  --ds-green-soft: #E3F1E8;
+  --ds-amber: #B9800F;
+  --ds-amber-soft: #FBF0DA;
+  --ds-red: #C8473A;
+  --ds-red-soft: #FBE8E4;
+  --ds-blue: #3B6BA5;
+  --ds-blue-soft: #E7EEF8;
+  --ds-violet: #6E55A8;
+  --ds-violet-soft: #EFEAF8;
+  --ds-shadow: 0 1px 2px rgba(60, 40, 20, 0.04), 0 6px 18px rgba(60, 40, 20, 0.05);
+  --ds-shadow-lg: 0 14px 34px rgba(60, 40, 20, 0.14);
+}
+
+.dark {
+  --ds-bg: #101916;
+  --ds-surface: #17231F;
+  --ds-surface-2: #1C2A25;
+  --ds-border: #26352F;
+  --ds-border-strong: #34473F;
+  --ds-ink: #EEF2EF;
+  --ds-muted: #A3AFA9;
+  --ds-faint: #6F7C76;
+  --ds-forest: #3D7A63;
+  --ds-forest-hover: #4A8B73;
+  --ds-forest-soft: rgba(61, 122, 99, 0.2);
+  --ds-side: #0C1512;
+  --ds-clay: #C08A5C;
+  --ds-clay-hover: #CF9B6D;
+  --ds-clay-soft: rgba(192, 138, 92, 0.16);
+  --ds-clay-ink: #E2B68E;
+  --ds-green: #62C08F;
+  --ds-green-soft: rgba(98, 192, 143, 0.14);
+  --ds-amber: #E6B455;
+  --ds-amber-soft: rgba(230, 180, 85, 0.14);
+  --ds-red: #F08272;
+  --ds-red-soft: rgba(240, 130, 114, 0.14);
+  --ds-blue: #8DB2E6;
+  --ds-blue-soft: rgba(141, 178, 230, 0.14);
+  --ds-violet: #B9A2EC;
+  --ds-violet-soft: rgba(185, 162, 236, 0.14);
+  --ds-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.22);
+  --ds-shadow-lg: 0 14px 34px rgba(0, 0, 0, 0.45);
+}
+
+.ds-page { background: var(--ds-bg); color: var(--ds-ink); }
+.ds-title { font-family: 'DM Serif Display', serif; color: var(--ds-ink); letter-spacing: -0.01em; }
+.ds-muted { color: var(--ds-muted); }
+.ds-faint { color: var(--ds-faint); }
+
+.ds-card {
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: 18px;
+  box-shadow: var(--ds-shadow);
+}
+.ds-card-hover { transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease; }
+.ds-card-hover:hover { box-shadow: var(--ds-shadow-lg); border-color: var(--ds-border-strong); }
+
+.ds-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  padding: 0.62rem 1.05rem;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+.ds-btn:active:not(:disabled) { transform: scale(0.98); }
+.ds-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.ds-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+.ds-btn-sm { padding: 0.45rem 0.8rem; font-size: 12.5px; border-radius: 10px; }
+.ds-btn-lg { padding: 0.8rem 1.3rem; font-size: 14.5px; }
+.ds-btn-primary { background: var(--ds-forest); color: #fff; }
+.ds-btn-primary:hover:not(:disabled) { background: var(--ds-forest-hover); }
+.ds-btn-clay { background: var(--ds-clay); color: #fff; box-shadow: 0 4px 12px rgba(176, 123, 79, 0.22); }
+.ds-btn-clay:hover:not(:disabled) { background: var(--ds-clay-hover); }
+.ds-btn-outline { background: var(--ds-surface); color: var(--ds-ink); border-color: var(--ds-border-strong); }
+.ds-btn-outline:hover:not(:disabled) { background: var(--ds-surface-2); border-color: var(--ds-clay); }
+.ds-btn-clay-outline { background: var(--ds-surface); color: var(--ds-ink); border-color: var(--ds-clay); }
+.ds-btn-clay-outline:hover:not(:disabled) { background: var(--ds-clay-soft); }
+.ds-btn-ghost { background: transparent; color: var(--ds-muted); }
+.ds-btn-ghost:hover:not(:disabled) { background: var(--ds-surface-2); color: var(--ds-ink); }
+.ds-btn-danger { background: var(--ds-red); color: #fff; }
+.ds-btn-danger:hover:not(:disabled) { filter: brightness(0.93); }
+
+.ds-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: var(--ds-muted);
+  transition: background 0.15s, color 0.15s;
+}
+.ds-icon-btn:hover:not(:disabled) { background: var(--ds-surface-2); color: var(--ds-ink); }
+.ds-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.ds-input {
+  width: 100%;
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border-strong);
+  color: var(--ds-ink);
+  border-radius: 12px;
+  padding: 0.66rem 0.9rem;
+  font-size: 14px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ds-input::placeholder { color: var(--ds-faint); }
+.ds-input:focus { outline: none; border-color: var(--ds-clay); box-shadow: 0 0 0 3px var(--ds-clay-soft); }
+.ds-input:disabled, .ds-input[readonly] { background: var(--ds-surface-2); color: var(--ds-muted); }
+select.ds-input {
+  appearance: none;
+  padding-right: 2.4rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238B918E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  cursor: pointer;
+}
+.dark input[type='date'].ds-input, .dark input[type='time'].ds-input { color-scheme: dark; }
+.ds-label { display: block; margin-bottom: 0.4rem; font-size: 13px; font-weight: 600; color: var(--ds-ink); }
+
+.ds-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.18rem 0.62rem;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.ds-pill-tab {
+  border-radius: 999px;
+  border: 1px solid var(--ds-border-strong);
+  background: var(--ds-surface);
+  color: var(--ds-ink);
+  padding: 0.5rem 1.1rem;
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.ds-pill-tab:hover { border-color: var(--ds-clay); }
+.ds-pill-tab.is-active { background: var(--ds-clay); border-color: var(--ds-clay); color: #fff; }
+
+.ds-underline-tab {
+  position: relative;
+  padding: 0.5rem 0.1rem 0.7rem;
+  font-size: 14.5px;
+  color: var(--ds-muted);
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.ds-underline-tab:hover { color: var(--ds-ink); }
+.ds-underline-tab.is-active { color: var(--ds-ink); font-weight: 600; }
+.ds-underline-tab.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--ds-clay);
+}
+
+.ds-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 9px;
+  padding: 0.55rem 0.7rem;
+  font-size: 13.5px;
+  color: var(--ds-ink);
+  text-align: left;
+}
+.ds-menu-item:hover:not(:disabled) { background: var(--ds-surface-2); }
+.ds-menu-item:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.ds-side-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 14.5px;
+  color: var(--ds-side-muted);
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+.ds-side-link:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.ds-side-link.is-active { background: var(--ds-side-active); color: #fff; font-weight: 600; }
+
+.ds-dialog {
+  background: var(--ds-surface) !important;
+  color: var(--ds-ink) !important;
+  border: 1px solid var(--ds-border);
+  border-radius: 20px !important;
+  box-shadow: var(--ds-shadow-lg);
+}
+
+.ds-btn:focus-visible,
+.ds-icon-btn:focus-visible,
+.ds-pill-tab:focus-visible,
+.ds-underline-tab:focus-visible,
+.ds-menu-item:focus-visible,
+.ds-side-link:focus-visible {
+  outline: 2px solid var(--ds-clay);
+  outline-offset: 2px;
+}
+
+/* Pulsing dot for live session times */
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.35; transform: scale(0.8); }
+}
+.live-dot { animation: livePulse 2s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-fade-in,
+  .animate-scale-in,
+  .animate-pulse-slow,
+  .animate-float-up,
+  .animate-blob,
+  .live-dot {
+    animation: none !important;
+  }
+  .hover-lift,
+  .stat-hover,
+  .btn-press { transition: none; }
+  .hover-lift:hover,
+  .stat-hover:hover { transform: none; }
+}

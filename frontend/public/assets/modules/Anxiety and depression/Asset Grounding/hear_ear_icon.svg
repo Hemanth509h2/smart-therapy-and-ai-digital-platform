@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 200" width="160" height="200">
+  <title>Hear Sense Ear Icon</title>
+  <desc>Vector recreation of the purple ear icon from the provided grounding exercise reference.</desc>
+
+  <!-- Outer ear -->
+  <path
+    d="M77 184
+       C49 184 32 166 32 139
+       L32 76
+       C32 39 57 18 91 18
+       C126 18 145 43 145 76
+       C145 101 137 116 120 130
+       C109 139 105 151 104 164
+       C102 177 92 184 77 184 Z"
+    fill="#B36AF2"
+    stroke="#5B00D9"
+    stroke-width="7"
+    stroke-linejoin="round"
+  />
+
+  <!-- Upper inner ear contour -->
+  <path
+    d="M48 83
+       C48 54 67 38 91 38
+       C113 38 127 53 127 75
+       C127 88 122 98 114 106"
+    fill="none"
+    stroke="#5B00D9"
+    stroke-width="7"
+    stroke-linecap="round"
+  />
+
+  <!-- Inner ear / antihelix -->
+  <path
+    d="M73 79
+       C62 77 55 85 55 96
+       C55 105 62 111 70 111
+       C79 111 85 105 85 97
+       C85 89 80 83 73 79 Z
+       M70 111
+       C70 122 66 132 59 140"
+    fill="none"
+    stroke="#5B00D9"
+    stroke-width="7"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

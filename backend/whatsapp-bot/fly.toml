@@ -1,0 +1,22 @@
+app = "staad-relay"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  AUTH_DIR = "/data/auth_info"
+  LOG_LEVEL = "info"
+
+[[mounts]]
+  source = "staad_relay_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]

@@ -1,0 +1,99 @@
+{
+  "game": "Bubble Splash",
+  "tagline": "Pop sight words • Boost fluency",
+  "difficulty_levels": ["easy", "medium", "hard"],
+  "speed_settings": ["slow", "normal", "fast"],
+  "categories": [
+    {
+      "id": "sight",
+      "label": "Sight",
+      "icon": "eye",
+      "active": true,
+      "description": "The child identifies and taps common words that should be recognized instantly without sounding them out.",
+      "source": "extracted_from_screenshot",
+      "words": [
+        "see",
+        "the",
+        "is",
+        "he",
+        "and",
+        "like",
+        "do",
+        "we",
+        "to",
+        "me",
+        "go",
+        "can"
+      ]
+    },
+    {
+      "id": "phonics",
+      "label": "Phonics",
+      "icon": "headphones",
+      "active": false,
+      "description": "The child identifies and taps words based on the target letter sound or letter combination shown on the screen.",
+      "source": "sample_placeholder",
+      "note": "Not visible in source screenshot; structure includes a target sound plus matching word bubbles as an example.",
+      "sets": [
+        {
+          "target_sound": "sh",
+          "words": ["ship", "shop", "fish", "wish", "shell"]
+        },
+        {
+          "target_sound": "th",
+          "words": ["this", "that", "with", "bath", "think"]
+        },
+        {
+          "target_sound": "ch",
+          "words": ["chip", "chair", "much", "lunch", "beach"]
+        }
+      ]
+    },
+    {
+      "id": "rhymes",
+      "label": "Rhymes",
+      "icon": "music-note",
+      "active": false,
+      "description": "The child identifies and taps words that have the same ending sound as the target word.",
+      "source": "sample_placeholder",
+      "note": "Not visible in source screenshot; structure includes a target word plus its rhyming word family as an example.",
+      "sets": [
+        {
+          "target_word": "cat",
+          "rhymes": ["hat", "bat", "mat", "sat", "rat"]
+        },
+        {
+          "target_word": "log",
+          "rhymes": ["dog", "fog", "frog", "jog", "hog"]
+        },
+        {
+          "target_word": "sun",
+          "rhymes": ["fun", "run", "bun", "gun", "nun"]
+        }
+      ]
+    },
+    {
+      "id": "vocab",
+      "label": "Vocab",
+      "icon": "book",
+      "active": false,
+      "description": "The child identifies and taps words that match the given meaning, category, or concept.",
+      "source": "sample_placeholder",
+      "note": "Not visible in source screenshot; structure includes a prompt concept plus matching category words as an example.",
+      "sets": [
+        {
+          "concept": "animals",
+          "words": ["dog", "cat", "bird", "fish", "cow"]
+        },
+        {
+          "concept": "colors",
+          "words": ["red", "blue", "green", "yellow", "purple"]
+        },
+        {
+          "concept": "food",
+          "words": ["apple", "bread", "milk", "egg", "banana"]
+        }
+      ]
+    }
+  ]
+}

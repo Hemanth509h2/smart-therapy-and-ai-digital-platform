@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E9FFF0"/>
+      <stop offset="55%" stop-color="#BDEFCB"/>
+      <stop offset="100%" stop-color="#8BD9A5"/>
+    </linearGradient>
+    <linearGradient id="shackle" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#48B878"/>
+      <stop offset="100%" stop-color="#158A52"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="7" stdDeviation="7" flood-opacity=".16"/>
+    </filter>
+  </defs>
+
+  <!-- soft decorative glow -->
+  <circle cx="128" cy="128" r="112" fill="#F5FFF8"/>
+
+  <!-- shackle -->
+  <path d="M82 112V82C82 55 102 35 128 35s46 20 46 47v30"
+        fill="none" stroke="#0D7D4A" stroke-width="22" stroke-linecap="round"/>
+  <path d="M82 112V82C82 55 102 35 128 35s46 20 46 47v30"
+        fill="none" stroke="url(#shackle)" stroke-width="15" stroke-linecap="round"/>
+
+  <!-- lock body -->
+  <rect x="51" y="101" width="154" height="122" rx="25"
+        fill="url(#body)" stroke="#20A35F" stroke-width="5" filter="url(#shadow)"/>
+
+  <!-- inner face -->
+  <rect x="65" y="115" width="126" height="94" rx="17"
+        fill="#DFFFF0" opacity=".72"/>
+
+  <!-- keyhole -->
+  <circle cx="128" cy="151" r="14" fill="#168B52"/>
+  <path d="M121 159h14l-3.5 31h-7z" fill="#168B52"/>
+
+  <!-- highlight -->
+  <path d="M75 126c0-5 4-9 9-9h42" fill="none"
+        stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" opacity=".7"/>
+
+  <!-- small sparkle -->
+  <path d="M205 59l3 8 8 3-8 3-3 8-3-8-8-3 8-3z"
+        fill="#D8C96B" opacity=".9"/>
+</svg>

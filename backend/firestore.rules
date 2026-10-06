@@ -1,0 +1,163 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Staad Firestore security rules
+//
+// REPLACES a catch-all `match /{document=**} { allow read, write: if
+// request.auth != null; }` under which ANY authenticated account could read and
+// write EVERY document — every patient's transcript, attention score, consent
+// state and therapist notes.
+//
+// ── The entitlement model ───────────────────────────────────────────────────
+// Firestore does not know who is entitled to a session. That lives in Postgres
+// (`Session.therapistId -> ProfileTherapist.userId`, `Session.clientId ->
+// ProfileClient.userId`) and rules cannot query it.
+//
+// So entitlement is MIRRORED into Firestore as `liveSessions/{id}.allowedUids`,
+// written ONLY by the server through the Admin SDK (which bypasses rules) in
+// src/lib/session-provisioning.ts. Every session-scoped rule below authorises
+// against that one field.
+//
+// This is why clients may not create or delete `liveSessions`, and may never
+// modify `allowedUids`: if a client could write it, it would be self-issued
+// authorisation and the whole model would be circular.
+//
+// ── Roles ───────────────────────────────────────────────────────────────────
+// User roles also live in Postgres. They reach rules as a Firebase custom claim
+// (`request.auth.token.role`), minted server-side at profile creation and by
+// scripts/backfill-role-claims.mjs. A claim is only trustworthy because the
+// client cannot set it.
+//
+// NOTE: claims land in the ID token, so a user must refresh their token (a
+// re-login, or an hour's expiry) before a newly minted claim is visible.
+// ─────────────────────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function liveSessionData(sid) {
+      return get(/databases/$(database)/documents/liveSessions/$(sid)).data;
+    }
+
+    function liveSessionExists(sid) {
+      return exists(/databases/$(database)/documents/liveSessions/$(sid));
+    }
+
+    // The single authorisation predicate for everything session-scoped.
+    // Fails closed: no liveSessions doc, or no allowedUids on it, means no access.
+    function isSessionMember(sid) {
+      return signedIn()
+        && liveSessionExists(sid)
+        && liveSessionData(sid).keys().hasAny(['allowedUids'])
+        && request.auth.uid in liveSessionData(sid).allowedUids;
+    }
+
+    function hasRole(role) {
+      return signedIn() && request.auth.token.get('role', '') == role;
+    }
+
+    // ── liveSessions/{sessionId} ────────────────────────────────────────────
+    // Real-time room state: participants, active module, module state,
+    // whiteboard flags, reactions. Both participants read and write it
+    // constantly during a call.
+    //
+    // Provisioned server-side. A client that could create this document could
+    // mint its own `allowedUids` and thereby grant itself access to any
+    // session id it can guess.
+    match /liveSessions/{sessionId} {
+      allow get, list: if isSessionMember(sessionId);
+
+      allow create: if false;
+      allow delete: if false;
+
+      // Members may update room state, but never the entitlement itself.
+      allow update: if isSessionMember(sessionId)
+        && request.resource.data.allowedUids == resource.data.allowedUids;
+    }
+
+    // ── sessions/{sessionId} ────────────────────────────────────────────────
+    // The durable session record: aiConsent, transcript[], aiInsight,
+    // moduleEvents[], therapistNotes[].
+    //
+    // Authorised off the SAME allowedUids as the live room, so the two can
+    // never disagree. Also provisioned server-side; the client only updates.
+    match /sessions/{sessionId} {
+      allow get, list: if isSessionMember(sessionId);
+
+      allow create: if false;
+      allow delete: if false;
+
+      allow update: if isSessionMember(sessionId);
+
+      // ── rawSessionLog: the session diary ─────────────────────────────────
+      // Append-only time series of attention scores (and, once the deferred
+      // dual-write lands, transcript entries). Immutable by design: this is
+      // clinical observation data, so history must not be rewritten after the
+      // fact. Deletion is a server-side retention concern, not a client one.
+      match /rawSessionLog/{entryId} {
+        allow get, list: if isSessionMember(sessionId);
+
+        allow create: if isSessionMember(sessionId)
+          && request.resource.data.keys().hasOnly(['timestamp', 'type', 'value'])
+          && request.resource.data.keys().hasAll(['timestamp', 'type', 'value'])
+          && request.resource.data.type in ['attention', 'transcript']
+          && (
+               (request.resource.data.type == 'attention'
+                 && request.resource.data.value is int
+                 && request.resource.data.value >= 0
+                 && request.resource.data.value <= 100)
+               ||
+               (request.resource.data.type == 'transcript'
+                 && request.resource.data.value is string
+                 && request.resource.data.value.size() <= 10000)
+             );
+
+        allow update, delete: if false;
+      }
+    }
+
+    // ── moduleStates/{sessionId}_{moduleId} ─────────────────────────────────
+    // Shared per-module state. The session id is encoded in the document id,
+    // so authorisation derives from the prefix before the first underscore.
+    // Session ids are UUIDs (no underscores), so this split is unambiguous
+    // regardless of what the module id contains.
+    match /moduleStates/{stateId} {
+      allow get, list: if isSessionMember(stateId.split('_')[0]);
+      allow create, update: if isSessionMember(stateId.split('_')[0]);
+      allow delete: if false;
+    }
+
+    // ── patients/{patientUid} ───────────────────────────────────────────────
+    // Cross-session per-patient data (currently MicroQuestBoard's quest list).
+    // Keyed by the patient's Firebase UID.
+    //
+    // Not session-scoped, so allowedUids cannot authorise it. The patient
+    // themselves always has access; therapists are permitted via role claim.
+    //
+    // KNOWN RESIDUAL GAP: this grants ANY therapist access to ANY patient's
+    // quests, not just their own patients. That is a large improvement on "any
+    // authenticated user", but it is not the end state. Closing it needs an
+    // explicit assignment list on the document (e.g. `therapistUids`), seeded
+    // server-side from Postgres the same way allowedUids is. Tracked as
+    // follow-up work; see SECURITY-RULES.md.
+    match /patients/{patientUid} {
+      allow get, list: if signedIn()
+        && (request.auth.uid == patientUid || hasRole('THERAPIST'));
+      allow create, update: if signedIn()
+        && (request.auth.uid == patientUid || hasRole('THERAPIST'));
+      allow delete: if false;
+    }
+
+    // ── Default deny ────────────────────────────────────────────────────────
+    // Anything not matched above is refused. This replaces the permissive
+    // catch-all. A NEW collection added in code will be denied until a rule is
+    // written for it here — that is deliberate: fail closed, not open.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

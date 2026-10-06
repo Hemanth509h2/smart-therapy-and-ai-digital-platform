@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <title>Taste Sense Tongue Icon</title>
+  <desc>Clean SVG recreation of the blue tongue icon shown in the provided reference image.</desc>
+
+  <!-- Upper tongue/lip shape -->
+  <path
+    d="M40 50
+       C40 38 49 30 61 30
+       C70 30 76 34 80 37
+       C84 34 90 30 99 30
+       C111 30 120 38 120 50
+       C120 60 113 67 103 68
+       L57 68
+       C47 67 40 60 40 50 Z"
+    fill="#1257E8"
+  />
+
+  <!-- Main tongue -->
+  <path
+    d="M51 60
+       L75 60
+       L75 100
+       C75 103 77 105 80 105
+       C83 105 85 103 85 100
+       L85 60
+       L109 60
+       L109 101
+       C109 122 98 136 80 136
+       C62 136 51 122 51 101 Z"
+    fill="#4F86EA"
+  />
+
+  <!-- Center tongue groove -->
+  <path
+    d="M80 61
+       L80 101"
+    fill="none"
+    stroke="#1554D9"
+    stroke-width="6"
+    stroke-linecap="round"
+  />
+</svg>

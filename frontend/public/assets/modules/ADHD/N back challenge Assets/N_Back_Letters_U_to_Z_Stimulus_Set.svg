@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="350" viewBox="0 0 1400 350">
+<rect width="100%" height="100%" fill="#fafaff"/>
+<defs><filter id="s"><feDropShadow dx="0" dy="5" stdDeviation="6" flood-opacity=".18"/></filter></defs>
+<rect x="80" y="80" width="180" height="180" rx="30" fill="white" stroke="#e8e6f5" filter="url(#s)"/>
+<text x="170" y="195" font-family="Arial" font-size="96" font-weight="700" text-anchor="middle" fill="#3046E8">U</text>
+<rect x="290" y="80" width="180" height="180" rx="30" fill="white" stroke="#e8e6f5" filter="url(#s)"/>
+<text x="380" y="195" font-family="Arial" font-size="96" font-weight="700" text-anchor="middle" fill="#7138E8">V</text>
+<rect x="500" y="80" width="180" height="180" rx="30" fill="white" stroke="#e8e6f5" filter="url(#s)"/>
+<text x="590" y="195" font-family="Arial" font-size="96" font-weight="700" text-anchor="middle" fill="#16A878">W</text>
+<rect x="710" y="80" width="180" height="180" rx="30" fill="white" stroke="#e8e6f5" filter="url(#s)"/>
+<text x="800" y="195" font-family="Arial" font-size="96" font-weight="700" text-anchor="middle" fill="#F39A18">X</text>
+<rect x="920" y="80" width="180" height="180" rx="30" fill="white" stroke="#e8e6f5" filter="url(#s)"/>
+<text x="1010" y="195" font-family="Arial" font-size="96" font-weight="700" text-anchor="middle" fill="#E83D45">Y</text>
+<rect x="1130" y="80" width="180" height="180" rx="30" fill="white" stroke="#e8e6f5" filter="url(#s)"/>
+<text x="1220" y="195" font-family="Arial" font-size="96" font-weight="700" text-anchor="middle" fill="#3046E8">Z</text>
+</svg>
