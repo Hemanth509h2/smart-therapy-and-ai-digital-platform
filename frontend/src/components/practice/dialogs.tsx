@@ -213,12 +213,18 @@ export function StartSessionDialog({
   const [clientId, setClientId] = useState('');
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
+  const [patientLink, setPatientLink] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setClientId(defaultClientId ?? clients[0]?.id ?? '');
     setError('');
     setStarting(false);
+    setPatientLink(null);
+    setSessionId(null);
+    setCopied(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -236,10 +242,31 @@ export function StartSessionDialog({
     setError('');
     try {
       const id = existing?.id ?? (await createSession(profile.id, clientId, new Date())).id;
-      router.push(sessionRoomUrl(id, moduleId));
+      // Get (or create) the patient join link for this session first.
+      const res = await apiFetch(`/api/sessions/${id}/guest-link`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not create the patient link.');
+      setSessionId(id);
+      setPatientLink(`${window.location.origin}/join/${data.token}`);
+      setStarting(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not start the session.');
       setStarting(false);
+    }
+  };
+
+  const joinVideo = () => {
+    if (sessionId) router.push(sessionRoomUrl(sessionId, moduleId));
+  };
+
+  const copyLink = async () => {
+    if (!patientLink) return;
+    try {
+      await navigator.clipboard.writeText(patientLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard blocked — user can select the text manually */
     }
   };
 
@@ -254,20 +281,44 @@ export function StartSessionDialog({
           : 'Open a live session room with a client right now.'
       }
       footer={
-        clients.length > 0 && (
+        patientLink ? (
           <>
             <button className="ds-btn ds-btn-ghost" onClick={() => onOpenChange(false)}>
-              Cancel
+              Close
             </button>
-            <button className="ds-btn ds-btn-primary" onClick={start} disabled={starting || !clientId}>
-              {starting && <Loader2 className="animate-spin" />}
-              {existing ? `Join ${existing.status === 'ACTIVE' ? 'live' : 'scheduled'} session` : 'Start session'}
+            <button className="ds-btn ds-btn-primary" onClick={joinVideo}>
+              Join video room
             </button>
           </>
+        ) : (
+          clients.length > 0 && (
+            <>
+              <button className="ds-btn ds-btn-ghost" onClick={() => onOpenChange(false)}>
+                Cancel
+              </button>
+              <button className="ds-btn ds-btn-primary" onClick={start} disabled={starting || !clientId}>
+                {starting && <Loader2 className="animate-spin" />}
+                {existing ? `Join ${existing.status === 'ACTIVE' ? 'live' : 'scheduled'} session` : 'Start session'}
+              </button>
+            </>
+          )
         )
       }
     >
-      {clients.length === 0 ? (
+      {patientLink ? (
+        <div className="space-y-4">
+          <p className="ds-muted text-[13px]">
+            Share this link with the patient — they open it on their phone/laptop to join.
+            Join the video room once they&apos;re ready.
+          </p>
+          <div className="flex items-center gap-2 rounded-xl p-2 pl-3" style={{ background: 'var(--ds-surface-2)', border: '1px solid var(--ds-border)' }}>
+            <span className="flex-1 truncate text-[13px]" style={{ color: 'var(--ds-ink)' }}>{patientLink}</span>
+            <button className="ds-btn ds-btn-sm ds-btn-primary" onClick={copyLink}>
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+        </div>
+      ) : clients.length === 0 ? (
         <NoClients onAddClient={onAddClient} />
       ) : (
         <div className="space-y-4">
@@ -398,57 +449,21 @@ export function AddClientDialog({
     <DsDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={link ? 'Invite link ready' : 'Add a new client'}
-      description={
-        link
-          ? `Share this link with ${firstName}. When they sign up, their first session is added to your schedule.`
-          : "We'll generate a private sign-up link for your client."
-      }
+      title="Add a new client"
+      description="Add the client to your caseload. No session or invite link is created."
       footer={
-        link ? (
-          <button className="ds-btn ds-btn-clay" onClick={() => onOpenChange(false)}>
-            Done
+        <>
+          <button className="ds-btn ds-btn-ghost" onClick={() => onOpenChange(false)}>
+            Cancel
           </button>
-        ) : (
-          <>
-            <button className="ds-btn ds-btn-ghost" onClick={() => onOpenChange(false)}>
-              Cancel
-            </button>
-            <button className="ds-btn ds-btn-clay" onClick={submit} disabled={saving}>
-              {saving && <Loader2 className="animate-spin" />}
-              Generate invite
-            </button>
-          </>
-        )
+          <button className="ds-btn ds-btn-clay" onClick={submit} disabled={saving}>
+            {saving && <Loader2 className="animate-spin" />}
+            Add Client
+          </button>
+        </>
       }
     >
-      {link ? (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 rounded-xl p-2 pl-3" style={{ background: 'var(--ds-surface-2)', border: '1px solid var(--ds-border)' }}>
-            <span className="flex-1 truncate text-[13px]" style={{ color: 'var(--ds-ink)' }}>
-              {link}
-            </span>
-            <button className="ds-btn ds-btn-sm ds-btn-primary" onClick={copy}>
-              {copied ? <Check /> : <Copy />}
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-          {phone.trim() ? (
-            <div className="flex items-center gap-2 rounded-xl p-3 text-[13px]" style={{ background: 'var(--ds-surface-2)', border: '1px solid var(--ds-border)', color: 'var(--ds-ink)' }}>
-              {waSending ? <Loader2 className="animate-spin" /> : <MessageCircle />}
-              {waSending ? 'Sending via WhatsApp…' : waStatus || 'Invite sent via WhatsApp.'}
-            </div>
-          ) : (
-            <a
-              className="ds-btn ds-btn-outline w-full"
-              href={`mailto:?subject=${encodeURIComponent('Your STAAD therapy session invite')}&body=${encodeURIComponent(message)}`}
-            >
-              <Mail /> Email
-            </a>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-4">
+      <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Field label="First name" htmlFor="client-first">
               <input id="client-first" className="ds-input" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Isha" autoFocus />
