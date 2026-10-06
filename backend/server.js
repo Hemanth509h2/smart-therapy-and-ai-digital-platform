@@ -88,7 +88,18 @@ function handleProxyConnection(client, query) {
 }
 
 app.prepare().then(() => {
-  const server = createServer((req, res) => handle(req, res, parse(req.url, true)))
+  const server = createServer((req, res) => {
+    // Request logging: one line per HTTP request, written when the response
+    // finishes. Skip Next.js internals to keep the terminal readable.
+    const start = Date.now()
+    res.on('finish', () => {
+      const url = req.url || ''
+      if (url.startsWith('/_next/') || url.startsWith('/favicon')) return
+      const ms = Date.now() - start
+      console.log(`[api] ${req.method} ${url} → ${res.statusCode} (${ms}ms)`)
+    })
+    handle(req, res, parse(req.url, true))
+  })
 
   const wss = new WebSocketServer({ noServer: true })
   wss.on('connection', (ws, req) => {

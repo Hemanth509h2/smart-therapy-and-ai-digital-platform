@@ -52,8 +52,10 @@ plans that the admin approves.
 Three roles on the `User.role` enum: **THERAPIST**, **CLIENT**, **ADMIN**.
 
 - **AuthProvider** (`src/components/AuthProvider.tsx`) resolves the Firebase user → `GET
-  /api/users/profile?uid=` → sets `{ role, profile }` in `useAuthStore`. `profile` is the
-  role's profile row (`ProfileTherapist` / `ProfileClient` / `ProfileAdmin`).
+  /api/users/profile` (the frontend's `apiFetch` attaches the Firebase ID token; the backend
+  verifies it and derives the uid from the token) → sets `{ role, profile }` in
+  `useAuthStore`. `profile` is the role's profile row (`ProfileTherapist` / `ProfileClient`
+  / `ProfileAdmin`).
 - **Routing/nav** is role-driven in `Sidebar.tsx` (`therapistNav` / `clientNav` / `adminNav`);
   `src/app/page.tsx` redirects ADMIN → `/admin`.
 - **Tool (module) access** is per-therapist: `ProfileTherapist.allModulesAllowed` (true ⇒ all)
@@ -61,10 +63,11 @@ Three roles on the `User.role` enum: **THERAPIST**, **CLIENT**, **ADMIN**.
   and enforced by `ModuleSelectorPanel`. Admin edits it directly, or it's set on subscription
   approval.
 
-> ⚠️ **Security posture:** API routes currently **trust client-passed IDs** — there is no
-> server-side Firebase ID-token verification or role enforcement yet (the Admin SDK is wired
-> for privileged ops like creating admins, but not as a request gate). This is consistent
-> across invites/admin/subscriptions and is the top hardening item.
+> ⚠️ **Security posture:** `/api/users/profile` verifies the Firebase ID token on every
+> method (`requireAuth` in `src/lib/apiAuth.ts`; the frontend attaches the token via
+> `apiFetch`). Most other routes still **trust client-passed IDs** — applying `requireAuth`
+> (plus role/ownership checks, as in `src/lib/progressAuth.ts`) to every route remains the
+> top hardening item.
 
 ---
 

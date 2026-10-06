@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { apiFetch } from '@/lib/api';
 
 function OnboardingForm() {
-  const { uid, email, setRoleAndProfile } = useAuthStore();
+  const { uid, setRoleAndProfile } = useAuthStore();
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get('invite');
   const router = useRouter();
@@ -72,8 +72,6 @@ function OnboardingForm() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          uid,
-          email,
           role,
           firstName,
           lastName,

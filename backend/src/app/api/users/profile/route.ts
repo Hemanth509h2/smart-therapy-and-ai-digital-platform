@@ -1,15 +1,28 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { adminAuth } from '@/lib/firebaseAdmin';
+import { requireAuth } from '@/lib/apiAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const { uid, email, role, firstName, lastName, specialty, dateOfBirth, diagnosis, inviteToken } = await request.json();
+    // Identity comes from the verified Firebase ID token — the client cannot
+    // choose the uid/email of the account being created.
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
+    const uid = auth.uid;
+    const email = auth.email;
 
-    if (!uid || !email || !role) {
+    const { role, firstName, lastName, specialty, dateOfBirth, diagnosis, inviteToken } = await request.json();
+
+    if (!email || !role) {
       return NextResponse.json({ error: 'Missing core credentials' }, { status: 400 });
+    }
+
+    const existing = await prisma.user.findUnique({ where: { id: uid }, select: { id: true } });
+    if (existing) {
+      return NextResponse.json({ error: 'Profile already exists for this account' }, { status: 409 });
     }
 
     const roleEnum = role === 'THERAPIST' ? 'THERAPIST' : 'CLIENT';
@@ -99,13 +112,20 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const { uid, role, firstName, lastName, qualification, experience, specialty, bio, dateOfBirth, gender, diagnosis } = await request.json();
+    // Only the signed-in user may update their own profile; the uid and role
+    // are taken from the verified token + database, never from the body.
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
+    const uid = auth.uid;
 
-    if (!uid) {
-      return NextResponse.json({ error: 'uid is required' }, { status: 400 });
+    const { firstName, lastName, qualification, experience, specialty, bio, dateOfBirth, gender, diagnosis } = await request.json();
+
+    const user = await prisma.user.findUnique({ where: { id: uid }, select: { role: true } });
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    if (role === 'THERAPIST') {
+    if (user.role === 'THERAPIST') {
       const updated = await prisma.profileTherapist.update({
         where: { userId: uid },
         data: {
@@ -120,7 +140,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ profile: updated });
     }
 
-    if (role === 'CLIENT') {
+    if (user.role === 'CLIENT') {
       const updateData: any = {};
       if (dateOfBirth !== undefined) updateData.dateOfBirth = new Date(dateOfBirth);
       if (gender !== undefined) updateData.gender = gender;
@@ -148,10 +168,11 @@ export async function PUT(request: Request) {
 // (deleting the User cascades to the therapist/client profile itself).
 export async function DELETE(request: Request) {
   try {
-    const { uid } = await request.json();
-    if (!uid) {
-      return NextResponse.json({ error: 'uid is required' }, { status: 400 });
-    }
+    // Only the signed-in user may delete their own account. The uid comes
+    // from the verified token; the request body is ignored.
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
+    const uid = auth.uid;
 
     const user = await prisma.user.findUnique({
       where: { id: uid },
@@ -188,12 +209,12 @@ export async function DELETE(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const uid = searchParams.get('uid');
-
-  if (!uid) {
-    return NextResponse.json({ error: 'UID is required' }, { status: 400 });
-  }
+  // Returns the caller's own profile. The uid comes from the verified
+  // Firebase ID token — the old `?uid=` query param let anyone read any
+  // user's profile and is no longer honored.
+  const auth = await requireAuth(request);
+  if (!auth.ok) return auth.response;
+  const uid = auth.uid;
 
   try {
     const user = await prisma.user.findUnique({

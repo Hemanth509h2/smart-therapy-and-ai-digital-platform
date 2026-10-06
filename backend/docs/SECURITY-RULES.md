@@ -107,7 +107,7 @@ Rollback is `firebase deploy --only firestore:rules` against the previous rulese
 ## 7. Known residual gaps
 
 - **`patients/{uid}` is therapist-wide.** Any account with the `THERAPIST` role claim can read any patient's quests, not only their own patients. This is a large improvement on "any authenticated user", but it is not the end state. Closing it needs an explicit `therapistUids` assignment list on the document, seeded from Postgres the same way `allowedUids` is.
-- **No API route verifies Firebase ID tokens.** `verifyIdToken` appears nowhere in the codebase. `/api/users/profile` accepts an arbitrary `uid` in the POST body, so the REST API trusts client-supplied identity. Firestore rules do not protect these routes. **This is a separate vulnerability of comparable severity and is not addressed here.**
+- **Most API routes still trust client-passed IDs.** `/api/users/profile` now verifies the Firebase ID token (`requireAuth` in `src/lib/apiAuth.ts`) and derives uid/email from the token, and a few other routes (`invites`, `stt-token`, `whatsapp/invite`, `progress/*`) verify tokens too. The remaining routes (sessions, notes, bookings, admin, …) still accept client-supplied IDs and need the same `requireAuth` treatment. Firestore rules do not protect REST routes.
 - **`aiConsent` is writable by either participant.** A participant can currently set the other side's consent flag. Tightening this needs a per-role field check.
 
 ## 8. Verification status

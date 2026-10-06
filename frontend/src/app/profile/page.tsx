@@ -124,7 +124,6 @@ export default function ProfilePage() {
     setSaving(true);
     try {
       const body: Record<string, unknown> = {
-        uid,
         role,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -178,12 +177,11 @@ export default function ProfilePage() {
     setDeleting(true);
     try {
       const currentUser = auth.currentUser;
+      // Delete server-side data FIRST: the backend verifies the Firebase ID
+      // token, which becomes invalid once the Firebase user is deleted.
+      const res = await apiFetch('/api/users/profile', { method: 'DELETE' });
+      if (!res.ok) throw new Error('delete-failed');
       if (currentUser) await deleteUser(currentUser);
-      await apiFetch('/api/users/profile', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid }),
-      });
       clearAuth();
       router.push('/auth');
     } catch (err: any) {

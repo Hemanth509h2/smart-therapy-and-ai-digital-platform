@@ -84,8 +84,10 @@ function AuthForm() {
     setLoading(true);
     const provider = new GoogleAuthProvider();
     try {
-      const result = await signInWithPopup(auth, provider);
-      const checkProfile = await apiFetch(`/api/users/profile?uid=${result.user.uid}`);
+      await signInWithPopup(auth, provider);
+      // apiFetch attaches the Firebase ID token; the backend verifies it and
+      // returns the caller's own profile.
+      const checkProfile = await apiFetch('/api/users/profile');
       if (checkProfile.ok) {
         router.push('/');
       } else {

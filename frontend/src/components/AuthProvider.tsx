@@ -25,7 +25,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         }
 
         try {
-          const res = await apiFetch(`/api/users/profile?uid=${firebaseUser.uid}`);
+          // Identity is verified server-side from the ID token that
+          // apiFetch attaches — no client-supplied uid.
+          const res = await apiFetch('/api/users/profile');
           if (res.ok) {
             const data = await res.json();
             if (data.user) {
