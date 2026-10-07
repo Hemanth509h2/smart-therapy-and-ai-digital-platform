@@ -194,6 +194,17 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   const PARTICIPANT_TILE_MAX = 640;
   const participantTileH = Math.round(participantTileW * 0.6);
 
+  // Client-side participants popup (mirrors doctor side but with swapped video roles):
+  // - client's own video stays fixed; doctor's video is resizable.
+  const [showParticipantsClient, setShowParticipantsClient] = useState(false);
+  const [participantsPosClient, setParticipantsPosClient] = useState<{ x: number; y: number } | null>(null);
+  const participantsDragClient = useRef<{ dx: number; dy: number } | null>(null);
+  const participantsPanelRefClient = useRef<HTMLDivElement>(null);
+  const [participantTileWClient, setParticipantTileWClient] = useState(200);
+  const participantTileHClient = Math.round(participantTileWClient * 0.6);
+  const PARTICIPANT_TILE_MIN_CLIENT = 140;
+  const PARTICIPANT_TILE_MAX_CLIENT = 640;
+
   const onParticipantsResizeStart = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -217,6 +228,57 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
   };
 
+  // Client-side resize handle start.
+  const onParticipantsResizeStartClient = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    participantsResize.current = { x: e.clientX, y: e.clientY, w: participantTileWClient };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onParticipantsResizeMoveClient = (e: React.PointerEvent<HTMLDivElement>) => {
+    const r = participantsResize.current;
+    if (!r || !participantsPosClient) return;
+    const dx = e.clientX - r.x;
+    const dyAsW = (e.clientY - r.y) / 0.6; // vertical drag, converted to width
+    const delta = Math.abs(dx) >= Math.abs(dyAsW) ? dx : dyAsW;
+    // Don't let the popup grow past the right edge of the screen.
+    const maxByViewport = window.innerWidth - participantsPosClient.x - 22 - 8;
+    setParticipantTileWClient(
+      Math.round(Math.min(Math.max(PARTICIPANT_TILE_MIN_CLIENT, r.w + delta), PARTICIPANT_TILE_MAX_CLIENT, maxByViewport))
+    );
+  };
+  const onParticipantsResizeEndClient = (e: React.PointerEvent<HTMLDivElement>) => {
+    participantsResize.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  // Client-side drag handle start.
+  const onParticipantsDragStartClient = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button')) return; // let the close button click
+    if (!participantsPosClient) return;
+    participantsDragClient.current = { dx: e.clientX - participantsPosClient.x, dy: e.clientY - participantsPosClient.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onParticipantsDragMoveClient = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = participantsDragClient.current;
+    if (!d) return;
+    setParticipantsPosClient(clampToViewportClient(e.clientX - d.dx, e.clientY - d.dy));
+  };
+  const onParticipantsDragEndClient = (e: React.PointerEvent<HTMLDivElement>) => {
+    participantsDragClient.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  const clampToViewportClient = (x: number, y: number) => {
+    const el = participantsPanelRefClient.current;
+    const w = el?.offsetWidth ?? participantTileWClient + 22;
+    const h = el?.offsetHeight ?? 160;
+    return {
+      x: Math.min(Math.max(8, x), window.innerWidth - w - 8),
+      y: Math.min(Math.max(8, y), window.innerHeight - h - 8),
+    };
+  };
+
   const clampToViewport = (x: number, y: number) => {
     const el = participantsPanelRef.current;
     const w = el?.offsetWidth ?? participantTileW + 22;
@@ -232,6 +294,13 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       setParticipantsPos({ x: window.innerWidth - participantTileW - 22 - 24, y: 110 });
     }
     setShowParticipants((v) => !v);
+  };
+
+  const toggleParticipantsClient = () => {
+    if (!showParticipantsClient && !participantsPosClient) {
+      setParticipantsPosClient({ x: window.innerWidth - participantTileWClient - 22 - 24, y: 110 });
+    }
+    setShowParticipantsClient((v) => !v);
   };
 
   const onParticipantsDragStart = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -257,6 +326,14 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, [showParticipants]);
+
+  // Keep the client-side popup on-screen when the window is resized / full-screen toggles.
+  useEffect(() => {
+    if (!showParticipantsClient) return;
+    const onResize = () => setParticipantsPosClient((p) => (p ? clampToViewport(p.x, p.y) : p));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [showParticipantsClient]);
 
   const toggleFullscreen = () => {
     if (typeof document === 'undefined') return;
@@ -883,7 +960,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                take a fixed row; they open in a floating panel over the canvas.
                Hidden in whiteboard mode: both feeds move into the board itself. ---- */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, flexShrink: 0, position: 'relative' }}>
-            {participantsPopupAvailable && (
+            {isTherapist && participantsPopupAvailable && (
               <button
                 onClick={toggleParticipants}
                 title={showParticipants ? 'Hide participants' : 'Show participants'}
@@ -894,7 +971,19 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
               </button>
             )}
 
-            {participantsPopupAvailable && showParticipants && participantsPos && (
+            {/* Client-side participants popup toggle - client can also resize the doctor's video */}
+            {(!isTherapist && participantsPopupAvailable) && (
+              <button
+                onClick={toggleParticipantsClient}
+                title={showParticipantsClient ? 'Hide participants' : 'Show participants'}
+                style={{ flexShrink: 0, height: 36, padding: '0 12px', borderRadius: 10, border: `1px solid ${showParticipantsClient ? RC.green : RC.border}`, background: showParticipantsClient ? RC.greenSoft : RC.panel, color: showParticipantsClient ? RC.greenDark : RC.ink, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              >
+                <Users size={16} />
+                {Object.keys(participants).length > 0 ? Object.keys(participants).length : ''}
+              </button>
+            )}
+
+            {isTherapist && participantsPopupAvailable && showParticipants && participantsPos && (
               <div
                 ref={participantsPanelRef}
                 style={{ position: 'fixed', left: participantsPos.x, top: participantsPos.y, zIndex: 40, display: 'flex', flexDirection: 'column', gap: 8, padding: 10, maxHeight: 'calc(100vh - 16px)', background: RC.panel, border: `1px solid ${RC.border}`, borderRadius: 16, boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }}
@@ -945,6 +1034,73 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                   onPointerCancel={onParticipantsResizeEnd}
                   onDoubleClick={() => setParticipantTileW(200)}
                   title="Drag to resize (double-click to reset)"
+                  style={{ position: 'absolute', right: 2, bottom: 2, width: 18, height: 18, cursor: 'nwse-resize', touchAction: 'none', zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', padding: 3 }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" style={{ display: 'block' }}>
+                    <path d="M9 1L1 9M9 5L5 9" stroke={RC.inkMuted} strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+              </div>
+            )}
+
+            {/* Client-side participants popup (mirrors doctor side but with swapped video roles):
+               - client's own video stays fixed; doctor's video is resizable.
+               - client can drag to move and resize the doctor's video tile. */}
+            {(!isTherapist && participantsPopupAvailable && showParticipantsClient && participantsPosClient) && (
+              <div
+                ref={participantsPanelRefClient}
+                style={{ position: 'fixed', left: participantsPosClient.x, top: participantsPosClient.y, zIndex: 40, display: 'flex', flexDirection: 'column', gap: 8, padding: 10, maxHeight: 'calc(100vh - 16px)', background: RC.panel, border: `1px solid ${RC.border}`, borderRadius: 16, boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }}
+              >
+                {/* Drag handle — grab the header to move the popup */}
+                <div
+                  onPointerDown={onParticipantsDragStartClient}
+                  onPointerMove={onParticipantsDragMoveClient}
+                  onPointerUp={onParticipantsDragEndClient}
+                  onPointerCancel={onParticipantsDragEndClient}
+                  title="Drag to move"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12.5, fontWeight: 600, color: RC.ink, padding: '2px 2px', cursor: 'grab', userSelect: 'none', touchAction: 'none' }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <GripHorizontal size={15} color={RC.inkMuted} />
+                    Participants
+                  </span>
+                  <button
+                    onClick={() => setShowParticipantsClient(false)}
+                    title="Close"
+                    style={{ border: 'none', background: 'transparent', color: RC.inkMuted, cursor: 'pointer', display: 'flex', padding: 2 }}
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflowY: 'auto' }}>
+                  {Object.values(participants).map((p) =>
+                    p.uid === uid ? (
+                      // Client: own video stays fixed; doctor's video is resizable.
+                      <LocalVideoPip
+                        key={p.uid}
+                        docked
+                        width={200}
+                        height={120}
+                      />
+                    ) : (
+                      <RemoteParticipantThumb
+                        key={p.uid}
+                        name={p.name}
+                        online={p.isOnline}
+                        width={participantTileWClient}
+                        height={participantTileHClient}
+                      />
+                    )
+                  )}
+                </div>
+
+                {/* Resize handle — drag the bottom-right corner to resize doctor's video */}
+                <div
+                  onPointerDown={onParticipantsResizeStartClient}
+                  onPointerMove={onParticipantsResizeMoveClient}
+                  onPointerUp={onParticipantsResizeEndClient}
+                  onPointerCancel={onParticipantsResizeEndClient}
+                  title="Drag to resize doctor's video (double-click to reset)"
                   style={{ position: 'absolute', right: 2, bottom: 2, width: 18, height: 18, cursor: 'nwse-resize', touchAction: 'none', zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', padding: 3 }}
                 >
                   <svg width="10" height="10" viewBox="0 0 10 10" style={{ display: 'block' }}>
@@ -1072,9 +1228,9 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
           flexShrink: 0,
           overflow: 'hidden',
           transition: 'width 0.3s cubic-bezier(0.4,0,0.2,1)',
-          display: 'flex',
+          display: isTherapist ? 'flex' : 'none',
           justifyContent: 'flex-end',
-          padding: sidebarOpen ? '12px 16px 12px 0' : 0,
+          padding: isTherapist ? (sidebarOpen ? '12px 16px 12px 0' : 0) : 0,
         }}>
           {sidebarPanel === 'assistant' && (
             <AIErrorBoundary>
