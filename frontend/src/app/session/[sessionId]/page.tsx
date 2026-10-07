@@ -14,7 +14,8 @@ import AIConsentBanner from '@/components/session/AIConsentBanner';
 import { AIErrorBoundary } from '@/components/session/AIErrorBoundary';
 import { useSessionTranscription } from '@/hooks/useSessionTranscription';
 import { useAttentionScoring, type AttentionState } from '@/hooks/useAttentionScoring';
-import { useLocalParticipant } from '@livekit/components-react';
+import { useLocalParticipant, useTracks, VideoTrack, type TrackReference } from '@livekit/components-react';
+import { Track } from 'livekit-client';
 import StaadVideo, { useSessionRoom } from '@/components/StaadVideo';
 import RemoteVideoArea from '@/components/RemoteVideoArea';
 import LocalVideoPip from '@/components/LocalVideoPip';
@@ -664,8 +665,10 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   // runs. Skill Development modules are deliberately excluded — they use
   // SkillDevLayout's chrome-free full-screen space by design (handled above).
   const moduleMode = isModuleActive && !isSkillModule(activeModule) && !whiteboardMode;
-  // Both canvas takeovers hide the thumbnail strip; the feeds move inside them.
-  const canvasTakeover = whiteboardMode || moduleMode;
+  // The participants popup stays available in module mode (it is the only place
+  // the feeds show there); only the whiteboard hides it, because both feeds move
+  // into the board itself.
+  const participantsPopupAvailable = !whiteboardMode;
   const sidebarOpen = sidebarPanel !== null && !whiteboardMode;
   const selfName = profile || guestName ? displayName : 'You';
 
@@ -840,7 +843,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                take a fixed row; they open in a floating panel over the canvas.
                Hidden in whiteboard mode: both feeds move into the board itself. ---- */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, flexShrink: 0, position: 'relative' }}>
-            {!canvasTakeover && (
+            {participantsPopupAvailable && (
               <button
                 onClick={toggleParticipants}
                 title={showParticipants ? 'Hide participants' : 'Show participants'}
@@ -851,7 +854,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
               </button>
             )}
 
-            {!canvasTakeover && showParticipants && participantsPos && (
+            {participantsPopupAvailable && showParticipants && participantsPos && (
               <div
                 ref={participantsPanelRef}
                 style={{ position: 'fixed', left: participantsPos.x, top: participantsPos.y, zIndex: 40, display: 'flex', flexDirection: 'column', gap: 8, padding: 10, maxHeight: '70vh', overflowY: 'auto', background: RC.panel, border: `1px solid ${RC.border}`, borderRadius: 16, boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }}
@@ -881,7 +884,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                   p.uid === uid ? (
                     <LocalVideoPip key={p.uid} docked />
                   ) : (
-                    <ParticipantThumb key={p.uid} name={p.name} online={p.isOnline} self={false} />
+                    <RemoteParticipantThumb key={p.uid} name={p.name} online={p.isOnline} />
                   )
                 )}
               </div>
@@ -1189,6 +1192,31 @@ function ParticipantThumb({ name, online, self }: { name: string; online: boolea
       <div style={{ position: 'absolute', bottom: 7, left: 9, display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 10, background: 'rgba(255,255,255,0.92)', fontSize: 12.5, fontWeight: 600, color: RC.ink, maxWidth: 'calc(100% - 18px)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: online ? RC.green : RC.inkMuted }} />
         {self ? 'You' : name}
+      </div>
+    </div>
+  );
+}
+
+/* ===== REMOTE PARTICIPANT TILE — participants popup =====
+   Shows the participant's live camera when we can find it, otherwise falls back
+   to the initial-letter thumbnail. LiveKit identities are display names (see
+   backend /api/livekit-token), so we match on name; if that fails and there is
+   exactly one remote camera (the normal 1:1 session), we use that one. */
+function RemoteParticipantThumb({ name, online }: { name: string; online: boolean }) {
+  const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: false }], { onlySubscribed: true });
+  const remote = tracks.filter((t) => !t.participant.isLocal);
+  const track =
+    remote.find((t) => t.participant.identity === name || t.participant.name === name) ??
+    (remote.length === 1 ? remote[0] : undefined);
+
+  if (!track) return <ParticipantThumb name={name} online={online} self={false} />;
+
+  return (
+    <div style={{ position: 'relative', width: 200, height: 120, borderRadius: 14, flexShrink: 0, overflow: 'hidden', background: 'linear-gradient(135deg, #1a2e28, #142420)', border: `2px solid ${RC.green}` }}>
+      <VideoTrack trackRef={track as TrackReference} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      <div style={{ position: 'absolute', bottom: 7, left: 9, display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 10, background: 'rgba(255,255,255,0.92)', fontSize: 12.5, fontWeight: 600, color: RC.ink, maxWidth: 'calc(100% - 18px)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: online ? RC.green : RC.inkMuted }} />
+        {name}
       </div>
     </div>
   );

@@ -9,87 +9,13 @@
 //     therapy conversation, so the room keeps its top bar, bottom bar and
 //     sidebar panels while the module takes the wide canvas.
 //
-// Video handling reuses the pattern proven by WhiteboardStage: both feeds shrink
-// to small labelled tiles at the top, and LiveKit is only read — no connection or
-// track logic is touched, exactly as before.
+// Video feeds are NOT drawn here: the session page shows them in its movable
+// participants popup, so the module gets the full canvas.
 
 import type { ReactNode } from 'react'
-import { useTracks, VideoTrack } from '@livekit/components-react'
-import type { TrackReference } from '@livekit/components-react'
-import { Track } from 'livekit-client'
 import { X, Lock, Unlock } from 'lucide-react'
 import { RC } from './roomTheme'
 import { MODULE_CATEGORIES } from '@/lib/modules'
-
-function VideoTile({
-  trackRef,
-  name,
-  width = 232,
-  height = 138,
-}: {
-  trackRef: TrackReference | undefined
-  name: string
-  width?: number
-  height?: number
-}) {
-  return (
-    <div style={{ flexShrink: 0 }}>
-      <div
-        style={{
-          width,
-          height,
-          borderRadius: 12,
-          // `relative` anchors the per-tile online dot below; the tile is
-          // otherwise unchanged.
-          position: 'relative',
-          overflow: 'hidden',
-          background: '#1a2a25',
-          border: `2px solid ${RC.green}`,
-          boxShadow: '0 6px 18px rgba(20,40,30,0.18)',
-        }}
-      >
-        {/* Per-tile online indicator, distinct from the shared "N online" pill
-            in the header row. White ring so it stays legible over both a live
-            video feed and the dark placeholder. */}
-        <span
-          style={{
-            position: 'absolute',
-            bottom: 6,
-            right: 6,
-            width: 11,
-            height: 11,
-            borderRadius: '50%',
-            background: RC.green,
-            border: '1.5px solid rgba(255,255,255,0.9)',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
-            zIndex: 2,
-          }}
-        />
-        {trackRef ? (
-          <VideoTrack trackRef={trackRef} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <div
-            style={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'rgba(255,255,255,0.85)',
-              fontSize: Math.round(height * 0.28),
-              fontWeight: 600,
-            }}
-          >
-            {name?.charAt(0)?.toUpperCase() || '?'}
-          </div>
-        )}
-      </div>
-      <div style={{ marginTop: 5, textAlign: 'center', fontSize: 18.5, fontWeight: 600, color: RC.inkMuted }}>
-        {name}
-      </div>
-    </div>
-  )
-}
 
 /** Floor for the activity canvas; below this the stage scrolls instead of squeezing.
     Kept low enough that the whole stage — video row, header, canvas and the
@@ -122,8 +48,9 @@ function moduleIdentity(moduleId: string | null) {
 
 export interface ModuleStageProps {
   activeModule: string | null
-  selfName: string
-  otherName: string
+  /** No longer rendered (feeds moved to the page's participants popup); kept so callers don't break. */
+  selfName?: string
+  otherName?: string
   timerStr: string
   onlineCount: number
   isTherapist: boolean
@@ -136,8 +63,6 @@ export interface ModuleStageProps {
 
 export default function ModuleStage({
   activeModule,
-  selfName,
-  otherName,
   timerStr,
   onlineCount,
   isTherapist,
@@ -146,12 +71,6 @@ export default function ModuleStage({
   onClose,
   children,
 }: ModuleStageProps) {
-  const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: false }], { onlySubscribed: false })
-  const selfTrack = tracks.find((t) => t.participant.isLocal) as TrackReference | undefined
-  const otherTrack = tracks.find(
-    (t) => !t.participant.isLocal && t.publication?.isSubscribed
-  ) as TrackReference | undefined
-
   const id = moduleIdentity(activeModule)
 
   const headerBtn: React.CSSProperties = {
@@ -198,23 +117,20 @@ export default function ModuleStage({
         ['--glass-border' as string]: 'rgba(0,0,0,0.10)',
       } as React.CSSProperties}
     >
-      {/* ---- Header: self video (left) · module identity (centre) · other
-          participant + controls (right). The module's own title lives here,
-          so modules render only their activity body. ---- */}
+      {/* ---- Header: module identity (left) · controls (right). The module's
+          own title lives here, so modules render only their activity body.
+          Video feeds live in the page's movable participants popup. ---- */}
       <div
         style={{
           flexShrink: 0,
           display: 'flex',
-          alignItems: 'flex-start',
+          alignItems: 'center',
           gap: 14,
           padding: '9px 14px 7px',
           borderBottom: `1px solid ${RC.border}`,
         }}
       >
-        {/* LEFT: self */}
-        <VideoTile trackRef={selfTrack} name={selfName} width={232} height={138} />
-
-        {/* CENTRE: title, then the live status line */}
+        {/* LEFT: title, then the live status line */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 2 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
             <div
@@ -276,10 +192,8 @@ export default function ModuleStage({
           </div>
         </div>
 
-        {/* RIGHT: other participant */}
+        {/* RIGHT: controls */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 7, flexShrink: 0 }}>
-          <VideoTile trackRef={otherTrack} name={otherName} width={232} height={138} />
-
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             {isTherapist && (
               <button
