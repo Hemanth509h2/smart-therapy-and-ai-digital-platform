@@ -923,7 +923,14 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflowY: 'auto' }}>
                   {Object.values(participants).map((p) =>
                     p.uid === uid ? (
-                      <LocalVideoPip key={p.uid} docked width={participantTileW} height={participantTileH} />
+                      // Doctor: resizing only grows/shrinks the CLIENT's tile; the
+                      // doctor's own self-view stays at the default small size.
+                      <LocalVideoPip
+                        key={p.uid}
+                        docked
+                        width={isTherapist ? 200 : participantTileW}
+                        height={isTherapist ? 120 : participantTileH}
+                      />
                     ) : (
                       <RemoteParticipantThumb key={p.uid} name={p.name} online={p.isOnline} width={participantTileW} height={participantTileH} />
                     )
