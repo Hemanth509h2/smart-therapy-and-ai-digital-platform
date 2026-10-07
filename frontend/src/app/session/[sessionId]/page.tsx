@@ -8,7 +8,7 @@ import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import {
   Mic, MicOff, Camera, CameraOff, PhoneOff, Settings, Smile,
-  Maximize2, Minimize2,
+  Maximize2, Minimize2, Users, X, GripHorizontal,
 } from 'lucide-react';
 import AIConsentBanner from '@/components/session/AIConsentBanner';
 import { AIErrorBoundary } from '@/components/session/AIErrorBoundary';
@@ -178,6 +178,54 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   const [consentStatus, setConsentStatus] = useState<{ therapist: boolean; client: boolean } | null>(null);
   const [myConsent, setMyConsent] = useState<boolean | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Participant thumbnails live in a floating popup instead of a fixed strip.
+  const [showParticipants, setShowParticipants] = useState(false);
+  // Draggable popup position (viewport px). null = not placed yet; it gets a
+  // default top-right spot the first time it opens, then remembers where it was dragged.
+  const [participantsPos, setParticipantsPos] = useState<{ x: number; y: number } | null>(null);
+  const participantsDrag = useRef<{ dx: number; dy: number } | null>(null);
+  const participantsPanelRef = useRef<HTMLDivElement>(null);
+
+  const clampToViewport = (x: number, y: number) => {
+    const el = participantsPanelRef.current;
+    const w = el?.offsetWidth ?? 222;
+    const h = el?.offsetHeight ?? 160;
+    return {
+      x: Math.min(Math.max(8, x), window.innerWidth - w - 8),
+      y: Math.min(Math.max(8, y), window.innerHeight - h - 8),
+    };
+  };
+
+  const toggleParticipants = () => {
+    if (!showParticipants && !participantsPos) {
+      setParticipantsPos({ x: window.innerWidth - 222 - 24, y: 110 });
+    }
+    setShowParticipants((v) => !v);
+  };
+
+  const onParticipantsDragStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button')) return; // let the close button click
+    if (!participantsPos) return;
+    participantsDrag.current = { dx: e.clientX - participantsPos.x, dy: e.clientY - participantsPos.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onParticipantsDragMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = participantsDrag.current;
+    if (!d) return;
+    setParticipantsPos(clampToViewport(e.clientX - d.dx, e.clientY - d.dy));
+  };
+  const onParticipantsDragEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    participantsDrag.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  // Keep the popup on-screen when the window is resized / full-screen toggles.
+  useEffect(() => {
+    if (!showParticipants) return;
+    const onResize = () => setParticipantsPos((p) => (p ? clampToViewport(p.x, p.y) : p));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [showParticipants]);
 
   const toggleFullscreen = () => {
     if (typeof document === 'undefined') return;
@@ -788,11 +836,47 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
             }
           />
 
-          {/* ---- Participant thumbnails. Hidden in whiteboard mode: both feeds
-               move into the board itself as small side-by-side tiles. ---- */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          {/* ---- Participants popup toggle + full-screen. The thumbnails no longer
+               take a fixed row; they open in a floating panel over the canvas.
+               Hidden in whiteboard mode: both feeds move into the board itself. ---- */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, flexShrink: 0, position: 'relative' }}>
             {!canvasTakeover && (
-              <div style={{ display: 'flex', gap: 10, flex: 1, minWidth: 0, overflowX: 'auto', paddingBottom: 2 }}>
+              <button
+                onClick={toggleParticipants}
+                title={showParticipants ? 'Hide participants' : 'Show participants'}
+                style={{ flexShrink: 0, height: 36, padding: '0 12px', borderRadius: 10, border: `1px solid ${showParticipants ? RC.green : RC.border}`, background: showParticipants ? RC.greenSoft : RC.panel, color: showParticipants ? RC.greenDark : RC.ink, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              >
+                <Users size={16} />
+                {Object.keys(participants).length}
+              </button>
+            )}
+
+            {!canvasTakeover && showParticipants && participantsPos && (
+              <div
+                ref={participantsPanelRef}
+                style={{ position: 'fixed', left: participantsPos.x, top: participantsPos.y, zIndex: 40, display: 'flex', flexDirection: 'column', gap: 8, padding: 10, maxHeight: '70vh', overflowY: 'auto', background: RC.panel, border: `1px solid ${RC.border}`, borderRadius: 16, boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }}
+              >
+                {/* Drag handle — grab the header to move the popup */}
+                <div
+                  onPointerDown={onParticipantsDragStart}
+                  onPointerMove={onParticipantsDragMove}
+                  onPointerUp={onParticipantsDragEnd}
+                  onPointerCancel={onParticipantsDragEnd}
+                  title="Drag to move"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12.5, fontWeight: 600, color: RC.ink, padding: '2px 2px', cursor: 'grab', userSelect: 'none', touchAction: 'none' }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <GripHorizontal size={15} color={RC.inkMuted} />
+                    Participants
+                  </span>
+                  <button
+                    onClick={() => setShowParticipants(false)}
+                    title="Close"
+                    style={{ border: 'none', background: 'transparent', color: RC.inkMuted, cursor: 'pointer', display: 'flex', padding: 2 }}
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
                 {Object.values(participants).map((p) =>
                   p.uid === uid ? (
                     <LocalVideoPip key={p.uid} docked />
@@ -802,7 +886,6 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                 )}
               </div>
             )}
-            {canvasTakeover && <div style={{ flex: 1 }} />}
 
             {/* Full-screen toggle — stays at the far right regardless of mode */}
             <button
