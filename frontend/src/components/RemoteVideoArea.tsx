@@ -3,6 +3,8 @@ import { useTracks, VideoTrack } from '@livekit/components-react'
 import type { TrackReference } from '@livekit/components-react'
 import { Track } from 'livekit-client'
 import ConnectionQualityBadge from '@/components/session/ConnectionQualityBadge'
+import VideoStatsBadge from '@/components/session/VideoStatsBadge'
+import { useState } from 'react'
 
 interface RemoteVideoAreaProps {
   participantName?: string
@@ -15,10 +17,16 @@ export default function RemoteVideoArea({ participantName = 'Participant' }: Rem
   )
   const remoteTracks = tracks.filter(t => !t.participant.isLocal)
   const subscribedRemote = remoteTracks.find(t => t.publication?.isSubscribed) as TrackReference | undefined
+  // Received resolution/fps/bitrate readout, shown while hovering the video.
+  const [hover, setHover] = useState(false)
 
   if (subscribedRemote) {
     return (
-      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div
+        style={{ position: 'relative', width: '100%', height: '100%' }}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+      >
         <VideoTrack
           trackRef={subscribedRemote}
           // `cover` fills the rounded card edge-to-edge so there are no black
@@ -30,6 +38,12 @@ export default function RemoteVideoArea({ participantName = 'Participant' }: Rem
           participant={subscribedRemote.participant}
           style={{ position: 'absolute', top: 12, right: 12, zIndex: 2 }}
         />
+        {hover && (
+          <VideoStatsBadge
+            track={subscribedRemote.publication?.track}
+            style={{ position: 'absolute', top: 12, right: 46, zIndex: 2 }}
+          />
+        )}
       </div>
     )
   }

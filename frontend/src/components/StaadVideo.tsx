@@ -28,8 +28,15 @@ const ROOM_OPTIONS: RoomOptions = {
   },
   publishDefaults: {
     simulcast: true,
-    videoEncoding: VideoPresets.h720.encoding,
+    // 720p top layer at 2.5 Mbps (LiveKit's preset is 1.7 Mbps). Webcams in
+    // indoor/low light produce noisy frames that eat bitrate; the extra headroom
+    // keeps faces sharp on the doctor's large screen. Simulcast + adaptiveStream
+    // still drop to the 360p/180p layers when a network can't carry it.
+    videoEncoding: { maxBitrate: 2_500_000, maxFramerate: 30 },
     videoSimulcastLayers: [VideoPresets.h180, VideoPresets.h360],
+    // When bandwidth/CPU is short, lower the frame rate before the resolution:
+    // in therapy a clear face matters more than perfectly smooth motion.
+    degradationPreference: 'maintain-resolution',
   },
 }
 
