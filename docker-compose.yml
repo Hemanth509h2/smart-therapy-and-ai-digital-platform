@@ -3,7 +3,7 @@ version: '3.8'
 services:
   frontend:
     build:
-      context: .
+      context: ./frontend
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
@@ -12,14 +12,15 @@ services:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - NEXT_PUBLIC_STT_TEST_MODE=${NEXT_PUBLIC_STT_TEST_MODE}
     volumes:
-      - ./frontend:/app/frontend
+      - ./frontend:/app
       - /app/.next
+      - /app/node_modules
     depends_on:
       - backend
 
   backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     ports:
       - "4000:4000"
@@ -29,8 +30,14 @@ services:
       - SARVAM_API_KEY=${SARVAM_API_KEY}
       - NEXT_PUBLIC_LIVEKIT_URL=${NEXT_PUBLIC_LIVEKIT_URL}
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - DATABASE_URL=${DATABASE_URL}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY}
     volumes:
-      - ./backend:/app/backend
+      - ./backend:/app
+      - /app/.next
+      - /app/node_modules
     depends_on:
       - db
 
@@ -42,6 +49,8 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
 
 volumes:
   pg_data:
