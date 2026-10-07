@@ -256,6 +256,12 @@
   border-radius: 32px !important;
   font-family: var(--font-text);
   overflow: hidden;
+  /* .staad-ui (staad-design.css) sets min-height:100vh for app shells. The
+     dialog portal carries `staad-ui` for its design tokens, which made the
+     popup stretch to the full viewport height (min-height beats max-height,
+     so no max-h on the popup could ever win). Dialogs size to their content. */
+  min-height: 0;
+  max-height: calc(100vh - 2rem);
 }
 .staad-ui.ds-dialog .ds-title,
 .staad-ui .ds-dialog .ds-title {
