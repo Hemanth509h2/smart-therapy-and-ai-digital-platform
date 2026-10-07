@@ -3,6 +3,7 @@ import { useLocalParticipant, VideoTrack } from '@livekit/components-react'
 import { Track } from 'livekit-client'
 import { useState, type CSSProperties } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
+import ConnectionQualityBadge from '@/components/session/ConnectionQualityBadge'
 
 export default function LocalVideoPip({
   docked = false,
@@ -78,6 +79,9 @@ export default function LocalVideoPip({
       >
         {userName}
       </div>
+      {localParticipant && (
+        <ConnectionQualityBadge participant={localParticipant} style={{ position: 'absolute', top: 5, right: 7 }} />
+      )}
     </div>
   )
 }

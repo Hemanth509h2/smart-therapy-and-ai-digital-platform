@@ -19,6 +19,7 @@ import { Track } from 'livekit-client';
 import StaadVideo, { useSessionRoom } from '@/components/StaadVideo';
 import RemoteVideoArea from '@/components/RemoteVideoArea';
 import LocalVideoPip from '@/components/LocalVideoPip';
+import ConnectionQualityBadge from '@/components/session/ConnectionQualityBadge';
 import GlassModulePanel, { SkillModuleView } from '@/components/GlassModulePanel';
 import SkillDevLayout from '@/components/session/SkillDevLayout';
 import ReactionOverlay from '@/components/ReactionOverlay';
@@ -1270,6 +1271,7 @@ function RemoteParticipantThumb({ name, online, width = 200, height = 120 }: { n
   return (
     <div style={{ position: 'relative', width, height, borderRadius: 14, flexShrink: 0, overflow: 'hidden', background: 'linear-gradient(135deg, #1a2e28, #142420)', border: `2px solid ${RC.green}` }}>
       <VideoTrack trackRef={track as TrackReference} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      <ConnectionQualityBadge participant={track.participant} style={{ position: 'absolute', top: 6, right: 7 }} />
       <div style={{ position: 'absolute', bottom: 7, left: 9, display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 10, background: 'rgba(255,255,255,0.92)', fontSize: 12.5, fontWeight: 600, color: RC.ink, maxWidth: 'calc(100% - 18px)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: online ? RC.green : RC.inkMuted }} />
         {name}

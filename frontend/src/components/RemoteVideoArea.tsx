@@ -2,6 +2,7 @@
 import { useTracks, VideoTrack } from '@livekit/components-react'
 import type { TrackReference } from '@livekit/components-react'
 import { Track } from 'livekit-client'
+import ConnectionQualityBadge from '@/components/session/ConnectionQualityBadge'
 
 interface RemoteVideoAreaProps {
   participantName?: string
@@ -17,13 +18,19 @@ export default function RemoteVideoArea({ participantName = 'Participant' }: Rem
 
   if (subscribedRemote) {
     return (
-      <VideoTrack
-        trackRef={subscribedRemote}
-        // `cover` fills the rounded card edge-to-edge so there are no black
-        // letterbox/pillarbox bars on the sides when the camera aspect ratio
-        // doesn't match the container.
-        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-      />
+      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <VideoTrack
+          trackRef={subscribedRemote}
+          // `cover` fills the rounded card edge-to-edge so there are no black
+          // letterbox/pillarbox bars on the sides when the camera aspect ratio
+          // doesn't match the container.
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+        <ConnectionQualityBadge
+          participant={subscribedRemote.participant}
+          style={{ position: 'absolute', top: 12, right: 12, zIndex: 2 }}
+        />
+      </div>
     )
   }
 
