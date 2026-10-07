@@ -954,41 +954,14 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                 </div>
               ) : null
             }
-            timerActions={
-              participantsPopupAvailable && (
-                <>
-                  {isTherapist && (
-                    <button
-                      onClick={toggleParticipants}
-                      title={showParticipants ? 'Hide participants' : 'Show participants'}
-                      style={{ flexShrink: 0, height: 36, padding: '0 12px', borderRadius: 10, border: `1px solid ${showParticipants ? RC.green : RC.border}`, background: showParticipants ? RC.greenSoft : RC.panel, color: showParticipants ? RC.greenDark : RC.ink, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      <Users size={16} />
-                      {Object.keys(participants).length}
-                    </button>
-                  )}
-                  {/* Client-side participants popup toggle - client can also resize the doctor's video */}
-                  {(!isTherapist && (
-                    <button
-                      onClick={toggleParticipantsClient}
-                      title={showParticipantsClient ? 'Hide participants' : 'Show participants'}
-                      style={{ flexShrink: 0, height: 36, padding: '0 12px', borderRadius: 10, border: `1px solid ${showParticipantsClient ? RC.green : RC.border}`, background: showParticipantsClient ? RC.greenSoft : RC.panel, color: showParticipantsClient ? RC.greenDark : RC.ink, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      <Users size={16} />
-                      {Object.keys(participants).length > 0 ? Object.keys(participants).length : ''}
-                    </button>
-                  ))}
-                  {/* Full-screen toggle */}
-                  <button
-                    onClick={toggleFullscreen}
-                    title={isFullscreen ? 'Exit full screen' : 'Full screen'}
-                    style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 10, border: `1px solid ${RC.border}`, background: RC.panel, color: RC.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                  >
-                    {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                  </button>
-                </>
-              )
-            }
+            // Timer action handlers
+            onToggleParticipants={isTherapist ? toggleParticipants : toggleParticipantsClient}
+            showParticipants={isTherapist ? showParticipants : showParticipantsClient}
+            onToggleFullscreen={toggleFullscreen}
+            isFullscreen={isFullscreen}
+            isTherapist={isTherapist}
+            participantsPopupAvailable={participantsPopupAvailable}
+            participantsCount={Object.keys(participants).length}
           />
 
             {isTherapist && participantsPopupAvailable && showParticipants && participantsPos && (
