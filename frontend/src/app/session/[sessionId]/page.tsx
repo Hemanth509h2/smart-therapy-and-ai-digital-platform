@@ -825,6 +825,26 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       endedSession?.startedAt && endedSession?.endedAt
         ? Math.max(0, Math.round((new Date(endedSession.endedAt).getTime() - new Date(endedSession.startedAt).getTime()) / 60000))
         : null;
+
+    // For client: close the window immediately after showing brief confirmation
+    // For therapist: show the session ended screen with redirect
+    useEffect(() => {
+      if (!isTherapist) {
+        // Give a moment for the UI to render, then close
+        const timer = setTimeout(() => {
+          window.close();
+          // Fallback if window.close() doesn't work (not opened by JS)
+          if (auth.currentUser?.uid?.startsWith('guest:')) {
+            auth.signOut().catch(() => {});
+            window.location.href = '/auth';
+          } else {
+            window.location.href = '/';
+          }
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    }, []);
+
     const done = () => {
       if (auth.currentUser?.uid?.startsWith('guest:')) {
         auth.signOut().catch(() => {});
@@ -833,25 +853,29 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
         window.location.href = '/';
       }
     };
+
     return (
       <div className="flex h-screen w-screen items-center justify-center px-4" style={{ background: '#0d1614' }}>
         <div className="w-full max-w-md rounded-2xl p-8 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
           <h1 className="text-xl font-semibold" style={{ color: '#fff' }}>Session ended</h1>
           <p className="mt-2 text-sm" style={{ color: 'var(--ink-muted)' }}>
-            The therapist has ended the session. Here are the details:
+            The therapist has ended the session.
+            {isTherapist ? ' Here are the details:' : ' Closing...'}
           </p>
-          <dl className="mt-6 space-y-3 text-left text-sm" style={{ color: 'var(--ink-muted)' }}>
-            <div className="flex justify-between"><dt>Client</dt><dd style={{ color: '#fff' }}>{endedSession?.clientName ?? '—'}</dd></div>
-            <div className="flex justify-between"><dt>Therapist</dt><dd style={{ color: '#fff' }}>{endedSession?.therapistName ?? '—'}</dd></div>
-            <div className="flex justify-between"><dt>Date</dt><dd style={{ color: '#fff' }}>{endedSession?.scheduledAt ? new Date(endedSession.scheduledAt).toLocaleString() : '—'}</dd></div>
-            <div className="flex justify-between"><dt>Duration</dt><dd style={{ color: '#fff' }}>{mins != null ? `${mins} min` : '—'}</dd></div>
-          </dl>
+          {isTherapist && endedSession && (
+            <dl className="mt-6 space-y-3 text-left text-sm" style={{ color: 'var(--ink-muted)' }}>
+              <div className="flex justify-between"><dt>Client</dt><dd style={{ color: '#fff' }}>{endedSession?.clientName ?? '—'}</dd></div>
+              <div className="flex justify-between"><dt>Therapist</dt><dd style={{ color: '#fff' }}>{endedSession?.therapistName ?? '—'}</dd></div>
+              <div className="flex justify-between"><dt>Date</dt><dd style={{ color: '#fff' }}>{endedSession?.scheduledAt ? new Date(endedSession.scheduledAt).toLocaleString() : '—'}</dd></div>
+              <div className="flex justify-between"><dt>Duration</dt><dd style={{ color: '#fff' }}>{mins != null ? `${mins} min` : '—'}</dd></div>
+            </dl>
+          )}
           <button
             onClick={done}
             className="mt-8 w-full rounded-xl py-3 font-semibold"
             style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}
           >
-            Done
+            {isTherapist ? 'Done' : 'Close'}
           </button>
         </div>
       </div>
