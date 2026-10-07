@@ -4,7 +4,16 @@ import { Track } from 'livekit-client'
 import { useState, type CSSProperties } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 
-export default function LocalVideoPip({ docked = false }: { docked?: boolean }) {
+export default function LocalVideoPip({
+  docked = false,
+  width = 200,
+  height = 120,
+}: {
+  docked?: boolean
+  /** Docked tile size (the participants popup is resizable). */
+  width?: number
+  height?: number
+}) {
   const { localParticipant, cameraTrack } = useLocalParticipant()
   const { profile } = useAuthStore()
   const [pipHover, setPipHover] = useState(false)
@@ -14,7 +23,7 @@ export default function LocalVideoPip({ docked = false }: { docked?: boolean }) 
   // `docked` renders the self-view as a tile in the top strip (replacing the
   // static "You" thumbnail). Default is the floating overlay over the video.
   const positionStyle: CSSProperties = docked
-    ? { position: 'relative', width: 200, height: 120, flexShrink: 0 }
+    ? { position: 'relative', width, height, flexShrink: 0 }
     : { position: 'absolute', bottom: 92, left: 18, width: 224, height: 162, zIndex: 18 }
 
   return (

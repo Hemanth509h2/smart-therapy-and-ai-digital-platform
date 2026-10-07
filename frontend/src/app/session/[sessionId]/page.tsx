@@ -186,10 +186,39 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   const [participantsPos, setParticipantsPos] = useState<{ x: number; y: number } | null>(null);
   const participantsDrag = useRef<{ dx: number; dy: number } | null>(null);
   const participantsPanelRef = useRef<HTMLDivElement>(null);
+  // Resizable popup: the tile width drives every tile (height keeps a 5:3 ratio).
+  const [participantTileW, setParticipantTileW] = useState(200);
+  const participantsResize = useRef<{ x: number; y: number; w: number } | null>(null);
+  const PARTICIPANT_TILE_MIN = 140;
+  const PARTICIPANT_TILE_MAX = 640;
+  const participantTileH = Math.round(participantTileW * 0.6);
+
+  const onParticipantsResizeStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    participantsResize.current = { x: e.clientX, y: e.clientY, w: participantTileW };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onParticipantsResizeMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const r = participantsResize.current;
+    if (!r || !participantsPos) return;
+    const dx = e.clientX - r.x;
+    const dyAsW = (e.clientY - r.y) / 0.6; // vertical drag, converted to width
+    const delta = Math.abs(dx) >= Math.abs(dyAsW) ? dx : dyAsW;
+    // Don't let the popup grow past the right edge of the screen.
+    const maxByViewport = window.innerWidth - participantsPos.x - 22 - 8;
+    setParticipantTileW(
+      Math.round(Math.min(Math.max(PARTICIPANT_TILE_MIN, r.w + delta), PARTICIPANT_TILE_MAX, maxByViewport))
+    );
+  };
+  const onParticipantsResizeEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    participantsResize.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+  };
 
   const clampToViewport = (x: number, y: number) => {
     const el = participantsPanelRef.current;
-    const w = el?.offsetWidth ?? 222;
+    const w = el?.offsetWidth ?? participantTileW + 22;
     const h = el?.offsetHeight ?? 160;
     return {
       x: Math.min(Math.max(8, x), window.innerWidth - w - 8),
@@ -199,7 +228,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
 
   const toggleParticipants = () => {
     if (!showParticipants && !participantsPos) {
-      setParticipantsPos({ x: window.innerWidth - 222 - 24, y: 110 });
+      setParticipantsPos({ x: window.innerWidth - participantTileW - 22 - 24, y: 110 });
     }
     setShowParticipants((v) => !v);
   };
@@ -672,6 +701,16 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   const sidebarOpen = sidebarPanel !== null && !whiteboardMode;
   const selfName = profile || guestName ? displayName : 'You';
 
+  // Doctor side: auto-open the participants popup so the client's live video is
+  // always in view: once when the room loads, and again whenever a module
+  // starts (the module takes the main canvas, so the popup is the only place the
+  // client's feed shows). The doctor can still move or close it.
+  useEffect(() => {
+    if (!isTherapist || loading || !participantsPopupAvailable) return;
+    setParticipantsPos((p) => p ?? { x: window.innerWidth - participantTileW - 22 - 24, y: 110 });
+    setShowParticipants(true);
+  }, [isTherapist, loading, moduleMode, participantsPopupAvailable]);
+
   // When the doctor ends the session, pull the session row once to show details.
   useEffect(() => {
     if (!sessionEnded) return;
@@ -857,7 +896,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
             {participantsPopupAvailable && showParticipants && participantsPos && (
               <div
                 ref={participantsPanelRef}
-                style={{ position: 'fixed', left: participantsPos.x, top: participantsPos.y, zIndex: 40, display: 'flex', flexDirection: 'column', gap: 8, padding: 10, maxHeight: '70vh', overflowY: 'auto', background: RC.panel, border: `1px solid ${RC.border}`, borderRadius: 16, boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }}
+                style={{ position: 'fixed', left: participantsPos.x, top: participantsPos.y, zIndex: 40, display: 'flex', flexDirection: 'column', gap: 8, padding: 10, maxHeight: 'calc(100vh - 16px)', background: RC.panel, border: `1px solid ${RC.border}`, borderRadius: 16, boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }}
               >
                 {/* Drag handle — grab the header to move the popup */}
                 <div
@@ -880,13 +919,30 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                     <X size={15} />
                   </button>
                 </div>
-                {Object.values(participants).map((p) =>
-                  p.uid === uid ? (
-                    <LocalVideoPip key={p.uid} docked />
-                  ) : (
-                    <RemoteParticipantThumb key={p.uid} name={p.name} online={p.isOnline} />
-                  )
-                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflowY: 'auto' }}>
+                  {Object.values(participants).map((p) =>
+                    p.uid === uid ? (
+                      <LocalVideoPip key={p.uid} docked width={participantTileW} height={participantTileH} />
+                    ) : (
+                      <RemoteParticipantThumb key={p.uid} name={p.name} online={p.isOnline} width={participantTileW} height={participantTileH} />
+                    )
+                  )}
+                </div>
+
+                {/* Resize handle — drag the bottom-right corner to resize */}
+                <div
+                  onPointerDown={onParticipantsResizeStart}
+                  onPointerMove={onParticipantsResizeMove}
+                  onPointerUp={onParticipantsResizeEnd}
+                  onPointerCancel={onParticipantsResizeEnd}
+                  onDoubleClick={() => setParticipantTileW(200)}
+                  title="Drag to resize (double-click to reset)"
+                  style={{ position: 'absolute', right: 2, bottom: 2, width: 18, height: 18, cursor: 'nwse-resize', touchAction: 'none', zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', padding: 3 }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" style={{ display: 'block' }}>
+                    <path d="M9 1L1 9M9 5L5 9" stroke={RC.inkMuted} strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
               </div>
             )}
 
@@ -1183,9 +1239,9 @@ function PillControls({
 }
 
 /* ===== PARTICIPANT THUMBNAIL — top strip ===== */
-function ParticipantThumb({ name, online, self }: { name: string; online: boolean; self: boolean }) {
+function ParticipantThumb({ name, online, self, width = 200, height = 120 }: { name: string; online: boolean; self: boolean; width?: number; height?: number }) {
   return (
-    <div style={{ position: 'relative', width: 200, height: 120, borderRadius: 14, flexShrink: 0, overflow: 'hidden', background: '#f3f5f8', border: `1px solid ${RC.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ position: 'relative', width, height, borderRadius: 14, flexShrink: 0, overflow: 'hidden', background: '#f3f5f8', border: `1px solid ${RC.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ width: 60, height: 60, borderRadius: '50%', background: RC.greenSoft, border: `2px solid ${RC.green}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: RC.greenDark, fontSize: 24, fontWeight: 600 }}>
         {name?.charAt(0)?.toUpperCase() || '?'}
       </div>
@@ -1202,17 +1258,17 @@ function ParticipantThumb({ name, online, self }: { name: string; online: boolea
    to the initial-letter thumbnail. LiveKit identities are display names (see
    backend /api/livekit-token), so we match on name; if that fails and there is
    exactly one remote camera (the normal 1:1 session), we use that one. */
-function RemoteParticipantThumb({ name, online }: { name: string; online: boolean }) {
+function RemoteParticipantThumb({ name, online, width = 200, height = 120 }: { name: string; online: boolean; width?: number; height?: number }) {
   const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: false }], { onlySubscribed: true });
   const remote = tracks.filter((t) => !t.participant.isLocal);
   const track =
     remote.find((t) => t.participant.identity === name || t.participant.name === name) ??
     (remote.length === 1 ? remote[0] : undefined);
 
-  if (!track) return <ParticipantThumb name={name} online={online} self={false} />;
+  if (!track) return <ParticipantThumb name={name} online={online} self={false} width={width} height={height} />;
 
   return (
-    <div style={{ position: 'relative', width: 200, height: 120, borderRadius: 14, flexShrink: 0, overflow: 'hidden', background: 'linear-gradient(135deg, #1a2e28, #142420)', border: `2px solid ${RC.green}` }}>
+    <div style={{ position: 'relative', width, height, borderRadius: 14, flexShrink: 0, overflow: 'hidden', background: 'linear-gradient(135deg, #1a2e28, #142420)', border: `2px solid ${RC.green}` }}>
       <VideoTrack trackRef={track as TrackReference} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       <div style={{ position: 'absolute', bottom: 7, left: 9, display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 10, background: 'rgba(255,255,255,0.92)', fontSize: 12.5, fontWeight: 600, color: RC.ink, maxWidth: 'calc(100% - 18px)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: online ? RC.green : RC.inkMuted }} />
