@@ -4,7 +4,8 @@ import type { TrackReference } from '@livekit/components-react'
 import { Track } from 'livekit-client'
 import ConnectionQualityBadge from '@/components/session/ConnectionQualityBadge'
 import VideoStatsBadge from '@/components/session/VideoStatsBadge'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { VIDEO_ASPECT, aspectRatioCss } from '@/lib/video-frame'
 
 interface RemoteVideoAreaProps {
   participantName?: string
@@ -20,6 +21,15 @@ export default function RemoteVideoArea({ participantName = 'Participant' }: Rem
   // Received resolution/fps/bitrate readout, shown while hovering the video.
   const [hover, setHover] = useState(false)
 
+  // Responsive frame with aspect-ratio preservation + object-fit: cover
+  // The container is the flex child; video fills it with cover (crops to fit)
+  const videoStyle = useMemo<React.CSSProperties>(() => ({
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    aspectRatio: aspectRatioCss(16, 9),
+  }), [])
+
   if (subscribedRemote) {
     return (
       <div
@@ -29,10 +39,7 @@ export default function RemoteVideoArea({ participantName = 'Participant' }: Rem
       >
         <VideoTrack
           trackRef={subscribedRemote}
-          // `cover` fills the rounded card edge-to-edge so there are no black
-          // letterbox/pillarbox bars on the sides when the camera aspect ratio
-          // doesn't match the container.
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          style={videoStyle}
         />
         <ConnectionQualityBadge
           participant={subscribedRemote.participant}

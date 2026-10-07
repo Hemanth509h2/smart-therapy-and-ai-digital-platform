@@ -1,9 +1,10 @@
 'use client'
 import { useLocalParticipant, VideoTrack } from '@livekit/components-react'
 import { Track } from 'livekit-client'
-import { useState, type CSSProperties } from 'react'
+import { useState, type CSSProperties, useMemo } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 import ConnectionQualityBadge from '@/components/session/ConnectionQualityBadge'
+import { viewportFrameCss, TILE_ASPECT, aspectRatioCss } from '@/lib/video-frame'
 
 export default function LocalVideoPip({
   docked = false,
@@ -21,18 +22,37 @@ export default function LocalVideoPip({
   const userName = profile ? `${profile.firstName} ${profile.lastName}` : 'You'
   const hasVideo = localParticipant && (cameraTrack?.isSubscribed || localParticipant.isCameraEnabled)
 
-  // `docked` renders the self-view as a tile in the top strip (replacing the
-  // static "You" thumbnail). Default is the floating overlay over the video.
-  const positionStyle: CSSProperties = docked
-    ? { position: 'relative', width, height, flexShrink: 0 }
-    : { position: 'absolute', bottom: 92, left: 18, width: 224, height: 162, zIndex: 18 }
+  // Responsive Design + Viewport-based sizing:
+  // - docked (popup tiles): use viewportFrameCss with TILE_ASPECT (5:3)
+  // - floating (PiP): responsive max-w, aspect-ratio preserved via CSS
+  const pipStyle = useMemo(() => {
+    if (docked) {
+      // Popup tile: width scales with viewport, capped at design width; height follows 5:3
+      return viewportFrameCss({
+        maxWidth: width,
+        aspect: TILE_ASPECT,
+        gutter: '2rem',
+        minHeight: 100,
+      })
+    }
+    // Floating PiP over main video: responsive but capped
+    return {
+      position: 'absolute' as const,
+      bottom: 92,
+      left: 18,
+      zIndex: 18,
+      width: `min(${width}px, 30vw)`,
+      aspectRatio: aspectRatioCss(width, height),
+      maxWidth: '100%',
+    }
+  }, [docked, width, height])
 
   return (
     <div
       onMouseEnter={() => setPipHover(true)}
       onMouseLeave={() => setPipHover(false)}
       style={{
-        ...positionStyle,
+        ...pipStyle,
         borderRadius: 14,
         overflow: 'hidden',
         background: 'linear-gradient(135deg, #1a2e28, #142420)',
@@ -40,6 +60,7 @@ export default function LocalVideoPip({
         boxShadow: '0 8px 22px rgba(0,0,0,0.28)',
         transition: 'border-color 0.2s, transform 0.2s',
         transform: pipHover ? 'scale(1.03)' : 'scale(1)',
+        flexShrink: 0,
       }}
     >
       {hasVideo ? (
