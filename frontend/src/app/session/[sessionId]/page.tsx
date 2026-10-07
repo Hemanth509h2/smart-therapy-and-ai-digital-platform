@@ -20,6 +20,7 @@ import StaadVideo, { useSessionRoom } from '@/components/StaadVideo';
 import RemoteVideoArea from '@/components/RemoteVideoArea';
 import LocalVideoPip from '@/components/LocalVideoPip';
 import ConnectionQualityBadge from '@/components/session/ConnectionQualityBadge';
+import VideoStatsBadge from '@/components/session/VideoStatsBadge';
 import GlassModulePanel, { SkillModuleView } from '@/components/GlassModulePanel';
 import SkillDevLayout from '@/components/session/SkillDevLayout';
 import ReactionOverlay from '@/components/ReactionOverlay';
@@ -1392,7 +1393,8 @@ function ParticipantThumb({ name, online, self, width = 200, height = 120 }: { n
    Shows the participant's live camera when we can find it, otherwise falls back
    to the initial-letter thumbnail. LiveKit identities are display names (see
    backend /api/livekit-token), so we match on name; if that fails and there is
-   exactly one remote camera (the normal 1:1 session), we use that one. */
+   exactly one remote camera (the normal 1:1 session), we use that one.
+   Shows VideoStatsBadge (resolution, fps, bitrate) on hover — same as doctor side. */
 function RemoteParticipantThumb({ name, online, width = 200, height = 120 }: { name: string; online: boolean; width?: number; height?: number }) {
   const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: false }], { onlySubscribed: true });
   const remote = tracks.filter((t) => !t.participant.isLocal);
@@ -1400,12 +1402,24 @@ function RemoteParticipantThumb({ name, online, width = 200, height = 120 }: { n
     remote.find((t) => t.participant.identity === name || t.participant.name === name) ??
     (remote.length === 1 ? remote[0] : undefined);
 
+  const [hover, setHover] = useState(false);
+
   if (!track) return <ParticipantThumb name={name} online={online} self={false} width={width} height={height} />;
 
   return (
-    <div style={{ position: 'relative', width, height, borderRadius: 14, flexShrink: 0, overflow: 'hidden', background: 'linear-gradient(135deg, #1a2e28, #142420)', border: `2px solid ${RC.green}` }}>
+    <div
+      style={{ position: 'relative', width, height, borderRadius: 14, flexShrink: 0, overflow: 'hidden', background: 'linear-gradient(135deg, #1a2e28, #142420)', border: `2px solid ${RC.green}` }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
       <VideoTrack trackRef={track as TrackReference} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       <ConnectionQualityBadge participant={track.participant} style={{ position: 'absolute', top: 6, right: 7 }} />
+      {hover && (
+        <VideoStatsBadge
+          track={track.publication?.track}
+          style={{ position: 'absolute', top: 6, right: 42, zIndex: 2 }}
+        />
+      )}
       <div style={{ position: 'absolute', bottom: 7, left: 9, display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 10, background: 'rgba(255,255,255,0.92)', fontSize: 12.5, fontWeight: 600, color: RC.ink, maxWidth: 'calc(100% - 18px)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: online ? RC.green : RC.inkMuted }} />
         {name}
