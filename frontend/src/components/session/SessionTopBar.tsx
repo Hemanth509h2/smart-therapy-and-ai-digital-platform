@@ -17,6 +17,8 @@ export default function SessionTopBar({
   sessionId,
   onlineCount,
   transcriptLine,
+  /** Extra actions rendered beside the session timer (e.g. participants toggle, fullscreen). */
+  timerActions,
 }: {
   timerStr: string
   sessionType?: string
@@ -25,6 +27,8 @@ export default function SessionTopBar({
   onlineCount: number
   /** Optional right-aligned status line (transcription chip) — kept from before. */
   transcriptLine?: React.ReactNode
+  /** ReactNode(s) to render next to the session timer. */
+  timerActions?: React.ReactNode
 }) {
   const [infoOpen, setInfoOpen] = useState(false)
 
@@ -92,27 +96,34 @@ export default function SessionTopBar({
           {transcriptLine}
         </div>
 
-        {/* Session Timer */}
-        <div style={{ flexShrink: 0, textAlign: 'right' }}>
-          <div style={{ ...microLabel, justifyContent: 'flex-end' }}>
-            <Clock size={10} />
-            Session Timer
+        {/* Session Timer + actions (participants toggle, fullscreen) */}
+        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ ...microLabel, justifyContent: 'flex-end' }}>
+              <Clock size={10} />
+              Session Timer
+            </div>
+            <div
+              style={{
+                fontSize: 17.5,
+                fontWeight: 600,
+                color: RC.ink,
+                fontFamily: 'monospace',
+                fontVariantNumeric: 'tabular-nums',
+                marginTop: 1,
+              }}
+            >
+              {timerStr}
+            </div>
           </div>
-          <div
-            style={{
-              fontSize: 17.5,
-              fontWeight: 600,
-              color: RC.ink,
-              fontFamily: 'monospace',
-              fontVariantNumeric: 'tabular-nums',
-              marginTop: 1,
-            }}
-          >
-            {timerStr}
-          </div>
-        </div>
+          {timerActions && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {timerActions}
+            </div>
+          )}
 
-        <div style={{ width: 1, height: 28, background: RC.border, flexShrink: 0 }} />
+          <div style={{ width: 1, height: 28, background: RC.border, flexShrink: 0 }} />
+        </div>
 
         {/* Session Info + expand toggle */}
         <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>

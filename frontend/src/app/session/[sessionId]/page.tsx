@@ -954,34 +954,42 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                 </div>
               ) : null
             }
+            timerActions={
+              participantsPopupAvailable && (
+                <>
+                  {isTherapist && (
+                    <button
+                      onClick={toggleParticipants}
+                      title={showParticipants ? 'Hide participants' : 'Show participants'}
+                      style={{ flexShrink: 0, height: 36, padding: '0 12px', borderRadius: 10, border: `1px solid ${showParticipants ? RC.green : RC.border}`, background: showParticipants ? RC.greenSoft : RC.panel, color: showParticipants ? RC.greenDark : RC.ink, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      <Users size={16} />
+                      {Object.keys(participants).length}
+                    </button>
+                  )}
+                  {/* Client-side participants popup toggle - client can also resize the doctor's video */}
+                  {(!isTherapist && (
+                    <button
+                      onClick={toggleParticipantsClient}
+                      title={showParticipantsClient ? 'Hide participants' : 'Show participants'}
+                      style={{ flexShrink: 0, height: 36, padding: '0 12px', borderRadius: 10, border: `1px solid ${showParticipantsClient ? RC.green : RC.border}`, background: showParticipantsClient ? RC.greenSoft : RC.panel, color: showParticipantsClient ? RC.greenDark : RC.ink, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      <Users size={16} />
+                      {Object.keys(participants).length > 0 ? Object.keys(participants).length : ''}
+                    </button>
+                  ))}
+                  {/* Full-screen toggle */}
+                  <button
+                    onClick={toggleFullscreen}
+                    title={isFullscreen ? 'Exit full screen' : 'Full screen'}
+                    style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 10, border: `1px solid ${RC.border}`, background: RC.panel, color: RC.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  >
+                    {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                  </button>
+                </>
+              )
+            }
           />
-
-          {/* ---- Participants popup toggle + full-screen. The thumbnails no longer
-               take a fixed row; they open in a floating panel over the canvas.
-               Hidden in whiteboard mode: both feeds move into the board itself. ---- */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, flexShrink: 0, position: 'relative' }}>
-            {isTherapist && participantsPopupAvailable && (
-              <button
-                onClick={toggleParticipants}
-                title={showParticipants ? 'Hide participants' : 'Show participants'}
-                style={{ flexShrink: 0, height: 36, padding: '0 12px', borderRadius: 10, border: `1px solid ${showParticipants ? RC.green : RC.border}`, background: showParticipants ? RC.greenSoft : RC.panel, color: showParticipants ? RC.greenDark : RC.ink, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-              >
-                <Users size={16} />
-                {Object.keys(participants).length}
-              </button>
-            )}
-
-            {/* Client-side participants popup toggle - client can also resize the doctor's video */}
-            {(!isTherapist && participantsPopupAvailable) && (
-              <button
-                onClick={toggleParticipantsClient}
-                title={showParticipantsClient ? 'Hide participants' : 'Show participants'}
-                style={{ flexShrink: 0, height: 36, padding: '0 12px', borderRadius: 10, border: `1px solid ${showParticipantsClient ? RC.green : RC.border}`, background: showParticipantsClient ? RC.greenSoft : RC.panel, color: showParticipantsClient ? RC.greenDark : RC.ink, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-              >
-                <Users size={16} />
-                {Object.keys(participants).length > 0 ? Object.keys(participants).length : ''}
-              </button>
-            )}
 
             {isTherapist && participantsPopupAvailable && showParticipants && participantsPos && (
               <div
@@ -1109,16 +1117,6 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                 </div>
               </div>
             )}
-
-            {/* Full-screen toggle — stays at the far right regardless of mode */}
-            <button
-              onClick={toggleFullscreen}
-              title={isFullscreen ? 'Exit full screen' : 'Full screen'}
-              style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 10, border: `1px solid ${RC.border}`, background: RC.panel, color: RC.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-            >
-              {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-            </button>
-          </div>
 
           {/* ---- Main canvas: patient video, or the whiteboard taking it over ---- */}
           <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', display: 'flex', flexDirection: 'column', gap: 12 }}>
