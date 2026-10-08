@@ -3,7 +3,7 @@ import { useLocalParticipant } from '@livekit/components-react'
 import {
   Mic, MicOff, Camera, CameraOff, PhoneOff, ChevronUp,
   MonitorUp, NotebookPen, PenTool, Blocks, Users, Settings,
-  Smile, Lock, LockOpen, Sparkles,
+  Smile, Lock, LockOpen, Sparkles, Video,
 } from 'lucide-react'
 import { RC } from './roomTheme'
 import type { SidebarPanel } from './sessionPanels'
@@ -30,6 +30,8 @@ export default function SessionBottomBar({
   onToggleLock,
   screenSharing,
   onToggleScreenShare,
+  showBackToVideo,
+  onBackToVideo,
 }: {
   activePanel: SidebarPanel
   onSelectPanel: (panel: Exclude<SidebarPanel, null>) => void
@@ -43,6 +45,8 @@ export default function SessionBottomBar({
   onToggleLock: () => void
   screenSharing: boolean
   onToggleScreenShare: () => void
+  showBackToVideo?: boolean
+  onBackToVideo?: () => void
 }) {
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant()
 
@@ -141,6 +145,12 @@ export default function SessionBottomBar({
         >
           <MonitorUp size={17} /> Share
         </button>
+
+        {showBackToVideo && (
+          <button onClick={onBackToVideo} title="Back to video call" style={item(true)}>
+            <Video size={17} /> Back to Call
+          </button>
+        )}
 
         <button onClick={() => onSelectPanel('assistant')} style={item(activePanel === 'assistant')}>
           <Sparkles size={17} /> AI Assistant

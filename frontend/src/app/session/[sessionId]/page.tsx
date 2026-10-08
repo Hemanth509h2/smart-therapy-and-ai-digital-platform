@@ -1244,6 +1244,8 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                 onToggleLock={handleLockToggle}
                 screenSharing={screenSharing}
                 onToggleScreenShare={() => setScreenSharing((s) => !s)}
+                showBackToVideo={whiteboardMode || moduleMode}
+                onBackToVideo={() => (whiteboardMode ? closeWhiteboard() : handleModuleClose())}
               />
             )}
           </div>
