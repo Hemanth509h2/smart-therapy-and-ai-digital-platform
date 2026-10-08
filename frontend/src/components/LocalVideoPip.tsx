@@ -5,6 +5,7 @@ import { useState, type CSSProperties, useMemo } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 import ConnectionQualityBadge from '@/components/session/ConnectionQualityBadge'
 import { viewportFrameCss, TILE_ASPECT, aspectRatioCss } from '@/lib/video-frame'
+import { useVideoTrackDimensions } from '@/hooks/useVideoTrackDimensions'
 
 export default function LocalVideoPip({
   docked = false,
@@ -22,15 +23,27 @@ export default function LocalVideoPip({
   const userName = profile ? `${profile.firstName} ${profile.lastName}` : 'You'
   const hasVideo = localParticipant && (cameraTrack?.isSubscribed || localParticipant.isCameraEnabled)
 
+  // Track reference for the local camera to detect its actual dimensions
+  const localTrackRef = useMemo(() => 
+    localParticipant && cameraTrack 
+      ? { participant: localParticipant, source: Track.Source.Camera, publication: cameraTrack } 
+      : undefined,
+    [localParticipant, cameraTrack]
+  )
+
+  // Auto-detect local camera's actual aspect ratio
+  const dimensions = useVideoTrackDimensions(localTrackRef)
+  const actualAspectRatio = dimensions?.aspectRatio ?? (width / height)
+
   // Responsive Design + Viewport-based sizing:
-  // - docked (popup tiles): use viewportFrameCss with TILE_ASPECT (5:3)
-  // - floating (PiP): responsive max-w, aspect-ratio preserved via CSS
+  // - docked (popup tiles): use viewportFrameCss with actual aspect ratio
+  // - floating (PiP): responsive max-w, aspect-ratio from actual camera
   const pipStyle = useMemo(() => {
     if (docked) {
-      // Popup tile: width scales with viewport, capped at design width; height follows 5:3
+      // Popup tile: width scales with viewport, capped at design width; height follows actual aspect
       return viewportFrameCss({
         maxWidth: width,
-        aspect: TILE_ASPECT,
+        aspect: actualAspectRatio,
         gutter: '2rem',
         minHeight: 100,
       })
@@ -42,10 +55,18 @@ export default function LocalVideoPip({
       left: 18,
       zIndex: 18,
       width: `min(${width}px, 30vw)`,
-      aspectRatio: aspectRatioCss(width, height),
+      aspectRatio: actualAspectRatio,
       maxWidth: '100%',
     }
-  }, [docked, width, height])
+  }, [docked, width, actualAspectRatio])
+
+  // Video element style with correct aspect ratio
+  const videoStyle: CSSProperties = {
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain',
+    aspectRatio: actualAspectRatio,
+  }
 
   return (
     <div
@@ -65,11 +86,11 @@ export default function LocalVideoPip({
     >
       {hasVideo ? (
         <VideoTrack
-          trackRef={{ participant: localParticipant!, source: Track.Source.Camera, publication: cameraTrack! }}
-          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          trackRef={localTrackRef}
+          style={videoStyle}
         />
       ) : (
-        <div className="flex items-center justify-center h-full">
+        <div className="flex items-center justify-center h-full" style={{ aspectRatio: actualAspectRatio }}>
           <span style={{ fontSize: 30, color: 'rgba(255,255,255,0.6)' }}>
             {userName?.charAt(0)?.toUpperCase() || 'Y'}
           </span>

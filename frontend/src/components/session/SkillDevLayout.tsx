@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useState, type ReactNode, useMemo } from 'react'
 import { useTracks, useLocalParticipant, VideoTrack } from '@livekit/components-react'
 import type { TrackReference } from '@livekit/components-react'
 import { Track } from 'livekit-client'
 import { Mic, MicOff, Camera, CameraOff, PhoneOff, X } from 'lucide-react'
+import { useVideoTrackDimensions } from '@/hooks/useVideoTrackDimensions'
 
 // Full-canvas layout used ONLY by Skill Development modules. The normal session
 // room layout (used by every other module) is untouched — the session page picks
@@ -35,6 +36,13 @@ function VideoPill({
   onExpand: () => void
 }) {
   const [hover, setHover] = useState(false)
+  
+  // Auto-detect video track's actual aspect ratio
+  const dimensions = useVideoTrackDimensions(trackRef)
+  const actualAspectRatio = dimensions?.aspectRatio ?? (4 / 3) // Default 4:3 for pills
+
+  const pillWidth = 96
+  const pillHeight = pillWidth / actualAspectRatio
 
   return (
     <div
@@ -52,8 +60,8 @@ function VideoPill({
       <div
         style={{
           position: 'relative',
-          width: 96,
-          height: 72,
+          width: pillWidth,
+          height: pillHeight,
           borderRadius: 12,
           overflow: 'hidden',
           border: '2px solid rgba(255,255,255,0.85)',
@@ -62,7 +70,15 @@ function VideoPill({
         }}
       >
         {trackRef ? (
-          <VideoTrack trackRef={trackRef} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <VideoTrack
+            trackRef={trackRef}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              aspectRatio: actualAspectRatio,
+            }}
+          />
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.75)', fontSize: 20, fontWeight: 700 }}>
             {name?.charAt(0)?.toUpperCase() || '?'}
@@ -98,6 +114,54 @@ function VideoPill({
           textShadow: '0 1px 3px rgba(0,0,0,0.8)',
         }}
       >
+        {name}
+      </div>
+    </div>
+  )
+}
+
+// Expanded video modal with auto-aspect-ratio detection
+function ExpandedVideo({
+  trackRef,
+  name,
+  onClose,
+}: {
+  trackRef: TrackReference | undefined
+  name: string
+  onClose: () => void
+}) {
+  // Auto-detect video track's actual aspect ratio
+  const dimensions = useVideoTrackDimensions(trackRef)
+  const actualAspectRatio = dimensions?.aspectRatio ?? (4 / 3)
+
+  return (
+    <div onClick={onClose} style={{ position: 'relative', width: 'min(80vw, 900px)', borderRadius: 16, overflow: 'hidden', background: '#1a2a25', border: '2px solid rgba(255,255,255,0.85)', aspectRatio: actualAspectRatio }}>
+      {trackRef ? (
+        <VideoTrack
+          trackRef={trackRef}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            aspectRatio: actualAspectRatio,
+          }}
+        />
+      ) : (
+        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', fontSize: 48, fontWeight: 700 }}>
+          {name?.charAt(0)?.toUpperCase() || '?'}
+        </div>
+      )}
+      <button
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+        style={{
+          position: 'absolute', top: 10, right: 10, width: 30, height: 30, borderRadius: 8,
+          border: 'none', cursor: 'pointer', background: 'rgba(0,0,0,0.6)', color: '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <X size={16} />
+      </button>
+      <div style={{ position: 'absolute', bottom: 10, left: 12, fontSize: 12, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
         {name}
       </div>
     </div>
@@ -198,28 +262,7 @@ export default function SkillDevLayout({
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40,
           }}
         >
-          <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: 'min(80vw, 900px)', aspectRatio: '4 / 3', borderRadius: 16, overflow: 'hidden', background: '#1a2a25', border: '2px solid rgba(255,255,255,0.85)' }}>
-            {expandedTrack ? (
-              <VideoTrack trackRef={expandedTrack} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', fontSize: 48, fontWeight: 700 }}>
-                {expandedName?.charAt(0)?.toUpperCase() || '?'}
-              </div>
-            )}
-            <button
-              onClick={() => setExpanded(null)}
-              style={{
-                position: 'absolute', top: 10, right: 10, width: 30, height: 30, borderRadius: 8,
-                border: 'none', cursor: 'pointer', background: 'rgba(0,0,0,0.6)', color: '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <X size={16} />
-            </button>
-            <div style={{ position: 'absolute', bottom: 10, left: 12, fontSize: 12, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
-              {expandedName}
-            </div>
-          </div>
+          <ExpandedVideo trackRef={expandedTrack} name={expandedName} onClose={() => setExpanded(null)} />
         </div>
       )}
     </div>

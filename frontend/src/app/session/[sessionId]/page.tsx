@@ -14,6 +14,7 @@ import AIConsentBanner from '@/components/session/AIConsentBanner';
 import { AIErrorBoundary } from '@/components/session/AIErrorBoundary';
 import { useSessionTranscription } from '@/hooks/useSessionTranscription';
 import { useAttentionScoring, type AttentionState } from '@/hooks/useAttentionScoring';
+import { useVideoFrameStyle } from '@/hooks/useVideoTrackDimensions';
 import { useLocalParticipant, useTracks, VideoTrack, type TrackReference } from '@livekit/components-react';
 import { Track } from 'livekit-client';
 import StaadVideo, { useSessionRoom } from '@/components/StaadVideo';
@@ -1418,7 +1419,8 @@ function ParticipantThumb({ name, online, self, width = 200, height = 120 }: { n
    to the initial-letter thumbnail. LiveKit identities are display names (see
    backend /api/livekit-token), so we match on name; if that fails and there is
    exactly one remote camera (the normal 1:1 session), we use that one.
-   Shows VideoStatsBadge (resolution, fps, bitrate) on hover — same as doctor side. */
+   Shows VideoStatsBadge (resolution, fps, bitrate) on hover — same as doctor side.
+   Auto-resizes to match incoming video's actual aspect ratio. */
 function RemoteParticipantThumb({ name, online, width = 200, height = 120 }: { name: string; online: boolean; width?: number; height?: number }) {
   const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: false }], { onlySubscribed: true });
   const remote = tracks.filter((t) => !t.participant.isLocal);
@@ -1427,16 +1429,21 @@ function RemoteParticipantThumb({ name, online, width = 200, height = 120 }: { n
     (remote.length === 1 ? remote[0] : undefined);
 
   const [hover, setHover] = useState(false);
+  
+  // Auto-resize frame to match incoming video's actual aspect ratio
+  const videoStyle = useVideoFrameStyle(track as TrackReference | undefined, width / height);
 
   if (!track) return <ParticipantThumb name={name} online={online} self={false} width={width} height={height} />;
 
   return (
     <div
-      style={{ position: 'relative', width, height, borderRadius: 14, flexShrink: 0, overflow: 'hidden', background: 'linear-gradient(135deg, #1a2e28, #142420)', border: `2px solid ${RC.green}` }}
+      style={{ position: 'relative', width, flexShrink: 0, overflow: 'hidden', background: 'linear-gradient(135deg, #1a2e28, #142420)', border: `2px solid ${RC.green}`, borderRadius: 14 }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <VideoTrack trackRef={track as TrackReference} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      <div style={videoStyle}>
+        <VideoTrack trackRef={track as TrackReference} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+      </div>
       <ConnectionQualityBadge participant={track.participant} style={{ position: 'absolute', top: 6, right: 7 }} />
       {hover && (
         <VideoStatsBadge

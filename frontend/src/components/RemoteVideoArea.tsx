@@ -5,7 +5,8 @@ import { Track } from 'livekit-client'
 import ConnectionQualityBadge from '@/components/session/ConnectionQualityBadge'
 import VideoStatsBadge from '@/components/session/VideoStatsBadge'
 import { useState, useMemo } from 'react'
-import { VIDEO_ASPECT, aspectRatioCss } from '@/lib/video-frame'
+import { aspectRatioCss } from '@/lib/video-frame'
+import { useVideoFrameStyle } from '@/hooks/useVideoTrackDimensions'
 
 interface RemoteVideoAreaProps {
   participantName?: string
@@ -21,12 +22,15 @@ export default function RemoteVideoArea({ participantName = 'Participant' }: Rem
   // Received resolution/fps/bitrate readout, shown while hovering the video.
   const [hover, setHover] = useState(false)
 
-  // Responsive frame with aspect-ratio preservation + object-fit: cover
-  // The container is the flex child; video fills it with cover (crops to fit)
-  const videoStyle = useMemo<React.CSSProperties>(() => ({
+  // Auto-resize frame to match incoming video's actual aspect ratio
+  // Uses MediaStreamTrack.getSettings() for local, RTC stats for remote
+  const videoStyle = useVideoFrameStyle(subscribedRemote, 16 / 9)
+
+  // Fallback style for when track isn't ready yet
+  const fallbackStyle = useMemo<React.CSSProperties>(() => ({
     width: '100%',
     height: '100%',
-    objectFit: 'cover',
+    objectFit: 'contain',
     aspectRatio: aspectRatioCss(16, 9),
   }), [])
 

@@ -10,6 +10,7 @@ import {
   Plus, Minus, Users, X, Lock,
 } from 'lucide-react'
 import { RC } from './roomTheme'
+import { useVideoTrackDimensions } from '@/hooks/useVideoTrackDimensions'
 
 // Whiteboard mode — the LAYOUT SHELL.
 //
@@ -36,12 +37,16 @@ function VideoTile({
   width?: number
   height?: number
 }) {
+  // Auto-detect video track's actual aspect ratio
+  const dimensions = useVideoTrackDimensions(trackRef)
+  const actualAspectRatio = dimensions?.aspectRatio ?? (width / height)
+
   return (
     <div style={{ flexShrink: 0 }}>
       <div
         style={{
           width,
-          height,
+          height: width / actualAspectRatio,
           borderRadius: 12,
           overflow: 'hidden',
           background: '#1a2a25',
@@ -50,7 +55,15 @@ function VideoTile({
         }}
       >
         {trackRef ? (
-          <VideoTrack trackRef={trackRef} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <VideoTrack
+            trackRef={trackRef}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              aspectRatio: actualAspectRatio,
+            }}
+          />
         ) : (
           <div
             style={{
@@ -60,7 +73,7 @@ function VideoTile({
               alignItems: 'center',
               justifyContent: 'center',
               color: 'rgba(255,255,255,0.75)',
-              fontSize: Math.round(height * 0.27),
+              fontSize: Math.round((width / actualAspectRatio) * 0.27),
               fontWeight: 600,
             }}
           >
