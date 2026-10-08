@@ -775,9 +775,9 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   // SkillDevLayout's chrome-free full-screen space by design (handled above).
   const moduleMode = isModuleActive && !isSkillModule(activeModule) && !whiteboardMode;
   // The participants popup stays available in module mode (it is the only place
-  // the feeds show there); only the whiteboard hides it, because both feeds move
-  // into the board itself.
-  const participantsPopupAvailable = !whiteboardMode;
+  // the feeds show there); whiteboard also keeps it available so participants
+  // can be viewed in the draggable popup alongside the board.
+  const participantsPopupAvailable = true;
   const sidebarOpen = sidebarPanel !== null && !whiteboardMode;
   const selfName = profile || guestName ? displayName : 'You';
 
