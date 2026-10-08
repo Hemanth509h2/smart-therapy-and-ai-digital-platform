@@ -1216,7 +1216,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                 </div>
               )}
 
-              <ReactionOverlay sessionId={sessionId} />
+              <ReactionOverlay sessionId={sessionId} open={reactionBarOpen} onOpenChange={setReactionBarOpen} />
 
               {/* Toast notification */}
               {toast && (

@@ -11,12 +11,15 @@ interface FloatingEmoji {
 
 interface ReactionOverlayProps {
   sessionId: string
+  /** Controlled open state for the emoji bar (driven by the React button). */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 const EMOJIS = ['👏', '⭐', '💪', '😊', '🎉']
 
-export default function ReactionOverlay({ sessionId }: ReactionOverlayProps) {
-  const [barOpen, setBarOpen] = useState(false)
+export default function ReactionOverlay({ sessionId, open = false, onOpenChange }: ReactionOverlayProps) {
+  const barOpen = open
   const [floaters, setFloaters] = useState<FloatingEmoji[]>([])
   const idRef = useRef(0)
 
@@ -46,7 +49,7 @@ export default function ReactionOverlay({ sessionId }: ReactionOverlayProps) {
 
   const sendReaction = useCallback(
     async (emoji: string) => {
-      setBarOpen(false)
+      onOpenChange?.(false)
       const id = ++idRef.current
       const floater: FloatingEmoji = { id, emoji, x: Math.random() * 60 + 20 }
       setFloaters((prev) => [...prev, floater])
@@ -61,7 +64,7 @@ export default function ReactionOverlay({ sessionId }: ReactionOverlayProps) {
         })
       } catch {}
     },
-    [sessionId]
+    [sessionId, onOpenChange]
   )
 
   return (
