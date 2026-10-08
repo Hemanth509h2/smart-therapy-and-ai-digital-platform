@@ -48,6 +48,7 @@ export default function SessionLayoutPreview() {
   const startTime = useRef(Date.now() - 1000 * 155);
 
   const [activePanel, setActivePanel] = useState<SidebarPanel>('assistant');
+  const [showModulesPopup, setShowModulesPopup] = useState(false);
   const [screenSharing, setScreenSharing] = useState(false);
   const [isLocked, setIsLocked] = useState(true);
   const [reactionBarOpen, setReactionBarOpen] = useState(false);
@@ -63,6 +64,12 @@ export default function SessionLayoutPreview() {
   const promptedRef = useRef(false);
 
   const selectPanel = (panel: Exclude<SidebarPanel, null>) => {
+    if (panel === 'modules') {
+      setShowModulesPopup((open) => !open);
+      setActivePanel(null);
+      return;
+    }
+    setShowModulesPopup(false);
     const next = activePanel === panel ? null : panel;
     setActivePanel(next);
     if (next === 'whiteboard' && !promptedRef.current) {
@@ -74,7 +81,7 @@ export default function SessionLayoutPreview() {
   const whiteboardMode = activePanel === 'whiteboard';
   const moduleMode = previewModule !== null && !whiteboardMode;
   const canvasTakeover = whiteboardMode || moduleMode;
-  const sidebarOpen = activePanel !== null && !whiteboardMode;
+  const sidebarOpen = activePanel !== null && activePanel !== 'modules' && !whiteboardMode;
 
   return (
     <RoomContext.Provider value={room}>
@@ -179,6 +186,8 @@ export default function SessionLayoutPreview() {
             <SessionBottomBar
               activePanel={activePanel}
               onSelectPanel={selectPanel}
+              modulesOpen={showModulesPopup}
+              onToggleModules={() => selectPanel('modules')}
               onEndCall={() => {}}
               participantCount={2}
               reactionBarOpen={reactionBarOpen}
@@ -220,14 +229,15 @@ export default function SessionLayoutPreview() {
               onClose={() => setActivePanel(null)}
             />
           )}
-          {activePanel === 'modules' && (
-            <TherapyModulesPanel
-              allowedModuleIds={null}
-              onLaunch={(id) => setPreviewModule(id)}
-              onClose={() => setActivePanel(null)}
-            />
-          )}
         </div>
+
+        {showModulesPopup && (
+          <TherapyModulesPanel
+            allowedModuleIds={null}
+            onLaunch={(id) => { setPreviewModule(id); setShowModulesPopup(false); }}
+            onClose={() => setShowModulesPopup(false)}
+          />
+        )}
 
         {shareAsk && (
           <ShareWhiteboardModal

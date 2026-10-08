@@ -8,8 +8,8 @@ Estimated CPU, RAM, storage and bandwidth for self-hosting this project on a VPS
 
 ## TL;DR
 
-| | vCPU | RAM | Disk |
-|---|---|---|---|
+|  | vCPU | RAM | Disk |
+| --- | --- | --- | --- |
 | **Minimum** | 2 | 4 GB (+2 GB swap) | 40 GB SSD |
 | **Recommended** | 4 | 8 GB | 80 GB SSD |
 
@@ -20,19 +20,19 @@ Most of the heavy work (video, database, AI, auth) runs on outside services. The
 ## 1. What actually runs on the VPS
 
 | Component | What it is | RAM (approx.) | CPU |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `frontend/` | Next.js 14 app (`next start`) | 200–400 MB | Low |
 | `backend/` | Next.js API routes + custom `server.js` (relays live session audio to Sarvam for speech-to-text) | 300–500 MB, plus a little per live session | Low to medium (busiest during live sessions) |
 | `backend/whatsapp-bot/` | Baileys WhatsApp bot (Express) | 150–300 MB | Very low |
-| Reverse proxy + process manager | Nginx/Caddy (HTTPS) + PM2 or Docker | ~100 MB | Very low |
-| **Total while running** | | **~1–1.5 GB** | |
+| Reverse proxy + process manager | Nginx/Caddy (HTTPS) + PM2 or Docker | \~100 MB | Very low |
+| **Total while running** |  | **\~1–1.5 GB** |  |
 
 ---
 
 ## 2. What does *not* run on the VPS
 
 | Service | Provider |
-|---|---|
+| --- | --- |
 | Video/audio calls | **LiveKit Cloud** (the most expensive part, not on your server) |
 | Relational DB + vector search | **Neon PostgreSQL** + pgvector (via Prisma) |
 | Auth + realtime data | **Firebase** (Auth + Firestore) |
@@ -48,7 +48,9 @@ Most of the heavy work (video, database, AI, auth) runs on outside services. The
 Running `next build` for each app (large packages: Excalidraw, LiveKit, Firebase, Chart.js, MediaPipe) can use **2–3 GB of RAM**. On a 2 GB server the build will usually crash with an out-of-memory error.
 
 Pick one:
+
 - **Build on the VPS:** have at least 4 GB RAM and add 2 GB of swap:
+
   ```bash
   sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
   sudo mkswap /swapfile && sudo swapon /swapfile
@@ -57,6 +59,7 @@ Pick one:
 - **Build somewhere else** (GitHub Actions or a Docker image) and only run the finished apps on the VPS.
 
 Give each app its own Node memory limit so one app can't use up all the RAM:
+
 ```bash
 NODE_OPTIONS=--max-old-space-size=1024
 ```
@@ -66,7 +69,7 @@ NODE_OPTIONS=--max-old-space-size=1024
 ## 4. Recommended plans
 
 | Tier | Specs | Suits |
-|---|---|---|
+| --- | --- | --- |
 | **Minimum** | 2 vCPU, 4 GB RAM, 40 GB SSD, 2 GB swap | Testing, demos, about 10–20 sessions at once |
 | **Recommended** | 4 vCPU, 8 GB RAM, 80 GB SSD | Production, about 50+ sessions at once, room to build without downtime |
 | **If you self-host LiveKit** | 8 vCPU, 16 GB RAM, 1 Gbps network, high bandwidth | Only if you move away from LiveKit Cloud. Running LiveKit on a separate server is better. |

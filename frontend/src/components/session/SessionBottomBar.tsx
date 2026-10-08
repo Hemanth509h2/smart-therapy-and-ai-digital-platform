@@ -20,6 +20,8 @@ import type { SidebarPanel } from './sessionPanels'
 export default function SessionBottomBar({
   activePanel,
   onSelectPanel,
+  modulesOpen,
+  onToggleModules,
   onEndCall,
   participantCount,
   reactionBarOpen,
@@ -31,6 +33,8 @@ export default function SessionBottomBar({
 }: {
   activePanel: SidebarPanel
   onSelectPanel: (panel: Exclude<SidebarPanel, null>) => void
+  modulesOpen: boolean
+  onToggleModules: () => void
   onEndCall: () => void
   participantCount: number
   reactionBarOpen: boolean
@@ -150,7 +154,7 @@ export default function SessionBottomBar({
           <PenTool size={17} /> Whiteboard
         </button>
 
-        <button onClick={() => onSelectPanel('modules')} style={item(activePanel === 'modules')}>
+        <button onClick={onToggleModules} style={item(modulesOpen)}>
           <Blocks size={17} /> Modules
         </button>
 

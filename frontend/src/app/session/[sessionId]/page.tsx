@@ -22,7 +22,7 @@ import RemoteVideoArea from '@/components/RemoteVideoArea';
 import LocalVideoPip from '@/components/LocalVideoPip';
 import ConnectionQualityBadge from '@/components/session/ConnectionQualityBadge';
 import VideoStatsBadge from '@/components/session/VideoStatsBadge';
-import GlassModulePanel, { SkillModuleView } from '@/components/GlassModulePanel';
+import { SkillModuleView } from '@/components/GlassModulePanel';
 import SkillDevLayout from '@/components/session/SkillDevLayout';
 import ReactionOverlay from '@/components/ReactionOverlay';
 import { resolveAllowedModuleIds, isSkillModule, moduleName as moduleDisplayName } from '@/lib/modules';
@@ -124,6 +124,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
 
   /* ---- Swappable right sidebar: one of four panels, or none ---- */
   const [activePanel, setActivePanel] = useState<SidebarPanel>(null);
+  const [showModulesPopup, setShowModulesPopup] = useState(false);
   const [screenSharing, setScreenSharing] = useState(false);
   const [shareWhiteboardAsk, setShareWhiteboardAsk] = useState(false);
   const whiteboardPromptedRef = useRef(false);
@@ -154,6 +155,12 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   // Clicking the bar button for the open panel closes it; clicking a different
   // one swaps the content directly (no close-first step).
   const selectPanel = (panel: Exclude<SidebarPanel, null>) => {
+    if (panel === 'modules') {
+      setShowModulesPopup((open) => !open);
+      setActivePanel(null);
+      return;
+    }
+    setShowModulesPopup(false);
     const next = activePanel === panel ? null : panel;
     setActivePanel(next);
     // First time the therapist opens the whiteboard, ask about collaboration.
@@ -374,9 +381,8 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
 
   const handleModuleLaunch = async (moduleId: string, moduleName: string) => {
     await handleModuleSwitch(moduleId);
-    // Keep the sidebar on the Therapy Modules view so the launched activity
-    // renders where the selector was — same behaviour as the old fixed panel.
-    setActivePanel('modules');
+    setShowModulesPopup(false);
+    setActivePanel(null);
     showToast(`${moduleName} launched`);
     // Log module usage for the admin dashboard (best-effort).
     if (isTherapist && profile?.id) {
@@ -613,7 +619,8 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
 
   const handleLaunchModule = (moduleSlug: string) => {
     handleModuleSwitch(moduleSlug);
-    setActivePanel('modules');
+    setShowModulesPopup(false);
+    setActivePanel(null);
     showToast(`Launching ${moduleSlug}`);
   };
 
@@ -778,7 +785,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   // the feeds show there); whiteboard also keeps it available so participants
   // can be viewed in the draggable popup alongside the board.
   const participantsPopupAvailable = true;
-  const sidebarOpen = sidebarPanel !== null && !whiteboardMode;
+  const sidebarOpen = sidebarPanel !== null && sidebarPanel !== 'modules' && !whiteboardMode;
   const selfName = profile || guestName ? displayName : 'You';
 
   // Doctor side: auto-open the participants popup so the client's live video is
@@ -1211,6 +1218,8 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
               <SessionBottomBar
                 activePanel={activePanel}
                 onSelectPanel={selectPanel}
+                modulesOpen={showModulesPopup}
+                onToggleModules={() => selectPanel('modules')}
                 onEndCall={() => setShowConfirm(true)}
                 participantCount={onlineCount}
                 reactionBarOpen={reactionBarOpen}
@@ -1260,32 +1269,15 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
             />
           )}
 
-          {/* Therapy Modules: the selector until something is launched, then the
-              existing module panel — unchanged component, unchanged launch path. */}
-          {/* With the live module on the canvas, the sidebar shows the selector so
-              the therapist can switch activity without closing the current one.
-              The old GlassModulePanel path still serves Skill Development and the
-              client mirror. */}
-          {sidebarPanel === 'modules' && (
-            isModuleActive && !moduleMode ? (
-              <GlassModulePanel
-                sessionId={sessionId}
-                activeModule={activeModule}
-                isTherapist={isTherapist}
-                isLocked={isLocked}
-                onModuleSwitch={handleModuleSwitch}
-                onLockToggle={handleLockToggle}
-                onClose={handleModuleClose}
-              />
-            ) : isTherapist ? (
-              <TherapyModulesPanel
-                allowedModuleIds={resolveAllowedModuleIds(profile)}
-                onLaunch={handleModuleLaunch}
-                onClose={() => setActivePanel(null)}
-              />
-            ) : null
-          )}
         </div>
+
+        {isTherapist && showModulesPopup && (
+          <TherapyModulesPanel
+            allowedModuleIds={resolveAllowedModuleIds(profile)}
+            onLaunch={handleModuleLaunch}
+            onClose={() => setShowModulesPopup(false)}
+          />
+        )}
 
         {/* Share Whiteboard? — first whiteboard activation */}
         {shareWhiteboardAsk && (

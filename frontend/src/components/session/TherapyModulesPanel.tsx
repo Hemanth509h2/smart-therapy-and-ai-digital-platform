@@ -1,16 +1,12 @@
 'use client'
 import { useMemo, useState } from 'react'
-import { Search, SlidersHorizontal } from 'lucide-react'
+import { Blocks, Search, X } from 'lucide-react'
 import { MODULE_CATEGORIES, type ModuleItem } from '@/lib/modules'
-import { GLASS } from './roomTheme'
-import PanelShell from './PanelShell'
+import { RC } from './roomTheme'
 
-// Therapy Modules sidebar panel.
-//
-// Visual re-skin only: the module list, categories, per-therapist access filter
-// and the launch call are the same ones ModuleSelectorPanel used
-// (MODULE_CATEGORIES + resolveAllowedModuleIds + onLaunch(id, name)). No module
-// data or launch mechanism changed.
+// The picker uses the same registry, permission filter, and launch callback as
+// the previous selector. It is shown as an overlay above the call instead of in
+// the session sidebar.
 export default function TherapyModulesPanel({
   allowedModuleIds,
   onLaunch,
@@ -21,8 +17,7 @@ export default function TherapyModulesPanel({
   onClose: () => void
 }) {
   const [query, setQuery] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
-  const [filterOpen, setFilterOpen] = useState(false)
+  const [showAll, setShowAll] = useState(false)
 
   const allowSet = allowedModuleIds == null ? null : new Set(allowedModuleIds)
 
@@ -42,201 +37,79 @@ export default function TherapyModulesPanel({
     const q = query.trim().toLowerCase()
     const out: Array<{ mod: ModuleItem; catId: string; catName: string; iconBg: string; iconBorder: string }> = []
     for (const c of categories) {
-      if (categoryFilter && c.id !== categoryFilter) continue
       for (const m of c.modules) {
         if (q && !`${m.name} ${m.desc}`.toLowerCase().includes(q)) continue
         out.push({ mod: m, catId: c.id, catName: c.name, iconBg: c.iconBg, iconBorder: c.iconBorder })
       }
     }
     return out
-  }, [categories, categoryFilter, query])
+  }, [categories, query])
+
+  const visibleRows = showAll || query ? rows : rows.slice(0, 8)
 
   return (
-    <PanelShell
-      title="Therapy Modules"
-      subtitle="Select a module to use in session"
-      onClose={onClose}
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Therapy modules"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 90,
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+        padding: '24px 24px 104px',
+        background: 'rgba(27,43,38,0.10)',
+        backdropFilter: 'blur(2px)',
+      }}
     >
-      <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {/* Search + filter */}
-        <div style={{ display: 'flex', gap: 7 }}>
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 7,
-              padding: '0 10px',
-              height: 34,
-              borderRadius: 10,
-              background: GLASS.fill,
-              border: `1px solid ${GLASS.fillBorder}`,
-            }}
-          >
-            <Search size={13} style={{ color: GLASS.inkFaint, flexShrink: 0 }} />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search modules..."
-              style={{
-                flex: 1,
-                minWidth: 0,
-                background: 'transparent',
-                border: 'none',
-                outline: 'none',
-                color: GLASS.ink,
-                fontSize: 11.5,
-                fontFamily: "'DM Sans', sans-serif",
-              }}
-            />
-          </div>
-          <button
-            onClick={() => setFilterOpen((o) => !o)}
-            title="Filter by category"
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 10,
-              border: `1px solid ${filterOpen || categoryFilter ? GLASS.border : GLASS.fillBorder}`,
-              background: filterOpen || categoryFilter ? GLASS.fill : 'transparent',
-              color: categoryFilter ? GLASS.accent : GLASS.inkMuted,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <SlidersHorizontal size={14} />
+      <section
+        style={{
+          width: 'min(100%, 1050px)',
+          maxHeight: 'min(52vh, 470px)',
+          overflow: 'hidden auto',
+          borderRadius: 22,
+          border: `1px solid ${RC.border}`,
+          background: 'rgba(255,255,255,0.98)',
+          boxShadow: '0 20px 52px rgba(25,50,42,0.22)',
+        }}
+      >
+        <header style={{ position: 'sticky', top: 0, zIndex: 1, display: 'flex', alignItems: 'center', gap: 9, padding: '14px 18px 11px', background: 'rgba(255,255,255,0.98)', borderBottom: `1px solid ${RC.border}` }}>
+          <Blocks size={20} color={RC.green} />
+          <h2 style={{ margin: 0, color: RC.greenDark, fontSize: 16, fontWeight: 700 }}>Modules</h2>
+          <div style={{ flex: 1 }} />
+          <label style={{ width: 190, maxWidth: '30vw', height: 31, display: 'flex', alignItems: 'center', gap: 6, padding: '0 9px', borderRadius: 9, border: `1px solid ${RC.border}`, background: RC.tile }}>
+            <Search size={14} color={RC.inkMuted} />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search modules" style={{ minWidth: 0, flex: 1, border: 0, outline: 0, background: 'transparent', color: RC.ink, fontSize: 12 }} />
+          </label>
+          <button onClick={() => setShowAll((value) => !value)} style={{ border: 0, background: 'transparent', color: RC.greenDark, cursor: 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>
+            {showAll ? 'Show fewer' : 'View all modules →'}
           </button>
+          <button onClick={onClose} aria-label="Close modules" style={{ width: 30, height: 30, border: 0, borderRadius: 8, background: 'transparent', color: RC.inkMuted, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+            <X size={19} />
+          </button>
+        </header>
+
+        <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))', gap: 12 }}>
+          {visibleRows.map(({ mod, iconBg, iconBorder }) => (
+            <button
+              key={mod.id}
+              onClick={() => onLaunch(mod.id, mod.name)}
+              title={`Start ${mod.name}`}
+              style={{ minHeight: 119, padding: '13px 8px 10px', borderRadius: 15, border: `1px solid ${RC.border}`, background: '#fff', color: RC.ink, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 3px 10px rgba(20,40,30,0.04)' }}
+            >
+              <span aria-hidden="true" style={{ width: 43, height: 43, borderRadius: 12, display: 'grid', placeItems: 'center', fontSize: 23, background: iconBg, border: `1px solid ${iconBorder}` }}>{mod.emoji}</span>
+              <span style={{ fontSize: 12, lineHeight: 1.25, fontWeight: 700, textAlign: 'center' }}>{mod.name}</span>
+            </button>
+          ))}
+          {visibleRows.length === 0 && <p style={{ gridColumn: '1 / -1', margin: '8px 0', color: RC.inkMuted, fontSize: 13 }}>No modules match “{query}”.</p>}
         </div>
-
-        {filterOpen && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-            {[{ id: null as string | null, name: 'All' }, ...categories.map((c) => ({ id: c.id as string | null, name: c.name }))].map(
-              (c) => {
-                const active = categoryFilter === c.id
-                return (
-                  <button
-                    key={c.id ?? 'all'}
-                    onClick={() => setCategoryFilter(c.id)}
-                    style={{
-                      padding: '3px 10px',
-                      borderRadius: 20,
-                      border: `1px solid ${active ? GLASS.accent : GLASS.fillBorder}`,
-                      background: active ? GLASS.accent : 'transparent',
-                      color: active ? GLASS.accentInk : GLASS.inkMuted,
-                      fontSize: 9.5,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {c.name}
-                  </button>
-                )
-              }
-            )}
-          </div>
-        )}
-
-        {/* Module rows */}
-        {rows.length === 0 ? (
-          <div style={{ fontSize: 10, color: GLASS.inkFaint, padding: '8px 0' }}>
-            No modules match “{query}”.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {rows.map(({ mod, catName, iconBg, iconBorder }) => {
-              // The registry stores one dot-separated descriptor string per
-              // module — split it into the tag row rather than inventing fields.
-              const tags = mod.desc.split('·').map((t) => t.trim()).filter(Boolean)
-              return (
-                <div
-                  key={mod.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '10px 11px',
-                    borderRadius: 14,
-                    background: GLASS.fill,
-                    border: `1px solid ${GLASS.fillBorder}`,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 10,
-                      background: iconBg,
-                      border: `1px solid ${iconBorder}`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 16,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {mod.emoji}
-                  </div>
-
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: GLASS.ink }}>{mod.name}</div>
-                    <div
-                      style={{
-                        fontSize: 9.5,
-                        color: GLASS.inkFaint,
-                        marginTop: 1,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {[catName, ...tags].join(' · ')}
-                    </div>
-                    <div style={{ display: 'flex', gap: 4, marginTop: 5, flexWrap: 'wrap' }}>
-                      {[catName, ...tags.slice(0, 1)].map((p) => (
-                        <span
-                          key={p}
-                          style={{
-                            padding: '1px 7px',
-                            borderRadius: 20,
-                            background: 'rgba(255,255,255,0.08)',
-                            border: `1px solid ${GLASS.fillBorder}`,
-                            fontSize: 8.5,
-                            fontWeight: 600,
-                            color: GLASS.inkMuted,
-                          }}
-                        >
-                          {p}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => onLaunch(mod.id, mod.name)}
-                    style={{
-                      padding: '6px 11px',
-                      borderRadius: 10,
-                      border: `1px solid ${GLASS.accentInk}40`,
-                      background: GLASS.accent,
-                      color: GLASS.accentInk,
-                      fontSize: 10,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      flexShrink: 0,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    Start Module
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-    </PanelShell>
+      </section>
+    </div>
   )
+
 }
