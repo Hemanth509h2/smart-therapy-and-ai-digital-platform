@@ -35,7 +35,17 @@ export async function PATCH(
   { params }: { params: { sessionId: string } }
 ) {
   try {
-    const { action, scheduledAt } = await request.json();
+    const { action, scheduledAt } = await request.json().catch(() => ({ action: undefined, scheduledAt: undefined })) ?? {};
+    // Browsers silently drop the body of PATCH requests sent with
+    // `keepalive: true` (e.g. the end-call handler). Accept action/scheduledAt
+    // from the query string as a fallback so those calls still work.
+    const queryAction = new URL(request.url).searchParams.get('action') ?? undefined;
+    const queryScheduledAt = new URL(request.url).searchParams.get('scheduledAt') ?? undefined;
+    const finalAction = action ?? queryAction;
+    const finalScheduledAt = scheduledAt ?? queryScheduledAt;
+    if (!finalAction) {
+      return NextResponse.json({ error: 'Missing action' }, { status: 400 });
+    }
 
     const existing = await prisma.session.findUnique({
       where: { id: params.sessionId },
@@ -51,24 +61,24 @@ export async function PATCH(
     // they return before Firestore provisioning.
     //   - 'cancel':     SCHEDULED -> CANCELLED
     //   - 'reschedule': SCHEDULED/CANCELLED -> SCHEDULED at the new `scheduledAt`
-    if (action === 'cancel' || action === 'reschedule') {
-      if (action === 'cancel' && existing.status !== 'SCHEDULED') {
+    if (finalAction === 'cancel' || finalAction === 'reschedule') {
+      if (finalAction === 'cancel' && existing.status !== 'SCHEDULED') {
         return NextResponse.json({ error: 'Only scheduled sessions can be cancelled' }, { status: 409 });
       }
-      if (action === 'reschedule') {
+      if (finalAction === 'reschedule') {
         if (existing.status !== 'SCHEDULED' && existing.status !== 'CANCELLED') {
           return NextResponse.json({ error: 'Only scheduled or cancelled sessions can be rescheduled' }, { status: 409 });
         }
-        if (!scheduledAt || Number.isNaN(new Date(scheduledAt).getTime())) {
+        if (!finalScheduledAt || Number.isNaN(new Date(finalScheduledAt).getTime())) {
           return NextResponse.json({ error: 'A valid scheduledAt is required' }, { status: 400 });
         }
       }
       const session = await prisma.session.update({
         where: { id: params.sessionId },
         data:
-          action === 'cancel'
+          finalAction === 'cancel'
             ? { status: 'CANCELLED' }
-            : { status: 'SCHEDULED', scheduledAt: new Date(scheduledAt) },
+            : { status: 'SCHEDULED', scheduledAt: new Date(finalScheduledAt) },
         include: { client: true, therapist: true },
       });
       return NextResponse.json({ session });
@@ -82,7 +92,7 @@ export async function PATCH(
     // Runs on 'start' and 'end' alike, and is idempotent: 'start' is a no-op in
     // Prisma once a session is already ACTIVE, but a rejoin still needs the
     // documents to exist and the entitlement to be current.
-    if (action === 'start' || action === 'end') {
+    if (finalAction === 'start' || finalAction === 'end') {
       try {
         await provisionSessionDocs(params.sessionId);
       } catch (e) {
@@ -96,7 +106,7 @@ export async function PATCH(
       }
     }
 
-    if (action === 'start') {
+    if (finalAction === 'start') {
       // Only promote a session that hasn't started or ended yet.
       if (existing.status === 'SCHEDULED') {
         data = {
@@ -104,7 +114,7 @@ export async function PATCH(
           startedAt: existing.startedAt ?? now,
         };
       }
-    } else if (action === 'end') {
+    } else if (finalAction === 'end') {
       // Mark complete; keep the first endedAt if it was already set.
       data = {
         status: 'COMPLETED',
@@ -130,7 +140,7 @@ export async function PATCH(
     });
 
     // Send "session started" WhatsApp notification when therapist starts the session
-    if (action === 'start' && session.status === 'ACTIVE' && session.client.phoneNumber) {
+    if (finalAction === 'start' && session.status === 'ACTIVE' && session.client.phoneNumber) {
       const sessionLink = `${new URL(request.url).origin}/session/${session.id}`;
       const now = new Date();
       try {
@@ -189,7 +199,7 @@ export async function PATCH(
     // When the therapist ends the call, expire the invite link(s) that led to
     // this client so the link can never be used to rejoin after the session,
     // and flag the room as ended so the other participant's screen exits too.
-    if (action === 'end') {
+    if (finalAction === 'end') {
       await prisma.invite
         .updateMany({
           where: {

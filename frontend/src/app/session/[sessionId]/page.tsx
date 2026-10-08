@@ -676,7 +676,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     // Mark the scheduled session as COMPLETED in the database so it moves into
     // the client's session history once the call is cut. `keepalive` lets the
     // request finish even while the browser navigates away below.
-    apiFetch(`/api/sessions/${sessionId}`, {
+    apiFetch(`/api/sessions/${sessionId}?action=end`, {
       method: 'PATCH',
       keepalive: true,
       headers: { 'Content-Type': 'application/json' },
