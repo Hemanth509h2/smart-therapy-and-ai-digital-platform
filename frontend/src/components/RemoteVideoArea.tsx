@@ -15,7 +15,7 @@ interface RemoteVideoAreaProps {
 export default function RemoteVideoArea({ participantName = 'Participant' }: RemoteVideoAreaProps) {
   const tracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: false }],
-    { onlySubscribed: false }
+    { onlySubscribed: true }
   )
   const remoteTracks = tracks.filter(t => !t.participant.isLocal)
   const subscribedRemote = remoteTracks.find(t => t.publication?.isSubscribed) as TrackReference | undefined
