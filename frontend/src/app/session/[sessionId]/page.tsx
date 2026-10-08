@@ -791,6 +791,14 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     setShowParticipants(true);
   }, [isTherapist, loading, moduleMode, participantsPopupAvailable]);
 
+  // Client side: auto-open the participants popup so the therapist's video is
+  // always in view. The client can still move or close it.
+  useEffect(() => {
+    if (isTherapist || loading || !participantsPopupAvailable) return;
+    setParticipantsPosClient((p) => p ?? { x: window.innerWidth - participantTileWClient - 22 - 24, y: 110 });
+    setShowParticipantsClient(true);
+  }, [isTherapist, loading, moduleMode, participantsPopupAvailable]);
+
   // When the doctor ends the session, pull the session row once to show details.
   useEffect(() => {
     if (!sessionEnded) return;
