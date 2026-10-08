@@ -158,22 +158,10 @@ export default function WhiteboardStage({
   const zoomIn = () => (onZoomIn ? onZoomIn() : setZoomLocal((z) => Math.min(400, z + 25)))
   const zoomOut = () => (onZoomOut ? onZoomOut() : setZoomLocal((z) => Math.max(25, z - 25)))
 
-  // Get local participant and camera track via useLocalParticipant (reliable for self-view)
-  const { localParticipant, cameraTrack: localCameraTrack } = useLocalParticipant()
-  // Get remote tracks - only subscribed ones to ensure VideoTrack works
-  const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: false }], { onlySubscribed: true })
-
-  // Build selfTrack from local participant (like LocalVideoPip does)
-  const selfTrack = useMemo(() => {
-    if (!localParticipant || !localCameraTrack) return undefined
-    return {
-      participant: localParticipant,
-      source: Track.Source.Camera,
-      publication: localCameraTrack,
-    } as TrackReference
-  }, [localParticipant, localCameraTrack])
-
-  // Find other track from useTracks (remote, subscribed)
+  // Use useTracks for both local and remote — local tracks work because
+  // onlySubscribed:false includes them, and the SDK provides proper TrackReferences.
+  const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: false }], { onlySubscribed: false })
+  const selfTrack = tracks.find((t) => t.participant.isLocal) as TrackReference | undefined
   const otherTrack = tracks.find(
     (t) => !t.participant.isLocal && t.publication?.isSubscribed
   ) as TrackReference | undefined

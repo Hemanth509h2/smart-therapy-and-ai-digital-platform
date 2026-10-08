@@ -177,21 +177,12 @@ export default function SkillDevLayout({
   children,
 }: SkillDevLayoutProps) {
   const [expanded, setExpanded] = useState<null | 'self' | 'other'>(null)
-  const { localParticipant, cameraTrack: localCameraTrack, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant()
+  const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant()
 
-  // Remote tracks - only subscribed ones
-  const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: false }], { onlySubscribed: true })
-  
-  // Local track - build proper TrackReference from useLocalParticipant (like WhiteboardStage)
-  const selfTrack = useMemo(() => {
-    if (!localParticipant || !localCameraTrack) return undefined
-    return {
-      participant: localParticipant,
-      source: Track.Source.Camera,
-      publication: localCameraTrack,
-    } as TrackReference
-  }, [localParticipant, localCameraTrack])
-
+  // Use useTracks for both local and remote — local tracks work because
+  // onlySubscribed:false includes them, and the SDK provides proper TrackReferences.
+  const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: false }], { onlySubscribed: false })
+  const selfTrack = tracks.find((t) => t.participant.isLocal) as TrackReference | undefined
   const otherTrack = tracks.find((t) => !t.participant.isLocal && t.publication?.isSubscribed) as TrackReference | undefined
 
   // Therapist always sits top-left, client top-right — regardless of who is viewing.
