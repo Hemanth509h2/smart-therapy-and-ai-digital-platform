@@ -33,8 +33,8 @@ import TranslationControl from '@/components/session/TranslationControl';
 import { useTranslationSettings, pairForRole, writeTranslationSettings } from '@/lib/translation';
 import SessionTopBar from '@/components/session/SessionTopBar';
 import SessionBottomBar from '@/components/session/SessionBottomBar';
-import AIAssistantPanel from '@/components/session/AIAssistantPanel';
-import AINotesPanel from '@/components/session/AINotesPanel';
+import AIAssistantPopup from '@/components/session/AIAssistantPopup';
+import AINotesPopup from '@/components/session/AINotesPopup';
 import TherapyModulesPanel from '@/components/session/TherapyModulesPanel';
 import { ShareWhiteboardModal } from '@/components/session/WhiteboardStage';
 import StaadWhiteboard from '@/components/session/StaadWhiteboard';
@@ -125,6 +125,9 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   /* ---- Swappable right sidebar: one of four panels, or none ---- */
   const [activePanel, setActivePanel] = useState<SidebarPanel>(null);
   const [showModulesPopup, setShowModulesPopup] = useState(false);
+  // AI Assistant & AI Notes are now floating popups instead of sidebar panels
+  const [showAssistantPopup, setShowAssistantPopup] = useState(false);
+  const [showNotesPopup, setShowNotesPopup] = useState(false);
   const [screenSharing, setScreenSharing] = useState(false);
   const [shareWhiteboardAsk, setShareWhiteboardAsk] = useState(false);
   const whiteboardPromptedRef = useRef(false);
@@ -161,6 +164,21 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       return;
     }
     setShowModulesPopup(false);
+
+    // AI Assistant and Notes are now floating popups — toggle them independently.
+    if (panel === 'assistant') {
+      setShowAssistantPopup((open) => !open);
+      setShowNotesPopup(false); // close the other popup when opening this one
+      setActivePanel(null);
+      return;
+    }
+    if (panel === 'notes') {
+      setShowNotesPopup((open) => !open);
+      setShowAssistantPopup(false); // close the other popup when opening this one
+      setActivePanel(null);
+      return;
+    }
+
     const next = activePanel === panel ? null : panel;
     setActivePanel(next);
     // First time the therapist opens the whiteboard, ask about collaboration.
@@ -785,7 +803,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   // the feeds show there); whiteboard also keeps it available so participants
   // can be viewed in the draggable popup alongside the board.
   const participantsPopupAvailable = true;
-  const sidebarOpen = sidebarPanel !== null && sidebarPanel !== 'modules' && !whiteboardMode;
+  const sidebarOpen = sidebarPanel !== null && sidebarPanel !== 'modules' && sidebarPanel !== 'assistant' && sidebarPanel !== 'notes' && !whiteboardMode;
   const selfName = profile || guestName ? displayName : 'You';
 
   // Doctor side: auto-open the participants popup so the client's live video is
@@ -1233,43 +1251,31 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
           </div>
         </div>
 
-        {/* ---- STEP 2: swappable right sidebar — one of four panels, full height.
-             Same 420px width for every panel type, so the Therapy Modules view
-             needs no internal resizing. ---- */}
-        <div style={{
-          width: sidebarOpen ? SIDEBAR_WIDTH : 0,
-          minWidth: sidebarOpen ? SIDEBAR_WIDTH : 0,
-          flexShrink: 0,
-          overflow: 'hidden',
-          transition: 'width 0.3s cubic-bezier(0.4,0,0.2,1)',
-          display: isTherapist ? 'flex' : 'none',
-          justifyContent: 'flex-end',
-          padding: isTherapist ? (sidebarOpen ? '12px 16px 12px 0' : 0) : 0,
-        }}>
-          {sidebarPanel === 'assistant' && (
-            <AIErrorBoundary>
-              <AIAssistantPanel
-                insight={aiInsight}
-                live={transcription.isRecording}
-                analyseLoading={analyseLoading}
-                analyseDisabled={!bothConsented || analyseCooldown || analyseLoading}
-                onAnalyse={handleAnalyse}
-                onLaunchModule={handleLaunchModule}
-                onClose={() => setActivePanel(null)}
-              />
-            </AIErrorBoundary>
-          )}
-
-          {sidebarPanel === 'notes' && (
-            <AINotesPanel
-              sessionId={sessionId}
-              sessionStartedAt={startTime.current}
+        {/* ---- STEP 2: swappable right sidebar — now only used for whiteboard if needed ---- */}
+        {/* AI Assistant Popup — floating, draggable */}
+        {showAssistantPopup && (
+          <AIErrorBoundary>
+            <AIAssistantPopup
               insight={aiInsight}
-              onClose={() => setActivePanel(null)}
+              live={transcription.isRecording}
+              analyseLoading={analyseLoading}
+              analyseDisabled={!bothConsented || analyseCooldown || analyseLoading}
+              onAnalyse={handleAnalyse}
+              onLaunchModule={handleLaunchModule}
+              onClose={() => setShowAssistantPopup(false)}
             />
-          )}
+          </AIErrorBoundary>
+        )}
 
-        </div>
+        {/* AI Notes Popup — floating, draggable */}
+        {showNotesPopup && (
+          <AINotesPopup
+            sessionId={sessionId}
+            sessionStartedAt={startTime.current}
+            insight={aiInsight}
+            onClose={() => setShowNotesPopup(false)}
+          />
+        )}
 
         {isTherapist && showModulesPopup && (
           <TherapyModulesPanel
