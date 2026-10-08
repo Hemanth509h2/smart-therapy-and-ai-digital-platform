@@ -53,6 +53,7 @@ enum WhatsAppMessageStatus {
 enum WhatsAppMessageType {
   CLIENT_INVITE
   SESSION_SCHEDULED
+  SESSION_STARTED
 }
 
 model User {

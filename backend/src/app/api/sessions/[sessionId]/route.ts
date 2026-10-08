@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { provisionSessionDocs } from '@/lib/session-provisioning';
 import { markSessionEnded } from '@/lib/session-provisioning';
+import { sendSessionStartedMessage } from '@/lib/whatsapp-bot';
 
 // GET /api/sessions/[sessionId] — fetch a single session (with client + therapist).
 export async function GET(
@@ -126,6 +128,63 @@ export async function PATCH(
       data,
       include: { client: true, therapist: true },
     });
+
+    // Send "session started" WhatsApp notification when therapist starts the session
+    if (action === 'start' && session.status === 'ACTIVE' && session.client.phoneNumber) {
+      const sessionLink = `${new URL(request.url).origin}/session/${session.id}`;
+      const now = new Date();
+      try {
+        const delivery = await prisma.whatsAppMessage.upsert({
+          where: { sessionId_messageType: { sessionId: session.id, messageType: 'SESSION_STARTED' } },
+          create: {
+            id: randomUUID(),
+            sessionId: session.id,
+            clientId: session.clientId,
+            phoneNumber: session.client.phoneNumber,
+            generatedLink: sessionLink,
+            messageType: 'SESSION_STARTED',
+            status: 'SENDING',
+            attempts: 1,
+            lastAttemptAt: now,
+            updatedAt: now,
+          },
+          update: {
+            phoneNumber: session.client.phoneNumber,
+            generatedLink: sessionLink,
+            status: 'SENDING',
+            attempts: { increment: 1 },
+            lastAttemptAt: now,
+            errorCode: null,
+            errorMessage: null,
+            updatedAt: now,
+          },
+        });
+
+        const message = await sendSessionStartedMessage({
+          to: session.client.phoneNumber,
+          patientName: session.client.firstName,
+          sessionLink,
+          therapistName: `${session.therapist.firstName} ${session.therapist.lastName}`.trim(),
+        });
+
+        await prisma.whatsAppMessage.update({
+          where: { id: delivery.id },
+          data: {
+            status: 'SENT',
+            providerMessageId: message.sid,
+            sentAt: new Date(),
+            providerStatusAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
+      } catch (error: any) {
+        console.error('Session-started WhatsApp notification failed:', error);
+        await prisma.whatsAppMessage.updateMany({
+          where: { sessionId: session.id, messageType: 'SESSION_STARTED' },
+          data: { status: 'FAILED', errorMessage: error?.message || 'WhatsApp send failed', updatedAt: new Date() },
+        });
+      }
+    }
 
     // When the therapist ends the call, expire the invite link(s) that led to
     // this client so the link can never be used to rejoin after the session,

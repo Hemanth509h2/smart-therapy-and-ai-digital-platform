@@ -100,3 +100,25 @@ Tap the link below when it's time to join:
 Take a deep breath — we'll see you there. 🌿`
   return deliver(to, text)
 }
+
+export interface SessionStartedInput {
+  to: string
+  patientName: string
+  sessionLink: string
+  therapistName?: string
+}
+
+export async function sendSessionStartedMessage(input: SessionStartedInput): Promise<WhatsAppMessageResult> {
+  const to = normalizeWhatsAppNumber(input.to)
+  const name = input.patientName || 'there'
+  const withWhom = input.therapistName ? `with ${input.therapistName}` : ''
+  const text = `Hi ${name}! 🎬
+
+Your STAAD session ${withWhom} has *started now*.
+
+Tap to join immediately:
+👉 ${input.sessionLink}
+
+We're ready when you are. 🌿`
+  return deliver(to, text)
+}
