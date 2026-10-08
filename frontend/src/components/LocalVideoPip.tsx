@@ -21,7 +21,7 @@ export default function LocalVideoPip({
   const { profile } = useAuthStore()
   const [pipHover, setPipHover] = useState(false)
   const userName = profile ? `${profile.firstName} ${profile.lastName}` : 'You'
-  const hasVideo = localParticipant && (cameraTrack?.isSubscribed || localParticipant.isCameraEnabled)
+  const hasVideo = !!(localParticipant && cameraTrack && localParticipant.isCameraEnabled)
 
   // Track reference for the local camera to detect its actual dimensions
   const localTrackRef = useMemo(() => 
