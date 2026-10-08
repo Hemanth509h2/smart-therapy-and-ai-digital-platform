@@ -1239,7 +1239,6 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                 modulesOpen={showModulesPopup}
                 onToggleModules={() => selectPanel('modules')}
                 onEndCall={() => setShowConfirm(true)}
-                participantCount={onlineCount}
                 reactionBarOpen={reactionBarOpen}
                 onToggleReactions={() => setReactionBarOpen((o) => !o)}
                 isLocked={isLocked}

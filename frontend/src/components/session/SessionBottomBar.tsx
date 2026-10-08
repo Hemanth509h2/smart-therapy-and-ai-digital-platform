@@ -2,7 +2,7 @@
 import { useLocalParticipant } from '@livekit/components-react'
 import {
   Mic, MicOff, Camera, CameraOff, PhoneOff, ChevronUp,
-  MonitorUp, NotebookPen, PenTool, Blocks, Users, Settings,
+  MonitorUp, NotebookPen, PenTool, Blocks, Settings,
   Smile, Lock, LockOpen, Sparkles, Video,
 } from 'lucide-react'
 import { RC } from './roomTheme'
@@ -10,7 +10,7 @@ import type { SidebarPanel } from './sessionPanels'
 
 // Therapist bottom bar.
 //   [End Call] [Mic ▾] [Camera ▾]   ···   [Screen Share] [AI Assistant] [AI Notes]
-//   [Whiteboard] [Therapy Modules] [Participants 2] [Reactions] [Control] [Settings]
+//   [Whiteboard] [Therapy Modules] [Reactions] [Control] [Settings]
 //
 // Mic/camera use the same LiveKit toggles as before; the dropdown chevrons are
 // visual affordances only (device switching is not wired up). Screen share is a
@@ -23,7 +23,6 @@ export default function SessionBottomBar({
   modulesOpen,
   onToggleModules,
   onEndCall,
-  participantCount,
   reactionBarOpen,
   onToggleReactions,
   isLocked,
@@ -38,7 +37,6 @@ export default function SessionBottomBar({
   modulesOpen: boolean
   onToggleModules: () => void
   onEndCall: () => void
-  participantCount: number
   reactionBarOpen: boolean
   onToggleReactions: () => void
   isLocked: boolean
@@ -166,30 +164,6 @@ export default function SessionBottomBar({
 
         <button onClick={onToggleModules} style={item(modulesOpen)}>
           <Blocks size={17} /> Modules
-        </button>
-
-        <button title="Participants" style={item(false)}>
-          <Users size={17} /> Participants
-          <span
-            style={{
-              position: 'absolute',
-              top: 3,
-              right: 5,
-              minWidth: 17,
-              height: 17,
-              padding: '0 4px',
-              borderRadius: 9,
-              background: RC.green,
-              color: '#fff',
-              fontSize: 12.5,
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            {participantCount}
-          </span>
         </button>
 
         <button onClick={onToggleReactions} title="Reactions" style={item(reactionBarOpen)}>

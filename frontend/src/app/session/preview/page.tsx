@@ -189,7 +189,6 @@ export default function SessionLayoutPreview() {
               modulesOpen={showModulesPopup}
               onToggleModules={() => selectPanel('modules')}
               onEndCall={() => {}}
-              participantCount={2}
               reactionBarOpen={reactionBarOpen}
               onToggleReactions={() => setReactionBarOpen((o) => !o)}
               isLocked={isLocked}
