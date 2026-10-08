@@ -262,12 +262,6 @@ export default function WhiteboardStage({
         </div>
       )}
 
-      {/* Shrunken video feeds — side by side, top-left */}
-      <div style={{ position: 'absolute', top: 14, left: 14, zIndex: 30, display: 'flex', gap: 8 }}>
-        <VideoTile trackRef={selfTrack} name={selfName} width={140} height={96} />
-        <VideoTile trackRef={otherTrack} name={otherName} width={140} height={96} />
-      </div>
-
       {/* Top-right controls */}
       <div style={{ position: 'absolute', top: 14, right: 14, zIndex: 30, display: 'flex', alignItems: 'center', gap: 7 }}>
         {statusChip}
