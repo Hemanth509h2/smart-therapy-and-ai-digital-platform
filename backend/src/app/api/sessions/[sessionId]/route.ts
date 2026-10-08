@@ -171,7 +171,7 @@ export async function PATCH(
           where: { id: delivery.id },
           data: {
             status: 'SENT',
-            providerMessageId: message.sid,
+            providerMessageId: message.id,
             sentAt: new Date(),
             providerStatusAt: new Date(),
             updatedAt: new Date(),

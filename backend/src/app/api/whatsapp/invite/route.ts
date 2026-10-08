@@ -87,13 +87,13 @@ export async function POST(request: Request) {
         where: { id: delivery.id },
         data: {
           status: 'SENT',
-          providerMessageId: message.sid,
+          providerMessageId: message.id,
           sentAt: new Date(),
           providerStatusAt: new Date(),
           updatedAt: new Date(),
         },
       })
-      return NextResponse.json({ success: true, message })
+      return NextResponse.json({ success: true, message: { ...message, sid: message.id } })
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'WhatsApp send failed'
       await prisma.whatsAppMessage.update({

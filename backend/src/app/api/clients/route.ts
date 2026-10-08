@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
-import { normalizeWhatsAppNumber } from '@/lib/twilio-whatsapp';
+import { normalizeWhatsAppNumber } from '@/lib/whatsapp-cloud-api';
 
 export const dynamic = 'force-dynamic';
 

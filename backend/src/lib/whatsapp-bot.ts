@@ -1,8 +1,9 @@
 import {
-  isTwilioWhatsAppConfigured,
   normalizeWhatsAppNumber,
-  sendTwilioWhatsAppText,
-} from './twilio-whatsapp'
+  sendCloudApiText,
+  sendCloudApiTemplate,
+  isCloudApiConfigured,
+} from './whatsapp-cloud-api'
 
 export interface WhatsAppInviteInput {
   to: string
@@ -12,53 +13,31 @@ export interface WhatsAppInviteInput {
 }
 
 export interface WhatsAppMessageResult {
-  sid: string
+  id: string
   status: string
   to: string
 }
 
+export interface SessionLinkInput {
+  to: string
+  patientName: string
+  sessionLink: string
+  scheduledAt: Date
+  therapistName?: string
+}
+
+export interface SessionStartedInput {
+  to: string
+  patientName: string
+  sessionLink: string
+  therapistName?: string
+}
+
 /**
- * Picks the WhatsApp transport. `WHATSAPP_PROVIDER=twilio|bot` forces one;
- * otherwise Twilio is used when its credentials are present (works on Vercel),
- * falling back to the self-hosted Baileys bot.
+ * Send a WhatsApp invite message (free-form text)
+ * Works within 24-hour customer service window
+ * For first-time invites outside the window, use a template instead
  */
-function deliver(to: string, text: string): Promise<WhatsAppMessageResult> {
-  const provider = process.env.WHATSAPP_PROVIDER?.trim().toLowerCase()
-  const useTwilio = provider ? provider === 'twilio' : isTwilioWhatsAppConfigured()
-  return useTwilio ? sendTwilioWhatsAppText(to, text) : sendViaBot(to, text)
-}
-
-async function sendViaBot(to: string, text: string): Promise<WhatsAppMessageResult> {
-  const botUrl = process.env.WHATSAPP_BOT_URL
-  const botSecret = process.env.WHATSAPP_BOT_SECRET
-
-  if (!botUrl || !botSecret) {
-    throw new Error('WhatsApp bot is not configured (set WHATSAPP_BOT_URL / WHATSAPP_BOT_SECRET)')
-  }
-
-  const response = await fetch(`${botUrl.replace(/\/$/, '')}/send`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-bot-secret': botSecret,
-    },
-    body: JSON.stringify({ to, text }),
-    cache: 'no-store',
-  })
-
-  const payload = (await response.json().catch(() => ({}))) as {
-    success?: boolean
-    id?: string
-    error?: string
-  }
-
-  if (!response.ok || !payload.success) {
-    throw new Error(payload.error || 'WhatsApp bot could not send the message')
-  }
-
-  return { sid: payload.id || 'unknown', status: 'sent', to }
-}
-
 export async function sendWhatsAppInvite(input: WhatsAppInviteInput): Promise<WhatsAppMessageResult> {
   const to = normalizeWhatsAppNumber(input.to)
   const name = input.patientName || 'there'
@@ -71,17 +50,19 @@ Setting up your account takes less than a minute:
 👉 ${input.inviteLink}
 
 We're glad you're here. 🌿`
-  return deliver(to, text)
+
+  if (!isCloudApiConfigured()) {
+    throw new Error('WhatsApp Cloud API not configured. Set WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID')
+  }
+
+  return sendCloudApiText(to, text)
 }
 
-export interface SessionLinkInput {
-  to: string
-  patientName: string
-  sessionLink: string
-  scheduledAt: Date
-  therapistName?: string
-}
-
+/**
+ * Send session scheduled notification
+ * Best sent as a template message (works outside 24h window)
+ * Template example: "session_scheduled" with variables: {{1}} patientName, {{2}} therapistName, {{3}} dateTime, {{4}} sessionLink
+ */
 export async function sendSessionScheduledMessage(input: SessionLinkInput): Promise<WhatsAppMessageResult> {
   const to = normalizeWhatsAppNumber(input.to)
   const name = input.patientName || 'there'
@@ -98,16 +79,34 @@ Tap the link below when it's time to join:
 👉 ${input.sessionLink}
 
 Take a deep breath — we'll see you there. 🌿`
-  return deliver(to, text)
+
+  if (!isCloudApiConfigured()) {
+    throw new Error('WhatsApp Cloud API not configured. Set WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID')
+  }
+
+  // Try template first (works outside 24h window), fallback to text
+  const templateName = process.env.WHATSAPP_TEMPLATE_SESSION_SCHEDULED || 'session_scheduled'
+  
+  try {
+    return await sendCloudApiTemplate(to, templateName, 'en', [
+      { type: 'body', parameters: [
+        { type: 'text', text: name },
+        { type: 'text', text: withWhom },
+        { type: 'text', text: when },
+        { type: 'text', text: input.sessionLink },
+      ]}
+    ])
+  } catch (templateError) {
+    console.warn('Template send failed, falling back to text message:', templateError)
+    return sendCloudApiText(to, text)
+  }
 }
 
-export interface SessionStartedInput {
-  to: string
-  patientName: string
-  sessionLink: string
-  therapistName?: string
-}
-
+/**
+ * Send session started notification
+ * Best sent as free-form text (within 24h window after scheduled message)
+ * Template example: "session_started" with variables: {{1}} patientName, {{2}} therapistName, {{3}} sessionLink
+ */
 export async function sendSessionStartedMessage(input: SessionStartedInput): Promise<WhatsAppMessageResult> {
   const to = normalizeWhatsAppNumber(input.to)
   const name = input.patientName || 'there'
@@ -120,5 +119,24 @@ Tap to join immediately:
 👉 ${input.sessionLink}
 
 We're ready when you are. 🌿`
-  return deliver(to, text)
+
+  if (!isCloudApiConfigured()) {
+    throw new Error('WhatsApp Cloud API not configured. Set WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID')
+  }
+
+  // Try template first, fallback to text
+  const templateName = process.env.WHATSAPP_TEMPLATE_SESSION_STARTED || 'session_started'
+  
+  try {
+    return await sendCloudApiTemplate(to, templateName, 'en', [
+      { type: 'body', parameters: [
+        { type: 'text', text: name },
+        { type: 'text', text: withWhom },
+        { type: 'text', text: input.sessionLink },
+      ]}
+    ])
+  } catch (templateError) {
+    console.warn('Template send failed, falling back to text message:', templateError)
+    return sendCloudApiText(to, text)
+  }
 }

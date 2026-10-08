@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
-import { normalizeWhatsAppNumber } from '@/lib/twilio-whatsapp';
+import { normalizeWhatsAppNumber } from '@/lib/whatsapp-cloud-api';
 
 // POST /api/invites — therapist creates a patient invite (name + diagnosis only).
 // Returns the generated token so the client can build a shareable link.
