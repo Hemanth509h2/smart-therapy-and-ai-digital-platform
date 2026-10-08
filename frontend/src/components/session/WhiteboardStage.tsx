@@ -7,7 +7,7 @@ import { Track } from 'livekit-client'
 import {
   Hand, MousePointer2, Type, Square, StickyNote, Maximize2,
   Pen, Highlighter, Shapes, Eraser, Undo2, Redo2, MoreHorizontal,
-  Plus, Minus, Users, X, Lock,
+  Plus, Minus, Users, X, Lock, PhoneOff,
 } from 'lucide-react'
 import { RC } from './roomTheme'
 import { useVideoTrackDimensions } from '@/hooks/useVideoTrackDimensions'
@@ -92,6 +92,8 @@ export interface WhiteboardStageProps {
   selfName: string
   otherName: string
   onClose: () => void
+  /** End the whole session (therapist + client both get the button wired to the confirm dialog). */
+  onEndCall?: () => void
   /** The drawing surface. Omitted -> the inert dot-grid placeholder. */
   children?: ReactNode
   /** Controlled tool selection. Ids match the button ids below. */
@@ -118,6 +120,7 @@ export default function WhiteboardStage({
   selfName,
   otherName,
   onClose,
+  onEndCall,
   children,
   activeTool: activeToolProp,
   onToolSelect,
@@ -287,6 +290,11 @@ export default function WhiteboardStage({
         <button onClick={() => onFullscreen?.()} title="Full screen" style={{ ...topBtn, padding: 6 }}>
           <Maximize2 size={14} />
         </button>
+        {onEndCall && (
+          <button onClick={onEndCall} title="End call" style={{ ...topBtn, padding: 6, color: '#e05252', borderColor: 'rgba(224,82,82,0.4)' }}>
+            <PhoneOff size={14} />
+          </button>
+        )}
         <button onClick={onClose} title="Close whiteboard" style={{ ...topBtn, padding: 6 }}>
           <X size={14} />
         </button>

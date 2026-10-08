@@ -119,6 +119,7 @@ export interface StaadWhiteboardProps {
   otherName: string
   onClose: () => void
   onFullscreen?: () => void
+  onEndCall?: () => void
 }
 
 export default function StaadWhiteboard({
@@ -130,6 +131,7 @@ export default function StaadWhiteboard({
   otherName,
   onClose,
   onFullscreen,
+  onEndCall,
 }: StaadWhiteboardProps) {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -311,6 +313,7 @@ export default function StaadWhiteboard({
       selfName={selfName}
       otherName={otherName}
       onClose={onClose}
+      onEndCall={onEndCall}
       activeTool={activeTool}
       onToolSelect={selectTool}
       activeColor={activeColor}

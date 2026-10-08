@@ -13,7 +13,7 @@
 // participants popup, so the module gets the full canvas.
 
 import type { ReactNode } from 'react'
-import { X, Lock, Unlock } from 'lucide-react'
+import { X, Lock, Unlock, PhoneOff } from 'lucide-react'
 import { RC } from './roomTheme'
 import { MODULE_CATEGORIES } from '@/lib/modules'
 
@@ -57,6 +57,8 @@ export interface ModuleStageProps {
   isLocked: boolean
   onLockToggle: () => void
   onClose: () => void
+  /** End the whole session from inside the module view. */
+  onEndCall?: () => void
   /** The module tree itself — the same <ModuleContent/> the sidebar panel uses. */
   children: ReactNode
 }
@@ -69,6 +71,7 @@ export default function ModuleStage({
   isLocked,
   onLockToggle,
   onClose,
+  onEndCall,
   children,
 }: ModuleStageProps) {
   const id = moduleIdentity(activeModule)
@@ -213,6 +216,11 @@ export default function ModuleStage({
             {isTherapist && (
               <button onClick={onClose} title="Close activity" style={{ ...headerBtn, padding: 6 }}>
                 <X size={14} />
+              </button>
+            )}
+            {onEndCall && (
+              <button onClick={onEndCall} title="End call" style={{ ...headerBtn, padding: 6, color: '#e05252', borderColor: 'rgba(224,82,82,0.4)' }}>
+                <PhoneOff size={14} />
               </button>
             )}
           </div>
