@@ -67,6 +67,7 @@ export default function AIAssistantPopup({
 
   const handleDragStart = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button')) return
+    if ((e.target as HTMLElement).closest('[data-resize-handle]')) return
     setIsDragging(true)
     dragOffset.current = {
       x: e.clientX - position.x,
@@ -75,6 +76,8 @@ export default function AIAssistantPopup({
   }
 
   const handleResizeStart = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
     setIsResizing(true)
     resizeStart.current = {
       x: e.clientX,
@@ -135,6 +138,7 @@ export default function AIAssistantPopup({
         top: position.y,
         zIndex: 50,
         width: size.width,
+        height: size.height,
         minHeight: 200,
         maxHeight: 'calc(100vh - 40px)',
         background: 'rgba(28, 28, 28, 0.95)',
@@ -334,6 +338,7 @@ export default function AIAssistantPopup({
 
       {/* Resize handle — bottom-right corner */}
       <div
+        data-resize-handle
         onMouseDown={handleResizeStart}
         style={{
           position: 'absolute',

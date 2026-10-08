@@ -121,6 +121,7 @@ export default function AINotesPopup({
 
   const handleDragStart = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button')) return
+    if ((e.target as HTMLElement).closest('[data-resize-handle]')) return
     setIsDragging(true)
     dragOffset.current = {
       x: e.clientX - position.x,
@@ -129,6 +130,8 @@ export default function AINotesPopup({
   }
 
   const handleResizeStart = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
     setIsResizing(true)
     resizeStart.current = {
       x: e.clientX,
@@ -250,6 +253,7 @@ export default function AINotesPopup({
         top: position.y,
         zIndex: 50,
         width: size.width,
+        height: size.height,
         minHeight: 200,
         maxHeight: 'calc(100vh - 40px)',
         background: 'rgba(28, 28, 28, 0.95)',
@@ -635,6 +639,7 @@ export default function AINotesPopup({
 
       {/* Resize handle — bottom-right corner */}
       <div
+        data-resize-handle
         onMouseDown={handleResizeStart}
         style={{
           position: 'absolute',
