@@ -168,13 +168,11 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     // AI Assistant and Notes are now floating popups — toggle them independently.
     if (panel === 'assistant') {
       setShowAssistantPopup((open) => !open);
-      setShowNotesPopup(false); // close the other popup when opening this one
       setActivePanel(null);
       return;
     }
     if (panel === 'notes') {
       setShowNotesPopup((open) => !open);
-      setShowAssistantPopup(false); // close the other popup when opening this one
       setActivePanel(null);
       return;
     }
@@ -1273,6 +1271,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
             sessionId={sessionId}
             sessionStartedAt={startTime.current}
             insight={aiInsight}
+            initialPosition={{ x: 820, y: 140 }}
             onClose={() => setShowNotesPopup(false)}
           />
         )}
