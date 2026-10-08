@@ -31,22 +31,39 @@ export default function AIAssistantPopup({
   const [isDragging, setIsDragging] = useState(false)
   const dragOffset = useRef({ x: 0, y: 0 })
 
+  // Resizable popup state
+  const [size, setSize] = useState({ width: 380, height: 420 })
+  const [isResizing, setIsResizing] = useState(false)
+  const resizeStart = useRef({ x: 0, y: 0, w: 380, h: 420 })
+
   useEffect(() => {
     const handleMove = (e: MouseEvent) => {
-      if (!isDragging) return
-      setPosition({
-        x: e.clientX - dragOffset.current.x,
-        y: e.clientY - dragOffset.current.y,
-      })
+      if (isDragging) {
+        setPosition({
+          x: e.clientX - dragOffset.current.x,
+          y: e.clientY - dragOffset.current.y,
+        })
+      }
+      if (isResizing) {
+        const dx = e.clientX - resizeStart.current.x
+        const dy = e.clientY - resizeStart.current.y
+        setSize({
+          width: Math.max(300, Math.min(600, resizeStart.current.w + dx)),
+          height: Math.max(250, Math.min(800, resizeStart.current.h + dy)),
+        })
+      }
     }
-    const handleUp = () => setIsDragging(false)
+    const handleUp = () => {
+      setIsDragging(false)
+      setIsResizing(false)
+    }
     window.addEventListener('mousemove', handleMove)
     window.addEventListener('mouseup', handleUp)
     return () => {
       window.removeEventListener('mousemove', handleMove)
       window.removeEventListener('mouseup', handleUp)
     }
-  }, [isDragging])
+  }, [isDragging, isResizing])
 
   const handleDragStart = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button')) return
@@ -54,6 +71,16 @@ export default function AIAssistantPopup({
     dragOffset.current = {
       x: e.clientX - position.x,
       y: e.clientY - position.y,
+    }
+  }
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    setIsResizing(true)
+    resizeStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      w: size.width,
+      h: size.height,
     }
   }
 
@@ -107,7 +134,7 @@ export default function AIAssistantPopup({
         left: position.x,
         top: position.y,
         zIndex: 50,
-        width: 380,
+        width: size.width,
         minHeight: 200,
         maxHeight: 'calc(100vh - 40px)',
         background: 'rgba(28, 28, 28, 0.95)',
@@ -303,6 +330,28 @@ export default function AIAssistantPopup({
           <Lock size={10} />
           AI insights are private and secure
         </div>
+      </div>
+
+      {/* Resize handle — bottom-right corner */}
+      <div
+        onMouseDown={handleResizeStart}
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          right: 0,
+          width: 16,
+          height: 16,
+          cursor: 'nwse-resize',
+          zIndex: 10,
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'flex-end',
+          padding: 4,
+        }}
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" style={{ display: 'block', opacity: 0.5 }}>
+          <path d="M9 1L1 9M9 5L5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
       </div>
 
       <style jsx>{`
