@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useNow } from '@/hooks/usePracticeData';
+import { useTheme } from '@/components/ThemeProvider';
 import {
   SESSION_KIND,
   byStartAsc,
@@ -14,7 +15,7 @@ import {
   sessionState,
   type PracticeSession,
 } from '@/lib/practice';
-import { IconArrowUpRight, IconCalendarSm, IconChevronDown } from './icons';
+import { IconArrowUpRight, IconCalendarSm, IconChevronDown, IconThemeA, IconThemeB } from './icons';
 
 const fmtChipDate = (d: Date) =>
   d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
@@ -28,6 +29,8 @@ const fmtChipDate = (d: Date) =>
 export function TopBar({ sessions = [] }: { sessions?: PracticeSession[] }) {
   const { profile } = useAuthStore();
   const now = useNow(30_000);
+  const { theme, toggle } = useTheme();
+  const ThemeIcon = theme === 'dark' ? IconThemeB : IconThemeA;
 
   const upcoming = [...sessions]
     .filter((s) => {
@@ -74,6 +77,16 @@ export function TopBar({ sessions = [] }: { sessions?: PracticeSession[] }) {
           <IconArrowUpRight />
         </Link>
       </div>
+
+      <button
+        type="button"
+        className="theme-btn"
+        onClick={toggle}
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        title="Theme"
+      >
+        <ThemeIcon />
+      </button>
 
       <Link className="av-btn" href="/profile" aria-label={`${fullName(profile) || 'Account'}, account menu`}>
         <span className="av av--user">{initials(profile?.firstName, profile?.lastName) || '—'}</span>

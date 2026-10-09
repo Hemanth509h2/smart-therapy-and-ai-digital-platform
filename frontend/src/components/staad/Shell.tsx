@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useTheme } from '@/components/ThemeProvider';
 import { initials, fullName } from '@/lib/practice';
 import {
   IconClients,
@@ -19,8 +18,6 @@ import {
   IconProfile,
   IconSchedule,
   IconSessions,
-  IconThemeA,
-  IconThemeB,
 } from './icons';
 
 type Role = 'THERAPIST' | 'CLIENT' | 'ADMIN' | null;
@@ -58,7 +55,6 @@ export function StaadShell({ children }: { children: React.ReactNode }) {
   const { role, profile } = useAuthStore();
   const pathname = usePathname();
   const router = useRouter();
-  const { theme, toggle } = useTheme();
 
   const [collapsed, setCollapsed] = useState(false);
   const [autoCollapsed, setAutoCollapsed] = useState(false);
@@ -98,7 +94,6 @@ export function StaadShell({ children }: { children: React.ReactNode }) {
 
   const name = fullName(profile) || 'Your account';
   const mark = initials(profile?.firstName, profile?.lastName) || '—';
-  const ThemeIcon = theme === 'dark' ? IconThemeB : IconThemeA;
   const isCollapsed = collapsed || autoCollapsed;
 
   return (
@@ -138,12 +133,6 @@ export function StaadShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="sb-foot">
-          <button className="nav-item" type="button" onClick={toggle}>
-            <span className="nav-ic">
-              <ThemeIcon />
-            </span>
-            <span className="nav-label">Theme</span>
-          </button>
           <button className="nav-item" type="button" onClick={handleLogout}>
             <span className="nav-ic">
               <IconLogout />

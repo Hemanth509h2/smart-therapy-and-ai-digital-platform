@@ -173,6 +173,13 @@ html[data-theme="dark"] .staad-ui{
 
 .av-btn .av{width:44px;height:44px;}
 
+.theme-btn{width:54px;height:54px;flex:none;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);
+  color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .2s;}
+
+.theme-btn:hover{transform:translateY(-1px);}
+
+.topbar :focus-visible{outline:2px solid var(--lime);outline-offset:3px;}
+
 /* ---------- Page head (inner pages) ---------- */
 .phead{display:flex;align-items:flex-end;justify-content:space-between;gap:40px;flex-wrap:wrap;}
 
