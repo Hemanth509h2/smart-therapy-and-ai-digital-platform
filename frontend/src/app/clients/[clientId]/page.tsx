@@ -31,6 +31,9 @@ import {
 import { AddClientDialog, StartSessionDialog } from '@/components/practice/dialogs';
 import { useSessionActions } from '@/components/practice/useSessionActions';
 import { toast } from '@/components/practice/ui';
+import SessionReportDrawer from '@/components/report/SessionReportDrawer';
+import { apiFetch } from '@/lib/api';
+import { Sparkles } from 'lucide-react';
 import { MODULE_CATEGORIES, type ModuleItem } from '@/lib/modules';
 import {
   createNote,
@@ -61,7 +64,17 @@ import {
   sessionState,
   startOfDay,
   type PracticeClient,
+  type PracticeSession,
 } from '@/lib/practice';
+
+interface SessionNote {
+  id: string;
+  sessionId: string;
+  content: string;
+  isPrivate: boolean;
+  createdAt: string;
+  session?: { id: string; scheduledAt: string };
+}
 
 type Tab = 'overview' | 'history' | 'notes' | 'goals' | 'documents';
 
@@ -141,6 +154,8 @@ export default function ClientProfilePage() {
   const [metrics, setMetrics] = useState<ProgressMetric[]>([]);
   const [notes, setNotes] = useState<ProgressNote[]>([]);
   const [reports, setReports] = useState<ProgressReport[]>([]);
+  const [reportFor, setReportFor] = useState<PracticeSession | null>(null);
+  const [sessionNotes, setSessionNotes] = useState<SessionNote[]>([]);
   const [extraLoading, setExtraLoading] = useState(true);
 
   const client = clients.find((c) => c.id === clientId) ?? null;
@@ -149,12 +164,18 @@ export default function ClientProfilePage() {
     if (!clientId) return;
     let cancelled = false;
     setExtraLoading(true);
-    Promise.allSettled([fetchClientMetrics(clientId), fetchClientNotes(clientId), fetchClientReports(clientId)])
-      .then(([m, n, r]) => {
+    Promise.allSettled([
+      fetchClientMetrics(clientId),
+      fetchClientNotes(clientId),
+      fetchClientReports(clientId),
+      apiFetch(`/api/notes?clientId=${encodeURIComponent(clientId)}`).then((res) => (res.ok ? res.json() : { notes: [] })),
+    ])
+      .then(([m, n, r, sn]) => {
         if (cancelled) return;
         if (m.status === 'fulfilled') setMetrics(m.value);
         if (n.status === 'fulfilled') setNotes(n.value);
         if (r.status === 'fulfilled') setReports(r.value);
+        if (sn.status === 'fulfilled') setSessionNotes(sn.value.notes ?? []);
       })
       .finally(() => {
         if (!cancelled) setExtraLoading(false);
@@ -175,6 +196,25 @@ export default function ClientProfilePage() {
   const upcoming = mine.filter((s) => s.status === 'ACTIVE' || (s.status === 'SCHEDULED' && new Date(s.scheduledAt) > now));
   const completed = mine.filter((s) => s.status === 'COMPLETED');
   const numbers = useMemo(() => sessionNumbers(sessions), [sessions]);
+  // General client notes and per-session notes in one newest-first list; session
+  // notes carry which session they were written for.
+  const allNotes = useMemo(
+    () =>
+      [
+        ...notes.map((n) => ({ id: n.id, content: n.content, createdAt: n.createdAt, isPrivate: n.isPrivate, sessionLabel: '' })),
+        ...sessionNotes.map((n) => {
+          const no = numbers.get(n.sessionId);
+          return {
+            id: n.id,
+            content: n.content,
+            createdAt: n.createdAt,
+            isPrivate: n.isPrivate,
+            sessionLabel: `${no ? `Session ${no}` : 'Session'} (${fmtDate(n.session?.scheduledAt ?? n.createdAt)})`,
+          };
+        }),
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [notes, sessionNotes, numbers]
+  );
   const status = client ? clientStatus(client, sessions, bookings, now) : 'follow-up';
   const statusMeta = CLIENT_STATUS_META[status];
   const focus = client ? focusArea(client) : '';
@@ -510,7 +550,17 @@ export default function ClientProfilePage() {
                         <div className="lcell">
                           <span className="lsub">{hasDocs(s) ? 'Documented' : 'No notes yet'}</span>
                         </div>
-                        <div className="lend">
+                        <div className="lend" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {s.status === 'COMPLETED' && (
+                            <button
+                              type="button"
+                              className="ds-btn ds-btn-sm ds-btn-clay"
+                              onClick={() => setReportFor(s)}
+                              style={{ padding: '0.25rem 0.5rem', minHeight: 'unset', height: '32px' }}
+                            >
+                              <Sparkles style={{ width: '14px', height: '14px' }} /> Report
+                            </button>
+                          )}
                           {(st === 'live' || st === 'upcoming' || st === 'missed') && (
                             <Btn sm variant="primary" onClick={() => actions.enter(s)}>
                               {st === 'live' ? 'Join' : 'Open'}
@@ -542,11 +592,11 @@ export default function ClientProfilePage() {
                 {savingNote ? 'Saving…' : 'Save note'}
               </Btn>
               <div className="divider" style={{ margin: '22px 0' }} />
-              {notes.length === 0 ? (
+              {allNotes.length === 0 ? (
                 <p className="note">No notes yet for this client.</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {notes.map((n) => (
+                  {allNotes.map((n) => (
                     <div key={n.id} className="note-row">
                       <span className="note-row__ic">
                         <IconCheckSm />
@@ -554,6 +604,7 @@ export default function ClientProfilePage() {
                       <div>
                         {n.content}
                         <time dateTime={n.createdAt}>
+                          {n.sessionLabel ? `${n.sessionLabel} · ` : ''}
                           {fmtDate(n.createdAt)} · {fmtTime(n.createdAt)}
                           {n.isPrivate ? ' · Private' : ''}
                         </time>
@@ -621,6 +672,7 @@ export default function ClientProfilePage() {
         }}
       />
       {actions.dialogs}
+      <SessionReportDrawer session={reportFor} onClose={() => setReportFor(null)} />
     </StaadShell>
   );
 }
