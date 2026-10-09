@@ -53,6 +53,9 @@ interface SessionState {
 /* The room colour palette now lives in components/session/roomTheme.ts (same
    values) so the top bar, bottom bar and the swappable panels share one source. */
 
+// How long the client sees the session-ended details before the window closes.
+const CLIENT_CLOSE_SECONDS = 10;
+
 // Thin wrapper so the transcription hook runs INSIDE <StaadVideo>'s room
 // context (it reads the LiveKit room via useSessionRoom). Renders nothing;
 // it just relays the recording state up to the page for the status chip.
@@ -841,6 +844,29 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       .catch(() => {});
   }, [sessionEnded, sessionId]);
 
+  // For client: show the session details, then close the window after a
+  // countdown. For therapist: the session-ended screen stays up until "Done".
+  // Must sit above the early returns — hooks can't be called conditionally.
+  const [closeIn, setCloseIn] = useState(CLIENT_CLOSE_SECONDS);
+  useEffect(() => {
+    if (!sessionEnded || isTherapist) return;
+    const interval = setInterval(() => setCloseIn((s) => Math.max(0, s - 1)), 1000);
+    const timer = setTimeout(() => {
+      window.close();
+      // Fallback if window.close() doesn't work (not opened by JS)
+      if (auth.currentUser?.uid?.startsWith('guest:')) {
+        auth.signOut().catch(() => {});
+        window.location.href = '/auth';
+      } else {
+        window.location.href = '/';
+      }
+    }, CLIENT_CLOSE_SECONDS * 1000);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timer);
+    };
+  }, [sessionEnded, isTherapist]);
+
   if (loading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center" style={{ background: '#0d1614' }}>
@@ -858,25 +884,6 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
         ? Math.max(0, Math.round((new Date(endedSession.endedAt).getTime() - new Date(endedSession.startedAt).getTime()) / 60000))
         : null;
 
-    // For client: close the window immediately after showing brief confirmation
-    // For therapist: show the session ended screen with redirect
-    useEffect(() => {
-      if (!isTherapist) {
-        // Give a moment for the UI to render, then close
-        const timer = setTimeout(() => {
-          window.close();
-          // Fallback if window.close() doesn't work (not opened by JS)
-          if (auth.currentUser?.uid?.startsWith('guest:')) {
-            auth.signOut().catch(() => {});
-            window.location.href = '/auth';
-          } else {
-            window.location.href = '/';
-          }
-        }, 1500);
-        return () => clearTimeout(timer);
-      }
-    }, []);
-
     const done = () => {
       if (auth.currentUser?.uid?.startsWith('guest:')) {
         auth.signOut().catch(() => {});
@@ -891,10 +898,9 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
         <div className="w-full max-w-md rounded-2xl p-8 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
           <h1 className="text-xl font-semibold" style={{ color: '#fff' }}>Session ended</h1>
           <p className="mt-2 text-sm" style={{ color: 'var(--ink-muted)' }}>
-            The therapist has ended the session.
-            {isTherapist ? ' Here are the details:' : ' Closing...'}
+            The therapist has ended the session. Here are the details:
           </p>
-          {isTherapist && endedSession && (
+          {endedSession && (
             <dl className="mt-6 space-y-3 text-left text-sm" style={{ color: 'var(--ink-muted)' }}>
               <div className="flex justify-between"><dt>Client</dt><dd style={{ color: '#fff' }}>{endedSession?.clientName ?? '—'}</dd></div>
               <div className="flex justify-between"><dt>Therapist</dt><dd style={{ color: '#fff' }}>{endedSession?.therapistName ?? '—'}</dd></div>
@@ -909,6 +915,11 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
           >
             {isTherapist ? 'Done' : 'Close'}
           </button>
+          {!isTherapist && (
+            <p className="mt-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
+              This window will close in {closeIn}s
+            </p>
+          )}
         </div>
       </div>
     );
