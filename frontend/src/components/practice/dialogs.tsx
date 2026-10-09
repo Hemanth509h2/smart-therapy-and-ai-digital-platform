@@ -481,7 +481,7 @@ export function AddClientDialog({
               <input id="client-last" className="ds-input" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Maurya" />
             </Field>
           </div>
-          <Field label="Focus areas" htmlFor="client-dx" hint="Separate with commas, e.g. Anxiety, ADHD">
+          <Field label="Conditions" htmlFor="client-dx" hint="Separate with commas, e.g. Anxiety, ADHD">
             <input id="client-dx" className="ds-input" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} placeholder="Anxiety, ADHD" />
           </Field>
           <Field label="WhatsApp number" htmlFor="client-phone" hint="Include the country code. The invite is sent here automatically.">

@@ -19,6 +19,7 @@ import {
   IconChat,
   IconCheckSm,
   IconChevronLeft,
+  IconModules,
   IconNoteAdd,
   IconPlus,
   IconProfile,
@@ -459,6 +460,10 @@ export default function ClientProfilePage() {
                   <button type="button" className="qact" onClick={() => setTab('notes')}>
                     Add Note
                     <IconNoteAdd />
+                  </button>
+                  <button type="button" className="qact" onClick={() => router.push('/modules')}>
+                    Assign Therapy Module
+                    <IconModules size={16} />
                   </button>
                   <button type="button" className="qact" onClick={() => messageClient(client)}>
                     Message
