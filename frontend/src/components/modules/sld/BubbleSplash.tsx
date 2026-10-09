@@ -705,6 +705,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
   }
 
   const handleTogglePlaying = () => {
+    if (!isTherapist) return
     const next = !isPlaying
     setIsPlaying(next)
     writeToFirestore({ 'moduleState.bsIsPlaying': next })
@@ -787,7 +788,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
      Every pill carries a 2px border so switching state never nudges the row,
      and every one is a comfortable ~42px tap target.
   ------------------------------------------------------------------------- */
-  const settingCursor: React.CSSProperties['cursor'] = isTherapist ? 'pointer' : 'default'
+  const settingCursor: React.CSSProperties['cursor'] = isTherapist ? 'pointer' : 'not-allowed'
 
   const modePill = (accent: string, on: boolean): React.CSSProperties => ({
     display: 'inline-flex',
@@ -804,7 +805,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
     whiteSpace: 'nowrap',
     cursor: settingCursor,
     boxShadow: on ? `0 6px 16px ${accent}47` : CARD_SHADOW,
-    opacity: isTherapist ? 1 : 0.85,
+    opacity: isTherapist ? 1 : 0.65,
     transition: 'all 0.16s ease',
   })
 
@@ -820,7 +821,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
     whiteSpace: 'nowrap',
     cursor: settingCursor,
     boxShadow: on ? '0 4px 12px rgba(22,163,74,0.16)' : 'none',
-    opacity: isTherapist ? 1 : 0.85,
+    opacity: isTherapist ? 1 : 0.65,
     transition: 'all 0.16s ease',
   })
 
@@ -839,7 +840,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
     whiteSpace: 'nowrap',
     cursor: settingCursor,
     boxShadow: on ? `0 4px 12px ${accent}26` : CARD_SHADOW,
-    opacity: isTherapist ? 1 : 0.85,
+    opacity: isTherapist ? 1 : 0.65,
     transition: 'all 0.16s ease',
   })
 
@@ -1007,35 +1008,39 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
             )
           })}
 
-          {divider}
+          {isTherapist && (
+            <>
+              {divider}
 
-          <button
-            type="button"
-            onClick={() => { if (isTherapist) handleTogglePlaying() }}
-            disabled={!isTherapist}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 9,
-              padding: '10px 24px',
-              borderRadius: 999,
-              border: `2px solid ${isPlaying ? '#F6D6AE' : '#BBE7CC'}`,
-              background: isPlaying ? '#FFF6EC' : '#E7F7EE',
-              color: isPlaying ? AMBER : GREEN_DEEP,
-              fontSize: 17.5,
-              fontWeight: 700,
-              lineHeight: 1.15,
-              whiteSpace: 'nowrap',
-              cursor: settingCursor,
-              opacity: isTherapist ? 1 : 0.85,
-              boxShadow: isPlaying ? '0 4px 12px rgba(194,65,12,0.18)' : '0 4px 12px rgba(22,163,74,0.16)',
-              transition: 'all 0.16s ease',
-            }}
-          >
-            {isPlaying
-              ? <><Pause size={16} strokeWidth={2.6} color={AMBER} /> Pause</>
-              : <><Play size={16} strokeWidth={2.6} color={GREEN_DEEP} /> Start</>}
-          </button>
+              <button
+                type="button"
+                onClick={() => { if (isTherapist) handleTogglePlaying() }}
+                disabled={!isTherapist}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 9,
+                  padding: '10px 24px',
+                  borderRadius: 999,
+                  border: `2px solid ${isPlaying ? '#F6D6AE' : '#BBE7CC'}`,
+                  background: isPlaying ? '#FFF6EC' : '#E7F7EE',
+                  color: isPlaying ? AMBER : GREEN_DEEP,
+                  fontSize: 17.5,
+                  fontWeight: 700,
+                  lineHeight: 1.15,
+                  whiteSpace: 'nowrap',
+                  cursor: 'pointer',
+                  opacity: 1,
+                  boxShadow: isPlaying ? '0 4px 12px rgba(194,65,12,0.18)' : '0 4px 12px rgba(22,163,74,0.16)',
+                  transition: 'all 0.16s ease',
+                }}
+              >
+                {isPlaying
+                  ? <><Pause size={16} strokeWidth={2.6} color={AMBER} /> Pause</>
+                  : <><Play size={16} strokeWidth={2.6} color={GREEN_DEEP} /> Start</>}
+              </button>
+            </>
+          )}
         </div>
 
         {/* ---- Explainer column + sky ---- */}

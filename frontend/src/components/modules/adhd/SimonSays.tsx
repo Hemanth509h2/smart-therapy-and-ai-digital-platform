@@ -6,19 +6,12 @@ import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { staadCancel } from '@/lib/voice/staadVoice'
 
-/* ── Art assets ───────────────────────────────────────────────────────────────
-   The delivered folder name contains spaces, so every segment is encoded and
-   the files are referenced with plain <img>/background-image rather than
-   next/image (same pattern as WorryVault). */
+/* ── Art assets ─────────────────────────────────────────────────────────────── */
 const SS_ASSET = (file: string) =>
   `/assets/modules/ADHD/${encodeURIComponent('Simon says Assets')}/${encodeURIComponent(file)}`
 
 const HEART_FILLED = SS_ASSET('heart-filled.svg')
 const HEART_EMPTY = SS_ASSET('heart-empty.svg')
-/* Glossy pad sprites (two states per colour) shipped in files.zip. */
-const PAD_ART = (color: string, lit: boolean) => SS_ASSET(`${color}-${lit ? 'lit' : 'normal'}.svg`)
-/* Soft pad tones shipped in "files (1).zip". */
-const PAD_TONE = (color: string) => SS_ASSET(`pad-tone-${color}.wav`)
 
 interface SimonSaysProps {
   sessionId: string
@@ -43,40 +36,104 @@ const COMMAND_ACTIONS: { text: string; emoji: string }[] = [
   { text: 'Shake your hands', emoji: '🤲' },
 ]
 
-const BUTTONS = ['green', 'red', 'yellow', 'blue']
-/* Glow colours are pulled from the lit sprite's own gradient stops so the CSS
-   halo and the artwork agree. */
-const PAD_GLOW: Record<string, string> = {
-  green: 'rgba(34,197,94,0.55)',
-  red: 'rgba(244,63,94,0.55)',
-  yellow: 'rgba(251,191,36,0.55)',
-  blue: 'rgba(59,130,246,0.55)',
+const BUTTONS = ['green', 'red', 'yellow', 'blue'] as const
+type PadColor = typeof BUTTONS[number]
+
+/* Harmonious, soothing chime frequencies (A-major chord: E4, A4, C#5, E5) */
+const TONE_FREQS: Record<string, number> = {
+  green: 329.63,  // E4  - Calm Forest green
+  red: 440.00,    // A4  - Warm Coral ruby
+  yellow: 554.37, // C#5 - Sunny Golden bell
+  blue: 659.25,   // E5  - Uplifting Sky sapphire
 }
 
-/* ── Design tokens (light canvas — dark ink everywhere except solid fills) ─── */
-const INK = '#2b2f33'
-const INK_MUTED = '#6b7280'
+/* Sensory-friendly, rich, delightful 3D pad aesthetics */
+const PAD_THEMES: Record<PadColor, {
+  name: string
+  note: string        // Musical note symbol shown on pad
+  noteLabel: string   // Short label shown below note
+  idleGradient: string
+  litGradient: string
+  idleBorder: string
+  litBorder: string
+  idleShadow: string
+  litShadow: string
+  glowColor: string
+}> = {
+  green: {
+    name: 'Green',
+    note: '♩',
+    noteLabel: 'DO',
+    idleGradient: 'linear-gradient(145deg, #10b981 0%, #059669 60%, #047857 100%)',
+    litGradient: 'linear-gradient(145deg, #a7f3d0 0%, #34d399 45%, #10b981 100%)',
+    idleBorder: '#6ee7b7',
+    litBorder: '#ffffff',
+    idleShadow: '0 8px 18px rgba(4, 120, 87, 0.35), inset 0 2px 4px rgba(255,255,255,0.4)',
+    litShadow: '0 0 55px 16px rgba(52, 211, 153, 0.95), 0 20px 40px rgba(5, 150, 105, 0.5), inset 0 2px 10px rgba(255,255,255,0.95)',
+    glowColor: 'rgba(52, 211, 153, 0.95)',
+  },
+  red: {
+    name: 'Red',
+    note: '♪',
+    noteLabel: 'RE',
+    idleGradient: 'linear-gradient(145deg, #f87171 0%, #ef4444 60%, #dc2626 100%)',
+    litGradient: 'linear-gradient(145deg, #fecaca 0%, #f87171 45%, #ef4444 100%)',
+    idleBorder: '#fca5a5',
+    litBorder: '#ffffff',
+    idleShadow: '0 8px 18px rgba(220, 38, 38, 0.35), inset 0 2px 4px rgba(255,255,255,0.4)',
+    litShadow: '0 0 55px 16px rgba(248, 113, 113, 0.95), 0 20px 40px rgba(220, 38, 38, 0.5), inset 0 2px 10px rgba(255,255,255,0.95)',
+    glowColor: 'rgba(248, 113, 113, 0.95)',
+  },
+  yellow: {
+    name: 'Yellow',
+    note: '♫',
+    noteLabel: 'MI',
+    idleGradient: 'linear-gradient(145deg, #fbbf24 0%, #f59e0b 60%, #d97706 100%)',
+    litGradient: 'linear-gradient(145deg, #fef08a 0%, #fbbf24 45%, #f59e0b 100%)',
+    idleBorder: '#fde68a',
+    litBorder: '#ffffff',
+    idleShadow: '0 8px 18px rgba(217, 119, 6, 0.35), inset 0 2px 4px rgba(255,255,255,0.4)',
+    litShadow: '0 0 55px 16px rgba(251, 191, 36, 0.95), 0 20px 40px rgba(217, 119, 6, 0.5), inset 0 2px 10px rgba(255,255,255,0.95)',
+    glowColor: 'rgba(251, 191, 36, 0.95)',
+  },
+  blue: {
+    name: 'Blue',
+    note: '♬',
+    noteLabel: 'FA',
+    idleGradient: 'linear-gradient(145deg, #60a5fa 0%, #3b82f6 60%, #2563eb 100%)',
+    litGradient: 'linear-gradient(145deg, #bfdbfe 0%, #60a5fa 45%, #3b82f6 100%)',
+    idleBorder: '#93c5fd',
+    litBorder: '#ffffff',
+    idleShadow: '0 8px 18px rgba(37, 99, 235, 0.35), inset 0 2px 4px rgba(255,255,255,0.4)',
+    litShadow: '0 0 55px 16px rgba(96, 165, 250, 0.95), 0 20px 40px rgba(37, 99, 235, 0.5), inset 0 2px 10px rgba(255,255,255,0.95)',
+    glowColor: 'rgba(96, 165, 250, 0.95)',
+  },
+}
+
+/* Design Tokens */
+const INK = '#2c293d'
+const INK_MUTED = '#645f78'
 const VIOLET = '#5B21B6'
-const VIOLET_MID = '#6D4AE0'
-const CARD_BORDER = '#e7eaef'
-const CARD_SHADOW = '0 4px 14px rgba(70,45,130,0.08)'
+const VIOLET_MID = '#7C3AED'
+const CARD_BORDER = '#E7E2F8'
+const CARD_SHADOW = '0 6px 18px rgba(91, 33, 182, 0.06)'
 
 const card: React.CSSProperties = {
   background: '#ffffff',
   border: `1px solid ${CARD_BORDER}`,
   borderRadius: 18,
   boxShadow: CARD_SHADOW,
-  padding: '9px 14px',
+  padding: '8px 14px',
   display: 'flex',
   alignItems: 'center',
   gap: 10,
 }
 
 const microLabel: React.CSSProperties = {
-  fontSize: 14,
+  fontSize: 13.5,
   fontWeight: 700,
   color: INK,
-  letterSpacing: 0.1,
+  letterSpacing: 0.2,
   whiteSpace: 'nowrap',
 }
 
@@ -98,9 +155,7 @@ function starRating(n: number): string {
   return '⭐⭐⭐'
 }
 
-/* Segmented pill group — the white settings cards in the mockup. Inactive text
-   stays dark-grey on a light track; white text only ever lands on a solid
-   saturated fill. */
+/* Segmented pill group with therapist/client access styles */
 function PillGroup({
   options,
   value,
@@ -113,7 +168,14 @@ function PillGroup({
   disabled: boolean
 }) {
   return (
-    <div style={{ display: 'flex', gap: 2, background: '#F3F4F8', borderRadius: 999, padding: 3 }}>
+    <div style={{
+      display: 'flex',
+      gap: 2,
+      background: '#F1ECFA',
+      borderRadius: 999,
+      padding: 3,
+      opacity: disabled ? 0.75 : 1,
+    }}>
       {options.map(o => {
         const on = value === o.key
         return (
@@ -126,21 +188,21 @@ function PillGroup({
               display: 'flex',
               alignItems: 'center',
               gap: 4,
-              padding: '5px 11px',
+              padding: '5px 12px',
               borderRadius: 999,
               border: 'none',
-              cursor: disabled ? 'default' : 'pointer',
-              fontSize: 15.5,
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              fontSize: 14,
               fontWeight: 700,
               lineHeight: 1.2,
               background: on ? o.fill : 'transparent',
               color: on ? '#ffffff' : INK_MUTED,
-              boxShadow: on ? '0 2px 6px rgba(40,25,90,0.20)' : 'none',
+              boxShadow: on ? '0 2px 6px rgba(124,58,237,0.22)' : 'none',
               transition: 'background 0.15s, color 0.15s',
               whiteSpace: 'nowrap',
             }}
           >
-            {o.icon && <span aria-hidden style={{ fontSize: 16 }}>{o.icon}</span>}
+            {o.icon && <span aria-hidden style={{ fontSize: 14 }}>{o.icon}</span>}
             {o.label}
           </button>
         )
@@ -149,11 +211,11 @@ function PillGroup({
   )
 }
 
-/* Decorative audio meter in the status banner. */
+/* Decorative calming audio waveform */
 function Waveform({ active }: { active: boolean }) {
-  const bars = [9, 17, 27, 13, 31, 21, 34, 17, 27, 12, 20, 9]
+  const bars = [10, 18, 28, 14, 32, 22, 34, 18, 28, 14, 20, 10]
   return (
-    <div aria-hidden style={{ display: 'flex', alignItems: 'center', gap: 3, height: 34, flexShrink: 0 }}>
+    <div aria-hidden style={{ display: 'flex', alignItems: 'center', gap: 3, height: 32, flexShrink: 0 }}>
       {bars.map((h, i) => (
         <span
           key={i}
@@ -163,7 +225,7 @@ function Waveform({ active }: { active: boolean }) {
             borderRadius: 2,
             background: i % 2 ? VIOLET_MID : '#A78BFA',
             transformOrigin: 'center',
-            opacity: active ? 1 : 0.4,
+            opacity: active ? 1 : 0.35,
             animation: active ? `ssWave 900ms ease-in-out ${i * 70}ms infinite` : 'none',
           }}
         />
@@ -191,8 +253,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
   const [round, setRound] = useState(1)
   const [childIn, setChildIn] = useState<string[]>([])
   const [isPlaySeq, setIsPlaySeq] = useState(false)
-  const [litIdx, setLitIdx] = useState(-1)
-  // The pad the player just pressed, so their own taps flash back at them.
+  const [activeLitColor, setActiveLitColor] = useState<string | null>(null)
   const [tapFlash, setTapFlash] = useState<string | null>(null)
   const tapT = useRef<ReturnType<typeof setTimeout>>()
   const [cmdIdx, setCmdIdx] = useState(-1)
@@ -208,13 +269,13 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
   const [animateKey, setAnimateKey] = useState(0)
   const [toast, setToast] = useState<{ msg: string } | null>(null)
 
-  // Local-only presentation state — never written to Firestore.
+  // Sound toggle
   const [muted, setMuted] = useState(false)
 
   const tmr = useRef<ReturnType<typeof setInterval>>()
+  const stepTimeouts = useRef<ReturnType<typeof setTimeout>[]>([])
   const toastT = useRef<ReturnType<typeof setTimeout>>()
   const fbT = useRef<ReturnType<typeof setTimeout>>()
-  const playedRef = useRef(false)
 
   const write = useCallback(async (d: Record<string, unknown>) => {
     try {
@@ -235,9 +296,6 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
       if (typeof s.ssCommandSpeed === 'number') setCmdSpeed(s.ssCommandSpeed)
       if (typeof s.ssTrapRatio === 'string') setTrapRatio(s.ssTrapRatio)
       if (typeof s.ssLivesTotal === 'number') setLivesTotal(s.ssLivesTotal)
-      // Was reading s.ssLivesRem (never written), so livesRem became undefined
-      // after the first wrong tap: every heart rendered black and the game could
-      // never reach 0 lives.
       if (typeof s.ssLivesRemaining === 'number') setLivesRem(s.ssLivesRemaining)
       if (typeof s.ssIsPlaying === 'boolean') setIsPlaying(s.ssIsPlaying)
       if (typeof s.ssScore === 'number') setScore(s.ssScore)
@@ -245,7 +303,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
       if (typeof s.ssCurrentRound === 'number') setRound(s.ssCurrentRound)
       if (Array.isArray(s.ssChildInput)) setChildIn(s.ssChildInput)
       if (typeof s.ssIsPlayingSequence === 'boolean') setIsPlaySeq(s.ssIsPlayingSequence)
-      if (typeof s.ssLitButtonIndex === 'number') setLitIdx(s.ssLitButtonIndex)
+      if (typeof s.ssActiveLitColor === 'string' || s.ssActiveLitColor === null) setActiveLitColor(s.ssActiveLitColor)
       if (typeof s.ssBestRound === 'number') setBestRound(s.ssBestRound)
       if (typeof s.ssCommandIndex === 'number') setCmdIdx(s.ssCommandIndex)
       if (Array.isArray(s.ssCommandList)) setCmdList(s.ssCommandList as Command[])
@@ -256,55 +314,151 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
     return () => unsub()
   }, [sessionId])
 
-  // Clear all timers on unmount
-  useEffect(() => () => {
+  const clearAllTimeouts = useCallback(() => {
     if (tmr.current) clearInterval(tmr.current)
+    stepTimeouts.current.forEach(t => clearTimeout(t))
+    stepTimeouts.current = []
     if (toastT.current) clearTimeout(toastT.current)
     if (fbT.current) clearTimeout(fbT.current)
     if (tapT.current) clearTimeout(tapT.current)
-    staadCancel()
   }, [])
 
-  /* ── Pad tones ──────────────────────────────────────────────────────────────
-     Purely a side effect of the states the game already drives (`litIdx` while
-     the sequence plays, `tapFlash` when a pad is pressed). No handler, timing
-     or Firestore path is touched. */
-  const padAudio = useRef<Record<string, HTMLAudioElement>>({})
+  useEffect(() => () => {
+    clearAllTimeouts()
+    staadCancel()
+  }, [clearAllTimeouts])
+
+  /* ── Harmonious & Zero-Latency Audio Synthesis Engine ─────────────────── */
+  // Single source: Web Audio API oscillator only — no WAV to avoid double-sound
+  const audioCtxRef = useRef<AudioContext | null>(null)
   const mutedRef = useRef(false)
   useEffect(() => { mutedRef.current = muted }, [muted])
 
-  const playPadTone = useCallback((color: string) => {
+  // Plays a rich, calming Tibetan singing bell tone with fundamental + soft harmonic
+  const playPadTone = useCallback((color: string, durationMs: number = 380) => {
+    if (typeof window === 'undefined' || mutedRef.current || !color) return
+
+    const durSec = Math.max(0.2, durationMs / 1000)
+
     try {
-      if (typeof window === 'undefined' || mutedRef.current || !color) return
-      let a = padAudio.current[color]
-      if (!a) {
-        a = new Audio(PAD_TONE(color))
-        a.volume = 0.45
-        padAudio.current[color] = a
+      if (!audioCtxRef.current) {
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+        audioCtxRef.current = new AudioCtx()
       }
-      a.currentTime = 0
-      a.play()?.catch(() => {})
+      const ctx = audioCtxRef.current
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {})
+      }
+
+      const freq = TONE_FREQS[color] || 440
+      const now = ctx.currentTime
+
+      // Fundamental tone (smooth sine)
+      const osc1 = ctx.createOscillator()
+      const gain1 = ctx.createGain()
+      osc1.type = 'sine'
+      osc1.frequency.setValueAtTime(freq, now)
+
+      // Soft upper octave overtone for crystal clarity
+      const osc2 = ctx.createOscillator()
+      const gain2 = ctx.createGain()
+      osc2.type = 'sine'
+      osc2.frequency.setValueAtTime(freq * 2, now)
+
+      // Soothing bell volume envelope (instant attack + exponential decay)
+      gain1.gain.setValueAtTime(0.001, now)
+      gain1.gain.exponentialRampToValueAtTime(0.36, now + 0.015)
+      gain1.gain.exponentialRampToValueAtTime(0.0001, now + durSec)
+
+      gain2.gain.setValueAtTime(0.001, now)
+      gain2.gain.exponentialRampToValueAtTime(0.08, now + 0.015)
+      gain2.gain.exponentialRampToValueAtTime(0.0001, now + durSec * 0.7)
+
+      osc1.connect(gain1)
+      gain1.connect(ctx.destination)
+
+      osc2.connect(gain2)
+      gain2.connect(ctx.destination)
+
+      osc1.start(now)
+      osc2.start(now)
+      osc1.stop(now + durSec + 0.05)
+      osc2.stop(now + durSec + 0.05)
     } catch {}
   }, [])
 
-  // Fires once per lit step; the -1 gap between rounds resets the guard so a
-  // repeated colour at the same index still sounds.
-  const lastToneRef = useRef('')
-  useEffect(() => {
-    const key = isPlaySeq && litIdx >= 0 && seq[litIdx] ? `${litIdx}:${seq[litIdx]}` : ''
-    if (!key) { lastToneRef.current = ''; return }
-    if (key === lastToneRef.current) return
-    lastToneRef.current = key
-    playPadTone(seq[litIdx])
-  }, [litIdx, isPlaySeq, seq, playPadTone])
+  const playSuccessChime = useCallback(() => {
+    if (typeof window === 'undefined' || mutedRef.current) return
+    try {
+      if (!audioCtxRef.current) {
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+        audioCtxRef.current = new AudioCtx()
+      }
+      const ctx = audioCtxRef.current
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {})
 
+      // Harmonious ascending arpeggio (C5, E5, G5, C6)
+      const notes = [523.25, 659.25, 783.99, 1046.5]
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        const t = ctx.currentTime + idx * 0.08
+
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(freq, t)
+        gain.gain.setValueAtTime(0.01, t)
+        gain.gain.exponentialRampToValueAtTime(0.24, t + 0.02)
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35)
+
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+
+        osc.start(t)
+        osc.stop(t + 0.38)
+      })
+    } catch {}
+  }, [])
+
+  const playGentleRetryTone = useCallback(() => {
+    if (typeof window === 'undefined' || mutedRef.current) return
+    try {
+      if (!audioCtxRef.current) {
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+        audioCtxRef.current = new AudioCtx()
+      }
+      const ctx = audioCtxRef.current
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+
+      // Soft, calming double-tone instead of harsh buzzer
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(320, ctx.currentTime)
+      osc.frequency.exponentialRampToValueAtTime(260, ctx.currentTime + 0.28)
+
+      gain.gain.setValueAtTime(0.18, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3)
+
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+
+      osc.start(ctx.currentTime)
+      osc.stop(ctx.currentTime + 0.32)
+    } catch {}
+  }, [])
+
+  // Sync audio with Simon's demonstration sequence
   useEffect(() => {
-    if (tapFlash) playPadTone(tapFlash)
-  }, [tapFlash, playPadTone])
+    if (activeLitColor) {
+      playPadTone(activeLitColor, Math.max(280, Math.floor(speed * 0.6)))
+    }
+  }, [activeLitColor, playPadTone, speed])
 
   useEffect(() => () => {
-    Object.values(padAudio.current).forEach(a => { try { a.pause() } catch {} })
-    padAudio.current = {}
+    if (audioCtxRef.current) {
+      try { audioCtxRef.current.close() } catch {}
+    }
   }, [])
 
   const showFeedback = useCallback((type: 'correct' | 'wrong' | 'gold', msg: string) => {
@@ -316,35 +470,56 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
   const showToast = useCallback((msg: string) => {
     setToast({ msg })
     if (toastT.current) clearTimeout(toastT.current)
-    toastT.current = setTimeout(() => setToast(null), 1500)
+    toastT.current = setTimeout(() => setToast(null), 200)
   }, [])
 
-  const clearTimer = useCallback(() => {
-    if (tmr.current) { clearInterval(tmr.current); tmr.current = undefined }
-  }, [])
-
-  // --- Classic Mode ---
+  // --- Classic Mode Sequence Flow with Clear Pop-Up Gaps ---
   const newRound = useCallback((s: string[], r: number) => {
-    clearTimer()
+    clearAllTimeouts()
+
     write({
       'moduleState.ssSequence': s,
       'moduleState.ssCurrentRound': r,
       'moduleState.ssChildInput': [],
       'moduleState.ssIsPlayingSequence': true,
-      'moduleState.ssLitButtonIndex': 0,
+      'moduleState.ssActiveLitColor': null,
     })
-    setLitIdx(0)
-    let i = 0
-    tmr.current = setInterval(() => {
-      i++
-      if (i >= s.length) {
-        clearInterval(tmr.current!); tmr.current = undefined
-        write({ 'moduleState.ssLitButtonIndex': -1, 'moduleState.ssIsPlayingSequence': false })
-        return
-      }
-      write({ 'moduleState.ssLitButtonIndex': i })
-    }, speed)
-  }, [speed, write, clearTimer])
+    setActiveLitColor(null)
+
+    // Play each step with an active "lit & pop" window and a distinct "rest" gap
+    // so repeated consecutive colors visibly pop up, drop down, and pop up again!
+    const stepDuration = speed
+    const onDuration = Math.max(280, Math.floor(stepDuration * 0.65))
+
+    s.forEach((color, idx) => {
+      const startTime = (idx + 1) * stepDuration
+
+      // Turn ON, Elevate 3D Pop & Play Tone
+      const onTimeout = setTimeout(() => {
+        setActiveLitColor(color)
+        write({ 'moduleState.ssActiveLitColor': color })
+      }, startTime)
+      stepTimeouts.current.push(onTimeout)
+
+      // Turn OFF & Settle down (gap before next note)
+      const offTimeout = setTimeout(() => {
+        setActiveLitColor(null)
+        write({ 'moduleState.ssActiveLitColor': null })
+      }, startTime + onDuration)
+      stepTimeouts.current.push(offTimeout)
+    })
+
+    // Finished sequence demonstration
+    const finishTime = (s.length + 1) * stepDuration + 200
+    const endTimeout = setTimeout(() => {
+      setActiveLitColor(null)
+      write({
+        'moduleState.ssActiveLitColor': null,
+        'moduleState.ssIsPlayingSequence': false,
+      })
+    }, finishTime)
+    stepTimeouts.current.push(endTimeout)
+  }, [speed, write, clearAllTimeouts])
 
   const startClassic = useCallback(() => {
     if (!isT) return
@@ -356,49 +531,51 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
   }, [isT, startLen, livesTotal, newRound])
 
   const handleClassicTap = useCallback((color: string) => {
-    // The therapist was previously blocked outright, which made the module look
-    // completely unresponsive whenever it was driven from a single window.
-    // canInteract already encodes the lock rule for the client.
     if (!canInteract || isPlaySeq || gameOver || !isPlaying) return
 
-    // Immediate acknowledgement of the press, independent of whether the tap
-    // turns out to be right or wrong.
+    // Immediately trigger zero-latency tone & visual pop-up
+    playPadTone(color, 280)
     setTapFlash(color)
     if (tapT.current) clearTimeout(tapT.current)
-    tapT.current = setTimeout(() => setTapFlash(null), 180)
+    tapT.current = setTimeout(() => setTapFlash(null), 280)
 
     const next = [...childIn, color]
     const idx = next.length - 1
     const isCorrect = next[idx] === seq[idx]
+
     if (!isCorrect) {
+      playGentleRetryTone()
       const nl = livesRem - 1
       setLivesAnim(prev => new Set(prev).add(livesRem - 1))
       setTimeout(() => setLivesAnim(prev => { const n = new Set(prev); n.delete(livesRem - 1); return n }), 450)
-      showFeedback('wrong', 'Oops! ✗')
-      showToast('Wrong!')
+      showFeedback('wrong', 'Gentle try! Let\'s watch again 🌸')
+      showToast('Take a breath 💛')
       write({ 'moduleState.ssLivesRemaining': nl, 'moduleState.ssChildInput': next })
       if (nl <= 0) {
-        clearTimer()
+        clearAllTimeouts()
         const b = Math.max(bestRound, round)
         write({ 'moduleState.ssGameOver': true, 'moduleState.ssBestRound': b, 'moduleState.ssIsPlaying': false })
         return
       }
-      setTimeout(() => newRound(seq, round), 1000)
+      setTimeout(() => newRound(seq, round), 1200)
       return
     }
+
     if (next.length === seq.length) {
+      playSuccessChime()
       const ns = score + 1
-      showFeedback('correct', '✓ Amazing!')
-      showToast('Correct!')
+      showFeedback('correct', '✨ Beautiful Memory! Next Round!')
+      showToast('Awesome! 🎉')
       const nr = round + 1
       const b = Math.max(bestRound, nr)
       const newSeq = [...seq, BUTTONS[Math.floor(Math.random() * 4)]]
       write({ 'moduleState.ssScore': ns, 'moduleState.ssCurrentRound': nr, 'moduleState.ssChildInput': next, 'moduleState.ssBestRound': b })
-      setTimeout(() => newRound(newSeq, nr), 1200)
+      setTimeout(() => newRound(newSeq, nr), 1250)
       return
     }
+
     write({ 'moduleState.ssChildInput': next })
-  }, [canInteract, isPlaySeq, gameOver, isPlaying, childIn, seq, livesRem, score, bestRound, round, speed, write, showFeedback, showToast, clearTimer, newRound])
+  }, [canInteract, isPlaySeq, gameOver, isPlaying, childIn, seq, livesRem, score, bestRound, round, write, showFeedback, showToast, clearAllTimeouts, newRound, playSuccessChime, playGentleRetryTone, playPadTone])
 
   // --- Simon Says Mode ---
   const startSimonSays = useCallback(() => {
@@ -447,36 +624,37 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
   }, [cmdIdx, mode, isPlaying, gameOver, lastCmdIdx])
 
   const handleSimonRespond = useCallback((doIt: boolean) => {
-    // Therapist lockout removed for the same reason as handleClassicTap.
     if (!canInteract || !currentCmd || gameOver || !isPlaying) return
     const shouldDoIt = currentCmd.hasSimonSays
     if (doIt === shouldDoIt) {
+      playSuccessChime()
       const ns = score + 1
       let nta = trapsAv
       if (!shouldDoIt) nta = trapsAv + 1
       const type = doIt && shouldDoIt ? 'correct' : 'gold'
-      const msg = doIt && shouldDoIt ? '✓ Correct!' : shouldDoIt ? 'You should have done it!' : 'Great self-control! 💪'
+      const msg = doIt && shouldDoIt ? '✓ Great focus!' : 'Super self-control! 🌟'
       if (type === 'gold') setTrapsAv(nta)
       showFeedback(type, msg)
       showToast(msg)
       write({ 'moduleState.ssScore': ns, 'moduleState.ssTrapsAvoided': nta })
     } else {
+      playGentleRetryTone()
       const nl = livesRem - 1
       setLivesAnim(prev => new Set(prev).add(livesRem - 1))
       setTimeout(() => setLivesAnim(prev => { const n = new Set(prev); n.delete(livesRem - 1); return n }), 450)
       let nta = trapsAv
       let nth = trapsHit
-      const msg = shouldDoIt ? 'You should have done it!' : 'Simon didn\'t say! 🪤'
+      const msg = shouldDoIt ? 'Simon said to do it! 😊' : 'Simon didn\'t say! 🪤'
       if (!shouldDoIt) nth = trapsHit + 1
       showFeedback('wrong', msg)
       showToast(msg)
       write({ 'moduleState.ssLivesRemaining': nl, 'moduleState.ssScore': score, 'moduleState.ssTrapsHit': nth, 'moduleState.ssTrapsAvoided': nta })
       if (nl <= 0) {
-        clearTimer()
+        clearAllTimeouts()
         write({ 'moduleState.ssGameOver': true, 'moduleState.ssIsPlaying': false })
       }
     }
-  }, [canInteract, currentCmd, gameOver, isPlaying, score, trapsAv, trapsHit, livesRem, write, showFeedback, showToast, clearTimer])
+  }, [canInteract, currentCmd, gameOver, isPlaying, score, trapsAv, trapsHit, livesRem, write, showFeedback, showToast, clearAllTimeouts, playSuccessChime, playGentleRetryTone])
 
   // Keyboard handlers
   useEffect(() => {
@@ -489,7 +667,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
     return () => window.removeEventListener('keydown', onKey)
   }, [mode, isPlaying, gameOver, handleSimonRespond])
 
-  // Log the sequencing result once when a game ends (therapist browser only).
+  // Log the result once when game ends
   const loggedOverRef = useRef(false)
   useEffect(() => {
     if (gameOver && isT && !loggedOverRef.current) {
@@ -497,7 +675,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
       logModuleEvent(sessionId, {
         module: 'simon-says',
         type: 'game_over',
-        detail: `Finished a Simon Says round (best sequence length ${Math.max(bestRound, round)}, score ${score})`,
+        detail: `Finished Simon Says (best round ${Math.max(bestRound, round)}, score ${score})`,
       })
     }
     if (!gameOver) loggedOverRef.current = false
@@ -512,13 +690,13 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
 
   const handlePause = useCallback(() => {
     if (!isT) return
-    clearTimer()
+    clearAllTimeouts()
     write({ 'moduleState.ssIsPlaying': false })
-  }, [isT, clearTimer, write])
+  }, [isT, clearAllTimeouts, write])
 
   const handleReset = useCallback(() => {
     if (!isT) return
-    clearTimer()
+    clearAllTimeouts()
     write({
       'moduleState.ssIsPlaying': false,
       'moduleState.ssScore': 0,
@@ -527,7 +705,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
       'moduleState.ssCurrentRound': 1,
       'moduleState.ssChildInput': [],
       'moduleState.ssIsPlayingSequence': false,
-      'moduleState.ssLitButtonIndex': -1,
+      'moduleState.ssActiveLitColor': null,
       'moduleState.ssCommandIndex': -1,
       'moduleState.ssCommandList': [],
       'moduleState.ssTrapsAvoided': 0,
@@ -535,9 +713,9 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
       'moduleState.ssGameOver': false,
     })
     setGameOver(false)
-    setLitIdx(-1)
+    setActiveLitColor(null)
     setCmdIdx(-1)
-  }, [isT, clearTimer, write, livesTotal])
+  }, [isT, clearAllTimeouts, write, livesTotal])
 
   const handlePlayAgain = useCallback(() => {
     if (!isT) return
@@ -548,43 +726,34 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
 
   const cmdBarColor = countPct > 60 ? '#22C55E' : countPct > 30 ? '#F5B923' : '#EF4459'
 
-  /* ── Derived presentation values ─────────────────────────────────────────── */
-
-  // The "Round x / y" card: classic counts rounds, Simon Says counts commands
-  // out of the generated list (both are existing state, nothing new is stored).
+  /* ── Presentation Values ─── */
   const roundLabel = mode === 'classic'
     ? String(round)
     : `${Math.max(0, cmdIdx + 1)} / ${cmdList.length || '—'}`
 
-  // Vertical Level meter. Purely visual progress — 10 rounds fills the tube in
-  // classic mode, the command list length in Simon Says mode.
   const levelValue = mode === 'classic' ? round : Math.max(1, cmdIdx + 1)
   const levelPct = mode === 'classic'
     ? Math.min(100, (round / 10) * 100)
     : cmdList.length ? Math.min(100, ((cmdIdx + 1) / cmdList.length) * 100) : 0
 
   const banner = useMemo(() => {
-    if (gameOver) return { icon: '🏁', title: 'Round complete', sub: 'Take a breath — you can play again whenever you are ready.' }
+    if (gameOver) return { icon: '🏆', title: 'Round Completed!', sub: 'Take a calm breath. You did wonderful work today.' }
     if (!isPlaying) {
       return isT
-        ? { icon: '🎮', title: 'Ready when you are', sub: 'Choose a difficulty and speed, then press Start to begin.' }
-        : { icon: '🎮', title: 'Get ready!', sub: 'Your therapist is setting up the activity for you...' }
+        ? { icon: '🎮', title: 'Ready to Begin', sub: 'Pick your difficulty, then press Start to play.' }
+        : { icon: '✨', title: 'Get Ready!', sub: 'Your therapist is getting the activity ready for you...' }
     }
     if (mode === 'classic') {
       return isPlaySeq
-        ? { icon: '👀', title: 'Watch Carefully...', sub: 'Simon will show the sequence and you have to repeat the sequence.' }
-        : { icon: '✋', title: 'Your Turn!', sub: `Repeat the pattern in order — ${childIn.length} of ${seq.length} taps done.` }
+        ? { icon: '👀', title: 'Simon\'s Turn — Watch & Listen', sub: 'Relax, watch the glowing pads and listen to the melody.' }
+        : { icon: '🎈', title: 'Your Turn — Tap the Colors!', sub: `Repeat the pattern: ${childIn.length} of ${seq.length} taps matched.` }
     }
-    return { icon: '👂', title: 'Listen Carefully...', sub: 'Only follow the command when Simon says. Otherwise, hold still.' }
+    return { icon: '👂', title: 'Listen Carefully...', sub: 'Follow the command only when Simon says so!' }
   }, [gameOver, isPlaying, isT, mode, isPlaySeq, childIn.length, seq.length])
 
   const settingsDisabled = !isT
 
   return (
-    /* Root fills the stage and never scrolls itself — ModuleStage's body is
-       overflow:hidden and expects `height:100%` plus internal flex:1 regions.
-       Every glyph on this lavender panel is dark ink; white text appears only
-       on the solid saturated pills, pads and buttons. */
     <div style={{
       height: '100%',
       minHeight: 0,
@@ -592,24 +761,68 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
       display: 'flex',
       flexDirection: 'column',
       position: 'relative',
-      borderRadius: 20,
+      borderRadius: 24,
       overflow: 'hidden',
-      padding: '14px 16px 14px',
-      gap: 12,
+      padding: '16px 20px',
+      gap: 14,
       color: INK,
-      fontFamily: '"DM Sans", sans-serif',
-      background: 'linear-gradient(155deg, #EFEBFD 0%, #E2DAFA 42%, #D5CAF6 100%)',
+      fontFamily: '"DM Sans", system-ui, sans-serif',
+      background: 'linear-gradient(160deg, #faf8ff 0%, #ede8fb 40%, #ddd3f7 75%, #cfc4f2 100%)',
+      border: '1px solid rgba(255,255,255,0.9)',
+      boxShadow: '0 12px 40px rgba(91,33,182,0.10)',
     }}>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap');
         @keyframes ci{0%{transform:scale(.9)translateY(10px);opacity:0}100%{transform:scale(1)translateY(0);opacity:1}}
-        @keyframes hl{0%{transform:scale(1.3);opacity:1}100%{transform:scale(0);opacity:0}}
+        @keyframes hl{0%{transform:scale(1.4);opacity:1}100%{transform:scale(0);opacity:0}}
         @keyframes ssWave{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
-        @keyframes ssPop{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
+        @keyframes ssPop{0%{transform:scale(.7) translateY(-16px);opacity:0}60%{transform:scale(1.08) translateY(2px);opacity:1}100%{transform:scale(1) translateY(0);opacity:1}}
+        @keyframes pad3DPop{
+          0% { transform: scale(1) translateY(0); }
+          45% { transform: scale(1.14) translateY(-12px); }
+          100% { transform: scale(1.10) translateY(-8px); }
+        }
+        @keyframes toastFlash{
+          0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}
+          30%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}
+          70%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+          100%{opacity:0;transform:translate(-50%,-50%) scale(.9)}
+        }
+        @keyframes orbitSpin{
+          from{transform:translate(-50%,-50%) rotate(0deg)}
+          to{transform:translate(-50%,-50%) rotate(360deg)}
+        }
+        @keyframes orbitSpinRev{
+          from{transform:translate(-50%,-50%) rotate(0deg)}
+          to{transform:translate(-50%,-50%) rotate(-360deg)}
+        }
+        @keyframes consoleFloat{
+          0%,100%{transform:translateY(0px)}
+          50%{transform:translateY(-6px)}
+        }
+        @keyframes haloPulse{
+          0%,100%{opacity:0.25;transform:translate(-50%,-50%) scale(1)}
+          50%{opacity:0.55;transform:translate(-50%,-50%) scale(1.04)}
+        }
+        @keyframes orbitDot{
+          from{transform:rotate(var(--start)) translateX(var(--r)) rotate(calc(-1 * var(--start)))}
+          to{transform:rotate(calc(var(--start) + 360deg)) translateX(var(--r)) rotate(calc(-1 * (var(--start) + 360deg)))}
+        }
+        @keyframes correctFlash{
+          0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}
+          35%{opacity:1;transform:translate(-50%,-50%) scale(1.15)}
+          65%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+          100%{opacity:0;transform:translate(-50%,-50%) scale(.8)}
+        }
         .ci-a{animation:ci .3s ease}
-        .ss-pop{animation:ssPop .22s ease}
+        .ss-pop{animation:ssPop .3s cubic-bezier(0.34,1.56,0.64,1)}
+        .toast-flash{animation:toastFlash .22s ease forwards}
+        .pad-elevated{
+          animation: pad3DPop 0.26s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
       `}</style>
 
-      {/* ── Settings row ─────────────────────────────────────────────────── */}
+      {/* ── Settings / Top Bar ────────────────────────────────────────────── */}
       <div style={{
         flexShrink: 0,
         display: 'flex',
@@ -625,11 +838,12 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
             value={difficulty}
             disabled={settingsDisabled}
             options={[
-              { key: 'easy', label: 'Easy', fill: '#22C55E' },
+              { key: 'easy', label: 'Easy', fill: '#10B981' },
               { key: 'medium', label: 'Medium', fill: '#F59E0B' },
               { key: 'hard', label: 'Hard', fill: '#EF4444' },
             ]}
             onSelect={(d) => {
+              if (!isT) return
               const sp = d === 'easy' ? 1200 : d === 'hard' ? 500 : 800
               const cs = d === 'easy' ? 3000 : d === 'hard' ? 1200 : 2000
               const lt = d === 'easy' ? 5 : d === 'hard' ? 3 : 3
@@ -646,11 +860,14 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
               value={String(speed)}
               disabled={settingsDisabled}
               options={[
-                { key: '1200', label: 'Slow', icon: '🐢', fill: '#3B82F6' },
-                { key: '800', label: 'Normal', icon: '🚶', fill: '#3B82F6' },
+                { key: '1200', label: 'Calm', icon: '🐢', fill: '#3B82F6' },
+                { key: '800', label: 'Balanced', icon: '🚶', fill: '#3B82F6' },
                 { key: '500', label: 'Fast', icon: '⚡', fill: '#3B82F6' },
               ]}
-              onSelect={(v) => write({ 'moduleState.ssSpeed': Number(v) })}
+              onSelect={(v) => {
+                if (!isT) return
+                write({ 'moduleState.ssSpeed': Number(v) })
+              }}
             />
           </div>
         ) : (
@@ -664,27 +881,30 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
                 { key: 'medium', label: 'Medium', icon: '🪤', fill: '#3B82F6' },
                 { key: 'high', label: 'High', icon: '🔥', fill: '#3B82F6' },
               ]}
-              onSelect={(r) => write({ 'moduleState.ssTrapRatio': r })}
+              onSelect={(r) => {
+                if (!isT) return
+                write({ 'moduleState.ssTrapRatio': r })
+              }}
             />
           </div>
         )}
 
         {/* Round + Score */}
         <div style={{ ...card, gap: 0, padding: '7px 6px' }}>
-          <div style={{ padding: '0 14px', textAlign: 'center', minWidth: 74 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: VIOLET }}>Round</div>
-            <div style={{ fontSize: 19.5, fontWeight: 800, color: INK, lineHeight: 1.25 }}>{roundLabel}</div>
+          <div style={{ padding: '0 14px', textAlign: 'center', minWidth: 70 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: VIOLET }}>Round</div>
+            <div style={{ fontSize: 19, fontWeight: 800, color: INK, lineHeight: 1.25 }}>{roundLabel}</div>
           </div>
           <div style={{ width: 1, alignSelf: 'stretch', background: CARD_BORDER }} />
           <div style={{ padding: '0 14px', textAlign: 'center', minWidth: 66 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: VIOLET, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: VIOLET, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
               <span aria-hidden>⭐</span> Score
             </div>
-            <div style={{ fontSize: 19.5, fontWeight: 800, color: INK, lineHeight: 1.25 }}>{score}</div>
+            <div style={{ fontSize: 19, fontWeight: 800, color: INK, lineHeight: 1.25 }}>{score}</div>
           </div>
         </div>
 
-        {/* Therapist-only: mode + transport */}
+        {/* Therapist-only: mode + transport controls */}
         {isT && (
           <div style={{ ...card, gap: 8 }}>
             <PillGroup
@@ -701,27 +921,27 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
               <button type="button" onClick={handleStart} style={{
                 padding: '7px 16px', borderRadius: 999, border: 'none', cursor: 'pointer',
                 background: `linear-gradient(180deg, ${VIOLET_MID}, ${VIOLET})`, color: '#ffffff',
-                fontSize: 16, fontWeight: 800, boxShadow: '0 3px 10px rgba(91,33,182,0.32)',
+                fontSize: 14.5, fontWeight: 800, boxShadow: '0 3px 10px rgba(91,33,182,0.32)',
               }}>▶ Start</button>
             ) : (
               <button type="button" onClick={handlePause} style={{
                 padding: '7px 16px', borderRadius: 999, border: `1px solid ${CARD_BORDER}`, cursor: 'pointer',
-                background: '#F3F4F8', color: INK, fontSize: 16, fontWeight: 800,
+                background: '#F3F4F8', color: INK, fontSize: 14.5, fontWeight: 800,
               }}>⏸ Pause</button>
             )}
             <button type="button" onClick={handleReset} style={{
               padding: '7px 13px', borderRadius: 999, border: '1px solid rgba(225,29,72,0.35)', cursor: 'pointer',
-              background: 'transparent', color: '#BE123C', fontSize: 16, fontWeight: 700,
+              background: 'transparent', color: '#BE123C', fontSize: 14.5, fontWeight: 700,
             }}>↺ Reset</button>
           </div>
         )}
       </div>
 
-      {/* ── Play area ────────────────────────────────────────────────────── */}
+      {/* ── Play Area ────────────────────────────────────────────────────── */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'stretch', gap: 14 }}>
 
-        {/* Left rail: Level meter + Lives */}
-        <div style={{ flexShrink: 0, width: 118, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
+        {/* Left Rail: Level Meter + Hearts */}
+        <div style={{ flexShrink: 0, width: 114, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
           {/* Level meter */}
           <div style={{
             ...card,
@@ -733,7 +953,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
             padding: '10px 8px 10px',
             borderRadius: 22,
             alignSelf: 'center',
-            width: 60,
+            width: 66,
           }}>
             <div style={{
               flex: 1,
@@ -749,32 +969,32 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
                 position: 'absolute', left: 0, right: 0, bottom: 0,
                 height: `${levelPct}%`,
                 borderRadius: 999,
-                background: `linear-gradient(180deg, #8B5CF6 0%, ${VIOLET} 100%)`,
+                background: `linear-gradient(180deg, #A78BFA 0%, ${VIOLET_MID} 100%)`,
                 transition: 'height 0.45s cubic-bezier(.4,0,.2,1)',
               }} />
               <div aria-hidden style={{
                 position: 'absolute', left: '50%', transform: 'translate(-50%, 50%)',
-                bottom: `${levelPct}%`, fontSize: 16.5, lineHeight: 1,
+                bottom: `${levelPct}%`, fontSize: 15, lineHeight: 1,
                 transition: 'bottom 0.45s cubic-bezier(.4,0,.2,1)',
               }}>⭐</div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: INK_MUTED }}>Level</div>
-              <div style={{ fontSize: 17.5, fontWeight: 800, color: INK, lineHeight: 1.2 }}>{levelValue}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: INK_MUTED }}>Level</div>
+              <div style={{ fontSize: 17, fontWeight: 800, color: INK, lineHeight: 1.2 }}>{levelValue}</div>
             </div>
           </div>
 
-          {/* Lives */}
+          {/* Lives (Hearts) */}
           <div style={{
             ...card,
             flexShrink: 0,
             flexDirection: 'column',
             gap: 6,
-            padding: '10px 10px 12px',
+            padding: '10px 8px 12px',
             borderRadius: 20,
           }}>
-            <div style={{ fontSize: 16, fontWeight: 800, color: VIOLET }}>Lives</div>
-            <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: VIOLET, textAlign: 'center' }}>Chances</div>
+            <div style={{ display: 'flex', gap: 3, justifyContent: 'center', flexWrap: 'wrap' }}>
               {Array.from({ length: livesTotal }, (_, i) => (
                 <span key={i} style={{
                   display: 'inline-flex',
@@ -784,8 +1004,8 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
                     src={i < livesRem ? HEART_FILLED : HEART_EMPTY}
                     alt=""
                     aria-hidden
-                    width={26}
-                    height={24}
+                    width={24}
+                    height={22}
                     style={{ display: 'block' }}
                   />
                 </span>
@@ -794,65 +1014,328 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
           </div>
         </div>
 
-        {/* Centre stage */}
-        <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {/* Centre Stage: Calming, Responsive Arcade Console */}
+        <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
           {mode === 'classic' ? (
-            <div style={{
-              position: 'relative',
-              height: '100%',
-              // Two 240x200 pads side by side — keep the sprites' native ratio
-              // so the artwork's corner radius is not distorted.
-              aspectRatio: '1.2',
-              maxWidth: '100%',
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gridTemplateRows: '1fr 1fr',
-              gap: 12,
-              opacity: isPlaying ? 1 : 0.62,
-              transition: 'opacity 0.25s',
-            }}>
-              {BUTTONS.map((color) => {
-                // litIdx is a position in the SEQUENCE, not a pad index. Comparing
-                // it against the pad index lit red/blue/green/yellow in fixed order
-                // regardless of the actual sequence, so the pattern the child saw
-                // was never the pattern being validated.
-                const isLit = isPlaySeq && litIdx >= 0 && seq[litIdx] === color
-                const isTapped = tapFlash === color
-                const isHot = isLit || isTapped
-                return (
-                  <div
-                    key={color}
-                    role="button"
-                    aria-label={`${color} pad`}
-                    onClick={() => handleClassicTap(color)}
-                    style={{
-                      borderRadius: 24,
-                      backgroundImage: `url("${PAD_ART(color, isHot)}")`,
-                      backgroundSize: '100% 100%',
-                      backgroundRepeat: 'no-repeat',
-                      cursor: canInteract && !isPlaySeq ? 'pointer' : 'default',
-                      transition: 'transform 0.1s, box-shadow 0.1s',
-                      boxShadow: isHot
-                        ? `0 0 34px 6px ${PAD_GLOW[color]}, 0 8px 20px rgba(50,30,110,0.18)`
-                        : '0 8px 20px rgba(50,30,110,0.16)',
-                      transform: isLit ? 'scale(1.035)' : isTapped ? 'scale(0.965)' : 'scale(1)',
-                      pointerEvents: isPlaySeq ? 'none' : 'auto',
-                      userSelect: 'none', WebkitUserSelect: 'none',
-                    }}
-                  />
-                )
-              })}
-              {/* Centre brain badge */}
-              <div aria-hidden style={{
-                position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-                width: 76, height: 76, borderRadius: '50%',
-                background: '#ffffff',
-                border: `1px solid ${CARD_BORDER}`,
-                boxShadow: '0 6px 20px rgba(50,30,110,0.18)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 37, zIndex: 5,
-              }}>🧠</div>
-            </div>
+            <>
+              {/* ── Animated Orbital Wrapper ── */}
+              <div style={{
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                // Extra space for orbit rings
+                width: 420,
+                height: 420,
+                flexShrink: 0,
+              }}>
+
+                {/* Outer halo pulse (ambient glow) */}
+                <div aria-hidden style={{
+                  position: 'absolute',
+                  top: '50%', left: '50%',
+                  width: 410, height: 410,
+                  borderRadius: '50%',
+                  background: isPlaySeq
+                    ? 'radial-gradient(circle, rgba(168,85,247,0.18) 0%, transparent 70%)'
+                    : isPlaying
+                    ? 'radial-gradient(circle, rgba(52,211,153,0.15) 0%, transparent 70%)'
+                    : 'radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)',
+                  animation: 'haloPulse 2.5s ease-in-out infinite',
+                  pointerEvents: 'none',
+                }} />
+
+                {/* Outer spinning conic ring */}
+                <div aria-hidden style={{
+                  position: 'absolute',
+                  top: '50%', left: '50%',
+                  width: 402, height: 402,
+                  borderRadius: '50%',
+                  background: 'conic-gradient(from 0deg, #10b981 0%, #3b82f6 25%, #f59e0b 50%, #ef4444 75%, #10b981 100%)',
+                  animation: 'orbitSpin 8s linear infinite',
+                  opacity: isPlaying ? 0.55 : 0.2,
+                  transition: 'opacity 0.5s ease',
+                  mask: 'radial-gradient(circle, transparent 190px, black 193px)',
+                  WebkitMask: 'radial-gradient(circle, transparent 190px, black 193px)',
+                  pointerEvents: 'none',
+                }} />
+
+                {/* Inner counter-spinning dashed ring */}
+                <div aria-hidden style={{
+                  position: 'absolute',
+                  top: '50%', left: '50%',
+                  width: 390, height: 390,
+                  borderRadius: '50%',
+                  border: '2px dashed rgba(167,139,250,0.35)',
+                  animation: 'orbitSpinRev 12s linear infinite',
+                  pointerEvents: 'none',
+                }} />
+
+                {/* Orbiting color dots */}
+                {isPlaying && [0,1,2,3].map((i) => {
+                  const colors = ['#10b981','#ef4444','#f59e0b','#3b82f6']
+                  const startDeg = i * 90
+                  const r = 200
+                  const x = r * Math.cos(startDeg * Math.PI / 180)
+                  const y = r * Math.sin(startDeg * Math.PI / 180)
+                  return (
+                    <div
+                      key={i}
+                      aria-hidden
+                      style={{
+                        position: 'absolute',
+                        top: `calc(50% + ${y}px)`,
+                        left: `calc(50% + ${x}px)`,
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        background: colors[i],
+                        boxShadow: `0 0 10px 4px ${colors[i]}88`,
+                        transform: 'translate(-50%,-50%)',
+                        animation: `orbitSpin ${6 + i * 1.2}s linear infinite`,
+                        transformOrigin: `${-x}px ${-y}px`,
+                        pointerEvents: 'none',
+                      }}
+                    />
+                  )
+                })}
+
+                {/* Pop-Up Classic Simon Console */}
+                <div style={{
+                  position: 'relative',
+                  width: 370,
+                  height: 370,
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gridTemplateRows: '1fr 1fr',
+                  gap: 16,
+                  padding: 16,
+                  background: 'radial-gradient(circle at 40% 35%, #352b5e 0%, #1f1738 55%, #120f24 100%)',
+                  borderRadius: '50%',
+                  boxShadow: isPlaySeq
+                    ? '0 24px 60px rgba(35, 20, 65, 0.5), 0 0 40px rgba(167,139,250,0.45), inset 0 3px 10px rgba(255,255,255,0.22)'
+                    : isPlaying
+                    ? '0 24px 60px rgba(35, 20, 65, 0.45), 0 0 24px rgba(52,211,153,0.25), inset 0 3px 10px rgba(255,255,255,0.18)'
+                    : '0 20px 48px rgba(35, 20, 65, 0.35), inset 0 2px 8px rgba(255,255,255,0.14)',
+                  animation: 'consoleFloat 4s ease-in-out infinite',
+                  opacity: isPlaying ? 1 : 0.9,
+                  transition: 'box-shadow 0.35s ease, opacity 0.25s',
+                  flexShrink: 0,
+                }}>
+                {BUTTONS.map((color, padIdx) => {
+                  const isLit = isPlaySeq && activeLitColor === color
+                  const isTapped = tapFlash === color
+                  const isHot = isLit || isTapped
+                  const theme = PAD_THEMES[color]
+
+                  // Corner radii to shape quadrant buttons into a seamless circular console
+                  const borderRadii = [
+                    '100% 28px 28px 28px', // Top Left (Green)
+                    '28px 100% 28px 28px', // Top Right (Red)
+                    '28px 28px 28px 100%', // Bottom Left (Yellow)
+                    '28px 28px 100% 28px', // Bottom Right (Blue)
+                  ][padIdx]
+
+                  return (
+                    <button
+                      key={color}
+                      type="button"
+                      role="button"
+                      aria-label={`${theme.name} pad`}
+                      onClick={() => handleClassicTap(color)}
+                      disabled={isPlaySeq || !isPlaying}
+                      className={isHot ? 'pad-elevated' : ''}
+                      style={{
+                        position: 'relative',
+                        borderRadius: borderRadii,
+                        background: isHot ? theme.litGradient : theme.idleGradient,
+                        border: `3.5px solid ${isHot ? theme.litBorder : theme.idleBorder}`,
+                        cursor: canInteract && !isPlaySeq && isPlaying ? 'pointer' : 'default',
+                        boxShadow: isHot ? theme.litShadow : theme.idleShadow,
+                        transform: isHot
+                          ? 'scale(1.09) translateY(-7px)'
+                          : isPlaySeq
+                          ? 'scale(0.97)'
+                          : 'scale(1)',
+                        zIndex: isHot ? 12 : 1,
+                        transition: 'transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease',
+                        outline: 'none',
+                        overflow: 'hidden',
+                        userSelect: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {/* Glossy curved reflection lens */}
+                      <div
+                        aria-hidden
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: '50%',
+                          background: 'linear-gradient(180deg, rgba(255,255,255,0.52) 0%, rgba(255,255,255,0.06) 100%)',
+                          borderRadius: borderRadii,
+                          pointerEvents: 'none',
+                        }}
+                      />
+
+                      {/* Pop-up glowing flash aura */}
+                      {isHot && (
+                        <div
+                          aria-hidden
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            background: 'radial-gradient(circle at 50% 50%, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 70%)',
+                            pointerEvents: 'none',
+                          }}
+                        />
+                      )}
+
+                      {/* Musical note symbol + solmization label */}
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 1,
+                        transform: isHot ? 'scale(1.22)' : 'scale(1)',
+                        transition: 'transform 0.18s ease',
+                        userSelect: 'none',
+                        pointerEvents: 'none',
+                      }}>
+                        <span style={{
+                          fontSize: isHot ? 36 : 28,
+                          lineHeight: 1,
+                          color: isHot ? '#ffffff' : 'rgba(255,255,255,0.88)',
+                          fontWeight: 900,
+                          textShadow: isHot
+                            ? '0 0 18px rgba(255,255,255,1), 0 2px 8px rgba(0,0,0,0.3)'
+                            : '0 2px 6px rgba(0,0,0,0.3)',
+                          transition: 'font-size 0.18s ease, text-shadow 0.18s ease',
+                        }}>
+                          {theme.note}
+                        </span>
+                        <span style={{
+                          fontSize: isHot ? 13 : 11,
+                          fontWeight: 800,
+                          letterSpacing: 1.5,
+                          color: isHot ? '#ffffff' : 'rgba(255,255,255,0.7)',
+                          textShadow: '0 1px 4px rgba(0,0,0,0.4)',
+                          transition: 'font-size 0.18s ease',
+                          lineHeight: 1,
+                        }}>
+                          {theme.noteLabel}
+                        </span>
+                      </div>
+                    </button>
+                  )
+                })}
+
+                {/* Centre Console Hub — concentric rings with status glow */}
+                <div aria-hidden style={{
+                  position: 'absolute',
+                  top: '50%', left: '50%',
+                  transform: 'translate(-50%,-50%)',
+                  width: 100,
+                  height: 100,
+                  borderRadius: '50%',
+                  zIndex: 15,
+                }}>
+                  {/* Outer decorative ring */}
+                  <div style={{
+                    position: 'absolute', inset: -6,
+                    borderRadius: '50%',
+                    border: `2.5px solid ${isPlaySeq ? 'rgba(192,132,252,0.6)' : isPlaying ? 'rgba(52,211,153,0.5)' : 'rgba(139,92,246,0.3)'}`,
+                    transition: 'border-color 0.3s ease',
+                    animation: isPlaying ? 'orbitSpinRev 6s linear infinite' : 'none',
+                  }} />
+                  {/* Main hub */}
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    borderRadius: '50%',
+                    background: 'radial-gradient(circle at 35% 30%, #46375e 0%, #1e1732 100%)',
+                    border: '3px solid #5c4a85',
+                    boxShadow: isPlaySeq
+                      ? '0 0 32px rgba(168,85,247,0.9), inset 0 2px 8px rgba(255,255,255,0.15)'
+                      : isPlaying
+                      ? '0 0 32px rgba(52,211,153,0.9), inset 0 2px 8px rgba(255,255,255,0.12)'
+                      : '0 6px 20px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.08)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'box-shadow 0.3s ease',
+                    gap: 2,
+                  }}>
+                    {/* Inner glossy lens */}
+                    <div style={{
+                      position: 'absolute', top: 4, left: 8, right: 8, height: '42%',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(180deg, rgba(255,255,255,0.2) 0%, transparent 100%)',
+                      pointerEvents: 'none',
+                    }} />
+                    <span style={{ fontSize: 22, lineHeight: 1, position: 'relative' }}>🎵</span>
+                    <span style={{
+                      fontSize: 9.5,
+                      fontWeight: 900,
+                      letterSpacing: 1.5,
+                      textTransform: 'uppercase',
+                      color: isPlaySeq ? '#e9d5ff' : isPlaying ? '#6ee7b7' : '#c4b5fd',
+                      position: 'relative',
+                      transition: 'color 0.3s ease',
+                    }}>
+                      {isPlaySeq ? 'WATCH' : isPlaying ? 'YOUR TURN' : 'SIMON'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Close orbital wrapper */}
+              </div>
+
+              {/* Calming Sequence Step Indicators (helps clients with anxiety/ADHD visually track their progress) */}
+              {isPlaying && seq.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  padding: '4px 14px',
+                  borderRadius: 999,
+                  background: 'rgba(255,255,255,0.7)',
+                  border: `1px solid ${CARD_BORDER}`,
+                }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: INK_MUTED }}>Sequence:</span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {seq.map((_, i) => {
+                      const isDone = i < childIn.length
+                      const isCurrent = !isPlaySeq && i === childIn.length
+                      return (
+                        <span
+                          key={i}
+                          style={{
+                            width: 11,
+                            height: 11,
+                            borderRadius: '50%',
+                            background: isDone
+                              ? VIOLET_MID
+                              : isCurrent
+                              ? '#34D399'
+                              : '#DDD6FE',
+                            boxShadow: isCurrent ? '0 0 8px #34D399' : 'none',
+                            transform: isCurrent ? 'scale(1.3)' : 'scale(1)',
+                            transition: 'all 0.2s ease',
+                          }}
+                        />
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             /* Simon Says mode — command card + response buttons */
             <div style={{ width: '100%', maxWidth: 620, height: '100%', display: 'flex', flexDirection: 'column', gap: 12, justifyContent: 'center' }}>
@@ -871,7 +1354,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
                 ) : (
                   <div style={{ fontSize: 16, fontWeight: 800, color: 'transparent' }}>&nbsp;</div>
                 )}
-                <div style={{ fontSize: 30, fontWeight: 800, color: INK, textAlign: 'center', lineHeight: 1.25 }}>
+                <div style={{ fontSize: 28, fontWeight: 800, color: INK, textAlign: 'center', lineHeight: 1.25 }}>
                   {currentCmd ? `${currentCmd.text} ${currentCmd.emoji}` : 'Waiting for the first command...'}
                 </div>
                 <div style={{ width: '100%', height: 6, borderRadius: 3, background: '#F1EDFC', marginTop: 6 }}>
@@ -884,17 +1367,17 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
               </div>
               <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
                 <button type="button" onClick={() => handleSimonRespond(true)} style={{
-                  flex: 1, height: 56, borderRadius: 18, border: 'none',
+                  flex: 1, height: 54, borderRadius: 18, border: 'none',
                   cursor: canInteract ? 'pointer' : 'default',
                   background: 'linear-gradient(180deg,#34D77F,#1E9E56)', color: '#ffffff',
-                  fontSize: 18.5, fontWeight: 800, letterSpacing: 0.2,
+                  fontSize: 17, fontWeight: 800, letterSpacing: 0.2,
                   boxShadow: '0 6px 16px rgba(30,158,86,0.28)',
                 }}>✅ DO IT!</button>
                 <button type="button" onClick={() => handleSimonRespond(false)} style={{
-                  flex: 1, height: 56, borderRadius: 18, border: 'none',
+                  flex: 1, height: 54, borderRadius: 18, border: 'none',
                   cursor: canInteract ? 'pointer' : 'default',
                   background: 'linear-gradient(180deg,#F4667B,#C81E38)', color: '#ffffff',
-                  fontSize: 18.5, fontWeight: 800, letterSpacing: 0.2,
+                  fontSize: 17, fontWeight: 800, letterSpacing: 0.2,
                   boxShadow: '0 6px 16px rgba(200,30,56,0.26)',
                 }}>❌ SKIP!</button>
               </div>
@@ -902,102 +1385,118 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
           )}
         </div>
 
-        {/* Right spacer keeps the pad grid optically centred against the rail. */}
-        <div aria-hidden style={{ flexShrink: 0, width: 118 }} />
+        {/* Right spacer for symmetrical centering */}
+        <div aria-hidden style={{ flexShrink: 0, width: 114 }} />
       </div>
 
-      {/* ── Status banner ────────────────────────────────────────────────── */}
+      {/* ── Status Banner ────────────────────────────────────────────────── */}
       <div style={{
         flexShrink: 0,
         display: 'flex',
         alignItems: 'center',
         gap: 14,
-        padding: '10px 16px',
+        padding: '10px 18px',
         borderRadius: 22,
-        background: 'rgba(255,255,255,0.78)',
-        border: '1px solid rgba(255,255,255,0.9)',
+        background: 'rgba(255,255,255,0.85)',
+        border: '1px solid rgba(255,255,255,0.95)',
         boxShadow: CARD_SHADOW,
         backdropFilter: 'blur(6px)',
       }}>
         <div aria-hidden style={{
-          flexShrink: 0, width: 46, height: 46, borderRadius: '50%',
+          flexShrink: 0, width: 44, height: 44, borderRadius: '50%',
           background: '#ffffff', border: `1px solid ${CARD_BORDER}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
-          boxShadow: '0 3px 10px rgba(50,30,110,0.12)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26,
+          boxShadow: '0 3px 10px rgba(91,33,182,0.10)',
         }}>{banner.icon}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 20.5, fontWeight: 800, color: VIOLET, lineHeight: 1.25 }}>{banner.title}</div>
-          <div style={{ fontSize: 16.5, fontWeight: 600, color: '#4A4560', lineHeight: 1.35 }}>{banner.sub}</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: VIOLET, lineHeight: 1.25 }}>{banner.title}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: '#4A4560', lineHeight: 1.35 }}>{banner.sub}</div>
         </div>
         <Waveform active={isPlaying && !gameOver} />
         <button
           type="button"
           onClick={() => setMuted(m => !m)}
-          title={muted ? 'Pad sounds off' : 'Pad sounds on'}
-          aria-label={muted ? 'Turn pad sounds on' : 'Turn pad sounds off'}
+          title={muted ? 'Turn sound on' : 'Turn sound off'}
+          aria-label={muted ? 'Turn sound on' : 'Turn sound off'}
           style={{
             flexShrink: 0, width: 34, height: 34, borderRadius: '50%',
             border: `1px solid ${CARD_BORDER}`, background: '#ffffff', cursor: 'pointer',
-            fontSize: 17.5, lineHeight: 1, color: INK,
+            fontSize: 16.5, lineHeight: 1, color: INK,
           }}
         >{muted ? '🔇' : '🔊'}</button>
       </div>
 
-      {/* ── Feedback flash ───────────────────────────────────────────────── */}
+      {/* ── Feedback Flash ───────────────────────────────────────────────── */}
       {feedback && (
         <div className="ss-pop" style={{
-          position: 'absolute', top: '42%', left: '50%', transform: 'translate(-50%,-50%)',
-          padding: '9px 20px', borderRadius: 999,
-          background: '#ffffff', border: `1px solid ${CARD_BORDER}`,
-          boxShadow: '0 8px 24px rgba(50,30,110,0.20)',
-          fontSize: 19.5, fontWeight: 800, zIndex: 30, pointerEvents: 'none', whiteSpace: 'nowrap',
-          color: feedback.type === 'correct' ? '#15803D' : feedback.type === 'gold' ? '#B45309' : '#BE123C',
+          position: 'absolute',
+          top: '50%', left: '50%',
+          transform: 'translate(-50%,-50%)',
+          padding: '14px 28px',
+          borderRadius: 999,
+          background: feedback.type === 'correct'
+            ? 'linear-gradient(135deg, #d1fae5, #a7f3d0)'
+            : feedback.type === 'gold'
+            ? 'linear-gradient(135deg, #fef3c7, #fde68a)'
+            : 'linear-gradient(135deg, #fee2e2, #fecaca)',
+          border: `2px solid ${
+            feedback.type === 'correct' ? '#34d399'
+            : feedback.type === 'gold' ? '#fbbf24'
+            : '#f87171'
+          }`,
+          boxShadow: `0 12px 36px ${
+            feedback.type === 'correct' ? 'rgba(52,211,153,0.35)'
+            : feedback.type === 'gold' ? 'rgba(251,191,36,0.35)'
+            : 'rgba(248,113,113,0.3)'
+          }`,
+          fontSize: 18, fontWeight: 800, zIndex: 30, pointerEvents: 'none', whiteSpace: 'nowrap',
+          color: feedback.type === 'correct' ? '#065f46' : feedback.type === 'gold' ? '#92400e' : '#991b1b',
         }}>
           {feedback.msg}
         </div>
       )}
 
-      {/* ── Game Over ────────────────────────────────────────────────────── */}
+      {/* ── Game Over Screen (Gentle & Encouraging) ───────────────────────── */}
       {gameOver && (
         <div style={{
           position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(233,228,251,0.82)', backdropFilter: 'blur(6px)', zIndex: 50, padding: 20,
+          background: 'rgba(235, 230, 252, 0.88)', backdropFilter: 'blur(8px)', zIndex: 50, padding: 20,
         }}>
           <div style={{
-            background: '#ffffff', border: `1px solid ${CARD_BORDER}`, borderRadius: 24,
-            boxShadow: '0 16px 44px rgba(50,30,110,0.22)', padding: '24px 32px',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, maxWidth: 420,
+            background: '#ffffff', border: `1px solid ${CARD_BORDER}`, borderRadius: 26,
+            boxShadow: '0 18px 48px rgba(70,30,120,0.22)', padding: '26px 34px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, maxWidth: 430,
           }}>
-            <div aria-hidden style={{ fontSize: 37 }}>🎮</div>
-            <div style={{ fontSize: 25.5, fontWeight: 800, color: VIOLET }}>Game Over!</div>
+            <div aria-hidden style={{ fontSize: 38 }}>🎉</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: VIOLET }}>Great Session!</div>
             {mode === 'classic' ? (
               <>
-                <div style={{ fontSize: 16.5, fontWeight: 600, color: INK_MUTED, textAlign: 'center', lineHeight: 1.5 }}>
+                <div style={{ fontSize: 16, fontWeight: 600, color: INK_MUTED, textAlign: 'center', lineHeight: 1.5 }}>
                   You reached round {round}<br />
-                  Best this session: {Math.max(bestRound, round)}
+                  Best sequence this run: {Math.max(bestRound, round)}
                 </div>
-                <div style={{ fontSize: 23.5 }}>{starRating(Math.max(bestRound, round))}</div>
+                <div style={{ fontSize: 24 }}>{starRating(Math.max(bestRound, round))}</div>
               </>
             ) : (
               <>
-                <div style={{ fontSize: 16.5, fontWeight: 600, color: INK_MUTED, textAlign: 'center', lineHeight: 1.5 }}>
+                <div style={{ fontSize: 16, fontWeight: 600, color: INK_MUTED, textAlign: 'center', lineHeight: 1.5 }}>
                   {score} correct out of {cmdList.length} commands<br />
                   Traps dodged: {trapsAv}<br />
                   Fell for traps: {trapsHit}
                 </div>
-                <div style={{ fontSize: 17.5, fontWeight: 700, color: INK, textAlign: 'center' }}>
+                <div style={{ fontSize: 17, fontWeight: 700, color: INK, textAlign: 'center' }}>
                   {cmdList.length > 0 ? (trapsAv / Math.max(1, trapsAv + trapsHit) > 0.8 ? 'Amazing self-control! ⭐⭐⭐' : trapsAv / Math.max(1, trapsAv + trapsHit) > 0.6 ? 'Great job! ⭐⭐' : 'Keep practising! ⭐') : '⭐'}
                 </div>
               </>
             )}
             {isT ? (
               <button type="button" onClick={handlePlayAgain} style={{
-                marginTop: 4, padding: '10px 26px', borderRadius: 999, border: 'none', cursor: 'pointer',
+                marginTop: 6, padding: '10px 28px', borderRadius: 999, border: 'none', cursor: 'pointer',
                 background: `linear-gradient(180deg, ${VIOLET_MID}, ${VIOLET})`, color: '#ffffff',
-                fontSize: 16.5, fontWeight: 800, boxShadow: '0 4px 14px rgba(91,33,182,0.32)',
+                fontSize: 16, fontWeight: 800, boxShadow: '0 4px 14px rgba(91,33,182,0.32)',
               }}>Play again</button>
             ) : (
-              <div style={{ marginTop: 4, fontSize: 16, fontWeight: 600, color: INK_MUTED }}>
+              <div style={{ marginTop: 6, fontSize: 15.5, fontWeight: 600, color: INK_MUTED }}>
                 Your therapist can start another round.
               </div>
             )}
@@ -1005,15 +1504,28 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
         </div>
       )}
 
-      {/* ── Toast ────────────────────────────────────────────────────────── */}
+      {/* ── Toast — 200ms correct flash in centre of console ──────────────── */}
       {toast && (
-        <div className="ss-pop" style={{
-          position: 'absolute', top: 14, left: '50%', transform: 'translateX(-50%)',
-          background: '#ffffff', border: `1px solid ${CARD_BORDER}`, borderRadius: 999,
-          boxShadow: '0 8px 22px rgba(50,30,110,0.18)',
-          padding: '7px 18px', color: INK, fontSize: 16.5, fontWeight: 700,
-          zIndex: 100, pointerEvents: 'none', whiteSpace: 'nowrap',
-        }}>
+        <div
+          className="toast-flash"
+          style={{
+            position: 'absolute',
+            top: '50%', left: '50%',
+            transform: 'translate(-50%,-50%)',
+            background: 'linear-gradient(135deg, #059669, #34d399)',
+            borderRadius: 999,
+            padding: '10px 22px',
+            color: '#ffffff',
+            fontSize: 17,
+            fontWeight: 900,
+            letterSpacing: 0.5,
+            zIndex: 200,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 0 30px rgba(52,211,153,0.7), 0 6px 20px rgba(5,150,105,0.5)',
+            border: '2px solid rgba(255,255,255,0.4)',
+          }}
+        >
           {toast.msg}
         </div>
       )}

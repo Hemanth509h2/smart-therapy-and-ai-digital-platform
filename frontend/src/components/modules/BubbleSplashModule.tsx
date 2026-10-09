@@ -1,25 +1,5 @@
 'use client';
 
-// RETIRED — not registered, not routed, not reachable.
-//
-// This 8-bubble click-to-pop activity was registered in the SLD category under
-// the slug `bubble_splash` while carrying an SLD description ("Sight words ·
-// reading fluency"). That routing meant launching "Bubble Splash" from the SLD
-// category rendered THIS calming toy instead of the real 851-line sight-words
-// module in sld/BubbleSplash.tsx, which was unreachable from any UI.
-//
-// It was not re-registered under Anxiety & Depression because Box Popping's
-// Bubble Wrap mode already covers the same ground and does it far better:
-// 48-120 drag-to-pop cells vs 8 click targets, pop animation and particles,
-// progress milestones, intensity settings and an end-of-activity mood check-in.
-// Adding this alongside it would have given therapists two near-identical
-// calming activities, one clearly worse.
-//
-// Kept rather than deleted so the interaction can be revisited if a genuinely
-// distinct use emerges. Note it also predates the current design system (light
-// Tailwind card, not the dark glass panel) and writes to the legacy
-// moduleStates/{sessionId}_{moduleId} collection rather than liveSessions.
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { updateModuleState, subscribeToModuleState } from '@/services/sessionSync';
@@ -89,8 +69,8 @@ export default function BubbleSplashModule({ sessionId, role, isLocked }: Bubble
   };
 
   const handleReset = () => {
-    if (!isInteractive) return;
-    
+    if (!isInteractive || !isTherapist) return;
+
     const resetBubbles = bubbles.map((b) => ({ ...b, popped: false }));
     setBubbles(resetBubbles);
     updateModuleState(sessionId, 'bubble_splash', { bubbles: resetBubbles }, uid || 'anonymous');
@@ -109,11 +89,10 @@ export default function BubbleSplashModule({ sessionId, role, isLocked }: Bubble
             key={bubble.id}
             onClick={() => handlePop(bubble.id)}
             disabled={bubble.popped || !isInteractive}
-            className={`absolute w-16 h-16 rounded-full flex items-center justify-center transition-all ${
-              bubble.popped 
-                ? 'scale-75 opacity-10 bg-transparent border-dashed border border-muted' 
+            className={`absolute w-16 h-16 rounded-full flex items-center justify-center transition-all ${bubble.popped
+                ? 'scale-75 opacity-10 bg-transparent border-dashed border border-muted'
                 : 'hover:scale-105 active:scale-95 shadow-md border border-white/20'
-            }`}
+              }`}
             style={{
               left: `${bubble.x}%`,
               top: `${bubble.y}%`,
@@ -125,15 +104,17 @@ export default function BubbleSplashModule({ sessionId, role, isLocked }: Bubble
         ))}
       </div>
 
-      <div className="mt-6">
-        <button
-          onClick={handleReset}
-          disabled={!isInteractive}
-          className="px-6 py-2.5 bg-primary text-primary-foreground hover:bg-primary/95 text-sm font-semibold rounded-xl transition-all shadow-sm disabled:opacity-50"
-        >
-          Reset Bubbles
-        </button>
-      </div>
+      {isTherapist && (
+        <div className="mt-6">
+          <button
+            onClick={handleReset}
+            disabled={!isInteractive}
+            className="px-6 py-2.5 bg-primary text-primary-foreground hover:bg-primary/95 text-sm font-semibold rounded-xl transition-all shadow-sm disabled:opacity-50"
+          >
+            Reset Bubbles
+          </button>
+        </div>
+      )}
     </div>
   );
 }

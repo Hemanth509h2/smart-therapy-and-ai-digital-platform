@@ -930,7 +930,7 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
               <span aria-hidden>✨</span> MATCH! <span aria-hidden style={{ color: INK_MUTED }}>→</span> Tap
             </div>
 
-            {!practiceActive && !isPlaying && !complete && (
+            {isTherapist && !practiceActive && !isPlaying && !complete && (
               <button
                 type="button"
                 onClick={startPractice}
@@ -1325,42 +1325,44 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                                 ? 'Tap if this is the same as the one right before it.'
                                 : 'First one — nothing to compare with yet.'}
                         </div>
-                        {practiceFinished ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={startPractice}
-                              style={{
-                                flexShrink: 0, padding: '6px 13px', borderRadius: 999,
-                                border: `1px solid ${BORDER}`, background: '#ffffff',
-                                color: INK_BODY, fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                              }}
-                            >
-                              Practice again
-                            </button>
+                        {isTherapist && (
+                          practiceFinished ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={startPractice}
+                                style={{
+                                  flexShrink: 0, padding: '6px 13px', borderRadius: 999,
+                                  border: `1px solid ${BORDER}`, background: '#ffffff',
+                                  color: INK_BODY, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                                }}
+                              >
+                                Practice again
+                              </button>
+                              <button
+                                type="button"
+                                onClick={endPractice}
+                                style={{
+                                  flexShrink: 0, padding: '6px 13px', borderRadius: 999, border: 'none',
+                                  background: INDIGO, color: '#ffffff', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+                                }}
+                              >
+                                I&apos;m ready
+                              </button>
+                            </>
+                          ) : (
                             <button
                               type="button"
                               onClick={endPractice}
                               style={{
-                                flexShrink: 0, padding: '6px 13px', borderRadius: 999, border: 'none',
-                                background: INDIGO, color: '#ffffff', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+                                flexShrink: 0, padding: '6px 13px', borderRadius: 999,
+                                border: `1px solid ${BORDER}`, background: '#ffffff',
+                                color: INK_MUTED, fontSize: 14, fontWeight: 700, cursor: 'pointer',
                               }}
                             >
-                              I&apos;m ready
+                              Skip practice
                             </button>
-                          </>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={endPractice}
-                            style={{
-                              flexShrink: 0, padding: '6px 13px', borderRadius: 999,
-                              border: `1px solid ${BORDER}`, background: '#ffffff',
-                              color: INK_MUTED, fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                            }}
-                          >
-                            Skip practice
-                          </button>
+                          )
                         )}
                       </div>
                     )}

@@ -16,6 +16,8 @@ import {
   ArrowLeft,
   ArrowRight,
   Lock,
+  RotateCcw,
+  Square,
 } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
@@ -282,6 +284,49 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
   }
 
   const handleNewMaze = () => handleGenerateMaze()
+
+  const handleReset = () => {
+    if (!isTherapist) return
+    setPlayerPos(START)
+    setVisited([])
+    setWrongMoves(0)
+    setCompleted(false)
+    setCompletionTime(0)
+    setTimeUp(false)
+    setStartTime(null)
+    setElapsed(0)
+    setBumpCell('')
+    if (timerMode) setTimeRemaining(timeLimit)
+    writeToFirestore({
+      'moduleState.vmPlayerPos': START,
+      'moduleState.vmVisited': [],
+      'moduleState.vmWrongMoves': 0,
+      'moduleState.vmCompleted': false,
+      'moduleState.vmCompletionTime': 0,
+      'moduleState.vmTimeUp': false,
+      'moduleState.vmTimeRemaining': timerMode ? timeLimit : 0,
+    })
+  }
+
+  const handleEnd = () => {
+    if (!isTherapist || !mazeReady || completed) return
+    const elapsedSeconds = startTime ? Math.floor((Date.now() - startTime) / 1000) : elapsed
+    setCompleted(true)
+    setCompletionTime(elapsedSeconds)
+    setBumpCell('')
+    if (timerRef.current) clearInterval(timerRef.current)
+    if (elapsedRef.current) clearInterval(elapsedRef.current)
+    writeToFirestore({
+      'moduleState.vmCompleted': true,
+      'moduleState.vmCompletionTime': elapsedSeconds,
+      'moduleState.vmTimeUp': false,
+    })
+    logModuleEvent(sessionId, {
+      module: 'maze',
+      type: 'session_ended',
+      detail: `Therapist ended the maze activity after ${elapsedSeconds}s (${wrongMoves} wrong moves, ${visited.length} cells visited)`,
+    })
+  }
 
   const handleHarder = () => {
     const order: Difficulty[] = ['easy', 'medium', 'hard']
@@ -599,11 +644,30 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
         ))}
       </div>
 
+      {/* Reset maze */}
+      <button className="vm-pill" onClick={handleReset} style={pill(false, UI.blue, UI.blueSoft)} title="Reset to start position">
+        <RotateCcw size={15} strokeWidth={2.2} color={UI.inkSoft} />
+        Reset
+      </button>
+
       {/* New maze */}
-      <button className="vm-pill" onClick={handleNewMaze} style={pill(false, UI.blue, UI.blueSoft)}>
+      <button className="vm-pill" onClick={handleNewMaze} style={pill(false, UI.blue, UI.blueSoft)} title="Generate new maze">
         <Box size={15} strokeWidth={2.2} color={UI.inkSoft} />
         New Maze
       </button>
+
+      {/* End */}
+      {!completed && (
+        <button
+          className="vm-pill"
+          onClick={handleEnd}
+          style={pill(false, UI.coral, UI.coralSoft)}
+          title="End maze activity"
+        >
+          <Square size={14} strokeWidth={2.2} color={UI.coralInk} />
+          <span style={{ color: UI.coralInk }}>End</span>
+        </button>
+      )}
     </div>
   )
 
