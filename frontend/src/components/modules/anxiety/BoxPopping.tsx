@@ -21,27 +21,9 @@ interface BoxPoppingProps {
 --------------------------------------------------------------------------- */
 const BP_BG = (file: string) => `/assets/modules/Background/${encodeURIComponent(file)}`
 
-/* Pastel dawn sky the balloon mockup floats its worries in. */
+
 const BP_SCENE = BP_BG('worry balloon popping.png')
 
-/* ---------------------------------------------------------------------------
-   Sound. The module shipped silent — there was no audio of any kind here.
-
-   Bubble wrap is played by dragging across the sheet, so pops fire in rapid
-   overlapping bursts. One shared <audio> element cannot do that: restarting it
-   cuts the previous pop off mid-tail and a fast drag turns into a stutter. The
-   pop is therefore decoded ONCE into an AudioBuffer and every pop gets its own
-   source node, so they layer the way real bubble wrap does.
-
-   The sample is this module's own delivered asset, alongside the balloon art.
-
-   No burst sound was delivered for the balloons, so it is synthesised rather
-   than faked with the bubble pop: filtered noise with a fast decay, which is
-   what a bursting balloon actually is.
-
-   All of it is decorative. Every call is wrapped so a blocked, unsupported or
-   suspended AudioContext can never stop a bubble from popping.
---------------------------------------------------------------------------- */
 const POP_SFX = `/assets/modules/${encodeURIComponent('Anxiety and depression')}/${encodeURIComponent('Balloon popping and bubble pop')}/bubble_pop.wav`
 
 let bpCtx: AudioContext | null = null
@@ -57,7 +39,7 @@ function audio(): AudioContext | null {
     if (!bpCtx) bpCtx = new Ctor()
     // Browsers hold a context suspended until a user gesture. Popping IS the
     // gesture, so resuming here is enough to get sound from the first pop.
-    if (bpCtx.state === 'suspended') void bpCtx.resume().catch(() => {})
+    if (bpCtx.state === 'suspended') void bpCtx.resume().catch(() => { })
     return bpCtx
   } catch { return null }
 }
@@ -116,11 +98,7 @@ function playBurst() {
   } catch { /* decorative */ }
 }
 
-/* Naming a worry is optional — this is a stress-relief exercise first. Launching
-   with an empty list floats this many unlabelled balloons so the mode is
-   playable straight away. The Launch button used to render only once a worry had
-   been typed, which left an empty list stuck on "Add worries in the panel" with
-   no way forward: the mode looked completely broken. */
+
 const FREE_BALLOONS = 8
 
 const GRID_MAP: Record<string, { cols: number; rows: number; total: number }> = {
@@ -129,15 +107,13 @@ const GRID_MAP: Record<string, { cols: number; rows: number; total: number }> = 
   large: { cols: 10, rows: 12, total: 120 },
 }
 
-/* Pastel balloon skins — light enough to carry DARK worry text, which is what
-   the mockup shows. Consumed by balloonLayout as `b.color`. */
+
 const WORRY_COLORS = ['#F9A8D4', '#FDE68A', '#C4B5FD', '#5EEAD4', '#FCA5A5', '#BFDBFE']
 const CONFETTI_COLORS = ['#EC4899', '#F97316', '#FACC15', '#4ADE80', '#3B82F6', '#A855F7', '#2DD4BF', '#F43F5E']
 const MOOD_EMOJIS = ['😌', '😊', '😐', '😢', '😰']
 const MODE_LABELS: Record<string, string> = { wrap: 'Bubble Wrap', balloon: 'Worry Balloons' }
 
-/* Candy palette for the game objects — base + a deeper stop so each bubble can
-   be shaded into a glossy 3D sphere rather than a flat tile. */
+
 const CANDY: { base: string; deep: string }[] = [
   { base: '#F43F8E', deep: '#BE1D63' }, // pink
   { base: '#F97316', deep: '#C2410C' }, // orange
@@ -148,10 +124,6 @@ const CANDY: { base: string; deep: string }[] = [
   { base: '#2DD4BF', deep: '#0D9488' }, // teal
 ]
 
-/* Palette — the stage canvas is WHITE, so every label here is dark ink on a
-   pale surface. White text appears ONLY on the solid green pill and the dark
-   toast. (This file used to print rgba(255,255,255,0.4) copy, which was
-   invisible on that canvas.) */
 const GREEN = '#1F7A44'
 const VIOLET = '#7C3AED'
 const PINK = '#DB2777'
@@ -187,32 +159,13 @@ const SPENT_DOTS: [number, number, number][] = [
   [17, 24, 0], [73, 17, 2], [50, 7, 5], [21, 71, 3], [79, 68, 4], [47, 87, 1], [88, 41, 6],
 ]
 
-/**
- * Burst colour for the pop particles. Presentation only — popCell's burst
- * handling is untouched, this just swaps the old muted teal/navy/plum for the
- * candy palette the mockup uses.
- */
+
 function rowColor(row: number, a: number): string {
   const s = [[236, 72, 153], [250, 204, 21], [59, 130, 246]]
   const [r, g, b] = s[row % 3]
   return `rgba(${r},${g},${b},${Math.min(1, a + 0.5)})`
 }
 
-/**
- * Lay the balloons out in rising lanes.
- *
- * They used to sit in a fixed grid and bob in place, so nothing ever rose and
- * the "catch it on the way up" game did not exist. Each balloon now gets a
- * horizontal lane, a rise duration and a stagger, and the CSS animation carries
- * it from below the board to above it.
- *
- * The rise LOOPS: a balloon that reaches the top comes back around instead of
- * leaving the round unfinishable. This is a stress-relief exercise, so there is
- * no failure state and no way to strand a worry you cannot reach.
- *
- * Everything here is derived from the index, never Math.random, because both
- * screens lay out independently and must agree on where each balloon is.
- */
 function balloonLayout(worries: string[], w: number) {
   if (worries.length === 0) return { items: [] }
   const width = Math.max(240, w)
@@ -506,7 +459,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
     const el = document.elementFromPoint(e.clientX, e.clientY)
     const cell = el?.closest('[data-cell]')
     if (cell) { const id = cell.getAttribute('data-cell')!; popCell(id) }
-    try { cRef.current?.setPointerCapture(e.pointerId) } catch {}
+    try { cRef.current?.setPointerCapture(e.pointerId) } catch { }
   }, [canInteract, mode, popCell])
 
   const pm = useCallback((e: React.PointerEvent) => {
@@ -570,9 +523,9 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
   const gapPx = Math.max(2, Math.min(9, Math.round(rawCell * 0.14)))
   const cell = measured
     ? Math.max(6, Math.floor(Math.min(
-        (canvasW - gapPx * (dispCols - 1)) / dispCols,
-        (canvasH - gapPx * (dispRows - 1)) / dispRows,
-      )))
+      (canvasW - gapPx * (dispCols - 1)) / dispCols,
+      (canvasH - gapPx * (dispRows - 1)) / dispRows,
+    )))
     : 10
   const dotSize = Math.max(2, Math.round(cell * 0.1))
 
@@ -1117,22 +1070,22 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
                         popBalloon(b.id, b.worry, px, py)
                       }}
                     >
-                    <div className={isA ? 'bb-burst' : undefined} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <div style={{
-                        width: b.size, height: b.size * 1.15,
-                        borderRadius: '50% 50% 50% 50% / 40% 40% 60% 60%',
-                        background: `radial-gradient(circle at 31% 25%, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.62) 15%, ${b.color} 55%, ${b.color} 100%)`,
-                        border: '1px solid rgba(255,255,255,0.65)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 7px',
-                        boxShadow: `inset 0 -6px 12px rgba(0,0,0,0.07), 0 6px 14px rgba(70,50,90,0.16)`,
-                      }}>
-                        {/* Dark text on a pastel balloon — never white-on-light. */}
-                        <span style={{
-                          fontSize: 13.5, fontWeight: 700, color: '#1f2937', textAlign: 'center', lineHeight: 1.22,
-                          overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', wordBreak: 'break-word',
-                        }}>{b.worry}</span>
-                      </div>
-                      <div style={{ width: 2, height: 30, background: 'rgba(120,110,140,0.45)', borderRadius: 1, marginTop: -2 }} />
+                      <div className={isA ? 'bb-burst' : undefined} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div style={{
+                          width: b.size, height: b.size * 1.15,
+                          borderRadius: '50% 50% 50% 50% / 40% 40% 60% 60%',
+                          background: `radial-gradient(circle at 31% 25%, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.62) 15%, ${b.color} 55%, ${b.color} 100%)`,
+                          border: '1px solid rgba(255,255,255,0.65)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 7px',
+                          boxShadow: `inset 0 -6px 12px rgba(0,0,0,0.07), 0 6px 14px rgba(70,50,90,0.16)`,
+                        }}>
+                          {/* Dark text on a pastel balloon — never white-on-light. */}
+                          <span style={{
+                            fontSize: 13.5, fontWeight: 700, color: '#1f2937', textAlign: 'center', lineHeight: 1.22,
+                            overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', wordBreak: 'break-word',
+                          }}>{b.worry}</span>
+                        </div>
+                        <div style={{ width: 2, height: 30, background: 'rgba(120,110,140,0.45)', borderRadius: 1, marginTop: -2 }} />
                       </div>
                     </div>
                   )
