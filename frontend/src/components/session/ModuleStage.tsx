@@ -96,7 +96,8 @@ export default function ModuleStage({
         position: 'absolute',
         inset: 0,
         borderRadius: 20,
-        overflow: 'hidden',
+        overflowY: 'auto',
+        overflowX: 'hidden',
         // Light canvas. Modules migrated to moduleMode have their internal
         // colours inverted to dark-on-light to match; they no longer appear in
         // the dark sidebar panel, so there is no second context to satisfy.
@@ -233,12 +234,6 @@ export default function ModuleStage({
         style={{
           flex: 1,
           minHeight: 0,
-          // Scrolls rather than compresses. Modules fill their container, so a
-          // short window used to squeeze every panel until the layout looked
-          // packed. The inner sizer below keeps a comfortable canvas and this
-          // scrolls past it instead.
-          overflowY: 'auto',
-          overflowX: 'hidden',
           padding: '10px 16px 12px',
           display: 'flex',
           flexDirection: 'column',

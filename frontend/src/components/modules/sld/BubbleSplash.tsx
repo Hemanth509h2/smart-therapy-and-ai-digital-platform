@@ -954,68 +954,64 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
             flexWrap: 'wrap',
           }}
         >
-          {MODES.map((m) => {
-            const on = wordSet === m.key
-            return (
-              <button
-                key={m.key}
-                type="button"
-                onClick={() => { if (isTherapist) handleWordSetChange(m.key) }}
-                disabled={!isTherapist}
-                aria-pressed={on}
-                title={`${m.label} words`}
-                style={modePill(m.accent, on)}
-              >
-                <m.Icon size={17} strokeWidth={2.4} color={on ? '#ffffff' : m.accent} />
-                {m.label}
-              </button>
-            )
-          })}
-
-          {divider}
-
-          {DIFFS.map((d) => (
-            <button
-              key={d.key}
-              type="button"
-              onClick={() => { if (isTherapist) handleDifficultyChange(d.key) }}
-              disabled={!isTherapist}
-              aria-pressed={difficulty === d.key}
-              style={diffPill(difficulty === d.key)}
-            >
-              {d.label}
-            </button>
-          ))}
-
-          {/* Pushes the speed group and Pause to the right edge, as in the mockup. */}
-          <span aria-hidden style={{ flex: '1 1 24px' }} />
-
-          {SPEEDS.map((s) => {
-            const on = speed === s.key
-            return (
-              <button
-                key={s.key}
-                type="button"
-                onClick={() => { if (isTherapist) handleSpeedChange(s.key) }}
-                disabled={!isTherapist}
-                aria-pressed={on}
-                title={`${s.label} float speed`}
-                style={speedPill(s.accent, on)}
-              >
-                <s.Icon size={16} strokeWidth={2.4} color={s.accent} />
-                {s.label}
-              </button>
-            )
-          })}
-
-          {isTherapist && (
+          {isTherapist ? (
             <>
+              {MODES.map((m) => {
+                const on = wordSet === m.key
+                return (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => { if (isTherapist) handleWordSetChange(m.key) }}
+                    aria-pressed={on}
+                    title={`${m.label} words`}
+                    style={modePill(m.accent, on)}
+                  >
+                    <m.Icon size={17} strokeWidth={2.4} color={on ? '#ffffff' : m.accent} />
+                    {m.label}
+                  </button>
+                )
+              })}
+
+              {divider}
+
+              {DIFFS.map((d) => (
+                <button
+                  key={d.key}
+                  type="button"
+                  onClick={() => { if (isTherapist) handleDifficultyChange(d.key) }}
+                  aria-pressed={difficulty === d.key}
+                  style={diffPill(difficulty === d.key)}
+                >
+                  {d.label}
+                </button>
+              ))}
+
+              {/* Pushes the speed group and Pause to the right edge, as in the mockup. */}
+              <span aria-hidden style={{ flex: '1 1 24px' }} />
+
+              {SPEEDS.map((s) => {
+                const on = speed === s.key
+                return (
+                  <button
+                    key={s.key}
+                    type="button"
+                    onClick={() => { if (isTherapist) handleSpeedChange(s.key) }}
+                    aria-pressed={on}
+                    title={`${s.label} float speed`}
+                    style={speedPill(s.accent, on)}
+                  >
+                    <s.Icon size={16} strokeWidth={2.4} color={s.accent} />
+                    {s.label}
+                  </button>
+                )
+              })}
+
               {divider}
 
               <button
                 type="button"
                 onClick={() => { if (isTherapist) handleTogglePlaying() }}
-                disabled={!isTherapist}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -1040,6 +1036,52 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                   : <><Play size={16} strokeWidth={2.6} color={GREEN_DEEP} /> Start</>}
               </button>
             </>
+          ) : (
+            /* Client side: only show the selected mode, difficulty, and speed */
+            (() => {
+              const activeMode = MODES.find((m) => m.key === wordSet) || MODES[0]
+              const activeDiff = DIFFS.find((d) => d.key === difficulty) || DIFFS[0]
+              const activeSpeed = SPEEDS.find((s) => s.key === speed) || SPEEDS[0]
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <div
+                    style={{
+                      ...modePill(activeMode.accent, true),
+                      opacity: 1,
+                      cursor: 'default',
+                    }}
+                  >
+                    <activeMode.Icon size={17} strokeWidth={2.4} color="#ffffff" />
+                    {activeMode.label}
+                  </div>
+
+                  {divider}
+
+                  <div
+                    style={{
+                      ...diffPill(true),
+                      opacity: 1,
+                      cursor: 'default',
+                    }}
+                  >
+                    {activeDiff.label}
+                  </div>
+
+                  {divider}
+
+                  <div
+                    style={{
+                      ...speedPill(activeSpeed.accent, true),
+                      opacity: 1,
+                      cursor: 'default',
+                    }}
+                  >
+                    <activeSpeed.Icon size={16} strokeWidth={2.4} color={activeSpeed.accent} />
+                    {activeSpeed.label}
+                  </div>
+                </div>
+              )
+            })()
           )}
         </div>
 

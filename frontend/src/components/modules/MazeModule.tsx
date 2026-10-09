@@ -217,23 +217,23 @@ export default function MazeModule({ sessionId, role, isLocked }: MazeModuleProp
     });
   };
 
-  // Adaptive tile dimensions for different grid complexities
+  // Adaptive tile dimensions for balanced, perfectly proportioned visibility
   const tileClasses = {
-    easy: 'w-12 h-12 md:w-14 md:h-14',
-    medium: 'w-9 h-9 md:w-10 md:h-10',
-    hard: 'w-7 h-7 md:w-8 md:h-8',
+    easy: 'w-14 h-14 sm:w-16 sm:h-16 md:w-16 md:h-16',
+    medium: 'w-10 h-10 sm:w-11 sm:h-11 md:w-11 md:h-11',
+    hard: 'w-8 h-8 sm:w-9 sm:h-9 md:w-9 md:h-9',
   }[difficulty];
 
   const emojiClasses = {
-    easy: 'text-2xl',
-    medium: 'text-lg',
-    hard: 'text-sm',
+    easy: 'text-2xl sm:text-3xl',
+    medium: 'text-lg sm:text-xl',
+    hard: 'text-sm sm:text-base',
   }[difficulty];
 
   return (
-    <div className="w-full max-w-3xl mx-auto p-4 md:p-6 bg-white/95 rounded-3xl border border-border/80 shadow-sm backdrop-blur-sm">
+    <div className="w-full max-w-6xl mx-auto p-4 md:p-6 bg-white/95 rounded-3xl border border-slate-200/80 shadow-sm backdrop-blur-sm flex flex-col gap-6">
       {/* Header */}
-      <div className="text-center mb-5">
+      <div className="text-center shrink-0">
         <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold tracking-wide uppercase mb-1.5">
           <Compass className="w-3.5 h-3.5 text-emerald-600" /> Focus & Motor Planning
         </div>
@@ -275,72 +275,73 @@ export default function MazeModule({ sessionId, role, isLocked }: MazeModuleProp
         </div>
       </div>
 
-      {/* Main Content Layout: Guide on Left, Maze & Controls on Right */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Directions & Guide Panel */}
-        <div className="md:col-span-5 flex flex-col gap-4">
+      {/* 3-Column Layout: Left (Instructions & Stats), Middle (Maze), Right (Arrow Controls) */}
+      <div className="flex-1 flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6 xl:gap-8 min-h-0">
+        
+        {/* LEFT COLUMN: Instructions & Stats Panel */}
+        <div className="w-full lg:w-80 xl:w-84 shrink-0 flex flex-col gap-4">
           {/* Guide Card */}
-          <div className="p-4 bg-gradient-to-br from-slate-50 to-emerald-50/40 rounded-2xl border border-slate-200/80 shadow-xs">
-            <div className="flex items-center gap-2 pb-2.5 mb-3 border-b border-slate-200/70 text-slate-800 font-bold text-sm">
+          <div className="p-5 bg-gradient-to-br from-slate-50 to-emerald-50/40 rounded-2xl border border-slate-200/80 shadow-xs">
+            <div className="flex items-center gap-2 pb-3 mb-3.5 border-b border-slate-200/70 text-slate-800 font-bold text-sm tracking-wide uppercase">
               <Sparkles className="w-4 h-4 text-emerald-600" />
               <span>How to Play</span>
             </div>
 
-            <ul className="space-y-2.5 text-xs text-slate-600">
-              <li className="flex items-start gap-2.5">
-                <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[11px] shrink-0 mt-0.5 shadow-xs">
+            <ul className="space-y-3.5 text-sm text-slate-600">
+              <li className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-xs">
                   1
                 </span>
-                <div>
-                  <span className="font-semibold text-slate-800">Start Position:</span> You begin at the top-left corner (<span className="inline-block">🐣</span>).
+                <div className="leading-relaxed">
+                  <span className="font-semibold text-slate-800">Start Position:</span> You begin at the top-left (<span className="text-base">🐣</span>).
                 </div>
               </li>
-              <li className="flex items-start gap-2.5">
-                <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[11px] shrink-0 mt-0.5 shadow-xs">
+              <li className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-xs">
                   2
                 </span>
-                <div>
-                  <span className="font-semibold text-slate-800">Clear Paths:</span> Follow open stone paths and avoid dark green hedge walls (🌿).
+                <div className="leading-relaxed">
+                  <span className="font-semibold text-slate-800">Clear Paths:</span> Follow open stone paths and avoid hedge walls (<span className="text-sm">🌿</span>).
                 </div>
               </li>
-              <li className="flex items-start gap-2.5">
-                <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[11px] shrink-0 mt-0.5 shadow-xs">
+              <li className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-xs">
                   3
                 </span>
-                <div>
-                  <span className="font-semibold text-slate-800">Reach the Star:</span> Reach the glowing star portal (<span className="inline-block">🌟</span>) at the bottom-right!
+                <div className="leading-relaxed">
+                  <span className="font-semibold text-slate-800">Reach the Star:</span> Reach the glowing star portal (<span className="text-base">🌟</span>) to win!
                 </div>
               </li>
             </ul>
 
-            <div className="mt-3.5 pt-3 border-t border-slate-200/70 flex items-center gap-2 text-[11px] text-slate-500 font-medium">
-              <Navigation className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              <span>Tip: Use on-screen arrows or keyboard <strong>↑ ↓ ← →</strong> keys.</span>
+            <div className="mt-4 pt-3.5 border-t border-slate-200/70 flex items-center gap-2 text-xs text-slate-500 font-semibold">
+              <Navigation className="w-4 h-4 text-slate-400 shrink-0" />
+              <span>Tip: Use arrow buttons or keyboard <strong>↑ ↓ ← →</strong> keys.</span>
             </div>
           </div>
 
           {/* Stats Card */}
-          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-around text-center">
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-around text-center">
             <div>
-              <div className="flex items-center justify-center gap-1 text-slate-400 text-xs font-semibold">
-                <Footprints className="w-3.5 h-3.5" /> Moves
+              <div className="flex items-center justify-center gap-1.5 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                <Footprints className="w-4 h-4" /> Moves
               </div>
-              <div className="text-xl font-extrabold text-slate-800 mt-0.5 tabular-nums">
+              <div className="text-3xl font-extrabold text-slate-800 mt-1 tabular-nums">
                 {state.moves || 0}
               </div>
             </div>
-            <div className="w-px h-8 bg-slate-200" />
+            <div className="w-px h-10 bg-slate-200" />
             <div>
-              <div className="flex items-center justify-center gap-1 text-slate-400 text-xs font-semibold">
-                <Flag className="w-3.5 h-3.5" /> Status
+              <div className="flex items-center justify-center gap-1.5 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                <Flag className="w-4 h-4" /> Status
               </div>
-              <div className="text-xs font-bold mt-1">
+              <div className="text-sm font-bold mt-1.5">
                 {state.completed ? (
-                  <span className="text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                  <span className="text-emerald-700 bg-emerald-100/80 px-3 py-1 rounded-full">
                     Completed 🎉
                   </span>
                 ) : (
-                  <span className="text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full">
+                  <span className="text-amber-700 bg-amber-100/80 px-3 py-1 rounded-full">
                     Exploring
                   </span>
                 )}
@@ -349,10 +350,10 @@ export default function MazeModule({ sessionId, role, isLocked }: MazeModuleProp
           </div>
         </div>
 
-        {/* Right Column: Beautiful Garden Maze & D-Pad Controls */}
-        <div className="md:col-span-7 flex flex-col items-center">
+        {/* MIDDLE COLUMN: Clean & Balanced Maze */}
+        <div className="flex-1 flex flex-col items-center justify-center min-w-0">
           {/* Maze Stage Card */}
-          <div className="relative p-3.5 bg-gradient-to-b from-[#e8efe9] to-[#dbe7dc] rounded-2xl border-2 border-[#ccdccc] shadow-inner flex items-center justify-center min-h-[260px]">
+          <div className="relative p-4 md:p-5 bg-gradient-to-b from-[#e8efe9] to-[#dbe7dc] rounded-3xl border-2 border-[#ccdccc] shadow-md flex items-center justify-center">
             <div
               className="grid gap-1.5 md:gap-2"
               style={{
@@ -368,14 +369,14 @@ export default function MazeModule({ sessionId, role, isLocked }: MazeModuleProp
                   return (
                     <div
                       key={`${y}-${x}`}
-                      className={`${tileClasses} rounded-lg md:rounded-xl flex items-center justify-center transition-all duration-200 select-none relative ${
+                      className={`${tileClasses} rounded-xl md:rounded-2xl flex items-center justify-center transition-all duration-200 select-none relative ${
                         isWall
-                          ? 'bg-gradient-to-b from-[#3b593f] to-[#2a422d] border border-[#213524] shadow-[0_3px_5px_rgba(0,0,0,0.15),inset_0_1px_1px_rgba(255,255,255,0.2)]'
+                          ? 'bg-gradient-to-b from-[#345339] to-[#243c27] border border-[#1b2d1e] shadow-[0_3px_5px_rgba(0,0,0,0.18),inset_0_1px_1px_rgba(255,255,255,0.22)]'
                           : isPlayer
-                          ? 'bg-gradient-to-br from-amber-400 to-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.5)] border-2 border-white scale-105 z-10 animate-pulse'
+                          ? 'bg-gradient-to-br from-amber-400 to-amber-500 shadow-[0_0_16px_rgba(245,158,11,0.6)] border-2 border-white scale-105 z-10 animate-pulse'
                           : isGoal
-                          ? 'bg-gradient-to-br from-yellow-300 via-amber-200 to-yellow-400 border-2 border-amber-300 shadow-[0_0_16px_rgba(234,179,8,0.6)] scale-100 z-5'
-                          : 'bg-white/90 border border-slate-200/90 shadow-[inset_0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white'
+                          ? 'bg-gradient-to-br from-yellow-300 via-amber-200 to-yellow-400 border-2 border-amber-300 shadow-[0_0_16px_rgba(234,179,8,0.7)] scale-100 z-5'
+                          : 'bg-white/95 border border-slate-200/90 shadow-[inset_0_1px_3px_rgba(0,0,0,0.03)] hover:bg-white'
                       }`}
                     >
                       {/* Cell Decor / Characters */}
@@ -388,9 +389,9 @@ export default function MazeModule({ sessionId, role, isLocked }: MazeModuleProp
                           🌟
                         </span>
                       ) : isWall ? (
-                        <span className="text-[10px] opacity-25 select-none">🌿</span>
+                        <span className="text-xs md:text-sm opacity-35 select-none">🌿</span>
                       ) : (
-                        <span className="w-1 h-1 rounded-full bg-slate-300/60" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-300/70" />
                       )}
                     </div>
                   );
@@ -400,26 +401,26 @@ export default function MazeModule({ sessionId, role, isLocked }: MazeModuleProp
 
             {/* Victory Banner Overlay */}
             {state.completed && (
-              <div className="absolute inset-0 bg-white/90 backdrop-blur-xs rounded-2xl flex flex-col items-center justify-center p-4 text-center animate-in fade-in zoom-in duration-300 z-20">
-                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-2 shadow-sm">
-                  <Trophy className="w-6 h-6" />
+              <div className="absolute inset-0 bg-white/95 backdrop-blur-xs rounded-3xl flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-300 z-20">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3 shadow-md">
+                  <Trophy className="w-8 h-8" />
                 </div>
-                <h4 className="text-lg font-bold text-emerald-800">Wonderful Job!</h4>
-                <p className="text-xs text-slate-600 mt-0.5">
+                <h4 className="text-2xl font-bold text-emerald-800">Wonderful Job!</h4>
+                <p className="text-sm text-slate-600 mt-1">
                   You completed the {difficulty.toUpperCase()} maze in {state.moves || 0} moves!
                 </p>
                 {isTherapist && (
-                  <div className="mt-3 flex gap-2">
+                  <div className="mt-4 flex flex-wrap gap-2.5 justify-center">
                     <button
                       onClick={handleReset}
-                      className="px-4 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 shadow-sm transition-all"
+                      className="px-5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 shadow-sm transition-all cursor-pointer"
                     >
                       Play Again
                     </button>
                     {difficulty === 'easy' && (
                       <button
                         onClick={() => handleDifficultyChange('medium')}
-                        className="px-4 py-1.5 bg-amber-600 text-white rounded-xl text-xs font-bold hover:bg-amber-700 shadow-sm transition-all"
+                        className="px-5 py-2 bg-amber-600 text-white rounded-xl text-xs font-bold hover:bg-amber-700 shadow-sm transition-all cursor-pointer"
                       >
                         Try Medium (7×7)
                       </button>
@@ -427,7 +428,7 @@ export default function MazeModule({ sessionId, role, isLocked }: MazeModuleProp
                     {difficulty === 'medium' && (
                       <button
                         onClick={() => handleDifficultyChange('hard')}
-                        className="px-4 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-sm transition-all"
+                        className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-sm transition-all cursor-pointer"
                       >
                         Try Hard (9×9)
                       </button>
@@ -437,76 +438,91 @@ export default function MazeModule({ sessionId, role, isLocked }: MazeModuleProp
               </div>
             )}
           </div>
+        </div>
 
-          {/* D-Pad Controls */}
-          <div className="mt-5 flex flex-col items-center gap-1.5">
-            <button
-              onClick={() => movePlayer(0, -1)}
-              disabled={!isInteractive || state.completed}
-              aria-label="Move Up"
-              className="w-12 h-11 bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700 font-bold rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-center transition-all active:scale-95 disabled:opacity-40 disabled:hover:bg-slate-100 disabled:hover:text-slate-700 cursor-pointer"
-            >
-              <ArrowUp className="w-5 h-5" />
-            </button>
+        {/* RIGHT COLUMN: Arrow Controls (D-Pad) & Actions */}
+        <div className="w-full lg:w-72 xl:w-80 shrink-0 flex flex-col items-center justify-center gap-4">
+          <div className="w-full p-5 bg-slate-50/90 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col items-center">
+            <div className="flex items-center gap-2 pb-3 mb-4 border-b border-slate-200/70 text-slate-700 font-bold text-xs uppercase tracking-wider w-full justify-center">
+              <Compass className="w-4 h-4 text-emerald-600" />
+              <span>Arrow Controls</span>
+            </div>
 
-            <div className="flex gap-2 items-center">
+            {/* Large, Chunky, Highly Visible D-Pad Controls */}
+            <div className="flex flex-col items-center gap-2.5">
               <button
-                onClick={() => movePlayer(-1, 0)}
+                onClick={() => movePlayer(0, -1)}
                 disabled={!isInteractive || state.completed}
-                aria-label="Move Left"
-                className="w-12 h-11 bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700 font-bold rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-center transition-all active:scale-95 disabled:opacity-40 disabled:hover:bg-slate-100 disabled:hover:text-slate-700 cursor-pointer"
+                aria-label="Move Up"
+                className="w-16 h-15 sm:w-18 sm:h-16 bg-white hover:bg-emerald-600 hover:text-white text-slate-700 font-bold rounded-2xl border-2 border-slate-200/90 shadow-sm flex items-center justify-center transition-all active:scale-95 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-slate-700 cursor-pointer"
               >
-                <ArrowLeft className="w-5 h-5" />
+                <ArrowUp className="w-8 h-8 stroke-[2.5]" />
               </button>
 
-              <div className="w-11 h-11 flex items-center justify-center rounded-xl bg-slate-100/60 border border-dashed border-slate-200 text-slate-400">
-                <Compass className="w-4 h-4 text-slate-400" />
+              <div className="flex gap-2.5 items-center">
+                <button
+                  onClick={() => movePlayer(-1, 0)}
+                  disabled={!isInteractive || state.completed}
+                  aria-label="Move Left"
+                  className="w-16 h-15 sm:w-18 sm:h-16 bg-white hover:bg-emerald-600 hover:text-white text-slate-700 font-bold rounded-2xl border-2 border-slate-200/90 shadow-sm flex items-center justify-center transition-all active:scale-95 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-slate-700 cursor-pointer"
+                >
+                  <ArrowLeft className="w-8 h-8 stroke-[2.5]" />
+                </button>
+
+                <div className="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center rounded-2xl bg-slate-100/80 border border-dashed border-slate-300 text-slate-400">
+                  <Compass className="w-6 h-6 text-emerald-600/70" />
+                </div>
+
+                <button
+                  onClick={() => movePlayer(1, 0)}
+                  disabled={!isInteractive || state.completed}
+                  aria-label="Move Right"
+                  className="w-16 h-15 sm:w-18 sm:h-16 bg-white hover:bg-emerald-600 hover:text-white text-slate-700 font-bold rounded-2xl border-2 border-slate-200/90 shadow-sm flex items-center justify-center transition-all active:scale-95 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-slate-700 cursor-pointer"
+                >
+                  <ArrowRight className="w-8 h-8 stroke-[2.5]" />
+                </button>
               </div>
 
               <button
-                onClick={() => movePlayer(1, 0)}
+                onClick={() => movePlayer(0, 1)}
                 disabled={!isInteractive || state.completed}
-                aria-label="Move Right"
-                className="w-12 h-11 bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700 font-bold rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-center transition-all active:scale-95 disabled:opacity-40 disabled:hover:bg-slate-100 disabled:hover:text-slate-700 cursor-pointer"
+                aria-label="Move Down"
+                className="w-16 h-15 sm:w-18 sm:h-16 bg-white hover:bg-emerald-600 hover:text-white text-slate-700 font-bold rounded-2xl border-2 border-slate-200/90 shadow-sm flex items-center justify-center transition-all active:scale-95 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-slate-700 cursor-pointer"
               >
-                <ArrowRight className="w-5 h-5" />
+                <ArrowDown className="w-8 h-8 stroke-[2.5]" />
               </button>
             </div>
 
-            <button
-              onClick={() => movePlayer(0, 1)}
-              disabled={!isInteractive || state.completed}
-              aria-label="Move Down"
-              className="w-12 h-11 bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700 font-bold rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-center transition-all active:scale-95 disabled:opacity-40 disabled:hover:bg-slate-100 disabled:hover:text-slate-700 cursor-pointer"
-            >
-              <ArrowDown className="w-5 h-5" />
-            </button>
+            <p className="text-xs text-slate-500 mt-4 font-semibold text-center">
+              Tap buttons or use keyboard keys
+            </p>
           </div>
 
           {/* Therapist Controls Bar */}
           {isTherapist && (
-            <div className="mt-5 flex items-center gap-3">
+            <div className="w-full flex flex-col gap-2">
               <button
                 onClick={handleReset}
                 disabled={!isInteractive}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold rounded-xl border border-slate-200 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold rounded-xl border border-slate-200 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-4 h-4" />
                 Reset Maze
               </button>
               {!state.completed && (
                 <button
                   onClick={handleEnd}
                   disabled={!isInteractive}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-bold rounded-xl border border-rose-200 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-bold rounded-xl border border-rose-200 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
                 >
-                  <Square className="w-3.5 h-3.5" />
+                  <Square className="w-4 h-4" />
                   End Activity
                 </button>
               )}
             </div>
           )}
         </div>
+
       </div>
     </div>
   );

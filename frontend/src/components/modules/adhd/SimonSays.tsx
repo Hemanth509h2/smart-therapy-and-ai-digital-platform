@@ -834,58 +834,105 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
         {/* Difficulty */}
         <div style={card}>
           <span style={microLabel}>Difficulty</span>
-          <PillGroup
-            value={difficulty}
-            disabled={settingsDisabled}
-            options={[
-              { key: 'easy', label: 'Easy', fill: '#10B981' },
-              { key: 'medium', label: 'Medium', fill: '#F59E0B' },
-              { key: 'hard', label: 'Hard', fill: '#EF4444' },
-            ]}
-            onSelect={(d) => {
-              if (!isT) return
-              const sp = d === 'easy' ? 1200 : d === 'hard' ? 500 : 800
-              const cs = d === 'easy' ? 3000 : d === 'hard' ? 1200 : 2000
-              const lt = d === 'easy' ? 5 : d === 'hard' ? 3 : 3
-              write({ 'moduleState.ssDifficulty': d, 'moduleState.ssSpeed': sp, 'moduleState.ssCommandSpeed': cs, 'moduleState.ssLivesTotal': lt, 'moduleState.ssLivesRemaining': lt })
-            }}
-          />
+          {isT ? (
+            <PillGroup
+              value={difficulty}
+              disabled={settingsDisabled}
+              options={[
+                { key: 'easy', label: 'Easy', fill: '#10B981' },
+                { key: 'medium', label: 'Medium', fill: '#F59E0B' },
+                { key: 'hard', label: 'Hard', fill: '#EF4444' },
+              ]}
+              onSelect={(d) => {
+                if (!isT) return
+                const sp = d === 'easy' ? 1200 : d === 'hard' ? 500 : 800
+                const cs = d === 'easy' ? 3000 : d === 'hard' ? 1200 : 2000
+                const lt = d === 'easy' ? 5 : d === 'hard' ? 3 : 3
+                write({ 'moduleState.ssDifficulty': d, 'moduleState.ssSpeed': sp, 'moduleState.ssCommandSpeed': cs, 'moduleState.ssLivesTotal': lt, 'moduleState.ssLivesRemaining': lt })
+              }}
+            />
+          ) : (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '5px 14px',
+              borderRadius: 999,
+              fontSize: 13.5,
+              fontWeight: 800,
+              color: '#ffffff',
+              background: difficulty === 'easy' ? '#10B981' : difficulty === 'medium' ? '#F59E0B' : '#EF4444',
+            }}>
+              {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+            </span>
+          )}
         </div>
 
         {/* Speed (classic) / Traps (simon says) */}
         {mode === 'classic' ? (
           <div style={card}>
             <span style={microLabel}>Speed</span>
-            <PillGroup
-              value={String(speed)}
-              disabled={settingsDisabled}
-              options={[
-                { key: '1200', label: 'Calm', icon: '🐢', fill: '#3B82F6' },
-                { key: '800', label: 'Balanced', icon: '🚶', fill: '#3B82F6' },
-                { key: '500', label: 'Fast', icon: '⚡', fill: '#3B82F6' },
-              ]}
-              onSelect={(v) => {
-                if (!isT) return
-                write({ 'moduleState.ssSpeed': Number(v) })
-              }}
-            />
+            {isT ? (
+              <PillGroup
+                value={String(speed)}
+                disabled={settingsDisabled}
+                options={[
+                  { key: '1200', label: 'Calm', icon: '🐢', fill: '#3B82F6' },
+                  { key: '800', label: 'Balanced', icon: '🚶', fill: '#3B82F6' },
+                  { key: '500', label: 'Fast', icon: '⚡', fill: '#3B82F6' },
+                ]}
+                onSelect={(v) => {
+                  if (!isT) return
+                  write({ 'moduleState.ssSpeed': Number(v) })
+                }}
+              />
+            ) : (
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '5px 14px',
+                borderRadius: 999,
+                fontSize: 13.5,
+                fontWeight: 800,
+                color: '#ffffff',
+                background: '#3B82F6',
+              }}>
+                <span>{speed >= 1200 ? '🐢 Calm' : speed <= 500 ? '⚡ Fast' : '🚶 Balanced'}</span>
+              </span>
+            )}
           </div>
         ) : (
           <div style={card}>
             <span style={microLabel}>Traps</span>
-            <PillGroup
-              value={trapRatio}
-              disabled={settingsDisabled}
-              options={[
-                { key: 'low', label: 'Low', icon: '🍀', fill: '#3B82F6' },
-                { key: 'medium', label: 'Medium', icon: '🪤', fill: '#3B82F6' },
-                { key: 'high', label: 'High', icon: '🔥', fill: '#3B82F6' },
-              ]}
-              onSelect={(r) => {
-                if (!isT) return
-                write({ 'moduleState.ssTrapRatio': r })
-              }}
-            />
+            {isT ? (
+              <PillGroup
+                value={trapRatio}
+                disabled={settingsDisabled}
+                options={[
+                  { key: 'low', label: 'Low', icon: '🍀', fill: '#3B82F6' },
+                  { key: 'medium', label: 'Medium', icon: '🪤', fill: '#3B82F6' },
+                  { key: 'high', label: 'High', icon: '🔥', fill: '#3B82F6' },
+                ]}
+                onSelect={(r) => {
+                  if (!isT) return
+                  write({ 'moduleState.ssTrapRatio': r })
+                }}
+              />
+            ) : (
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '5px 14px',
+                borderRadius: 999,
+                fontSize: 13.5,
+                fontWeight: 800,
+                color: '#ffffff',
+                background: '#3B82F6',
+              }}>
+                <span>{trapRatio === 'low' ? '🍀 Low' : trapRatio === 'high' ? '🔥 High' : '🪤 Medium'}</span>
+              </span>
+            )}
           </div>
         )}
 
