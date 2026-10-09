@@ -19,7 +19,6 @@ import {
   IconChat,
   IconCheckSm,
   IconChevronLeft,
-  IconModules,
   IconNoteAdd,
   IconPlus,
   IconProfile,
@@ -63,14 +62,13 @@ import {
   type PracticeClient,
 } from '@/lib/practice';
 
-type Tab = 'overview' | 'history' | 'notes' | 'goals' | 'modules' | 'documents';
+type Tab = 'overview' | 'history' | 'notes' | 'goals' | 'documents';
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
   { key: 'history', label: 'Session History' },
   { key: 'notes', label: 'Notes' },
   { key: 'goals', label: 'Goals' },
-  { key: 'modules', label: 'Therapy Modules' },
   { key: 'documents', label: 'Documents' },
 ];
 
@@ -462,10 +460,6 @@ export default function ClientProfilePage() {
                     Add Note
                     <IconNoteAdd />
                   </button>
-                  <button type="button" className="qact" onClick={() => setTab('modules')}>
-                    Assign Therapy Module
-                    <IconModules size={16} />
-                  </button>
                   <button type="button" className="qact" onClick={() => messageClient(client)}>
                     Message
                     <IconChat />
@@ -580,28 +574,6 @@ export default function ClientProfilePage() {
                 ))}
               </div>
             </article>
-          )}
-
-          {tab === 'modules' && (
-            <section>
-              <div className="grid2">
-                {assigned.map((m) => (
-                  <article key={m.id} className="card card--flat">
-                    <div className="modrow" style={{ border: 0, padding: 0 }}>
-                      <div>
-                        <h3 className="mod__t">{m.name}</h3>
-                        <p className="mod__p">{m.desc}</p>
-                      </div>
-                    </div>
-                    <div className="mod__foot">
-                      <Btn sm href="/modules">
-                        Open library
-                      </Btn>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
           )}
 
           {tab === 'documents' && (

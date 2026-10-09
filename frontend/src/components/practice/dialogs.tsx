@@ -360,6 +360,9 @@ export function AddClientDialog({
   const [lastName, setLastName] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [gender, setGender] = useState('');
   const [link, setLink] = useState('');
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -373,6 +376,9 @@ export function AddClientDialog({
       setLastName('');
       setDiagnosis('');
       setPhone('');
+      setEmail('');
+      setDateOfBirth('');
+      setGender('');
       setLink('');
       setCopied(false);
       setError('');
@@ -420,6 +426,9 @@ export function AddClientDialog({
           lastName: lastName.trim(),
           diagnosis: diagnosis.split(',').map((d) => d.trim()).filter(Boolean),
           phoneNumber: phone,
+          email: email.trim(),
+          dateOfBirth: dateOfBirth || undefined,
+          gender,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -472,7 +481,7 @@ export function AddClientDialog({
               <input id="client-last" className="ds-input" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Maurya" />
             </Field>
           </div>
-          <Field label="Conditions" htmlFor="client-dx" hint="Separate with commas, e.g. Anxiety, ADHD">
+          <Field label="Focus areas" htmlFor="client-dx" hint="Separate with commas, e.g. Anxiety, ADHD">
             <input id="client-dx" className="ds-input" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} placeholder="Anxiety, ADHD" />
           </Field>
           <Field label="WhatsApp number" htmlFor="client-phone" hint="Include the country code. The invite is sent here automatically.">
@@ -485,6 +494,40 @@ export function AddClientDialog({
               inputMode="tel"
             />
           </Field>
+          <Field label="Email" htmlFor="client-email">
+            <input
+              id="client-email"
+              type="email"
+              className="ds-input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="isha@example.com"
+              inputMode="email"
+              autoComplete="off"
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Date of birth" htmlFor="client-dob">
+              <input
+                id="client-dob"
+                type="date"
+                className="ds-input"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                max={toDateInput(new Date())}
+              />
+            </Field>
+            <Field label="Gender" htmlFor="client-gender">
+              <select id="client-gender" className="ds-input" value={gender} onChange={(e) => setGender(e.target.value)}>
+                <option value="">Select</option>
+                <option value="Female">Female</option>
+                <option value="Male">Male</option>
+                <option value="Non-binary">Non-binary</option>
+                <option value="Other">Other</option>
+                <option value="Prefer not to say">Prefer not to say</option>
+              </select>
+            </Field>
+          </div>
           {error && <ErrorText>{error}</ErrorText>}
         </div>
     </DsDialog>

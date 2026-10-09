@@ -14,9 +14,18 @@ export async function POST(request: Request) {
     const auth = await requireAuth(request);
     if (!auth.ok) return auth.response;
 
-    const { therapistId, firstName, lastName, diagnosis, phoneNumber, dateOfBirth } = await request.json();
+    const { therapistId, firstName, lastName, diagnosis, phoneNumber, dateOfBirth, email, gender } = await request.json();
     if (!therapistId || !firstName) {
       return NextResponse.json({ error: 'therapistId and firstName are required' }, { status: 400 });
+    }
+
+    const contactEmail = typeof email === 'string' && email.trim() ? email.trim().toLowerCase() : null;
+    if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+      return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 });
+    }
+    const dob = dateOfBirth ? new Date(dateOfBirth) : null;
+    if (dob && (Number.isNaN(dob.getTime()) || dob.getTime() > Date.now())) {
+      return NextResponse.json({ error: 'Enter a valid date of birth' }, { status: 400 });
     }
 
     const therapist = await prisma.profileTherapist.findUnique({
@@ -46,7 +55,11 @@ export async function POST(request: Request) {
             typeof phoneNumber === 'string' && phoneNumber.trim()
               ? normalizeWhatsAppNumber(phoneNumber)
               : null,
-          dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : new Date(),
+          dateOfBirth: dob ?? new Date(),
+          gender: typeof gender === 'string' && gender.trim() ? gender.trim() : null,
+          // The client has no login yet (placeholder account), so the contact
+          // address lives here — it's what the client profile shows as Email.
+          parentEmail: contactEmail,
         },
       });
     });
