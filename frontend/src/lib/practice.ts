@@ -12,6 +12,10 @@ export interface PracticeClient {
   firstName: string;
   lastName: string;
   diagnosis: string[];
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  phoneNumber?: string | null;
+  parentEmail?: string | null;
   sessionCount?: number;
   lastSession?: string | null;
   nextSession?: { id: string; scheduledAt: string } | null;
@@ -159,6 +163,29 @@ export const initials = (first?: string, last?: string) =>
 
 export const fullName = (p?: { firstName?: string; lastName?: string } | null) =>
   p ? `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim() : '';
+
+/** First diagnosis, used as the client's therapy focus on caseload cards. */
+export const focusArea = (c?: { diagnosis?: string[] } | null) =>
+  c?.diagnosis?.find((d) => d.trim())?.trim() || 'General support';
+
+export function clientAge(dob?: string | Date | null) {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age -= 1;
+  return age >= 1 && age < 120 ? age : null;
+}
+
+export const isPlaceholderEmail = (email?: string | null) =>
+  !email || /@(?:client\.)?staad\.local$/i.test(email);
+
+export const clientEmail = (c?: PracticeClient | null) => {
+  const email = c?.parentEmail || c?.user?.email;
+  return email && !isPlaceholderEmail(email) ? email : null;
+};
 
 const hash = (s: string) => {
   let h = 0;

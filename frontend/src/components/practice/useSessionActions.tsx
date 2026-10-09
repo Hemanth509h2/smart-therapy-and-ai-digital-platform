@@ -26,7 +26,7 @@ export function useSessionActions(refresh: () => void) {
   const [cancelFor, setCancelFor] = useState<PracticeSession | null>(null);
 
   const enter = useCallback((s: PracticeSession) => router.push(sessionRoomUrl(s.id)), [router]);
-  const viewClient = useCallback((clientId: string) => router.push(`/clients/${clientId}/progress`), [router]);
+  const viewClient = useCallback((clientId: string) => router.push(`/clients/${clientId}`), [router]);
 
   const addToCalendar = (s: PracticeSession, minutes: number) => {
     downloadFile(`staad-session-${s.id.slice(0, 8)}.ics`, sessionIcs([{ s, minutes }]), 'text/calendar');
