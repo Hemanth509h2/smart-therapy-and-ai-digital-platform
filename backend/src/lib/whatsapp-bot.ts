@@ -1,9 +1,24 @@
-import {
-  normalizeWhatsAppNumber,
-  sendCloudApiText,
-  sendCloudApiTemplate,
-  isCloudApiConfigured,
-} from './whatsapp-cloud-api'
+import { normalizeWhatsAppNumber } from './whatsapp-cloud-api'
+
+// Messages are delivered by the self-hosted Baileys bot (whatapps/), which
+// exposes POST /send guarded by the shared x-bot-secret header.
+async function sendViaBot(to: string, text: string): Promise<WhatsAppMessageResult> {
+  const url = process.env.WHATSAPP_BOT_URL
+  const secret = process.env.WHATSAPP_BOT_SECRET
+  if (!url || !secret) {
+    throw new Error('WhatsApp bot not configured. Set WHATSAPP_BOT_URL and WHATSAPP_BOT_SECRET')
+  }
+
+  const res = await fetch(`${url.replace(/\/+$/, '')}/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-bot-secret': secret },
+    body: JSON.stringify({ to, text }),
+    signal: AbortSignal.timeout(15_000),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `WhatsApp bot responded ${res.status}`)
+  return { id: data.id ?? '', status: 'sent', to }
+}
 
 export interface WhatsAppInviteInput {
   to: string
@@ -51,11 +66,7 @@ Setting up your account takes less than a minute:
 
 We're glad you're here. 🌿`
 
-  if (!isCloudApiConfigured()) {
-    throw new Error('WhatsApp Cloud API not configured. Set WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID')
-  }
-
-  return sendCloudApiText(to, text)
+  return sendViaBot(to, text)
 }
 
 /**
@@ -80,26 +91,7 @@ Tap the link below when it's time to join:
 
 Take a deep breath — we'll see you there. 🌿`
 
-  if (!isCloudApiConfigured()) {
-    throw new Error('WhatsApp Cloud API not configured. Set WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID')
-  }
-
-  // Try template first (works outside 24h window), fallback to text
-  const templateName = process.env.WHATSAPP_TEMPLATE_SESSION_SCHEDULED || 'session_scheduled'
-  
-  try {
-    return await sendCloudApiTemplate(to, templateName, 'en', [
-      { type: 'body', parameters: [
-        { type: 'text', text: name },
-        { type: 'text', text: withWhom },
-        { type: 'text', text: when },
-        { type: 'text', text: input.sessionLink },
-      ]}
-    ])
-  } catch (templateError) {
-    console.warn('Template send failed, falling back to text message:', templateError)
-    return sendCloudApiText(to, text)
-  }
+  return sendViaBot(to, text)
 }
 
 /**
@@ -120,23 +112,5 @@ Tap to join immediately:
 
 We're ready when you are. 🌿`
 
-  if (!isCloudApiConfigured()) {
-    throw new Error('WhatsApp Cloud API not configured. Set WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID')
-  }
-
-  // Try template first, fallback to text
-  const templateName = process.env.WHATSAPP_TEMPLATE_SESSION_STARTED || 'session_started'
-  
-  try {
-    return await sendCloudApiTemplate(to, templateName, 'en', [
-      { type: 'body', parameters: [
-        { type: 'text', text: name },
-        { type: 'text', text: withWhom },
-        { type: 'text', text: input.sessionLink },
-      ]}
-    ])
-  } catch (templateError) {
-    console.warn('Template send failed, falling back to text message:', templateError)
-    return sendCloudApiText(to, text)
-  }
+  return sendViaBot(to, text)
 }
