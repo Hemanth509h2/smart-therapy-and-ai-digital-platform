@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
+import { appUrl } from '@/lib/app-url';
 import { sendSessionScheduledMessage } from '@/lib/whatsapp-bot';
 
 export const dynamic = 'force-dynamic';
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
     // Best-effort WhatsApp notification — a failure here must not fail session
     // creation, so it's logged rather than thrown.
     if (session.client.phoneNumber) {
-      const sessionLink = `${new URL(request.url).origin}/session/${session.id}`;
+      const sessionLink = `${appUrl(request)}/session/${session.id}`;
       const now = new Date();
       try {
         const delivery = await prisma.whatsAppMessage.upsert({

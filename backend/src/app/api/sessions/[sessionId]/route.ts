@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
+import { appUrl } from '@/lib/app-url';
 import { provisionSessionDocs } from '@/lib/session-provisioning';
 import { markSessionEnded } from '@/lib/session-provisioning';
 import { sendSessionStartedMessage } from '@/lib/whatsapp-bot';
@@ -141,7 +142,7 @@ export async function PATCH(
 
     // Send "session started" WhatsApp notification when therapist starts the session
     if (finalAction === 'start' && session.status === 'ACTIVE' && session.client.phoneNumber) {
-      const sessionLink = `${new URL(request.url).origin}/session/${session.id}`;
+      const sessionLink = `${appUrl(request)}/session/${session.id}`;
       const now = new Date();
       try {
         const delivery = await prisma.whatsAppMessage.upsert({
