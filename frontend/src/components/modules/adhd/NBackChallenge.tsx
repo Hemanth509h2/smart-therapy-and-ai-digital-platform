@@ -958,52 +958,98 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
           <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
 
             {/* Settings row */}
-            <div style={{ flexShrink: 0, display: 'flex', gap: 10, alignItems: 'stretch', flexWrap: 'wrap' }}>
-              {/* Cards keep a content-sized floor so a narrow stage wraps the row
-                  instead of clipping the pill labels. */}
-              <div style={{ ...card, flex: '1 1 250px', minWidth: 250, padding: '7px 10px 9px' }}>
-                <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Category</div>
-                <PillGroup
-                  value={stimulusType}
-                  disabled={settingsDisabled}
-                  options={[
-                    { key: 'colors', label: 'Colors' },
-                    { key: 'shapes', label: 'Shapes' },
-                    { key: 'letters', label: 'Letters' },
-                    { key: 'position', label: 'Position' },
-                  ]}
-                  onSelect={(v) => handleStimulusTypeChange(v as StimulusType)}
-                />
-              </div>
+            {isTherapist ? (
+              <div style={{ flexShrink: 0, display: 'flex', gap: 10, alignItems: 'stretch', flexWrap: 'wrap' }}>
+                {/* Cards keep a content-sized floor so a narrow stage wraps the row
+                    instead of clipping the pill labels. */}
+                <div style={{ ...card, flex: '1 1 250px', minWidth: 250, padding: '7px 10px 9px' }}>
+                  <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Category</div>
+                  <PillGroup
+                    value={stimulusType}
+                    disabled={settingsDisabled}
+                    options={[
+                      { key: 'colors', label: 'Colors' },
+                      { key: 'shapes', label: 'Shapes' },
+                      { key: 'letters', label: 'Letters' },
+                      { key: 'position', label: 'Position' },
+                    ]}
+                    onSelect={(v) => handleStimulusTypeChange(v as StimulusType)}
+                  />
+                </div>
 
-              <div style={{ ...card, flex: '1 1 165px', minWidth: 165, padding: '7px 10px 9px' }}>
-                <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Speed</div>
-                <PillGroup
-                  value={String(speed)}
-                  disabled={settingsDisabled}
-                  options={[
-                    { key: '3000', label: 'Slow' },
-                    { key: '2000', label: 'Normal' },
-                    { key: '1200', label: 'Fast' },
-                  ]}
-                  onSelect={(v) => handleSpeedChange(Number(v))}
-                />
-              </div>
+                <div style={{ ...card, flex: '1 1 165px', minWidth: 165, padding: '7px 10px 9px' }}>
+                  <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Speed</div>
+                  <PillGroup
+                    value={String(speed)}
+                    disabled={settingsDisabled}
+                    options={[
+                      { key: '3000', label: 'Slow' },
+                      { key: '2000', label: 'Normal' },
+                      { key: '1200', label: 'Fast' },
+                    ]}
+                    onSelect={(v) => handleSpeedChange(Number(v))}
+                  />
+                </div>
 
-              <div style={{ ...card, flex: '1 1 235px', minWidth: 235, padding: '7px 10px 9px' }}>
-                <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Sequence Length</div>
-                <PillGroup
-                  value={String(seqLength)}
-                  disabled={settingsDisabled}
-                  options={[
-                    { key: '10', label: 'Short (10)' },
-                    { key: '15', label: 'Medium (15)' },
-                    { key: '20', label: 'Long (20)' },
-                  ]}
-                  onSelect={(v) => handleLengthChange(Number(v))}
-                />
+                <div style={{ ...card, flex: '1 1 235px', minWidth: 235, padding: '7px 10px 9px' }}>
+                  <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: INDIGO, marginBottom: 5 }}>Sequence Length</div>
+                  <PillGroup
+                    value={String(seqLength)}
+                    disabled={settingsDisabled}
+                    options={[
+                      { key: '10', label: 'Short (10)' },
+                      { key: '15', label: 'Medium (15)' },
+                      { key: '20', label: 'Long (20)' },
+                    ]}
+                    onSelect={(v) => handleLengthChange(Number(v))}
+                  />
+                </div>
               </div>
-            </div>
+            ) : (
+              <div style={{ flexShrink: 0, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ ...card, padding: '7px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: INK_MUTED }}>Category:</span>
+                  <span style={{
+                    padding: '3px 11px',
+                    borderRadius: 999,
+                    background: INDIGO,
+                    color: '#ffffff',
+                    fontSize: 13.5,
+                    fontWeight: 800,
+                  }}>
+                    {stimulusType.charAt(0).toUpperCase() + stimulusType.slice(1)}
+                  </span>
+                </div>
+
+                <div style={{ ...card, padding: '7px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: INK_MUTED }}>Speed:</span>
+                  <span style={{
+                    padding: '3px 11px',
+                    borderRadius: 999,
+                    background: INDIGO,
+                    color: '#ffffff',
+                    fontSize: 13.5,
+                    fontWeight: 800,
+                  }}>
+                    {speed >= 3000 ? 'Slow' : speed <= 1200 ? 'Fast' : 'Normal'}
+                  </span>
+                </div>
+
+                <div style={{ ...card, padding: '7px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: INK_MUTED }}>Sequence:</span>
+                  <span style={{
+                    padding: '3px 11px',
+                    borderRadius: 999,
+                    background: INDIGO,
+                    color: '#ffffff',
+                    fontSize: 13.5,
+                    fontWeight: 800,
+                  }}>
+                    {seqLength <= 10 ? 'Short (10)' : seqLength >= 20 ? 'Long (20)' : 'Medium (15)'}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Stimulus stage */}
             <div
