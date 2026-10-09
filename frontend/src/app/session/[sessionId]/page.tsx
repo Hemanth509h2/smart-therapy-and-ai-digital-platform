@@ -161,6 +161,11 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   // Clicking the bar button for the open panel closes it; clicking a different
   // one swaps the content directly (no close-first step).
   const selectPanel = (panel: Exclude<SidebarPanel, null>) => {
+    // Modules / Assistant / Notes clear activePanel, which hides the board
+    // locally — tell the client too, or it stays stuck on the whiteboard.
+    if (panel !== 'whiteboard' && activePanel === 'whiteboard') {
+      publishWhiteboardState(false, whiteboardShared);
+    }
     if (panel === 'modules') {
       setShowModulesPopup((open) => !open);
       setActivePanel(null);
@@ -582,6 +587,9 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     try {
       await updateDoc(doc(db, 'liveSessions', sessionId), {
         activeModuleId: moduleId,
+        // The client shows the whiteboard ahead of any module, so launching a
+        // module must also take the board down for them.
+        whiteboard: { active: false, shared: whiteboardShared },
         'timestamps.updatedAt': new Date().toISOString(),
       });
     } catch {
