@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { appUrl } from '@/lib/app-url';
-import { sendSessionScheduledMessage } from '@/lib/whatsapp-bot';
+import { sendWhatsAppInvite } from '@/lib/whatsapp-bot';
 
 export const dynamic = 'force-dynamic';
 
@@ -107,11 +107,10 @@ export async function POST(request: Request) {
           },
         });
 
-        const message = await sendSessionScheduledMessage({
+        const message = await sendWhatsAppInvite({
           to: session.client.phoneNumber,
           patientName: session.client.firstName,
-          sessionLink,
-          scheduledAt: session.scheduledAt,
+          inviteLink: sessionLink,
           therapistName: `${session.therapist.firstName} ${session.therapist.lastName}`.trim(),
         });
 

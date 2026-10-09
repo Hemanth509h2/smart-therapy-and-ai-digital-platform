@@ -59,12 +59,12 @@ export async function sendWhatsAppInvite(input: WhatsAppInviteInput): Promise<Wh
   const invitedBy = input.therapistName ? `${input.therapistName} has invited you` : "You've been invited"
   const text = `Hi ${name}! 👋
 
-${invitedBy} to join *STAAD* — a calm, supportive space for your therapy sessions.
+${invitedBy} to a therapy session on *STAAD*.
 
-Setting up your account takes less than a minute:
+Tap the link below to join — no sign-up needed:
 👉 ${input.inviteLink}
 
-We're glad you're here. 🌿`
+See you there. 🌿`
 
   return sendViaBot(to, text)
 }
