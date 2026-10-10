@@ -3,7 +3,8 @@
 // shared x-bot-secret header.
 import 'dotenv/config'
 import { timingSafeEqual } from 'node:crypto'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readdirSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
 import express from 'express'
 import qrcodeTerminal from 'qrcode-terminal'
 import QRCode from 'qrcode'
@@ -48,16 +49,22 @@ async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR)
   const { version } = await fetchLatestBaileysVersion()
 
-  sock = makeWASocket({
+  const current = makeWASocket({
     version,
     auth: state,
     logger,
     printQRInTerminal: false, // we handle QR display ourselves below
   })
+  sock = current
 
-  sock.ev.on('creds.update', saveCreds)
+  // Events from a socket replaced by /logout are ignored, so it can't write
+  // creds back into the cleared auth dir or trigger a reconnect.
+  current.ev.on('creds.update', () => {
+    if (sock === current) saveCreds()
+  })
 
-  sock.ev.on('connection.update', async (update) => {
+  current.ev.on('connection.update', async (update) => {
+    if (sock !== current) return
     const { connection, lastDisconnect, qr } = update
 
     if (qr) {
@@ -92,7 +99,7 @@ async function startBot() {
       const loggedOut = statusCode === DisconnectReason.loggedOut
       console.log('[whatsapp-bot] connection closed', { statusCode, loggedOut })
       if (loggedOut) {
-        console.error(`[whatsapp-bot] logged out — delete ${AUTH_DIR} and restart to re-pair`)
+        console.error('[whatsapp-bot] logged out — POST /logout to clear the session and re-pair')
       } else {
         console.log('[whatsapp-bot] reconnecting...')
         pairingRequested = false
@@ -100,6 +107,32 @@ async function startBot() {
       }
     }
   })
+}
+
+// Unlinks the current WhatsApp account and wipes its saved session, then
+// starts a fresh socket so a new number can be paired via /qr or PAIRING_NUMBER.
+async function clearAccount() {
+  const old = sock
+  sock = null
+  connectionReady = false
+  latestQr = null
+  pairingRequested = false
+
+  if (old) {
+    try {
+      await old.logout() // removes this device from the phone's Linked devices
+    } catch {
+      old.end(undefined) // not connected — just drop the socket
+    }
+  }
+
+  // Empty the directory rather than removing it, as it may be a mounted volume.
+  mkdirSync(AUTH_DIR, { recursive: true })
+  for (const entry of readdirSync(AUTH_DIR)) {
+    rmSync(join(AUTH_DIR, entry), { recursive: true, force: true })
+  }
+
+  await startBot()
 }
 
 // ---------------------------------------------------------------------------
@@ -157,8 +190,23 @@ app.post('/send', async (req, res) => {
   }
 })
 
+app.post('/logout', async (req, res) => {
+  if (!secretMatches(req.header('x-bot-secret'))) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+
+  try {
+    await clearAccount()
+    console.log('[whatsapp-bot] account cleared — waiting for a new pairing')
+    return res.json({ success: true })
+  } catch (err) {
+    console.error('[whatsapp-bot] logout failed', err)
+    return res.status(500).json({ error: err instanceof Error ? err.message : 'Logout failed' })
+  }
+})
+
 app.listen(PORT, () => {
-  console.log(`[whatsapp-bot] listening on :${PORT} (POST /send, GET /qr, GET /health)`)
+  console.log(`[whatsapp-bot] listening on :${PORT} (POST /send, POST /logout, GET /qr, GET /health)`)
 })
 
 startBot().catch((e) => {
