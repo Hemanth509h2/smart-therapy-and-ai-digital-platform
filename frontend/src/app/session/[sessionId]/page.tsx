@@ -1201,7 +1201,6 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                   isLocked={isLocked}
                   onLockToggle={handleLockToggle}
                   onClose={handleModuleClose}
-                  onEndCall={() => setShowConfirm(true)}
                 >
                   <ModuleContent
                     activeModule={activeModule}
