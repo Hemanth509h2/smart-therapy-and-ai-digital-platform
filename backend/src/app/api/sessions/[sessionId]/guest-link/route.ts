@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
-import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
+import { getOrCreateGuestInvite, sendSessionLinkWhatsApp } from '@/lib/session-whatsapp';
 
 // POST /api/sessions/[sessionId]/guest-link — create (or reuse) a patient
-// join link for an already-created session. The invite is marked CLAIMED
-// with claimedClientId = session.clientId, so opening the link lands the
-// patient in THIS session's room (no new session is created on join).
+// join link for an already-created session ("Start a new session"). The
+// invite is marked CLAIMED with claimedClientId = session.clientId, so opening
+// the link lands the patient in THIS session's room (no new session is
+// created on join). The link is also sent to the patient on WhatsApp.
 export async function POST(request: Request, { params }: { params: { sessionId: string } }) {
   try {
     const auth = await requireAuth(request);
@@ -14,7 +15,7 @@ export async function POST(request: Request, { params }: { params: { sessionId: 
 
     const session = await prisma.session.findUnique({
       where: { id: params.sessionId },
-      include: { client: true, therapist: { select: { userId: true } } },
+      include: { therapist: { select: { userId: true } } },
     });
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
@@ -23,34 +24,8 @@ export async function POST(request: Request, { params }: { params: { sessionId: 
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const client = session.client;
-
-    // Reuse a live link if one already exists for this client + therapist.
-    let invite = await prisma.invite.findFirst({
-      where: {
-        therapistId: session.therapistId,
-        claimedClientId: session.clientId,
-        status: 'CLAIMED',
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (!invite) {
-      invite = await prisma.invite.create({
-        data: {
-          token: randomUUID(),
-          therapistId: session.therapistId,
-          firstName: client.firstName,
-          lastName: client.lastName,
-          diagnosis: client.diagnosis,
-          phoneNumber: client.phoneNumber,
-          scheduledAt: session.scheduledAt,
-          status: 'CLAIMED',
-          claimedClientId: client.id,
-        },
-      });
-    }
+    const invite = await getOrCreateGuestInvite(session);
+    await sendSessionLinkWhatsApp(session.id, request);
 
     return NextResponse.json({ token: invite.token });
   } catch (error: any) {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { sendSessionBookedWhatsApp } from '@/lib/session-whatsapp';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,7 +45,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { therapistId, clientId, scheduledAt } = await request.json();
+    const { therapistId, clientId, scheduledAt, booking } = await request.json();
 
     // If clientId is a userId (firebase UID), look up the profile ID
     let finalClientId = clientId;
@@ -72,8 +73,10 @@ export async function POST(request: Request) {
       },
     });
 
-    // No WhatsApp message here — the join link is only sent when the
-    // therapist starts the session (PATCH /api/sessions/[sessionId]).
+    // A booking gets a date/time confirmation (no link). Instant sessions get
+    // nothing here — the join link is sent when the session is started.
+    if (booking) await sendSessionBookedWhatsApp(session.id);
+
     return NextResponse.json({ session });
   } catch (error: any) {
     console.error('Session creation error:', error);

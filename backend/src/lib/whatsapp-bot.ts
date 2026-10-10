@@ -33,10 +33,10 @@ export interface WhatsAppMessageResult {
   to: string
 }
 
-export interface SessionStartedInput {
+export interface SessionScheduledInput {
   to: string
   patientName: string
-  sessionLink: string
+  scheduledAt: Date
   therapistName?: string
 }
 
@@ -62,22 +62,25 @@ See you there. 🌿`
 }
 
 /**
- * Send session started notification
- * Best sent as free-form text (within 24h window after scheduled message)
- * Template example: "session_started" with variables: {{1}} patientName, {{2}} therapistName, {{3}} sessionLink
+ * Send session booked confirmation. Deliberately carries no join link —
+ * the link is only sent when the therapist starts the session.
  */
-export async function sendSessionStartedMessage(input: SessionStartedInput): Promise<WhatsAppMessageResult> {
+export async function sendSessionScheduledMessage(input: SessionScheduledInput): Promise<WhatsAppMessageResult> {
   const to = normalizeWhatsAppNumber(input.to)
   const name = input.patientName || 'there'
-  const withWhom = input.therapistName ? `with ${input.therapistName}` : ''
-  const text = `Hi ${name}! 🎬
+  const when = input.scheduledAt.toLocaleString('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'Asia/Kolkata',
+  })
+  const withWhom = input.therapistName ? ` with ${input.therapistName}` : ''
+  const text = `Hi ${name}! 🗓️
 
-Your STAAD session ${withWhom} has *started now*.
+Your STAAD session${withWhom} is booked for *${when}*.
 
-Tap to join immediately:
-👉 ${input.sessionLink}
+We'll send you the link to join when your session starts.
 
-We're ready when you are. 🌿`
+Take a deep breath — we'll see you there. 🌿`
 
   return sendViaBot(to, text)
 }

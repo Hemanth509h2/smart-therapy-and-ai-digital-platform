@@ -114,7 +114,7 @@ export function BookSessionDialog({
     setSaving(true);
     setError('');
     try {
-      const session = await createSession(profile.id, clientId, when, duration);
+      const session = await createSession(profile.id, clientId, when, duration, true);
       toast(`Session booked for ${fmtDayTime(when)}`);
       onOpenChange(false);
       onBooked?.(session);
