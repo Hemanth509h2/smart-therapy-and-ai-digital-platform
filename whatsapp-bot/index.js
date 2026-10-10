@@ -190,14 +190,30 @@ app.post('/send', async (req, res) => {
   }
 })
 
+// Browser-friendly confirm page. Logging out takes a button press (a POST), so
+// a link preview or prefetch of this URL can't unlink the account.
+app.get('/logout', (req, res) => {
+  if (!secretMatches(req.query.secret)) return res.status(401).send('Unauthorized')
+  const secret = encodeURIComponent(req.query.secret)
+  res.send(`<!doctype html><title>Unlink WhatsApp</title>
+<body style="font-family:sans-serif;text-align:center;padding:40px">
+<h2>Unlink the WhatsApp account from the bot?</h2>
+<p>${connectionReady ? 'A number is currently linked.' : 'No number is linked right now.'}
+Messages won't send until a new number is paired.</p>
+<form method="post" action="/logout?secret=${secret}"><button style="font-size:18px;padding:10px 24px">Unlink and clear</button></form>
+</body>`)
+})
+
 app.post('/logout', async (req, res) => {
-  if (!secretMatches(req.header('x-bot-secret'))) {
+  const fromBrowser = req.query.secret !== undefined
+  if (!secretMatches(fromBrowser ? req.query.secret : req.header('x-bot-secret'))) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
   try {
     await clearAccount()
     console.log('[whatsapp-bot] account cleared — waiting for a new pairing')
+    if (fromBrowser) return res.redirect(303, `/qr?secret=${encodeURIComponent(req.query.secret)}`)
     return res.json({ success: true })
   } catch (err) {
     console.error('[whatsapp-bot] logout failed', err)
@@ -206,7 +222,7 @@ app.post('/logout', async (req, res) => {
 })
 
 app.listen(PORT, () => {
-  console.log(`[whatsapp-bot] listening on :${PORT} (POST /send, POST /logout, GET /qr, GET /health)`)
+  console.log(`[whatsapp-bot] listening on :${PORT} (POST /send, GET|POST /logout, GET /qr, GET /health)`)
 })
 
 startBot().catch((e) => {
