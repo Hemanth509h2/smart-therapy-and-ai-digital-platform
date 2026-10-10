@@ -412,13 +412,14 @@ export async function createSession(
   therapistId: string,
   clientId: string,
   when: Date,
-  duration?: number
+  duration?: number,
+  instant = false
 ): Promise<PracticeSession> {
   const data = await jsonOrThrow(
     await apiFetch('/api/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ therapistId, clientId, scheduledAt: when.toISOString() }),
+      body: JSON.stringify({ therapistId, clientId, scheduledAt: when.toISOString(), instant }),
     })
   );
   if (duration) {

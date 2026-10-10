@@ -241,7 +241,7 @@ export function StartSessionDialog({
     setStarting(true);
     setError('');
     try {
-      const id = existing?.id ?? (await createSession(profile.id, clientId, new Date())).id;
+      const id = existing?.id ?? (await createSession(profile.id, clientId, new Date(), undefined, true)).id;
       // Get (or create) the patient join link for this session first.
       const res = await apiFetch(`/api/sessions/${id}/guest-link`, { method: 'POST' });
       const data = await res.json().catch(() => ({}));

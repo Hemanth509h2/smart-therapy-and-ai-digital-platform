@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { appUrl } from '@/lib/app-url';
-import { sendWhatsAppInvite } from '@/lib/whatsapp-bot';
+import { sendSessionScheduledMessage, sendWhatsAppInvite } from '@/lib/whatsapp-bot';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { therapistId, clientId, scheduledAt } = await request.json();
+    const { therapistId, clientId, scheduledAt, instant } = await request.json();
 
     // If clientId is a userId (firebase UID), look up the profile ID
     let finalClientId = clientId;
@@ -76,9 +76,11 @@ export async function POST(request: Request) {
     });
 
     // Best-effort WhatsApp notification — a failure here must not fail session
-    // creation, so it's logged rather than thrown.
+    // creation, so it's logged rather than thrown. Only an instant session
+    // (the "Start a new session" button) carries the join link; a booking just
+    // gets a date/time confirmation.
     if (session.client.phoneNumber) {
-      const sessionLink = `${appUrl(request)}/session/${session.id}`;
+      const sessionLink = instant ? `${appUrl(request)}/session/${session.id}` : '';
       const now = new Date();
       try {
         const delivery = await prisma.whatsAppMessage.upsert({
@@ -107,12 +109,20 @@ export async function POST(request: Request) {
           },
         });
 
-        const message = await sendWhatsAppInvite({
-          to: session.client.phoneNumber,
-          patientName: session.client.firstName,
-          inviteLink: sessionLink,
-          therapistName: `${session.therapist.firstName} ${session.therapist.lastName}`.trim(),
-        });
+        const therapistName = `${session.therapist.firstName} ${session.therapist.lastName}`.trim();
+        const message = instant
+          ? await sendWhatsAppInvite({
+              to: session.client.phoneNumber,
+              patientName: session.client.firstName,
+              inviteLink: sessionLink,
+              therapistName,
+            })
+          : await sendSessionScheduledMessage({
+              to: session.client.phoneNumber,
+              patientName: session.client.firstName,
+              scheduledAt: session.scheduledAt,
+              therapistName,
+            });
 
         await prisma.whatsAppMessage.update({
           where: { id: delivery.id },
