@@ -25,6 +25,16 @@ interface Mole {
   holeIndex: number
 }
 
+/** One whack, synced so the other browser can replay its feedback. */
+interface WamHit {
+  id: string
+  by: 'therapist' | 'client'
+  hole: number
+  result: 'correct' | 'wrong'
+  streak: number
+  wrongCount: number
+}
+
 interface HoleState {
   flash: 'correct' | 'wrong' | null
 }
@@ -491,6 +501,13 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
   gameRef.current = { question, moles, isPlaying, operation, difficulty, speed, score, streak, wrongCount, answerHoleIndex }
   const reactIdRef = useRef(0)
   const firestoreReady = useRef(true)
+  const hitPrimedRef = useRef(false)
+  const answeredRef = useRef<{ key: string; at: number } | null>(null)
+  const lastHitIdRef = useRef<string | null>(null)
+  // The snapshot listener is subscribed once, so it reaches the latest
+  // handlers through refs rather than a stale closure.
+  const showHitFeedbackRef = useRef<(hole: number, result: 'correct' | 'wrong', streak: number) => void>(() => {})
+  const startNewQuestionRef = useRef<() => void>(() => {})
 
   /* Board geometry. The playfield never scrolls, so the 3x3 grid is sized from
      whichever axis runs out first — same measure-then-size approach BoxPopping
@@ -531,7 +548,14 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
       const data = snap.data()
       const s = data.moduleState || {}
       if (s.wamQuestion) {
-        setQuestion(s.wamQuestion as Question)
+        const incoming = s.wamQuestion as Question
+        const current = gameRef.current.question
+        // A new question means a new round: the miss counter and any leftover
+        // flash belong to the previous one.
+        if (!current || current.display !== incoming.display || current.answer !== incoming.answer) {
+          setWrongCount(0)
+        }
+        setQuestion(incoming)
       }
       if (Array.isArray(s.wamMoles)) {
         setMoles(s.wamMoles)
@@ -554,9 +578,36 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
       if (typeof s.wamStreak === 'number') {
         setStreak(s.wamStreak)
       }
+
+      /* Whacks are mirrored as events. Before this, a hit only ever animated in
+         the browser that made it, so the therapist watched a board where the
+         child's whacks — right or wrong — simply never showed up. The first
+         snapshot only records the last event so a reopened module doesn't
+         replay an old whack. */
+      const hit = s.wamLastHit as WamHit | undefined
+      if (!hitPrimedRef.current) {
+        hitPrimedRef.current = true
+        lastHitIdRef.current = hit?.id ?? null
+        return
+      }
+      if (hit && hit.id !== lastHitIdRef.current) {
+        lastHitIdRef.current = hit.id
+        if (hit.by === role) return
+        showHitFeedbackRef.current(hit.hole, hit.result, hit.streak)
+        if (hit.result === 'wrong') setWrongCount(hit.wrongCount)
+        // The therapist's browser is the only one that deals: it owns the
+        // shuffle timer, so it also advances the round after the child's whack.
+        // When the child dealt the next question themselves, the therapist's
+        // timer could overwrite it with a reshuffle of the OLD numbers,
+        // leaving a board without the answer on it.
+        if (role === 'therapist') {
+          if (hit.result === 'correct') setTimeout(() => startNewQuestionRef.current(), 400)
+          else if (hit.wrongCount >= 2) setTimeout(() => startNewQuestionRef.current(), 500)
+        }
+      }
     })
     return () => unsub()
-  }, [sessionId])
+  }, [sessionId, role])
 
   // `override` matters when the therapist has just changed operation/difficulty:
   // gameRef still holds the previous value at that point in the event handler, so
@@ -586,6 +637,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
       })
     }
   }, [writeToFirestore])
+  startNewQuestionRef.current = startNewQuestion
 
   /* The therapist's browser owns the shuffle timer and both screens follow the
      deal it writes. Previously BOTH browsers ran this interval and both wrote
@@ -614,6 +666,29 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
     }
   }, [isPlaying, isTherapist, speed, writeToFirestore])
 
+  /* The visible half of a whack — flash, mallet spin, sound, streak badge.
+     Runs in the browser that whacked and, via wamLastHit, in the other one. */
+  const showHitFeedback = (holeIdx: number, result: 'correct' | 'wrong', newStreak: number) => {
+    setHoleFlashes({ [holeIdx]: result })
+    if (result === 'correct') {
+      setSpinningHole(holeIdx)
+      playWhack()
+      if (newStreak === 3) {
+        setStreakBadge('🔥 On fire!')
+        setTimeout(() => setStreakBadge(null), 2000)
+      } else if (newStreak === 5) {
+        setStreakBadge('⭐ Amazing!')
+        setTimeout(() => setStreakBadge(null), 2000)
+        triggerReaction('🎉')
+      }
+    }
+    setTimeout(() => {
+      setSpinningHole(null)
+      setHoleFlashes({})
+    }, 400)
+  }
+  showHitFeedbackRef.current = showHitFeedback
+
   const triggerReaction = (emoji: string) => {
     const id = reactIdRef.current++
     const x = 20 + Math.random() * 60
@@ -633,44 +708,41 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
     // Only a mole that is actually above ground can be struck.
     if (!moles.find((m) => m.holeIndex === holeIdx)?.isUp) return
 
+    // After a correct whack the next deal comes from the therapist's browser, a
+    // round-trip away; until it lands the same answer must not score twice.
+    const qKey = `${question.display}|${question.answer}`
+    const answered = answeredRef.current
+    if (answered && answered.key === qKey && Date.now() - answered.at < 3000) return
+
+    const hitId = `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    lastHitIdRef.current = hitId
+
     if (holeIdx === answerHoleIndex) {
-      setSpinningHole(holeIdx)
-      setHoleFlashes({ [holeIdx]: 'correct' })
-      playWhack()
       const newScore = score + 1
       const newStreak = streak + 1
       setScore(newScore)
       setStreak(newStreak)
+      showHitFeedback(holeIdx, 'correct', newStreak)
+      answeredRef.current = { key: qKey, at: Date.now() }
 
-      if (newStreak === 3) {
-        setStreakBadge('🔥 On fire!')
-        setTimeout(() => setStreakBadge(null), 2000)
-      } else if (newStreak === 5) {
-        setStreakBadge('⭐ Amazing!')
-        setTimeout(() => setStreakBadge(null), 2000)
-        triggerReaction('🎉')
-      }
-
+      const hit: WamHit = { id: hitId, by: role, hole: holeIdx, result: 'correct', streak: newStreak, wrongCount }
       writeToFirestore({
         'moduleState.wamScore': newScore,
         'moduleState.wamStreak': newStreak,
+        'moduleState.wamLastHit': hit,
       })
 
-      setTimeout(() => {
-        setSpinningHole(null)
-        setHoleFlashes({})
-        startNewQuestion()
-      }, 400)
+      if (isTherapist) setTimeout(() => startNewQuestion(), 400)
     } else {
-      setHoleFlashes({ [holeIdx]: 'wrong' })
       const newWrong = wrongCount + 1
       setWrongCount(newWrong)
       setStreak(0)
-      writeToFirestore({ 'moduleState.wamStreak': 0 })
+      showHitFeedback(holeIdx, 'wrong', 0)
 
-      setTimeout(() => setHoleFlashes({}), 400)
+      const hit: WamHit = { id: hitId, by: role, hole: holeIdx, result: 'wrong', streak: 0, wrongCount: newWrong }
+      writeToFirestore({ 'moduleState.wamStreak': 0, 'moduleState.wamLastHit': hit })
 
-      if (newWrong >= 2) {
+      if (isTherapist && newWrong >= 2) {
         setTimeout(() => startNewQuestion(), 500)
       }
     }

@@ -347,6 +347,11 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null)
   const [checkItems, setCheckItems] = useState<Set<string>>(new Set())
   const [toast, setToast] = useState<{ msg: string } | null>(null)
+  /* The last wrong drop, shared so BOTH screens show it. The shake and bin flash
+     used to be local to whoever dropped, and lasted under half a second — the
+     therapist watching never saw a miss at all, and the child barely did. */
+  const [lastWrong, setLastWrong] = useState<{ itemId: string; binId: string; k: number } | null>(null)
+  const [itemOrderLoaded, setItemOrderLoaded] = useState(false)
 
   const voiceLanguage = useVoiceLanguage(sessionId)
   // Ref so drop handlers can read the current language without gaining a new
@@ -372,11 +377,21 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
       if (typeof s.ddDifficulty === 'string') setDifficulty(s.ddDifficulty)
       if (s.ddDisplayMode === 'emoji' || s.ddDisplayMode === 'emoji+label') setDisplayMode(s.ddDisplayMode)
       if (Array.isArray(s.ddItemOrder)) setItemOrder(s.ddItemOrder)
+      setItemOrderLoaded(true)
       if (typeof s.ddSetRound === 'number') setSetRound(s.ddSetRound)
       if (typeof s.ddSorted === 'object' && s.ddSorted !== null) setSorted(s.ddSorted as Record<string, string>)
       if (typeof s.ddCorrect === 'number') setCorrect(s.ddCorrect)
       if (typeof s.ddWrong === 'number') setWrong(s.ddWrong)
       if (typeof s.ddCompleted === 'boolean') setCompleted(s.ddCompleted)
+      const lw = s.ddLastWrong
+      if (lw && typeof lw.itemId === 'string' && typeof lw.binId === 'string' && typeof lw.k === 'number') {
+        // A marker left over from earlier (e.g. on re-joining) is not a new miss.
+        if (Date.now() - lw.k < 10000) {
+          setLastWrong(prev => (prev && prev.k === lw.k ? prev : { itemId: lw.itemId, binId: lw.binId, k: lw.k }))
+        }
+      } else if (lw === null) {
+        setLastWrong(null)
+      }
     })
     return () => unsub()
   }, [sessionId])
@@ -412,19 +427,41 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
     return m
   }, [poolItems])
 
-  const sortedCount = Object.keys(sorted).length
-  const totalItems = itemOrder.length
-  const remaining = totalItems - sortedCount
-  const pct = totalItems > 0 ? Math.round((sortedCount / totalItems) * 100) : 0
-  const allDone = completed || (totalItems > 0 && sortedCount >= totalItems)
-
   const resolvedItems = useMemo(() => {
     const fromStore = itemOrder.filter(id => itemMap.has(id))
     if (fromStore.length > 0) return fromStore
     return shuffle(Array.from(itemMap.keys()))
   }, [itemOrder, itemMap])
 
+  const sortedCount = Object.keys(sorted).filter(id => itemMap.has(id)).length
+  /* Counted from the items actually on the board. It used to be the raw stored
+     order's length, which is 0 until a deal has been written — so on a fresh
+     board the very first correct drop satisfied "sortedCount + 1 >= 0" and
+     ended the game. */
+  const totalItems = resolvedItems.length
+  const remaining = totalItems - sortedCount
+  const pct = totalItems > 0 ? Math.round((sortedCount / totalItems) * 100) : 0
+  const allDone = completed || (totalItems > 0 && sortedCount >= totalItems)
+
   const unsortedItems = resolvedItems.filter(id => !sorted[id])
+
+  /* No shared deal yet (first launch in this session, or a stored order left
+     over from a different set): the therapist writes one, so both screens draw
+     the same cards in the same order instead of each shuffling locally. */
+  useEffect(() => {
+    if (!isT || !itemOrderLoaded) return
+    if (itemOrder.some(id => itemMap.has(id))) return
+    if (itemMap.size === 0) return
+    write({ 'moduleState.ddItemOrder': resolvedItems, 'moduleState.ddLastWrong': null })
+  }, [isT, itemOrderLoaded, itemOrder, itemMap, resolvedItems, write])
+
+  /* Clear the shared wrong-drop marker a moment after it lands, locally. */
+  useEffect(() => {
+    if (!lastWrong) return
+    const k = lastWrong.k
+    const t = setTimeout(() => setLastWrong(prev => (prev && prev.k === k ? null : prev)), 1800)
+    return () => clearTimeout(t)
+  }, [lastWrong])
   const sortedEntries = Object.entries(sorted).filter(([id]) => itemMap.has(id))
 
   const handleDrop = useCallback((itemId: string, binId: string) => {
@@ -453,8 +490,10 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
       setTimeout(() => {
         setAnimShake(prev => { const s = new Set(prev); s.delete(itemId); return s })
         setFlashWrong(prev => { const s = new Set(prev); s.delete(binId); return s })
-      }, 400)
-      write({ 'moduleState.ddWrong': wrong + 1 })
+      }, 900)
+      const marker = { itemId, binId, k: Date.now() }
+      setLastWrong(marker)
+      write({ 'moduleState.ddWrong': wrong + 1, 'moduleState.ddLastWrong': marker })
     }
   }, [canInteract, itemMap, sorted, write, correct, wrong, sortedCount, totalItems])
 
@@ -479,7 +518,7 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
   }, [allDone, completed, wrong, correct, showToast, isT, sessionId, currentSet.name])
 
   const handleReset = useCallback(() => {
-    write({ 'moduleState.ddSorted': {}, 'moduleState.ddCorrect': 0, 'moduleState.ddWrong': 0, 'moduleState.ddCompleted': false })
+    write({ 'moduleState.ddSorted': {}, 'moduleState.ddCorrect': 0, 'moduleState.ddWrong': 0, 'moduleState.ddCompleted': false, 'moduleState.ddLastWrong': null })
     const fresh = shuffle(Array.from(itemMap.keys()))
     write({ 'moduleState.ddItemOrder': fresh })
   }, [write, itemMap])
@@ -502,6 +541,7 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
       'moduleState.ddCorrect': 0,
       'moduleState.ddWrong': 0,
       'moduleState.ddCompleted': false,
+      'moduleState.ddLastWrong': null,
     })
   }, [setRound, currentSet, usedBins, difficulty, write])
 
@@ -517,6 +557,7 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
       'moduleState.ddItemOrder': order,
       'moduleState.ddSorted': {}, 'moduleState.ddCorrect': 0, 'moduleState.ddWrong': 0,
       'moduleState.ddCompleted': false,
+      'moduleState.ddLastWrong': null,
     })
   }, [difficulty, write])
 
@@ -528,6 +569,7 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
       'moduleState.ddItemOrder': order,
       'moduleState.ddSorted': {}, 'moduleState.ddCorrect': 0, 'moduleState.ddWrong': 0,
       'moduleState.ddCompleted': false,
+      'moduleState.ddLastWrong': null,
     })
   }, [currentSet, setRound, write])
 
@@ -703,6 +745,18 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
         }}
       >
 
+        {/* Wrong-drop message: names the item and the bin it does NOT belong in. */}
+        {lastWrong && itemMap.get(lastWrong.itemId) && (
+          <div key={lastWrong.k} role="status" aria-live="assertive" style={{
+            position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 20,
+            padding: '8px 18px', borderRadius: 999, background: DANGER, color: '#ffffff',
+            fontSize: 16, fontWeight: 800, whiteSpace: 'nowrap', pointerEvents: 'none',
+            boxShadow: '0 6px 18px rgba(180,67,44,0.38)', animation: 'fb .25s ease',
+          }}>
+            ✗ {itemMap.get(lastWrong.itemId)!.label} doesn&apos;t go in {usedBins.find(b => b.id === lastWrong.binId)?.label ?? 'that bin'} — try again!
+          </div>
+        )}
+
         {/* Item pool */}
         <div style={{
           background: 'rgba(255,255,255,0.78)', borderRadius: 14, padding: 16,
@@ -721,7 +775,7 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
           {unsortedItems.map(id => {
             const item = itemMap.get(id)
             if (!item) return null
-            const isShaking = animShake.has(id)
+            const isShaking = animShake.has(id) || lastWrong?.itemId === id
             const isBouncing = animBounce.has(id)
             if (isBouncing) return null
             return (
@@ -771,7 +825,7 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
         <div style={{ display: 'flex', gap: 12, flex: 1, minHeight: 0 }}>
           {usedBins.map(bin => {
             const isHover = hoverBin === bin.id
-            const isFlash = flashWrong.has(bin.id)
+            const isFlash = flashWrong.has(bin.id) || lastWrong?.binId === bin.id
             // While anything is in hand, EVERY bin firms up equally, so no
             // single bin stands out until the item is actually over it.
             const isArmed = !!dragItem && !isHover && !isFlash
@@ -787,19 +841,30 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
                   transition: 'all 0.2s', overflowY: 'auto',
                   boxShadow: '0 4px 14px rgba(20,30,40,0.06)',
-                  background: isFlash ? 'rgba(200,96,42,0.2)'
+                  background: isFlash ? 'rgba(220,60,40,0.22)'
                     : isHover ? HOVER_TINT
                     : isArmed ? 'rgba(255,255,255,0.92)'
                     : 'rgba(255,255,255,0.78)',
-                  border: isFlash ? '1.5px solid rgba(200,96,42,0.5)'
+                  border: isFlash ? `2.5px solid ${DANGER}`
                     : isHover ? `2px solid ${HOVER_LINE}`
                     : isArmed ? '1.5px dashed rgba(0,0,0,0.30)'
                     : '1.5px dashed rgba(0,0,0,0.18)',
                   borderStyle: isHover || isFlash ? 'solid' : 'dashed',
                   transform: isHover ? 'scale(1.02)' : 'scale(1)',
+                  animation: isFlash ? 'ws .35s ease 2' : undefined,
                   position: 'relative',
                 }}
               >
+                {/* Red ✗ over the bin a wrong item was dropped on — seen on both
+                    screens, since the miss is synced. */}
+                {isFlash && lastWrong?.binId === bin.id && (
+                  <div key={lastWrong.k} style={{
+                    position: 'absolute', top: 8, right: 10, zIndex: 5, pointerEvents: 'none',
+                    width: 34, height: 34, borderRadius: '50%', background: DANGER, color: '#ffffff',
+                    fontSize: 20, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(180,67,44,0.45)', animation: 'bi .3s ease',
+                  }}>✗</div>
+                )}
                 {/* "Apple!" pops over the bin the moment it lands correctly. */}
                 {namePop && namePop.binId === bin.id && (
                   <div
@@ -860,6 +925,7 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
         <div style={{ flexShrink: 0, background: 'rgba(255,255,255,0.82)', borderRadius: 12, padding: '12px 14px', boxShadow: '0 4px 14px rgba(20,30,40,0.06)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14, color: 'rgba(0,0,0,0.62)', marginBottom: 8 }}>
             <span>✓ {correct} sorted correctly</span>
+            <span style={{ color: wrong > 0 ? DANGER : undefined, fontWeight: wrong > 0 ? 700 : undefined }}>✗ {wrong} wrong</span>
             <span>{remaining} left</span>
           </div>
           <div style={{ width: '100%', height: 6, borderRadius: 3, background: 'rgba(0,0,0,0.10)', overflow: 'hidden' }}>
@@ -901,14 +967,24 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
             Correct: {correct} | Wrong attempts: {wrong}
             <br />{starText}
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={handleReset}
-              style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(0,0,0,0.07)', color: 'rgba(0,0,0,0.8)', cursor: 'pointer', fontSize: 16 }}
-            >Same set again</button>
-            <button onClick={handleNewSet}
-              style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(74,124,111,0.4)', background: 'rgba(74,124,111,0.2)', color: '#1F7A44', cursor: 'pointer', fontSize: 16 }}
-            >New set</button>
-          </div>
+          {/* Only the therapist picks what comes next. The client used to get the
+              same two buttons, and a tap on "Same set again" dealt the finished
+              cards straight back. Both choices sync, so the client's board
+              follows whichever the therapist picks. */}
+          {isT ? (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={handleNewSet}
+                style={{ padding: '8px 20px', borderRadius: 8, border: `1px solid ${GREEN}`, background: GREEN, color: '#ffffff', cursor: 'pointer', fontSize: 16, fontWeight: 700 }}
+              >New set →</button>
+              <button onClick={handleReset}
+                style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(0,0,0,0.07)', color: 'rgba(0,0,0,0.8)', cursor: 'pointer', fontSize: 16 }}
+              >Same set again</button>
+            </div>
+          ) : (
+            <div style={{ fontSize: 15, color: 'rgba(0,0,0,0.55)', fontStyle: 'italic' }}>
+              Waiting for your therapist to start the next set…
+            </div>
+          )}
         </div>
       )}
 

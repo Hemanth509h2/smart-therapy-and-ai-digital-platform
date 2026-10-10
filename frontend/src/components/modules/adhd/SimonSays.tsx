@@ -285,10 +285,17 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
     }
   }, [sessionId])
 
+  /* Sound/flash for actions taken in the OTHER browser. Pad taps and their
+     chimes used to play only where the tap happened, so the therapist saw the
+     child's input arrive silently. Set after the audio engine is defined. */
+  const remoteFxRef = useRef<((s: Record<string, unknown>, remote: boolean) => void) | null>(null)
+
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'liveSessions', sessionId), (snap) => {
       if (!snap.exists()) return
       const s = snap.data().moduleState || {}
+      // Local echoes carry pending writes; this browser already played them.
+      remoteFxRef.current?.(s, !snap.metadata.hasPendingWrites)
       if (s.ssMode === 'classic' || s.ssMode === 'simon-says') setMode(s.ssMode)
       if (typeof s.ssDifficulty === 'string') setDifficulty(s.ssDifficulty)
       if (typeof s.ssSpeed === 'number') setSpeed(s.ssSpeed)
@@ -454,6 +461,30 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
       playPadTone(activeLitColor, Math.max(280, Math.floor(speed * 0.6)))
     }
   }, [activeLitColor, playPadTone, speed])
+
+  // Previous synced values, to tell what the other side just did.
+  const prevSyncRef = useRef<{ childIn: string[]; score: number; lives: number } | null>(null)
+  useEffect(() => {
+    remoteFxRef.current = (s, remote) => {
+      const nextChildIn = Array.isArray(s.ssChildInput) ? (s.ssChildInput as string[]) : []
+      const nextScore = typeof s.ssScore === 'number' ? s.ssScore : 0
+      const nextLives = typeof s.ssLivesRemaining === 'number' ? s.ssLivesRemaining : 0
+      const prev = prevSyncRef.current
+      prevSyncRef.current = { childIn: nextChildIn, score: nextScore, lives: nextLives }
+      if (!prev || !remote) return
+
+      if (nextChildIn.length > prev.childIn.length) {
+        const color = nextChildIn[nextChildIn.length - 1]
+        playPadTone(color, 280)
+        setTapFlash(color)
+        if (tapT.current) clearTimeout(tapT.current)
+        tapT.current = setTimeout(() => setTapFlash(null), 280)
+      }
+      if (nextScore > prev.score) playSuccessChime()
+      else if (nextLives < prev.lives) playGentleRetryTone()
+    }
+    return () => { remoteFxRef.current = null }
+  }, [playPadTone, playSuccessChime, playGentleRetryTone])
 
   useEffect(() => () => {
     if (audioCtxRef.current) {

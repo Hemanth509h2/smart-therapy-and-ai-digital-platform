@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { deleteField, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
-import { staadSpeak, staadCancel } from '@/lib/voice/staadVoice'
 
 interface SocialStorySequencingProps {
   sessionId: string
@@ -131,7 +130,6 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
   const [shuffled, setShuffled] = useState<string[]>([])
   const [placed, setPlaced] = useState<Record<string, string>>({})
   const [difficulty, setDifficulty] = useState('standard')
-  const [readAloud, setReadAloud] = useState(true)
   const [attempts, setAttempts] = useState(0)
   const [completed, setCompleted] = useState(false)
   const [storiesDone, setStoriesDone] = useState(0)
@@ -150,6 +148,11 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
   const [customTitle, setCustomTitle] = useState('')
   const [customPanels, setCustomPanels] = useState<{ emoji: string; caption: string }[]>(Array.from({ length: 4 }, () => ({ emoji: '😊', caption: '' })))
   const [toast, setToast] = useState<{ msg: string } | null>(null)
+  /* Tap-to-place: tap a card, then tap the slot it belongs in. Dragging still
+     works; this is for small hands and touch screens where a drag is hard. */
+  const [selectedCard, setSelectedCard] = useState<string | null>(null)
+  /* The slot that just received a card, for the pop-in animation. */
+  const [justPlaced, setJustPlaced] = useState<{ idx: number; k: number } | null>(null)
   // The celebration replay runs on the board itself; `waiting` flips to true only
   // once every panel has been walked through and read, and that is what reveals
   // the same-set / new-set choice.
@@ -164,6 +167,9 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
   // Bumped whenever a replay is superseded (new story, reset, skip, unmount) so
   // timers and speech callbacks still in flight from the old run bail out.
   const replayRun = useRef(0)
+  /* True when THIS screen made the last placement, so only one side runs the
+     automatic check when the final card lands. */
+  const lastDropMine = useRef(false)
 
   const write = useCallback(async (d: Record<string, unknown>) => {
     try { await updateDoc(doc(db, 'liveSessions', sessionId), { ...d, 'timestamps.updatedAt': new Date().toISOString() }) } catch {}
@@ -175,7 +181,6 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
       const s = snap.data().moduleState || {}
       if (typeof s.ssStoryId === 'string') setStoryId(s.ssStoryId)
       if (typeof s.ssDifficulty === 'string') setDifficulty(s.ssDifficulty)
-      if (typeof s.ssReadAloud === 'boolean') setReadAloud(s.ssReadAloud)
       if (typeof s.ssAttempts === 'number') setAttempts(s.ssAttempts)
       if (typeof s.ssCompleted === 'boolean') setCompleted(s.ssCompleted)
       if (typeof s.ssStoriesCompleted === 'number') setStoriesDone(s.ssStoriesCompleted)
@@ -209,7 +214,6 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     if (toastT.current) clearTimeout(toastT.current)
     chain.current.forEach(t => clearTimeout(t))
     chain.current = []
-    staadCancel()
   }, [])
 
   const showToast = useCallback((msg: string) => {
@@ -277,29 +281,30 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     setHintPanel(null)
     setShowAnswer(false)
     setPlayIdx(-1)
+    setSelectedCard(null)
   }, [write, customStory])
 
   const handleDrop = useCallback((panelId: string, slotIdx: number) => {
     if (!canDrop || completed) return
     if (Object.values(placed).includes(panelId)) return
     const slotKey = String(slotIdx)
+    // A filled slot is not overwritten — tap it first to send its card back.
+    if (placed[slotKey]) return
+    lastDropMine.current = true
+    // Optimistic, so the card lands at once instead of after the round trip.
+    setPlaced(prev => ({ ...prev, [slotKey]: panelId }))
     write({ [`moduleState.ssPlaced.${slotKey}`]: panelId })
+    setSelectedCard(null)
+    setJustPlaced({ idx: slotIdx, k: Date.now() })
     setWrongSlots(prev => { const n = new Set(prev); n.delete(slotIdx); return n })
     setCorrectSlots(prev => { const n = new Set(prev); n.delete(slotIdx); return n })
-    if (readAloud && !completed) {
-      const panel = panelMap.get(panelId)
-      if (panel) {
-        staadCancel()
-        // Captions are authored in English, so read them with the en-IN voice.
-        staadSpeak({ text: panel.caption, language: 'en-IN', type: 'instruction' })
-      }
-    }
-  }, [canDrop, completed, placed, write, readAloud, panelMap])
+  }, [canDrop, completed, placed, write])
 
   const removeFromSlot = useCallback((slotIdx: number) => {
     if (!canDrop || completed) return
     // Must delete the key, not blank it: an empty value still counts toward
     // placedCount and leaves the slot permanently occupied-but-unrenderable.
+    setPlaced(prev => { const n = { ...prev }; delete n[String(slotIdx)]; return n })
     write({ [`moduleState.ssPlaced.${slotIdx}`]: deleteField() })
     chain.current.forEach(t => clearTimeout(t))
     chain.current = []
@@ -346,6 +351,21 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     }
   }, [allFilled, placed, slotCount, panelMap, write, storiesDone, showToast, activePanels, attempts, sessionId, storyId, customStory])
 
+  /* Guided and Standard give feedback the moment a card lands — green ✓ in the
+     right slot, red ✗ and a shake in the wrong one — straight from the shared
+     placement, so both screens show the same marks. Challenge still waits for
+     Check, which is what makes it the hard mode. */
+  const instantFeedback = difficulty !== 'challenge'
+
+  /* When the last card lands, check automatically (only on the screen that
+     placed it, so the result is written once). */
+  useEffect(() => {
+    if (!instantFeedback || !allFilled || completed || showAnswer) return
+    if (!lastDropMine.current) return
+    lastDropMine.current = false
+    handleCheck()
+  }, [instantFeedback, allFilled, completed, showAnswer, handleCheck])
+
   const orderedPanels = useMemo(
     () => [...activePanels].sort((a, b) => a.correctIndex - b.correctIndex),
     [activePanels],
@@ -362,11 +382,11 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     replayRun.current += 1
     chain.current.forEach(t => clearTimeout(t))
     chain.current = []
-    staadCancel()
   }, [])
 
   // Once the story is right, hold on the board and walk the panels in order,
-  // reading each caption, before offering the same-set / new-set choice.
+  // lighting each one up in turn, before offering the same-set / new-set choice.
+  // Silent by design: the voice read-back was removed at the clinic's request.
   useEffect(() => {
     if (!completed) {
       stopReplay()
@@ -390,38 +410,23 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
         after(600, () => setWaiting(true))
         return
       }
-      const panel = ordered[i]
       i += 1
       setPlayIdx(i - 1)
-      if (!readAloud) { after(PLAY_DUR + TRANS_DUR, step); return }
-
-      let advanced = false
-      const next = () => {
-        if (advanced || !alive()) return
-        advanced = true
-        after(TRANS_DUR, step)
-      }
-      staadSpeak({ text: panel.caption, language: 'en-IN', type: 'instruction', onEnd: next })
-      // Speech synthesis can go silent without ever firing onend (no voices, tab
-      // throttling). Keep the sequence moving on a deliberately generous estimate
-      // so the fallback never races a line that is still being spoken.
-      after(Math.max(PLAY_DUR, panel.caption.length * 140) + 4000, next)
+      after(PLAY_DUR + TRANS_DUR, step)
     }
 
-    staadCancel()
     after(700, step)
 
     return () => {
       replayRun.current += 1
       chain.current.forEach(t => clearTimeout(t))
       chain.current = []
-      staadCancel()
     }
     // Deliberately keyed on replaySig, not on the activePanels array: the session
     // doc is shared by every module, so an unrelated write used to hand back a new
     // array, restart this effect and cancel the line that was mid-sentence.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [completed, replaySig, readAloud, stopReplay])
+  }, [completed, replaySig, stopReplay])
 
   const skipReplay = useCallback(() => {
     stopReplay()
@@ -564,6 +569,11 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
 
   const canCheck = allFilled && !completed && !showAnswer
 
+  // A card in hand that the other screen has just placed is no longer in hand.
+  useEffect(() => {
+    if (selectedCard && !unplacedIds.includes(selectedCard)) setSelectedCard(null)
+  }, [selectedCard, unplacedIds])
+
   return (
     <>
       <style>{`
@@ -573,6 +583,12 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
         .sh-a{animation:sh .35s ease}
         @keyframes pl{0%,100%{box-shadow:0 0 0 rgba(74,124,111,0)}50%{box-shadow:0 0 16px rgba(74,124,111,.4)}}
         .hint-pulse{animation:pl 1s ease-in-out infinite}
+        @keyframes ss-pop{0%{transform:scale(.4) rotate(-8deg);opacity:0}60%{transform:scale(1.15) rotate(2deg);opacity:1}100%{transform:scale(1) rotate(0)}}
+        @keyframes ss-badge{0%{transform:scale(0)}70%{transform:scale(1.3)}100%{transform:scale(1)}}
+        @keyframes ss-next{0%,100%{border-color:rgba(74,124,111,.25)}50%{border-color:rgba(74,124,111,.9)}}
+        @keyframes ss-lift{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+        @keyframes ss-fall{0%{transform:translateY(-20px) rotate(0);opacity:0}10%{opacity:1}100%{transform:translateY(420px) rotate(540deg);opacity:0}}
+        .ss-card:hover{transform:translateY(-3px) scale(1.04)!important;box-shadow:0 8px 18px rgba(0,0,0,.18)!important}
       `}</style>
 
       {/* Therapist controls */}
@@ -623,10 +639,6 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
                 }}
               >{d === 'challenge' ? 'Challenge' : d === 'standard' ? 'Standard' : 'Guided'}</button>
             ))}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(0,0,0,0.5)', cursor: 'pointer', marginLeft: 4 }}>
-              <input type="checkbox" checked={readAloud} onChange={e => write({ 'moduleState.ssReadAloud': e.target.checked })} style={{ accentColor: '#4a7c6f' }} />
-              Read aloud
-            </label>
           </div>
         </div>
       )}
@@ -696,10 +708,16 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
               const pid = placed[String(idx)]
               const panel = pid ? panelMap.get(pid) : null
               const isHover = hoverSlot === idx
-              const isWrong = wrongSlots.has(idx)
-              const isCorrect = correctSlots.has(idx)
+              const liveRight = instantFeedback && !!panel && panel.correctIndex === idx
+              const liveWrong = instantFeedback && !!panel && panel.correctIndex !== idx
+              const isWrong = wrongSlots.has(idx) || liveWrong
+              const isCorrect = correctSlots.has(idx) || liveRight
               const isPlay = playIdx === idx
               const isOccupied = !!pid
+              // The first empty slot breathes when a card is in hand (tapped).
+              const firstEmpty = Array.from({ length: slotCount }, (_, j) => j).find(j => !placed[String(j)])
+              const isTarget = !isOccupied && !!selectedCard && idx === firstEmpty
+              const pop = justPlaced && justPlaced.idx === idx
               return (
                 <div key={idx} data-slot={idx}
                   onDragOver={onSlotDragOver}
@@ -715,26 +733,53 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
                     border: isPlay ? '2px solid #4a7c6f' : isWrong ? '1.5px solid rgba(200,96,42,0.5)' : isCorrect ? '1.5px solid rgba(74,124,111,0.6)' : isHover ? '1.5px solid rgba(74,124,111,0.4)' : '1.5px dashed rgba(0,0,0,0.15)',
                     borderStyle: isHover ? 'solid' : isPlay ? 'solid' : isWrong ? 'solid' : isCorrect ? 'solid' : 'dashed',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '4px 3px',
-                    transition: 'all 0.2s', cursor: canDrop && !isOccupied ? 'pointer' : 'default',
+                    transition: 'all 0.2s', cursor: canDrop && (!isOccupied || !liveRight) ? 'pointer' : 'default',
                     transform: isPlay ? 'scale(1.08)' : isHover ? 'scale(1.03)' : 'scale(1)',
                     boxShadow: isPlay ? '0 0 16px rgba(74,124,111,0.3)' : 'none',
                     position: 'relative',
+                    ...(isTarget ? { animation: 'ss-next 1s ease-in-out infinite', borderStyle: 'solid', borderWidth: 2 } : {}),
                   }}
-                  onClick={() => { if (isOccupied && canDrop) removeFromSlot(idx) }}
+                  onClick={() => {
+                    if (!canDrop || completed) return
+                    // Tap-to-place: a card is in hand and this slot is empty.
+                    if (!isOccupied && selectedCard) { handleDrop(selectedCard, idx); return }
+                    // A card already proven right stays put; anything else goes back.
+                    if (isOccupied && !liveRight) removeFromSlot(idx)
+                  }}
                 >
+                  {/* Step number, always visible, so the strip reads as 1-2-3. */}
+                  <span style={{
+                    position: 'absolute', top: 4, left: 6, fontSize: 11, fontWeight: 800,
+                    color: isCorrect ? '#1F7A44' : isWrong ? '#B4432C' : 'rgba(0,0,0,0.3)',
+                  }}>{idx + 1}</span>
+                  {(isCorrect || isWrong) && panel && (
+                    <span key={`${pid}-${isCorrect}`} style={{
+                      position: 'absolute', top: -8, right: -8, width: 22, height: 22, borderRadius: '50%',
+                      background: isCorrect ? '#1F7A44' : '#B4432C', color: '#fff', fontSize: 13, fontWeight: 900,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.25)', animation: 'ss-badge .3s ease', zIndex: 2,
+                    }}>{isCorrect ? '✓' : '✗'}</span>
+                  )}
                   {panel ? (
-                    <>
+                    <div key={pop ? justPlaced!.k : pid} style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                      animation: pop
+                        ? (liveWrong ? 'ss-pop .4s ease, sh .35s ease .4s 2' : 'ss-pop .4s ease')
+                        : isPlay ? 'ss-lift .6s ease-in-out infinite' : undefined,
+                    }}>
                       <span style={{ fontSize: slotCount >= 5 ? 26 : 31.5, lineHeight: 1 }}>{panel.emoji}</span>
                       {difficulty !== 'challenge' && (
                         <span style={{ fontSize: slotCount >= 5 ? 9.5 : 11, color: 'rgba(0,0,0,0.7)', textAlign: 'center', lineHeight: 1.15, overflowWrap: 'anywhere' }}>{panel.caption}</span>
                       )}
-                    </>
+                    </div>
                   ) : (
                     <>
                       {difficulty === 'guided' && (
                         <span style={{ fontSize: 19.5, color: 'rgba(0,0,0,0.15)', fontWeight: 700 }}>{idx + 1}</span>
                       )}
-                      <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.15)' }}>Drop here</span>
+                      <span style={{ fontSize: 12, color: isTarget ? '#1F7A44' : 'rgba(0,0,0,0.25)', fontWeight: isTarget ? 700 : 400 }}>
+                        {selectedCard ? 'Tap to place' : 'Drop here'}
+                      </span>
                     </>
                   )}
                   {isWrong && <div className="sh-a" style={{ position: 'absolute', inset: 0, borderRadius: 12, pointerEvents: 'none' }} />}
@@ -743,31 +788,45 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
             })}
           </div>
 
+          {/* What to do next, in words. */}
+          {!completed && (
+            <div style={{ textAlign: 'center', fontSize: 14, color: 'rgba(0,0,0,0.55)', flexShrink: 0 }}>
+              {selectedCard
+                ? '👆 Now tap the box where this card goes'
+                : unplacedIds.length
+                  ? `What happens next? Drag a card, or tap it then tap a box · ${placedCount} of ${slotCount} placed`
+                  : instantFeedback ? 'Fix any red ✗ cards — tap one to send it back' : 'All placed — press Check my story!'}
+            </div>
+          )}
+
           {/* Shuffled panel cards */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, padding: 12, minHeight: 132, alignContent: 'flex-start', alignItems: 'flex-start', justifyContent: 'center', background: 'rgba(0,0,0,0.035)', borderRadius: 14, border: '1px dashed rgba(0,0,0,0.14)', flex: 1, overflowY: 'auto' }}>
             {unplacedIds.map(id => {
               const panel = panelMap.get(id)
               if (!panel) return null
               const isHint = hintPanel === id
+              const isSel = selectedCard === id
               return (
                 <div key={id}
                   draggable={canDrop && !completed}
                   onDragStart={e => onDragStart(e, id)}
                   onDragEnd={onDragEnd}
                   onTouchStart={onTouchStart(id)}
-                  className={isHint ? 'hint-pulse' : ''}
+                  onClick={() => { if (canDrop && !completed) setSelectedCard(isSel ? null : id) }}
+                  className={`ss-card ${isHint ? 'hint-pulse' : ''}`}
                   style={{
                     // Sized to fit three per row in the 420px panel. Height is a
                     // minimum, not a fixed box, and the caption is unclamped, so a
                     // long line grows the card instead of ending in an ellipsis.
                     width: 104, minHeight: difficulty === 'challenge' ? 76 : 112, borderRadius: 12,
-                    background: 'rgba(0,0,0,0.07)', border: isHint ? '1.5px solid rgba(74,124,111,0.5)' : '1.5px solid rgba(0,0,0,0.12)',
+                    background: isSel ? 'rgba(74,124,111,0.18)' : '#ffffff',
+                    border: isSel ? '2.5px solid #1F7A44' : isHint ? '1.5px solid rgba(74,124,111,0.5)' : '1.5px solid rgba(0,0,0,0.12)',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '8px 6px',
                     cursor: canDrop && !completed ? 'grab' : 'default',
                     transition: 'all 0.15s', userSelect: 'none', WebkitUserSelect: 'none',
                     boxShadow: dragItem === id ? '0 8px 20px rgba(0,0,0,0.3)' : '0 2px 6px rgba(0,0,0,0.2)',
                     opacity: dragItem === id ? 0.8 : 1,
-                    transform: dragItem === id ? 'scale(1.1)' : 'scale(1)',
+                    transform: dragItem === id || isSel ? 'scale(1.1)' : 'scale(1)',
                   }}
                 >
                   <span style={{ fontSize: 30, lineHeight: 1 }}>{panel.emoji}</span>
@@ -790,7 +849,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
               background: 'rgba(74,124,111,0.14)', border: '1px solid rgba(74,124,111,0.35)',
             }}>
               <span style={{ fontSize: 15, color: '#1F7A44' }}>
-                🔊 Reading your story in order… {Math.min(playIdx + 1, slotCount) || 1} of {slotCount}
+                ▶ Playing your story in order… {Math.min(playIdx + 1, slotCount) || 1} of {slotCount}
               </span>
               <button onClick={skipReplay}
                 style={{ marginLeft: 'auto', padding: '4px 12px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(255,255,255,0.5)', color: 'rgba(0,0,0,0.6)', cursor: 'pointer', fontSize: 14 }}
@@ -846,8 +905,26 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
           position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
           background: 'rgba(74,124,111,0.2)', backdropFilter: 'blur(6px)', zIndex: 50, padding: 20,
         }}>
-          <div style={{ fontSize: 39 }}>🌟</div>
+          {/* Confetti burst */}
+          <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+            {Array.from({ length: 18 }, (_, i) => (
+              <span key={i} style={{
+                position: 'absolute', top: 0, left: `${(i * 37) % 100}%`, fontSize: 22,
+                animation: `ss-fall ${1.8 + (i % 5) * 0.3}s ease-in ${(i % 6) * 0.15}s forwards`, opacity: 0,
+              }}>{['🎉', '⭐', '🌟', '🎊', '✨'][i % 5]}</span>
+            ))}
+          </div>
+          <div style={{ fontSize: 39, animation: 'ss-pop .5s ease' }}>🌟</div>
           <div style={{ fontSize: 21, fontFamily: '"DM Serif Display", serif', color: '#2b2f33', textAlign: 'center' }}>You got the story right!</div>
+          {/* The finished story as a strip, so the child sees the whole sequence. */}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+            {orderedPanels.map((p, i) => (
+              <span key={p.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 28, animation: `ss-pop .4s ease ${i * 0.12}s both` }}>{p.emoji}</span>
+                {i < orderedPanels.length - 1 && <span style={{ color: 'rgba(0,0,0,0.3)' }}>→</span>}
+              </span>
+            ))}
+          </div>
           <div style={{ fontSize: 16, color: 'rgba(0,0,0,0.5)' }}>Attempts: {attempts || 0}</div>
           <div style={{ fontSize: 14, color: 'rgba(0,0,0,0.45)', textAlign: 'center' }}>
             {isT ? 'Play the same set again, or move on to a new one.' : 'Play the same set again, or wait for a new one.'}

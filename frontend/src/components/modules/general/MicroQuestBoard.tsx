@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { CSSProperties } from 'react'
-import { doc, onSnapshot, setDoc } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore'
 import {
   ChartColumnIncreasing, CalendarDays, Plus, Leaf, Flag, Rocket, Pointer,
   EllipsisVertical, Check, Trash2, Target, GlassWater, FileText, Phone,
@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { writeModuleState } from '@/lib/modules/writeModuleState'
 
 interface MicroQuestBoardProps {
   sessionId: string
@@ -115,29 +116,59 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
   const touchMoved = useRef(false)
   const touchStart = useRef({ x: 0, y: 0 })
 
+  /* The live board rides on liveSessions/{id}.moduleState.mqQuests — the one
+     document both participants are always entitled to write. It used to live
+     only on patients/{clientUid}, which the session rules refuse unless the
+     therapist's role claim has landed; that write failed into a bare catch,
+     the board snapped back on the next snapshot, and nothing ever "stuck".
+     The patient record is still written as a best-effort long-term copy and
+     seeds the board when a session opens it for the first time. */
+  const seededRef = useRef(false)
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'liveSessions', sessionId), (snap) => {
       if (!snap.exists()) return
-      const parts = snap.data().participants || {}
+      const data = snap.data()
+      const parts = data.participants || {}
       const client = Object.values(parts).find((p: any) => p?.role === 'client') as any
       if (client?.uid) setClientId(client.uid)
+      const live = data.moduleState?.mqQuests
+      if (Array.isArray(live)) {
+        seededRef.current = true
+        setQuests(live)
+      }
     })
     return () => unsub()
   }, [sessionId])
 
+  // One-time seed from the client's saved quests, therapist side only so the
+  // two browsers can't race to write it.
   useEffect(() => {
-    if (!clientId) return
-    const unsub = onSnapshot(doc(db, 'patients', clientId), (snap) => {
-      const data = snap.exists() ? snap.data() : {}
-      if (Array.isArray(data.quests)) setQuests(data.quests)
-    })
-    return () => unsub()
-  }, [clientId])
+    if (!isT || !clientId || seededRef.current) return
+    let cancelled = false
+    getDoc(doc(db, 'patients', clientId))
+      .then((snap) => {
+        if (cancelled || seededRef.current) return
+        const saved = snap.exists() ? snap.data().quests : null
+        seededRef.current = true
+        if (Array.isArray(saved) && saved.length) {
+          setQuests(saved)
+          writeModuleState(sessionId, { 'moduleState.mqQuests': saved }, { label: 'MicroQuestBoard' })
+        }
+      })
+      .catch((err) => console.warn('[MicroQuestBoard] Could not load saved quests', err))
+    return () => { cancelled = true }
+  }, [isT, clientId, sessionId])
 
   const persist = useCallback(async (next: Quest[]) => {
+    seededRef.current = true
+    await writeModuleState(sessionId, { 'moduleState.mqQuests': next }, { label: 'MicroQuestBoard' })
     if (!clientId) return
-    try { await setDoc(doc(db, 'patients', clientId), { quests: next }, { merge: true }) } catch {}
-  }, [clientId])
+    try {
+      await setDoc(doc(db, 'patients', clientId), { quests: next }, { merge: true })
+    } catch (err) {
+      console.warn('[MicroQuestBoard] Could not save quests to the patient record', err)
+    }
+  }, [sessionId, clientId])
 
   const addQuest = useCallback(() => {
     if (!isT || !questText.trim()) return

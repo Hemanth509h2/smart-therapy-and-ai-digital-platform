@@ -94,9 +94,10 @@ interface Worry { id: string; text: string; locked: boolean }
 
 const MAX_CHARS = 120
 
-export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProps) {
+// isLocked is accepted for registry parity but unused: every action here is
+// therapist-driven, so there is nothing on the client side to lock.
+export default function WorryVault({ sessionId, role }: WorryVaultProps) {
   const isT = role === 'therapist'
-  const canInteract = isT || !isLocked
 
   const [worries, setWorries] = useState<Worry[]>([])
   const [selected, setSelected] = useState<string | null>(null)
@@ -122,7 +123,7 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
 
   const addWorry = useCallback(() => {
     const t = text.trim()
-    if (!t || !canInteract) return
+    if (!t || !isT) return
     const w: Worry = { id: `wv${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, text: t, locked: false }
     write({ 'moduleState.wvWorries': [...worries, w] })
     logModuleEvent(sessionId, {
@@ -139,7 +140,7 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
       const updated = [...worries, w].map(x => x.id === w.id ? { ...x, locked: true } : x)
       write({ 'moduleState.wvWorries': updated })
     }, 1600)
-  }, [text, canInteract, worries, write, sessionId])
+  }, [text, isT, worries, write, sessionId])
 
   const reopenWorry = useCallback((id: string) => {
     if (!isT) return
@@ -166,7 +167,9 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
 
   const selectedWorry = worries.find(w => w.id === selected)
   const lockedWorries = worries.filter(w => w.locked && w.id !== selected)
-  const canSubmit = canInteract && !!text.trim()
+  // Only the therapist writes worries down — the client says them out loud and
+  // watches them get locked away, so they never face a text box.
+  const canSubmit = isT && !!text.trim()
 
   return (
     /* Root fills the stage and never scrolls itself — ModuleStage's body is
@@ -240,7 +243,19 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
           </div>
 
           {/* ---- Capture: wide rounded field + solid-green pill ---- */}
-          {!vaultOpen && (
+          {!vaultOpen && !isT && (
+            <div style={{
+              width: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              background: 'rgba(255,255,255,0.85)', border: `1px solid ${BORDER}`, borderRadius: 20,
+              padding: '16px 22px', fontSize: 18.5, lineHeight: 1.4, color: INK_BODY, textAlign: 'center',
+              boxShadow: '0 2px 12px rgba(31,59,44,0.06)',
+            }}>
+              <MessageCircle size={20} color={ACCENT} strokeWidth={1.9} style={{ flexShrink: 0 }} />
+              Tell your therapist what&apos;s on your mind — they&apos;ll lock it in the vault for you.
+            </div>
+          )}
+
+          {!vaultOpen && isT && (
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, marginTop: 2 }}>
               <div style={{ position: 'relative', width: '100%' }}>
                 <MessageCircle size={20} color={ACCENT} strokeWidth={1.9} style={{ position: 'absolute', left: 22, top: 21, pointerEvents: 'none' }} />
@@ -248,8 +263,7 @@ export default function WorryVault({ sessionId, role, isLocked }: WorryVaultProp
                   className="wv-input"
                   value={text}
                   onChange={e => setText(e.target.value.slice(0, MAX_CHARS))}
-                  placeholder="What's on your mind?"
-                  disabled={!canInteract}
+                  placeholder="What's on the client's mind?"
                   maxLength={MAX_CHARS}
                   style={{
                     width: '100%', boxSizing: 'border-box', minHeight: 64,

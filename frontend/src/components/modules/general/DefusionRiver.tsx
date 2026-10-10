@@ -1,13 +1,16 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import {
   Leaf as LeafIcon, MessageCircle, Eye, Sparkles, Waves, Cloud, Heart,
-  Lightbulb, HelpCircle, Pause, Play, ArrowRight, Wind, RotateCcw,
+  Lightbulb, HelpCircle, Pause, Play, ArrowRight, Wind, RotateCcw, Volume2,
 } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { staadSpeak, type VoiceLanguage } from '@/lib/voice/staadVoice'
+import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'
+import VoiceLanguageToggle from '@/components/modules/VoiceLanguageToggle'
 
 /* ---------------------------------------------------------------------------
    Art assets. The Background folder name is clean but the file name carries a
@@ -58,6 +61,35 @@ const STEPS = [
   'Now just watch it float away',
 ]
 
+/* Spoken guidance, one line per step in each voice language. The thought itself
+   is read as typed — it is the client's own words, so it is never translated. */
+const VOICE_LINES: Record<VoiceLanguage, { steps: [string, string, string]; release: string }> = {
+  'en-IN': {
+    steps: [
+      'Read the thought on the leaf.',
+      'Say: I am having the thought that,',
+      'Now just watch it float away.',
+    ],
+    release: 'Let it go. You are in control.',
+  },
+  'hi-IN': {
+    steps: [
+      'पत्ते पर लिखे विचार को पढ़ो।',
+      'कहो: मेरे मन में यह विचार आ रहा है कि,',
+      'अब बस इसे बहते हुए देखो।',
+    ],
+    release: 'इसे जाने दो। तुम नियंत्रण में हो।',
+  },
+  'te-IN': {
+    steps: [
+      'ఆకుపై ఉన్న ఆలోచనను చదవండి.',
+      'ఇలా చెప్పండి: నాకు ఈ ఆలోచన వస్తోంది,',
+      'ఇప్పుడు అది తేలిపోతూ వెళ్ళడం చూడండి.',
+    ],
+    release: 'దాన్ని వదిలేయండి. మీరు నియంత్రణలో ఉన్నారు.',
+  },
+}
+
 /* Short labels for the bottom switcher — the same three `drStep` values, named
    the way the mockup names them. */
 const STEP_TABS = [
@@ -74,7 +106,8 @@ const STEP_ICONS = [
   { Icon: Eye, tint: '#E8871E' },
 ]
 
-export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiverProps) {
+// isLocked is accepted for registry parity; the client has nothing to operate here.
+export default function DefusionRiver({ sessionId, role }: DefusionRiverProps) {
   const isT = role === 'therapist'
 
   const [thought, setThought] = useState('')
@@ -85,6 +118,13 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
 
   /* Local-only, never synced: the mockup's "Help & Tips" popover. */
   const [showTips, setShowTips] = useState(false)
+
+  const voiceLanguage = useVoiceLanguage(sessionId)
+  const voiceLangRef = useRef(voiceLanguage)
+  voiceLangRef.current = voiceLanguage
+  /* Flipped by the first snapshot. Speech only reacts to CHANGES after that, so
+     joining mid-exercise doesn't replay a step that was already spoken. */
+  const [loaded, setLoaded] = useState(false)
 
   const write = useCallback(async (d: Record<string, unknown>) => {
     try { await updateDoc(doc(db, 'liveSessions', sessionId), { ...d, 'timestamps.updatedAt': new Date().toISOString() }) } catch {}
@@ -98,6 +138,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
       if (Array.isArray(s.drLeaves)) setLeaves(s.drLeaves)
       if (typeof s.drPaused === 'boolean') setPaused(s.drPaused)
       if (typeof s.drStep === 'number') setStep(s.drStep)
+      setLoaded(true)
     })
     return () => unsub()
   }, [sessionId])
@@ -137,6 +178,44 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
     })
   }, [isT, step, leaves, write])
 
+  /* Spoken on both browsers, like the other modules' guidance — the child hears
+     the prompt in the session's voice language. */
+  const speakStep = useCallback((n: number, text = thought) => {
+    const lang = voiceLangRef.current
+    const line = VOICE_LINES[lang].steps[n] ?? ''
+    // Steps 1 and 2 are about the thought itself, so it's read after the prompt.
+    const withThought = n <= 1 && text ? `${line} ${text}` : line
+    staadSpeak({ text: withThought, language: lang, type: 'instruction' })
+  }, [thought])
+
+  const spokenStepRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!loaded) return
+    if (spokenStepRef.current === null) { spokenStepRef.current = step; return }
+    if (spokenStepRef.current === step) return
+    spokenStepRef.current = step
+    speakStep(step)
+  }, [loaded, step, speakStep])
+
+  // A newly placed leaf is read aloud as soon as it lands; clearing the river
+  // gets the "let it go" line.
+  const seenLeafRef = useRef<string | null | undefined>(undefined)
+  useEffect(() => {
+    if (!loaded) return
+    const newest = leaves.length ? leaves[leaves.length - 1].id : null
+    if (seenLeafRef.current === undefined) { seenLeafRef.current = newest; return }
+    if (seenLeafRef.current === newest) return
+    const hadLeaf = seenLeafRef.current !== null
+    seenLeafRef.current = newest
+    if (newest) {
+      const leaf = leaves[leaves.length - 1]
+      if (!leaf.floating) speakStep(0, leaf.text)
+    } else if (hadLeaf) {
+      const lang = voiceLangRef.current
+      staadSpeak({ text: VOICE_LINES[lang].release, language: lang, type: 'praise' })
+    }
+  }, [loaded, leaves, speakStep])
+
   const canSubmit = isT && !!input.trim()
   const nextStep = (step + 1) % STEPS.length
 
@@ -163,6 +242,13 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
         @keyframes dr-bob { 0%,100%{transform:translateY(0) rotate(-2deg)} 50%{transform:translateY(-6px) rotate(2deg)} }
         @keyframes dr-ripple { 0%,100%{opacity:0.3} 50%{opacity:0.6} }
         @keyframes dr-breathe { 0%,100%{transform:scale(1);opacity:0.5} 50%{transform:scale(1.25);opacity:0.9} }
+        /* Flowing water. The current runs away from the viewer, so the streaks
+           scroll UP the frame (the same way the leaves travel) while the
+           surface ripples drift sideways. */
+        @keyframes dr-current { from { background-position: 0 0, 0 0 } to { background-position: 0 -120px, 0 -60px } }
+        @keyframes dr-drift { from { transform: translateX(0) } to { transform: translateX(-50%) } }
+        @keyframes dr-drift-r { from { transform: translateX(-50%) } to { transform: translateX(0) } }
+        @keyframes dr-glint { 0%,100%{opacity:0;transform:scale(0.6)} 50%{opacity:0.9;transform:scale(1)} }
         @keyframes dr-twinkle { 0%,100%{opacity:0.25;transform:scale(0.8)} 50%{opacity:1;transform:scale(1.15)} }
         .dr-input::placeholder { color: #93a29a; }
         .dr-input:focus { border-color: ${GREEN}; box-shadow: 0 0 0 3px rgba(31,122,68,0.14); }
@@ -195,6 +281,20 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
               }}>
                 {i + 1}. {s}{step === 1 && i === 1 && thought ? ` “${thought}”` : ''}
               </span>
+              {active && (
+                <button
+                  onClick={() => speakStep(i)}
+                  aria-label="Read this step aloud"
+                  title="Read aloud"
+                  style={{
+                    marginLeft: 'auto', flexShrink: 0, width: 32, height: 32, borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: `1px solid ${MINT_LINE}`, background: '#ffffff', cursor: 'pointer',
+                  }}
+                >
+                  <Volume2 size={16} color={GREEN} strokeWidth={2.2} />
+                </button>
+              )}
             </div>
           )
         })}
@@ -217,11 +317,46 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
         {/* ===== Water layer: ripples, drifting leaves, sparkles. Sits behind
             every card so a leaf can float the full width of the scene. ===== */}
         <div aria-hidden style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-          {/* ripple lines across the water band */}
+          {/* Moving water: a receding band of streaks flowing toward the
+              horizon, trapezoid-clipped to the river's narrowing banks. */}
+          <div style={{
+            position: 'absolute', left: 0, right: 0, top: '44%', bottom: 0,
+            clipPath: 'polygon(36% 0, 64% 0, 100% 100%, 0 100%)',
+            WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, #000 30%)',
+            maskImage: 'linear-gradient(180deg, transparent 0%, #000 30%)',
+            background: [
+              'repeating-linear-gradient(180deg, rgba(255,255,255,0) 0 26px, rgba(255,255,255,0.22) 26px 29px, rgba(255,255,255,0) 29px 40px)',
+              'repeating-linear-gradient(172deg, rgba(120,200,240,0) 0 14px, rgba(255,255,255,0.12) 14px 16px)',
+            ].join(', '),
+            animation: 'dr-current 4s linear infinite',
+            animationPlayState: paused ? 'paused' : 'running',
+          }} />
+
+          {/* ripple lines across the water band, drifting with the surface */}
           {[58, 68, 78, 88].map((top, i) => (
-            <svg key={i} width="100%" height="20" style={{ position: 'absolute', top: `${top}%`, left: 0, animation: `dr-ripple ${3 + i}s ease-in-out infinite` }}>
-              <path d="M0,10 Q40,3 80,10 T160,10 T240,10 T320,10 T400,10 T480,10 T560,10 T640,10 T720,10 T800,10" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="1.5" />
-            </svg>
+            <div key={i} style={{
+              position: 'absolute', top: `${top}%`, left: 0, width: '200%', height: 20,
+              animation: `${i % 2 ? 'dr-drift-r' : 'dr-drift'} ${14 + i * 4}s linear infinite`,
+              animationPlayState: paused ? 'paused' : 'running',
+            }}>
+              <svg width="100%" height="20" preserveAspectRatio="none" viewBox="0 0 1600 20"
+                style={{ display: 'block', animation: `dr-ripple ${3 + i}s ease-in-out infinite` }}>
+                <path d="M0,10 Q50,3 100,10 T200,10 T300,10 T400,10 T500,10 T600,10 T700,10 T800,10 T900,10 T1000,10 T1100,10 T1200,10 T1300,10 T1400,10 T1500,10 T1600,10" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.6" />
+              </svg>
+            </div>
+          ))}
+
+          {/* sun glints catching the current */}
+          {[
+            { l: 30, t: 72, d: '0s' }, { l: 62, t: 64, d: '1.3s' }, { l: 46, t: 84, d: '2.1s' },
+            { l: 72, t: 90, d: '0.6s' }, { l: 22, t: 92, d: '1.8s' }, { l: 54, t: 56, d: '2.7s' },
+          ].map((g, k) => (
+            <span key={k} style={{
+              position: 'absolute', left: `${g.l}%`, top: `${g.t}%`, width: 16, height: 3, borderRadius: 2,
+              background: 'rgba(255,255,255,0.85)', boxShadow: '0 0 6px rgba(255,255,255,0.8)',
+              animation: 'dr-glint 3.2s ease-in-out infinite', animationDelay: g.d,
+              animationPlayState: paused ? 'paused' : 'running',
+            }} />
           ))}
 
           {leaves.map((leaf, idx) => {
@@ -330,6 +465,10 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
           position: 'relative', zIndex: 1, height: '100%', minHeight: 0,
           display: 'flex', flexDirection: 'column', gap: 10, padding: 14,
         }}>
+          {/* The client sees just the river and the guidance above it: the
+              composer, the explainer cards and every control are the
+              therapist's, so none of it is drawn on the client's screen. */}
+          {isT ? (
           <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
 
             {/* ---- LEFT: compose a thought ---- */}
@@ -366,7 +505,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                 <Sparkles size={15} color="#E8B23C" strokeWidth={2.2} />
               </div>
 
-              {isT ? (
+              {isT && (
                 <>
                   <div style={{ position: 'relative' }}>
                     <textarea
@@ -429,20 +568,6 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                     </button>
                   )}
                 </>
-              ) : (
-                /* Client view — writing is the therapist's; `isLocked` decides
-                   how the invitation reads. */
-                <div style={{
-                  background: '#F7FAF8', border: `1px solid ${BORDER}`, borderRadius: 14,
-                  padding: '12px 13px', fontSize: 16.5, lineHeight: 1.45, color: INK, minHeight: 76,
-                }}>
-                  {thought
-                    ? <>Your thought: <strong style={{ color: HEAD }}>“{thought}”</strong></>
-                    : <span style={{ color: MUTED }}>Your therapist will place your thought on a leaf.</span>}
-                  <div style={{ marginTop: 8, fontSize: 15.5, color: MUTED }}>
-                    {isLocked ? 'Your therapist is guiding this exercise.' : 'Follow along with your therapist.'}
-                  </div>
-                </div>
               )}
 
               <div style={{
@@ -504,8 +629,12 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
               </div>
             </div>
           </div>
+          ) : (
+            <div style={{ flex: 1 }} />
+          )}
 
           {/* ---- Bottom bar: helpers · step switcher · progression ---- */}
+          {isT && (
           <div style={{ flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', gap: 10 }}>
 
             {/* Tips popover — local state only, never synced. */}
@@ -542,6 +671,14 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
                   {paused ? 'Resume River' : 'Pause River'}
                 </button>
               )}
+              {/* The shared toggle is styled for a dark surface, so it gets a
+                  dark pill of its own here on the bright river art. */}
+              <div style={{
+                display: 'flex', alignItems: 'center', padding: '6px 10px', borderRadius: 999,
+                background: 'rgba(20,45,32,0.82)', boxShadow: CARD_SHADOW,
+              }}>
+                <VoiceLanguageToggle sessionId={sessionId} language={voiceLanguage} />
+              </div>
             </div>
 
             {/* CENTRE: the three drStep values. Only the *next* segment is
@@ -603,6 +740,7 @@ export default function DefusionRiver({ sessionId, role, isLocked }: DefusionRiv
               )}
             </div>
           </div>
+          )}
         </div>
 
         {/* Empty state — dark copy inside a near-opaque pill, never bare text

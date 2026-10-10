@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useId } from 'react'
+import { useState, useEffect, useRef, useCallback, useId, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import {
   Leaf,
@@ -18,10 +18,11 @@ import {
   Lock,
   RotateCcw,
   Square,
+  Route,
 } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
-import { staadPraise } from '@/lib/voice/staadVoice'
+import { staadPraise, staadSpeak } from '@/lib/voice/staadVoice'
 import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'
 
 interface VirtualMazeProps {
@@ -145,10 +146,38 @@ function generateMaze(gridSize: number): { maze: number[]; startPos: Pos; goalPo
   }
 }
 
-function getRating(wrongMoves: number): { stars: string; text: string } {
-  if (wrongMoves <= 2) return { stars: '⭐⭐⭐', text: 'Perfect!' }
-  if (wrongMoves <= 5) return { stars: '⭐⭐', text: 'Great job!' }
-  return { stars: '⭐', text: 'Keep practising!' }
+/* Fewest steps from start to goal (BFS over open cells). The maze is a
+   perfect maze, so this is the length of its one true route; -1 if unreachable. */
+function shortestPathLength(maze: number[], gridSize: number, start: Pos, goal: Pos): number {
+  if (maze.length !== gridSize * gridSize || maze[start.row * gridSize + start.col] === 1) return -1
+  const dist = new Array(maze.length).fill(-1)
+  const queue: number[] = [start.row * gridSize + start.col]
+  dist[queue[0]] = 0
+  const goalIdx = goal.row * gridSize + goal.col
+  for (let head = 0; head < queue.length; head++) {
+    const idx = queue[head]
+    if (idx === goalIdx) return dist[idx]
+    const r = Math.floor(idx / gridSize)
+    const c = idx % gridSize
+    for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const nr = r + dr
+      const nc = c + dc
+      if (nr < 0 || nr >= gridSize || nc < 0 || nc >= gridSize) continue
+      const n = nr * gridSize + nc
+      if (maze[n] === 1 || dist[n] !== -1) continue
+      dist[n] = dist[idx] + 1
+      queue.push(n)
+    }
+  }
+  return -1
+}
+
+/* Only the shortest path counts as a correct solve. Any step beyond it is an
+   extra move — backtracking out of a dead end included. */
+function getRating(extraMoves: number): { stars: string; text: string } {
+  if (extraMoves === 0) return { stars: '⭐⭐⭐', text: 'Perfect — shortest path!' }
+  if (extraMoves <= 6) return { stars: '⭐⭐', text: 'Solved, but not the shortest path' }
+  return { stars: '⭐', text: 'Solved — try to find the shortest path' }
 }
 
 function formatTime(seconds: number): string {
@@ -173,6 +202,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
   const [goalPos, setGoalPos] = useState<Pos>({ row: 0, col: 0 })
   const [visited, setVisited] = useState<string[]>([])
   const [wrongMoves, setWrongMoves] = useState(0)
+  const [moveCount, setMoveCount] = useState(0)
   const [completed, setCompleted] = useState(false)
   const [completionTime, setCompletionTime] = useState(0)
   const [timerMode, setTimerMode] = useState(false)
@@ -190,6 +220,13 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
   timeRemainingRef.current = timeRemaining
 
   const theme = THEME_COLORS[themeName]
+
+  // Start is fixed at the top-left room for every generated maze.
+  const shortestMoves = useMemo(
+    () => (maze.length ? shortestPathLength(maze, gridSize, START, goalPos) : -1),
+    [maze, gridSize, goalPos],
+  )
+  const extraMoves = shortestMoves > 0 ? Math.max(0, moveCount - shortestMoves) : 0
 
   const writeToFirestore = useCallback(async (data: Record<string, unknown>) => {
     try {
@@ -214,6 +251,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
       if (typeof s.vmTimeLimit === 'number') setTimeLimit(s.vmTimeLimit)
       if (typeof s.vmTimeRemaining === 'number') setTimeRemaining(s.vmTimeRemaining)
       if (typeof s.vmWrongMoves === 'number') setWrongMoves(s.vmWrongMoves)
+      if (typeof s.vmMoves === 'number') setMoveCount(s.vmMoves)
       if (typeof s.vmCompleted === 'boolean') setCompleted(s.vmCompleted)
       if (typeof s.vmCompletionTime === 'number') setCompletionTime(s.vmCompletionTime)
       if (typeof s.vmTimeUp === 'boolean') setTimeUp(s.vmTimeUp)
@@ -248,6 +286,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
       'moduleState.vmPlayerPos': startPos,
       'moduleState.vmVisited': [],
       'moduleState.vmWrongMoves': 0,
+      'moduleState.vmMoves': 0,
       'moduleState.vmCompleted': false,
       'moduleState.vmCompletionTime': 0,
       'moduleState.vmTimeUp': false,
@@ -261,6 +300,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
     setGoalPos(gp)
     setVisited([])
     setWrongMoves(0)
+    setMoveCount(0)
     setCompleted(false)
     setCompletionTime(0)
     setTimeUp(false)
@@ -290,6 +330,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
     setPlayerPos(START)
     setVisited([])
     setWrongMoves(0)
+    setMoveCount(0)
     setCompleted(false)
     setCompletionTime(0)
     setTimeUp(false)
@@ -301,6 +342,7 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
       'moduleState.vmPlayerPos': START,
       'moduleState.vmVisited': [],
       'moduleState.vmWrongMoves': 0,
+      'moduleState.vmMoves': 0,
       'moduleState.vmCompleted': false,
       'moduleState.vmCompletionTime': 0,
       'moduleState.vmTimeUp': false,
@@ -371,8 +413,10 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
       setStartTime(now)
     }
 
+    const newMoves = moveCount + 1
     setVisited(newVisited)
     setPlayerPos(newPos)
+    setMoveCount(newMoves)
 
     const isGoal = newPos.row === goalPos.row && newPos.col === goalPos.col
 
@@ -382,7 +426,16 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
       setCompletionTime(elapsedSeconds)
       setBumpCell('')
 
-      staadPraise(voiceLangRef.current, 'Amazing! You found the way out!')
+      const extra = shortestMoves > 0 ? Math.max(0, newMoves - shortestMoves) : 0
+      if (extra === 0) {
+        staadPraise(voiceLangRef.current, 'Amazing! You found the shortest way out!')
+      } else {
+        staadSpeak({
+          text: `You found the way out, with ${extra} extra move${extra === 1 ? '' : 's'}. Can you find the shortest path?`,
+          language: voiceLangRef.current,
+          type: 'feedback',
+        })
+      }
 
       writeToFirestore({
         'moduleState.vmPlayerPos': newPos,
@@ -390,20 +443,24 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
         'moduleState.vmCompleted': true,
         'moduleState.vmCompletionTime': elapsedSeconds,
         'moduleState.vmWrongMoves': wrongMoves,
+        'moduleState.vmMoves': newMoves,
         'moduleState.vmTimeUp': false,
       })
       logModuleEvent(sessionId, {
         module: 'maze',
         type: 'maze_solved',
-        detail: `Solved the maze in ${elapsedSeconds}s with ${wrongMoves} wrong move${wrongMoves === 1 ? '' : 's'}`,
+        detail:
+          `${extra === 0 ? 'Solved the maze on the shortest path' : `Reached the exit with ${extra} extra move${extra === 1 ? '' : 's'} (not the shortest path)`}` +
+          ` — ${newMoves} moves vs ${shortestMoves} shortest, ${elapsedSeconds}s, ${wrongMoves} wall bump${wrongMoves === 1 ? '' : 's'}`,
       })
     } else {
       writeToFirestore({
         'moduleState.vmPlayerPos': newPos,
         'moduleState.vmVisited': newVisited,
+        'moduleState.vmMoves': newMoves,
       })
     }
-  }, [canInteract, completed, mazeReady, timeUp, playerPos, gridSize, maze, wrongMoves, visited, goalPos, startTime, writeToFirestore, sessionId])
+  }, [canInteract, completed, mazeReady, timeUp, playerPos, gridSize, maze, wrongMoves, moveCount, shortestMoves, visited, goalPos, startTime, writeToFirestore, sessionId])
 
   const movePlayerRef = useRef(movePlayer)
   movePlayerRef.current = movePlayer
@@ -696,7 +753,12 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
       {divider}
       {statItem(<Ban size={14} strokeWidth={2.2} color={UI.muted} />, `${wrongMoves} wrong`)}
       {divider}
-      {statItem(<Footprints size={14} strokeWidth={2.2} color={UI.muted} />, `${visited.length} cells`)}
+      {statItem(
+        <Footprints size={14} strokeWidth={2.2} color={UI.muted} />,
+        shortestMoves > 0 ? `${moveCount} / ${shortestMoves} moves` : `${moveCount} moves`,
+      )}
+      {divider}
+      {statItem(<Route size={14} strokeWidth={2.2} color={extraMoves > 0 ? UI.coralInk : UI.muted} />, `${extraMoves} extra`)}
       {timerMode && !completed && !timeUp && (
         <>
           {divider}
@@ -739,6 +801,8 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
 
   const isBumping = bumpCell === `${playerPos.row}-${playerPos.col}`
   const playerOnGoal = playerPos.row === goalPos.row && playerPos.col === goalPos.col
+  // The therapist's End button also sets `completed`, without the goal reached.
+  const reachedGoal = playerOnGoal
 
   const board = (
     <svg
@@ -1103,17 +1167,35 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
             {completed && !timeUp && overlayShell(
               <>
                 <div style={{ fontSize: 23.5, fontWeight: 800, color: UI.ink, letterSpacing: -0.4, marginBottom: 4 }}>
-                  Maze complete
+                  {reachedGoal ? 'Maze complete' : 'Maze ended'}
                 </div>
-                <div style={{ fontSize: 21, marginBottom: 8 }}>{getRating(wrongMoves).stars}</div>
-                <div style={{ fontSize: 16.5, fontWeight: 700, color: UI.greenInk, marginBottom: 12 }}>
-                  {getRating(wrongMoves).text}
-                </div>
+                {reachedGoal && (
+                  <>
+                    <div style={{ fontSize: 21, marginBottom: 8 }}>{getRating(extraMoves).stars}</div>
+                    <div style={{ fontSize: 16.5, fontWeight: 700, color: extraMoves === 0 ? UI.greenInk : UI.coralInk, marginBottom: 12 }}>
+                      {getRating(extraMoves).text}
+                    </div>
+                  </>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: 18 }}>
                   <div>
                     <div style={microLabel}>Time</div>
                     <div style={{ fontSize: 18.5, fontWeight: 800, color: UI.ink, fontVariantNumeric: 'tabular-nums' }}>
                       {formatTime(completionTime)}
+                    </div>
+                  </div>
+                  <div style={{ width: 1, background: UI.border }} />
+                  <div>
+                    <div style={microLabel}>Moves</div>
+                    <div style={{ fontSize: 18.5, fontWeight: 800, color: UI.ink, fontVariantNumeric: 'tabular-nums' }}>
+                      {shortestMoves > 0 ? `${moveCount} / ${shortestMoves}` : moveCount}
+                    </div>
+                  </div>
+                  <div style={{ width: 1, background: UI.border }} />
+                  <div>
+                    <div style={microLabel}>Extra moves</div>
+                    <div style={{ fontSize: 18.5, fontWeight: 800, color: extraMoves > 0 ? UI.coralInk : UI.ink, fontVariantNumeric: 'tabular-nums' }}>
+                      {extraMoves}
                     </div>
                   </div>
                   <div style={{ width: 1, background: UI.border }} />

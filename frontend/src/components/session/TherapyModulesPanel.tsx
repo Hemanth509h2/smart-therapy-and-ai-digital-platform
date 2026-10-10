@@ -9,15 +9,22 @@ import { RC } from './roomTheme'
 // the session sidebar.
 export default function TherapyModulesPanel({
   allowedModuleIds,
+  activeModuleId = null,
   onLaunch,
   onClose,
 }: {
   allowedModuleIds?: string[] | null
+  /** The module currently running in the session; its tile is highlighted. */
+  activeModuleId?: string | null
   onLaunch: (moduleId: string, moduleName: string) => void
   onClose: () => void
 }) {
   const [query, setQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
+  // The tile just clicked. Launching is async, so this highlights the choice
+  // immediately instead of waiting for the session to report it as active.
+  const [clickedId, setClickedId] = useState<string | null>(null)
+  const selectedId = clickedId ?? activeModuleId
 
   const allowSet = allowedModuleIds == null ? null : new Set(allowedModuleIds)
 
@@ -95,17 +102,24 @@ export default function TherapyModulesPanel({
         </header>
 
         <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))', gap: 12 }}>
-          {visibleRows.map(({ mod, iconBg, iconBorder }) => (
-            <button
-              key={mod.id}
-              onClick={() => onLaunch(mod.id, mod.name)}
-              title={`Start ${mod.name}`}
-              style={{ minHeight: 119, padding: '13px 8px 10px', borderRadius: 15, border: `1px solid ${RC.border}`, background: '#fff', color: RC.ink, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 3px 10px rgba(20,40,30,0.04)' }}
-            >
-              <span aria-hidden="true" style={{ width: 43, height: 43, borderRadius: 12, display: 'grid', placeItems: 'center', fontSize: 23, background: iconBg, border: `1px solid ${iconBorder}` }}>{mod.emoji}</span>
-              <span style={{ fontSize: 12, lineHeight: 1.25, fontWeight: 700, textAlign: 'center' }}>{mod.name}</span>
-            </button>
-          ))}
+          {visibleRows.map(({ mod, iconBg, iconBorder }) => {
+            const selected = mod.id === selectedId
+            return (
+              <button
+                key={mod.id}
+                onClick={() => {
+                  setClickedId(mod.id)
+                  onLaunch(mod.id, mod.name)
+                }}
+                title={selected && mod.id === activeModuleId ? `${mod.name} (running)` : `Start ${mod.name}`}
+                aria-pressed={selected}
+                style={{ minHeight: 119, padding: '13px 8px 10px', borderRadius: 15, border: selected ? `2px solid ${RC.green}` : `1px solid ${RC.border}`, background: selected ? RC.tileActive : '#fff', color: selected ? RC.greenDark : RC.ink, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: selected ? '0 0 0 3px rgba(63,174,106,0.18), 0 3px 10px rgba(20,40,30,0.08)' : '0 3px 10px rgba(20,40,30,0.04)', transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s' }}
+              >
+                <span aria-hidden="true" style={{ width: 43, height: 43, borderRadius: 12, display: 'grid', placeItems: 'center', fontSize: 23, background: iconBg, border: `1px solid ${iconBorder}` }}>{mod.emoji}</span>
+                <span style={{ fontSize: 12, lineHeight: 1.25, fontWeight: 700, textAlign: 'center' }}>{mod.name}</span>
+              </button>
+            )
+          })}
           {visibleRows.length === 0 && <p style={{ gridColumn: '1 / -1', margin: '8px 0', color: RC.inkMuted, fontSize: 13 }}>No modules match “{query}”.</p>}
         </div>
       </section>

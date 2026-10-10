@@ -118,6 +118,24 @@ const WORD_TRANSLATIONS: Record<Exclude<VoiceLanguage, 'en-IN'>, Record<string, 
   },
 }
 
+/* The English word spelled phonetically in Telugu script. A Telugu voice reads
+   Latin text unreliably (some engines spell it letter by letter, others hand it
+   to a non-Indian English voice), so in a Telugu session the word itself is
+   spoken from this spelling — the child hears the English word in a Telugu
+   accent. Custom words have no entry and are passed through as typed. */
+const TE_ACCENT: Record<string, string> = {
+  cat: 'క్యాట్', dog: 'డాగ్', hat: 'హ్యాట్', sun: 'సన్', run: 'రన్', big: 'బిగ్',
+  red: 'రెడ్', cup: 'కప్', sit: 'సిట్', hot: 'హాట్', man: 'మ్యాన్', bus: 'బస్',
+  fog: 'ఫాగ్', pen: 'పెన్', web: 'వెబ్', zip: 'జిప్', jam: 'జామ్', mud: 'మడ్',
+  leg: 'లెగ్', fin: 'ఫిన్',
+  apple: 'యాపిల్', chair: 'చైర్', bread: 'బ్రెడ్', cloud: 'క్లౌడ్', flame: 'ఫ్లేమ్',
+  grass: 'గ్రాస్', plant: 'ప్లాంట్', tiger: 'టైగర్', stone: 'స్టోన్', crown: 'క్రౌన్',
+  shelf: 'షెల్ఫ్', train: 'ట్రైన్', globe: 'గ్లోబ్', stamp: 'స్టాంప్',
+  captain: 'కెప్టెన్', explore: 'ఎక్స్‌ప్లోర్', blanket: 'బ్లాంకెట్', freedom: 'ఫ్రీడమ్',
+  justice: 'జస్టిస్', dolphin: 'డాల్ఫిన్', journey: 'జర్నీ', primary: 'ప్రైమరీ',
+  thunder: 'థండర్', support: 'సపోర్ట్',
+}
+
 /* Everything else this module says, in each supported language. */
 const LINES: Record<VoiceLanguage, { start: string; tryAgain: string; finished: string }> = {
   'en-IN': {
@@ -413,7 +431,18 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
       staadSpeak({ text: word, language: 'en-IN', type: 'instruction' })
       return
     }
-    const translated = WORD_TRANSLATIONS[lang]?.[word.toLowerCase()]
+    const key = word.toLowerCase()
+    const translated = WORD_TRANSLATIONS[lang]?.[key]
+    if (lang === 'te-IN') {
+      // The English word first, in a Telugu accent, then its Telugu meaning.
+      const spoken = TE_ACCENT[key] ?? word
+      staadSpeak({
+        text: translated && translated !== spoken ? `${spoken}. ${translated}` : spoken,
+        language: lang,
+        type: 'instruction',
+      })
+      return
+    }
     staadSpeak({
       text: translated ? `${translated}, ${word}` : word,
       language: lang,

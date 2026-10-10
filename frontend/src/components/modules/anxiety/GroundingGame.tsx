@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { doc, onSnapshot } from 'firebase/firestore'
+import { writeModuleState } from '@/lib/modules/writeModuleState'
 import { Check, Clock, Sparkles } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
@@ -116,6 +117,27 @@ function initializeItems(existing?: string[][]): string[][] {
   return result
 }
 
+/* Firestore rejects nested arrays, so `string[][]` can never be written as-is:
+   every ggItems update failed (silently, in the old bare catch) and the
+   client never saw what the therapist typed, or vice versa. The items travel
+   as a map keyed by step instead. Reading still accepts the legacy array. */
+function itemsToFirestore(items: string[][]): Record<string, string[]> {
+  const out: Record<string, string[]> = {}
+  items.forEach((arr, i) => { out[`s${i}`] = arr })
+  return out
+}
+
+function itemsFromFirestore(raw: unknown): string[][] | null {
+  if (Array.isArray(raw)) return initializeItems(raw as string[][])
+  if (raw && typeof raw === 'object') {
+    const m = raw as Record<string, unknown>
+    return initializeItems(
+      STEPS.map((_, i) => (Array.isArray(m[`s${i}`]) ? (m[`s${i}`] as string[]) : []))
+    )
+  }
+  return null
+}
+
 /** Plays the delivered step-complete Lottie once, while mounted. */
 function StepCompleteFx() {
   const host = useRef<HTMLDivElement>(null)
@@ -179,21 +201,18 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
-  const writeToFirestore = useCallback(async (data: Record<string, unknown>) => {
-    try {
-      await updateDoc(doc(db, 'liveSessions', sessionId), {
-        ...data,
-        'timestamps.updatedAt': new Date().toISOString(),
-      })
-    } catch {}
-  }, [sessionId])
+  const writeToFirestore = useCallback(
+    (data: Record<string, unknown>) => writeModuleState(sessionId, data, { label: 'GroundingGame' }),
+    [sessionId]
+  )
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'liveSessions', sessionId), (snap) => {
       if (!snap.exists()) return
       const s = snap.data().moduleState || {}
       if (typeof s.ggCurrentStep === 'number') setCurrentStep(s.ggCurrentStep)
-      if (Array.isArray(s.ggItems)) setItems(initializeItems(s.ggItems as string[][]))
+      const syncedItems = itemsFromFirestore(s.ggItems)
+      if (syncedItems) setItems(syncedItems)
       if (typeof s.ggBreathPace === 'number') setBreathPace(s.ggBreathPace)
       if (typeof s.ggStartMood === 'string') setStartMood(s.ggStartMood)
       if (typeof s.ggEndMood === 'string') setEndMood(s.ggEndMood)
@@ -232,7 +251,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
     const newItems = items.map(arr => [...arr])
     newItems[currentStep][slotIdx] = value
     setItems(newItems)
-    writeToFirestore({ 'moduleState.ggItems': newItems })
+    writeToFirestore({ 'moduleState.ggItems': itemsToFirestore(newItems) })
   }
 
   const handleItemKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, slotIdx: number) => {
@@ -310,7 +329,7 @@ export default function GroundingGame({ sessionId, role, isLocked }: GroundingGa
     setTransitioning(false)
     writeToFirestore({
       'moduleState.ggCurrentStep': 0,
-      'moduleState.ggItems': fresh,
+      'moduleState.ggItems': itemsToFirestore(fresh),
       'moduleState.ggCompleted': false,
       'moduleState.ggEndMood': '',
       'moduleState.ggCaptureStartMood': false,

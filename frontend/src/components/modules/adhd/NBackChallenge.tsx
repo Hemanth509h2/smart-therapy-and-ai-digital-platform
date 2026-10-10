@@ -626,18 +626,21 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
     }
   }
 
-  // Spacebar handler
+  // Spacebar handler. Goes through a ref: the listener is bound once per
+  // play state, and calling handleMatchPress directly kept the render it was
+  // bound in — a stale currentIndex that made Space do nothing.
+  const matchPressRef = useRef(handleMatchPress)
+  matchPressRef.current = handleMatchPress
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && isPlaying && currentIndex >= n && !complete) {
+      if (e.code === 'Space' && isPlaying && !complete) {
         e.preventDefault()
-        handleMatchPress()
+        matchPressRef.current()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTherapist, isPlaying, complete])
+  }, [isPlaying, complete])
 
   const handleStart = () => {
     if (!isTherapist) return
@@ -1291,18 +1294,34 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                           ? !canInteract || !practiceItem || practiceTapped.includes(practiceIdx)
                           : !tapEnabled
                       }
+                      aria-label="Tap when it's a match"
                       style={{
                         width: '100%',
-                        height: 58,
-                        borderRadius: 16,
-                        background: '#ffffff',
+                        height: 76,
+                        borderRadius: 18,
+                        /* A filled, obviously-pressable button. It used to be a
+                           white bar that read as a status strip, so children
+                           never realised there was something to tap. */
+                        background:
+                          feedback?.type === 'correct'
+                            ? GREEN_SOFT
+                            : feedback?.type === 'wrong'
+                              ? RED_SOFT
+                              : (practiceActive ? canInteract && !!practiceItem : tapEnabled)
+                                ? `linear-gradient(180deg, ${INDIGO} 0%, ${INDIGO_DEEP} 100%)`
+                                : '#ffffff',
                         border:
                           feedback?.type === 'correct'
                             ? `2px solid ${GREEN}`
                             : feedback?.type === 'wrong'
                               ? `2px solid ${RED}`
                               : `1px solid ${BORDER}`,
-                        boxShadow: CARD_SHADOW,
+                        boxShadow:
+                          (practiceActive ? canInteract && !!practiceItem : tapEnabled) && !feedback
+                            ? '0 6px 0 #1f1980, 0 10px 22px rgba(55,48,216,0.30)'
+                            : CARD_SHADOW,
+                        touchAction: 'manipulation',
+                        userSelect: 'none',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -1314,20 +1333,28 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
                         transition: 'border-color 0.15s, opacity 0.15s',
                       }}
                     >
-                      <span aria-hidden style={{ fontSize: 25.5, lineHeight: 1 }}>✋</span>
+                      <span aria-hidden style={{ fontSize: 30, lineHeight: 1 }}>✋</span>
                       <span
                         style={{
-                          fontSize: 23.5,
+                          fontSize: 26,
                           fontWeight: 800,
                           color:
                             feedback?.type === 'correct'
                               ? '#0F7A38'
                               : feedback?.type === 'wrong'
                                 ? '#A8123A'
-                                : INK,
+                                : (practiceActive ? canInteract && !!practiceItem : tapEnabled)
+                                  ? '#ffffff'
+                                  : INK,
                         }}
                       >
-                        {feedback ? feedback.text : practiceActive || isMatchable ? 'Tap' : 'Watch and wait…'}
+                        {feedback
+                          ? feedback.text
+                          : !canInteract
+                            ? 'Locked by therapist'
+                            : practiceActive || isMatchable
+                              ? 'Tap — Match!'
+                              : 'Watch and wait…'}
                       </span>
                       <span
                         style={{

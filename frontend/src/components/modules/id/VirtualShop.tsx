@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore'
+import { doc, onSnapshot, arrayUnion } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { writeModuleState } from '@/lib/modules/writeModuleState'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { staadPraise, staadCancel } from '@/lib/voice/staadVoice'
 import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'
@@ -149,7 +150,12 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
   const [editList, setEditList] = useState(false)
   const [editQty, setEditQty] = useState<Record<string, number>>({})
   const [paying, setPaying] = useState(false)
+  /* The receipt is SHARED state now. It used to be set only on the screen that
+     pressed Pay, so the other side saw nothing but a bare "complete" panel. */
   const [receipt, setReceipt] = useState<Receipt | null>(null)
+  /* The client can close the receipt on their own screen (the timestamp of the
+     one they closed); only the therapist starts the next shop. */
+  const [dismissedReceipt, setDismissedReceipt] = useState<number | null>(null)
   const [floaters, setFloaters] = useState<{ id: string; x: number; y: number }[]>([])
   const [toast, setToast] = useState<{ msg: string } | null>(null)
 
@@ -157,9 +163,13 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
   const toastT = useRef<ReturnType<typeof setTimeout>>()
   const pk = useRef(0)
 
-  const write = useCallback(async (d: Record<string, unknown>) => {
-    try { await updateDoc(doc(db, 'liveSessions', sessionId), { ...d, 'timestamps.updatedAt': new Date().toISOString() }) } catch {}
-  }, [sessionId])
+  /* Through the shared helper so a rejected write is logged instead of
+     swallowed — a silently failed payment write looked exactly like a dead
+     Pay button. */
+  const write = useCallback(
+    (d: Record<string, unknown>) => writeModuleState(sessionId, d, { label: 'VirtualShop' }),
+    [sessionId],
+  )
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'liveSessions', sessionId), (snap) => {
@@ -175,6 +185,8 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
       if (typeof s.vsScore === 'number') setScore(s.vsScore)
       if (typeof s.vsCompleted === 'boolean') setCompleted(s.vsCompleted)
       if (Array.isArray(s.vsPurchaseHistory)) setPurchaseHistory(s.vsPurchaseHistory)
+      if (s.vsReceipt && typeof s.vsReceipt === 'object' && Array.isArray(s.vsReceipt.items)) setReceipt(s.vsReceipt as Receipt)
+      else if (s.vsReceipt === null) setReceipt(null)
     })
     return () => unsub()
   }, [sessionId])
@@ -221,6 +233,27 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
   }, [shoppingList, basketMap])
 
   const canPay = basket.length > 0 && total <= walletAmount && (!shoppingList.length || allListItemsInBasket)
+  /* What still stands between the basket and the till, said out loud. The Pay
+     button used to just grey out with no reason given, so a basket missing one
+     list item read as a broken button. */
+  const missingFromList = useMemo(() => {
+    const out: string[] = []
+    for (const l of shoppingList) {
+      const have = basketMap.get(l.itemId)?.quantity || 0
+      if (have < l.quantity) {
+        const item = ITEM_MAP.get(l.itemId)
+        out.push(`${item?.emoji || ''} ${item?.name || l.itemId} ×${l.quantity - have}`.trim())
+      }
+    }
+    return out
+  }, [shoppingList, basketMap])
+  const payBlockedReason = basket.length === 0
+    ? 'Add something to your basket first'
+    : total > walletAmount
+      ? 'Not enough money for everything in the basket'
+      : missingFromList.length
+        ? `Still need: ${missingFromList.join(', ')}`
+        : null
 
   // Maths helper terms
   const mathTerms = useMemo(() => {
@@ -273,18 +306,29 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
   }, [canInteract, completed, basketMap, basket, walletBalance, write])
 
   const handlePay = useCallback(() => {
-    if (!canPay || paying) return
+    if (!canInteract || completed || paying) return
+    if (!canPay) {
+      if (payBlockedReason) showToast(payBlockedReason)
+      return
+    }
     const change = walletBalance
     setPaying(true)
-    setTimeout(() => {
-      setPaying(false)
-      const rc: Receipt = { items: [...basket], total, paid: walletAmount, change, timestamp: Date.now() }
-      setReceipt(rc)
-      write({
+    setTimeout(async () => {
+      // Plain objects only — Firestore rejects the whole write on any undefined.
+      const items = basket.map(b => ({ itemId: b.itemId, quantity: b.quantity, price: b.price }))
+      const rc: Receipt = { items, total, paid: walletAmount, change, timestamp: Date.now() }
+      const ok = await write({
         'moduleState.vsCompleted': true,
         'moduleState.vsScore': score + 1,
+        'moduleState.vsReceipt': rc,
         'moduleState.vsPurchaseHistory': arrayUnion(rc),
       })
+      setPaying(false)
+      if (!ok) {
+        showToast('Payment did not go through — please try again')
+        return
+      }
+      setReceipt(rc)
       logModuleEvent(sessionId, {
         module: 'virtual-shop',
         type: 'purchase_completed',
@@ -292,10 +336,16 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
       })
       staadPraise(voiceLangRef.current, 'Well done! You bought everything on your list!')
     }, 700)
-  }, [canPay, paying, walletBalance, basket, total, walletAmount, score, write, sessionId, itemCount, currency, difficulty, shoppingList.length])
+  }, [canInteract, completed, canPay, payBlockedReason, showToast, paying, walletBalance, basket, total, walletAmount, score, write, sessionId, itemCount, currency, difficulty, shoppingList.length])
 
   const resetShop = useCallback(() => {
-    if (!isT && completed) return
+    // The client closes the receipt on their own screen; the therapist decides
+    // when the next shop starts. This used to be a silent no-op on the client,
+    // which left the receipt stuck open with a dead button.
+    if (!isT && completed) {
+      if (receipt) setDismissedReceipt(receipt.timestamp)
+      return
+    }
     setReceipt(null)
     setPaying(false)
     setBasketOpen(false)
@@ -303,8 +353,9 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
       'moduleState.vsBasket': [],
       'moduleState.vsWalletBalance': walletAmount,
       'moduleState.vsCompleted': false,
+      'moduleState.vsReceipt': null,
     })
-  }, [isT, completed, walletAmount, write])
+  }, [isT, completed, receipt, walletAmount, write])
 
   /* Full reset — every piece of shared state back to the values the module
      mounts with, plus the local view state.
@@ -332,6 +383,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
       'moduleState.vsScore': 0,
       'moduleState.vsCompleted': false,
       'moduleState.vsPurchaseHistory': [],
+      'moduleState.vsReceipt': null,
     })
   }, [isT, write])
 
@@ -344,6 +396,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
       'moduleState.vsWalletBalance': p.wallet,
       'moduleState.vsBasket': [],
       'moduleState.vsCompleted': false,
+      'moduleState.vsReceipt': null,
     })
   }, [write])
 
@@ -661,8 +714,11 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
                   Change: {fmtPrice(walletBalance, currency)}
                 </div>
               )}
+              {!completed && payBlockedReason && basket.length > 0 && (
+                <div style={{ fontSize: 16, color: DANGER, fontWeight: 600, marginBottom: 6 }}>{payBlockedReason}</div>
+              )}
               {!completed && (
-                <button onClick={handlePay} disabled={!canPay || paying}
+                <button onClick={handlePay} disabled={paying || !canInteract} title={payBlockedReason || 'Pay for your basket'}
                   style={{
                     width: '100%', height: 50, borderRadius: 13, fontSize: 22.5, fontWeight: 800,
                     cursor: canPay && !paying ? 'pointer' : 'default',
@@ -699,16 +755,19 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
         )}
 
         {/* Receipt */}
-        {receipt && (
+        {receipt && receipt.timestamp !== dismissedReceipt && (
           <div style={{
             position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 50, padding: 20,
           }}>
             <div style={{
-              background: 'rgba(255,255,240,0.1)', border: '1px solid rgba(255,255,200,0.2)', borderRadius: 8,
+              /* Solid paper. The card was 10% translucent on a dark scrim while
+                 its lines were dark ink, so the receipt read as an empty box. */
+              background: '#FFFDF5', border: '1px solid rgba(0,0,0,0.10)', borderRadius: 8,
+              boxShadow: '0 16px 40px rgba(0,0,0,0.25)',
               padding: 20, width: '100%', maxWidth: 340, animation: 'receiptUp 0.4s ease',
             }}>
-              <div style={{ fontFamily: '"DM Serif Display", serif', fontSize: 20.5, color: '#fff', textAlign: 'center', marginBottom: 8 }}>🏪 Staad Store</div>
+              <div style={{ fontFamily: '"DM Serif Display", serif', fontSize: 20.5, color: INK, textAlign: 'center', marginBottom: 8 }}>🏪 Staad Store</div>
               <div style={{ borderTop: '1px dashed rgba(0,0,0,0.15)', marginBottom: 8 }} />
               {receipt.items.map(b => {
                 const item = ITEM_MAP.get(b.itemId)
@@ -720,7 +779,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
                 )
               })}
               <div style={{ borderTop: '1px dashed rgba(0,0,0,0.15)', margin: '6px 0' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 19, color: '#fff', fontWeight: 600 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 19, color: INK, fontWeight: 700 }}>
                 <span>Total</span><span>{fmtPrice(receipt.total, currency)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 17, color: '#48544D' }}>
@@ -735,13 +794,13 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
               <div style={{ fontSize: 18, color: '#3A453F', textAlign: 'center' }}>Thank you! 😊</div>
               <button onClick={resetShop}
                 style={{ marginTop: 10, width: '100%', padding: '11px 0', borderRadius: 12, border: 'none', background: GREEN, color: '#ffffff', cursor: 'pointer', fontSize: 19, fontWeight: 800, boxShadow: '0 5px 14px rgba(31,122,68,0.26)' }}
-              >Shop again</button>
+              >{isT ? 'Shop again' : 'Close'}</button>
             </div>
           </div>
         )}
 
         {/* Completion info on receipt closed */}
-        {completed && !receipt && (
+        {completed && (!receipt || receipt.timestamp === dismissedReceipt) && (
           <div style={{
             position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
             background: 'rgba(74,124,111,0.15)', backdropFilter: 'blur(4px)', zIndex: 45, padding: 20,
@@ -749,9 +808,13 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
             <div style={{ fontSize: 36.5 }}>🎉</div>
             <div style={{ fontSize: 20.5, color: '#2b2f33', textAlign: 'center' }}>Shopping complete!</div>
             <div style={{ fontSize: 18, color: '#48544D' }}>Score: {score}</div>
-            <button onClick={resetShop}
-              style={{ padding: '11px 26px', borderRadius: 12, border: 'none', background: GREEN, color: '#ffffff', cursor: 'pointer', fontSize: 19, fontWeight: 800, boxShadow: '0 5px 14px rgba(31,122,68,0.26)' }}
-            >Shop again</button>
+            {isT ? (
+              <button onClick={resetShop}
+                style={{ padding: '11px 26px', borderRadius: 12, border: 'none', background: GREEN, color: '#ffffff', cursor: 'pointer', fontSize: 19, fontWeight: 800, boxShadow: '0 5px 14px rgba(31,122,68,0.26)' }}
+              >Shop again</button>
+            ) : (
+              <div style={{ fontSize: 16, color: '#48544D', fontStyle: 'italic' }}>Waiting for your therapist to start the next shop…</div>
+            )}
           </div>
         )}
       </div>

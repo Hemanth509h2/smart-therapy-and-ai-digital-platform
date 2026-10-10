@@ -54,6 +54,31 @@ const BINS: BinSpec[] = [
   { id: 'unclear', label: 'Assumption / Unclear', sub: 'Not certain yet', accent: VIOLET_BRIGHT, tint: '#F7F3FE', border: '#DFD3FB', dash: '#C0A8F6', cardBorder: '#E8DEFC' },
 ]
 
+/* The takeaway shown under the completed summary. Picks its tone from what the
+   work actually showed — a drop in belief, no change, or a rise — so it never
+   congratulates a shift that didn't happen. */
+function closingComment(
+  thought: string,
+  againstCount: number,
+  before: number | null,
+  after: number | null,
+): string {
+  const quoted = thought ? `“${thought}”` : 'that thought'
+  const found = againstCount > 0
+    ? `You found ${againstCount} piece${againstCount === 1 ? '' : 's'} of evidence that ${quoted} isn’t the whole story. `
+    : ''
+  if (before != null && after != null) {
+    if (after < before) {
+      return `${found}Great detective work — your belief in it dropped from ${before} to ${after}. Thoughts can feel like facts, but when you check them, they often loosen their grip. Keep your balanced thought handy for next time.`
+    }
+    if (after === before) {
+      return `${found}Your belief stayed at ${before}, and that’s okay — just stopping to look at the evidence is a skill. Each time you practise, the balanced thought gets a little easier to reach.`
+    }
+    return `${found}This thought still feels strong right now, and that’s worth talking through together. Noticing it and testing it is the first brave step.`
+  }
+  return `${found}You slowed down and looked at ${quoted} from more than one side. That’s exactly how we stop a thought from running the show.`
+}
+
 const STEPS = [
   'Click “Add Thought” to write your thought.',
   'Click “Add Evidence” to add evidence cards.',
@@ -554,6 +579,24 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
                   ) : (
                     <div style={{ fontSize: 15.5, fontWeight: 500, color: INK_FAINT }}>Not rated</div>
                   )}
+                </div>
+
+                {/* The closing word. The summary above is the record; this is
+                    what the child takes away from it. Derived from synced state,
+                    so both screens show the same sentence. */}
+                <div style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 11,
+                  padding: '13px 15px', borderRadius: 14,
+                  background: '#ffffff', border: '1px solid #CBEFD8',
+                  boxShadow: '0 2px 8px rgba(22,163,74,0.08)',
+                }}>
+                  <Lightbulb size={20} color="#D97706" fill="#FCD34D" style={{ flexShrink: 0, marginTop: 2 }} />
+                  <div>
+                    <div style={{ ...microLabel(GREEN), marginBottom: 4 }}>What you discovered</div>
+                    <div style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.5, color: '#14532D' }}>
+                      {closingComment(thought, againstCount, beliefBefore, beliefAfter)}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

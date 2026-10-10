@@ -220,6 +220,10 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
   const [elapsed, setElapsed] = useState(0)
 
   const feedbackTimer = useRef<ReturnType<typeof setTimeout>>()
+  /* Snapshot callbacks are registered once, so they read the open card and the
+     last-seen answer through refs rather than stale state. */
+  const currentCardRef = useRef<string | null>(null)
+  const answeredCardRef = useRef<string>('')
   const elapsedRef = useRef<ReturnType<typeof setInterval>>()
 
   const writeToFirestore = useCallback(async (data: Record<string, unknown>) => {
@@ -239,15 +243,35 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
       if (typeof s.ecMode === 'string') setMode(s.ecMode)
       if (typeof s.ecDifficulty === 'string') setDifficulty(s.ecDifficulty)
       if (Array.isArray(s.ecCategories)) setCategories(s.ecCategories)
-      if (typeof s.ecCurrentCard === 'string') {
-        if (s.ecCurrentCard !== currentCardId) {
+      const nextCard: string | null = typeof s.ecCurrentCard === 'string' && s.ecCurrentCard ? s.ecCurrentCard : null
+      if (nextCard !== currentCardRef.current) {
+        if (nextCard) {
           setCardFlip(true)
           setTimeout(() => setCardFlip(false), 350)
         }
-        setCurrentCardId(s.ecCurrentCard)
-      } else if (s.ecCurrentCard === null || s.ecCurrentCard === undefined) {
-        setCurrentCardId(null)
+        // A new card is a new question on BOTH screens. `answered` used to be
+        // reset only in the drawing (therapist) browser, so the child stayed on
+        // "Waiting for next card…" from the first answer onward.
+        if (feedbackTimer.current) clearTimeout(feedbackTimer.current)
+        setFeedback(null)
       }
+      currentCardRef.current = nextCard
+      setCurrentCardId(nextCard)
+
+      /* Identify mode: which card has been answered is shared, so the other
+         screen sees the answer land (and its result) instead of nothing. */
+      const answeredCard = typeof s.ecAnsweredCard === 'string' ? s.ecAnsweredCard : ''
+      const isAnswered = !!nextCard && answeredCard === nextCard
+      setAnswered(isAnswered)
+      if (isAnswered && answeredCardRef.current !== answeredCard && !snap.metadata.hasPendingWrites) {
+        const last = s.ecLastAnswer as AnswerRecord | undefined
+        if (last && typeof last.correct === 'boolean') {
+          setFeedback(last.correct ? 'correct' : 'wrong')
+          if (feedbackTimer.current) clearTimeout(feedbackTimer.current)
+          feedbackTimer.current = setTimeout(() => setFeedback(null), last.correct ? 1000 : 1500)
+        }
+      }
+      answeredCardRef.current = answeredCard
       if (Array.isArray(s.ecDeckRemaining)) setDeckRemaining(s.ecDeckRemaining)
       if (Array.isArray(s.ecDeckDrawn)) setDeckDrawn(s.ecDeckDrawn)
       if (typeof s.ecScore === 'number') setScore(s.ecScore)
@@ -383,6 +407,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
 
     writeToFirestore({
       'moduleState.ecCurrentCard': pick,
+      'moduleState.ecAnsweredCard': '',
       'moduleState.ecDeckRemaining': newRemaining,
       'moduleState.ecDeckDrawn': newDrawn,
     })
@@ -402,6 +427,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
       'moduleState.ecDeckRemaining': shuffled,
       'moduleState.ecDeckDrawn': [],
       'moduleState.ecCurrentCard': '',
+      'moduleState.ecAnsweredCard': '',
       'moduleState.ecExpressGuess': '',
     })
   }
@@ -422,7 +448,9 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
     setCardsPlayed(prev => prev + 1)
     setAnswerHistory(newHistory.slice(-5))
 
+    answeredCardRef.current = currentCardId
     writeToFirestore({
+      'moduleState.ecAnsweredCard': currentCardId,
       'moduleState.ecScore': correct ? score + 1 : score,
       'moduleState.ecCardsPlayed': cardsPlayed + 1,
       'moduleState.ecLastAnswer': record,
@@ -640,7 +668,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
               setExpressGuess('')
               setAnswered(false)
               setFeedback(null)
-              writeToFirestore({ 'moduleState.ecMode': 'identify', 'moduleState.ecExpressPool': [], 'moduleState.ecCurrentCard': '', 'moduleState.ecExpressGuess': '' })
+              writeToFirestore({ 'moduleState.ecMode': 'identify', 'moduleState.ecExpressPool': [], 'moduleState.ecCurrentCard': '', 'moduleState.ecAnsweredCard': '', 'moduleState.ecExpressGuess': '' })
             }} style={segPill(mode === 'identify')}>
               <span style={{ fontSize: 17.5 }}>🔍</span> Identify
             </button>
@@ -651,7 +679,7 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
               setExpressGuess('')
               setAnswered(false)
               setFeedback(null)
-              writeToFirestore({ 'moduleState.ecMode': 'express', 'moduleState.ecExpressPool': [], 'moduleState.ecCurrentCard': '', 'moduleState.ecExpressGuess': '' })
+              writeToFirestore({ 'moduleState.ecMode': 'express', 'moduleState.ecExpressPool': [], 'moduleState.ecCurrentCard': '', 'moduleState.ecAnsweredCard': '', 'moduleState.ecExpressGuess': '' })
             }} style={segPill(mode === 'express')}>
               <span style={{ fontSize: 17.5 }}>🎭</span> Express
             </button>

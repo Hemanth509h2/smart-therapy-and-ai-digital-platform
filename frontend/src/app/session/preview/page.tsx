@@ -233,6 +233,7 @@ export default function SessionLayoutPreview() {
         {showModulesPopup && (
           <TherapyModulesPanel
             allowedModuleIds={null}
+            activeModuleId={previewModule}
             onLaunch={(id) => { setPreviewModule(id); setShowModulesPopup(false); }}
             onClose={() => setShowModulesPopup(false)}
           />

@@ -1301,6 +1301,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
         {isTherapist && showModulesPopup && (
           <TherapyModulesPanel
             allowedModuleIds={resolveAllowedModuleIds(profile)}
+            activeModuleId={activeModule}
             onLaunch={handleModuleLaunch}
             onClose={() => setShowModulesPopup(false)}
           />
