@@ -677,22 +677,28 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     // fire-and-forget: on slow/offline networks awaiting them can hang for a
     // long time (Firestore queues writes while offline; the PATCH hits Prisma
     // + Google provisioning), which made the End call button look dead.
+    // Only the therapist ends the session. A client leaving just goes offline:
+    // the room stays open and their invite link keeps working, so they can
+    // rejoin until the therapist ends the call.
     if (uid) {
       updateDoc(doc(db, 'liveSessions', sessionId), {
         [`participants.${uid}.isOnline`]: false,
-        status: 'ended',
+        ...(isTherapist ? { status: 'ended' } : {}),
         'timestamps.updatedAt': new Date().toISOString(),
       }).catch(() => {});
     }
     // Mark the scheduled session as COMPLETED in the database so it moves into
-    // the client's session history once the call is cut. `keepalive` lets the
-    // request finish even while the browser navigates away below.
-    apiFetch(`/api/sessions/${sessionId}?action=end`, {
-      method: 'PATCH',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'end' }),
-    }).catch(() => {});
+    // the client's session history once the call is cut. This also expires the
+    // client's invite link server-side, so it is therapist-only. `keepalive`
+    // lets the request finish even while the browser navigates away below.
+    if (isTherapist) {
+      apiFetch(`/api/sessions/${sessionId}?action=end`, {
+        method: 'PATCH',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'end' }),
+      }).catch(() => {});
+    }
     // Log transcription volume for the admin dashboard (therapist side, best-effort).
     if (isTherapist && profile?.id && transcription.chunkCount > 0) {
       apiFetch('/api/usage', {
