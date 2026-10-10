@@ -33,13 +33,6 @@ export interface WhatsAppMessageResult {
   to: string
 }
 
-export interface SessionScheduledInput {
-  to: string
-  patientName: string
-  scheduledAt: Date
-  therapistName?: string
-}
-
 export interface SessionStartedInput {
   to: string
   patientName: string
@@ -64,30 +57,6 @@ Tap the link below to join — no sign-up needed:
 👉 ${input.inviteLink}
 
 See you there. 🌿`
-
-  return sendViaBot(to, text)
-}
-
-/**
- * Send session scheduled notification. Deliberately carries no join link —
- * the link is only sent when the therapist starts the session.
- */
-export async function sendSessionScheduledMessage(input: SessionScheduledInput): Promise<WhatsAppMessageResult> {
-  const to = normalizeWhatsAppNumber(input.to)
-  const name = input.patientName || 'there'
-  const when = input.scheduledAt.toLocaleString('en-IN', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'Asia/Kolkata',
-  })
-  const withWhom = input.therapistName ? `with ${input.therapistName}` : ''
-  const text = `Hi ${name}! 🗓️
-
-Your STAAD session ${withWhom} is confirmed for *${when}*.
-
-We'll send you the link to join when your session starts.
-
-Take a deep breath — we'll see you there. 🌿`
 
   return sendViaBot(to, text)
 }

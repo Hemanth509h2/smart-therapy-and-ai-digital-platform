@@ -241,7 +241,7 @@ export function StartSessionDialog({
     setStarting(true);
     setError('');
     try {
-      const id = existing?.id ?? (await createSession(profile.id, clientId, new Date(), undefined, true)).id;
+      const id = existing?.id ?? (await createSession(profile.id, clientId, new Date())).id;
       // Get (or create) the patient join link for this session first.
       const res = await apiFetch(`/api/sessions/${id}/guest-link`, { method: 'POST' });
       const data = await res.json().catch(() => ({}));
@@ -367,8 +367,6 @@ export function AddClientDialog({
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [waSending, setWaSending] = useState(false);
-  const [waStatus, setWaStatus] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -382,31 +380,8 @@ export function AddClientDialog({
       setLink('');
       setCopied(false);
       setError('');
-      setWaStatus('');
     }
   }, [open]);
-
-  // Fires on its own once the invite exists — the therapist never clicks "send".
-  const sendWhatsApp = async (inviteLink: string) => {
-    if (!profile?.id || !phone.trim() || !auth.currentUser) return;
-    setWaSending(true);
-    setWaStatus('');
-    try {
-      const token = await auth.currentUser.getIdToken();
-      const res = await apiFetch('/api/whatsapp/invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ therapistId: profile.id, patientName: firstName.trim(), inviteLink }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'WhatsApp send failed');
-      setWaStatus('Invite sent via WhatsApp.');
-    } catch (e) {
-      setWaStatus(e instanceof Error ? e.message : 'WhatsApp send failed');
-    } finally {
-      setWaSending(false);
-    }
-  };
 
   const submit = async () => {
     if (!profile?.id) return;
@@ -484,7 +459,7 @@ export function AddClientDialog({
           <Field label="Conditions" htmlFor="client-dx" hint="Separate with commas, e.g. Anxiety, ADHD">
             <input id="client-dx" className="ds-input" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} placeholder="Anxiety, ADHD" />
           </Field>
-          <Field label="WhatsApp number" htmlFor="client-phone" hint="Include the country code. The invite is sent here automatically.">
+          <Field label="WhatsApp number" htmlFor="client-phone" hint="Include the country code. The session link is sent here when you start the session.">
             <input
               id="client-phone"
               className="ds-input"

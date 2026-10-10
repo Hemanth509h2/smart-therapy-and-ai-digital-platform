@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
-import { appUrl } from '@/lib/app-url';
-import { sendSessionScheduledMessage, sendWhatsAppInvite } from '@/lib/whatsapp-bot';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +44,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { therapistId, clientId, scheduledAt, instant } = await request.json();
+    const { therapistId, clientId, scheduledAt } = await request.json();
 
     // If clientId is a userId (firebase UID), look up the profile ID
     let finalClientId = clientId;
@@ -75,74 +72,8 @@ export async function POST(request: Request) {
       },
     });
 
-    // Best-effort WhatsApp notification — a failure here must not fail session
-    // creation, so it's logged rather than thrown. Only an instant session
-    // (the "Start a new session" button) carries the join link; a booking just
-    // gets a date/time confirmation.
-    if (session.client.phoneNumber) {
-      const sessionLink = instant ? `${appUrl(request)}/session/${session.id}` : '';
-      const now = new Date();
-      try {
-        const delivery = await prisma.whatsAppMessage.upsert({
-          where: { sessionId_messageType: { sessionId: session.id, messageType: 'SESSION_SCHEDULED' } },
-          create: {
-            id: randomUUID(),
-            sessionId: session.id,
-            clientId: session.clientId,
-            phoneNumber: session.client.phoneNumber,
-            generatedLink: sessionLink,
-            messageType: 'SESSION_SCHEDULED',
-            status: 'SENDING',
-            attempts: 1,
-            lastAttemptAt: now,
-            updatedAt: now,
-          },
-          update: {
-            phoneNumber: session.client.phoneNumber,
-            generatedLink: sessionLink,
-            status: 'SENDING',
-            attempts: { increment: 1 },
-            lastAttemptAt: now,
-            errorCode: null,
-            errorMessage: null,
-            updatedAt: now,
-          },
-        });
-
-        const therapistName = `${session.therapist.firstName} ${session.therapist.lastName}`.trim();
-        const message = instant
-          ? await sendWhatsAppInvite({
-              to: session.client.phoneNumber,
-              patientName: session.client.firstName,
-              inviteLink: sessionLink,
-              therapistName,
-            })
-          : await sendSessionScheduledMessage({
-              to: session.client.phoneNumber,
-              patientName: session.client.firstName,
-              scheduledAt: session.scheduledAt,
-              therapistName,
-            });
-
-        await prisma.whatsAppMessage.update({
-          where: { id: delivery.id },
-          data: {
-            status: 'SENT',
-            providerMessageId: message.id,
-            sentAt: new Date(),
-            providerStatusAt: new Date(),
-            updatedAt: new Date(),
-          },
-        });
-      } catch (error: any) {
-        console.error('Session-scheduled WhatsApp notification failed:', error);
-        await prisma.whatsAppMessage.updateMany({
-          where: { sessionId: session.id, messageType: 'SESSION_SCHEDULED' },
-          data: { status: 'FAILED', errorMessage: error?.message || 'WhatsApp send failed', updatedAt: new Date() },
-        });
-      }
-    }
-
+    // No WhatsApp message here — the join link is only sent when the
+    // therapist starts the session (PATCH /api/sessions/[sessionId]).
     return NextResponse.json({ session });
   } catch (error: any) {
     console.error('Session creation error:', error);
