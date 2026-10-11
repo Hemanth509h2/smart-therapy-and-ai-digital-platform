@@ -1,318 +1,705 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useAuthStore } from '@/store/useAuthStore';
-import DashboardLayout from '@/components/layout/DashboardLayout';
-import { ArrowLeft, Mail, Calendar, Clock, Users, Activity, Sparkles, Puzzle, FileText } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
+import React, { useMemo, useState } from 'react';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { Activity, Clock, Eye, Gift, Mail, Sparkles, UserX, UserCheck, Users } from 'lucide-react';
+import {
+  AdminPage,
+  Badge,
+  Btn,
+  Card,
+  ConfirmDialog,
+  DataTable,
+  EmptyState,
+  ErrorBanner,
+  Field,
+  Input,
+  KV,
+  Modal,
+  Pagination,
+  Section,
+  Select,
+  Spinner,
+  StatCard,
+  Tabs,
+  Textarea,
+  useAdmin,
+  useAdminQuery,
+  type Column,
+  type Tone,
+} from '@/components/admin/kit';
+import { ChartCard } from '@/components/admin/charts';
+import { adminFetch, fmtDate, fmtDateTime, fmtMinutes, num, timeAgo } from '@/lib/adminApi';
+import { MODULE_CATEGORIES, moduleName } from '@/lib/modules';
+import { toast } from '@/components/practice/ui';
 
-const CARD_BASE =
-  'rounded-[14px] border-[0.5px] border-[var(--glass-border)] shadow-[var(--glass-shadow)] bg-[var(--glass-bg)] dark:bg-[#16221e]';
-
-interface TherapistDetail {
-  id: string;
-  userId: string;
-  name: string;
-  email: string;
-  specialty: string[];
-  qualification: string;
-  experience: number;
-  bio: string;
-  joinedAt: string;
-  access: { allModulesAllowed: boolean; moduleAccess: string[]; allowedCount: number; totalModules: number };
+interface Detail {
+  therapist: {
+    id: string;
+    userId: string;
+    name: string;
+    email: string;
+    specialty: string[];
+    qualification: string | null;
+    experience: string | null;
+    bio: string | null;
+    joinedAt: string;
+    status: 'ACTIVE' | 'SUSPENDED';
+    suspendedAt: string | null;
+    suspendReason: string | null;
+    lastSeenAt: string | null;
+    access: { allModulesAllowed: boolean; moduleAccess: string[]; allowedCount: number; totalModules: number };
+  };
+  stats: {
+    clients: number;
+    sessions: { total: number; active: number; completed: number; scheduled: number };
+    totalMinutes: number;
+    invites: { pending: number; claimed: number };
+    documents: number;
+    ai: { analyses: number; transcriptLines: number; moduleLaunches: number };
+    topModules: { id: string; count: number }[];
+    lastActive: string | null;
+  };
+  clients: { id: string; name: string; sessions: number; lastSession: string | null }[];
+  billing: {
+    current: { planName: string; status: string; currentPeriodEnd: string; toolQuota: number | null; moduleAccess: string[] } | null;
+    history: SubRow[];
+    pendingRequest: { id: string; planName: string; months: number; modules: string[]; toolQuota: number | null; note: string | null; createdAt: string } | null;
+  };
+  usageDaily: Record<UsageType, { date: string; count: number }[]>;
+  sessions: SessionRow[];
 }
 
-interface Stats {
-  clients: number;
-  sessions: { total: number; active: number; completed: number; scheduled: number };
-  totalMinutes: number;
-  invites: { pending: number; claimed: number };
-  documents: number;
-  ai: { analyses: number; transcriptLines: number; moduleLaunches: number };
-  topModules: { id: string; count: number }[];
-  lastActive: string | null;
-}
-
-interface ClientRow {
+interface SubRow {
   id: string;
-  firstName: string;
-  lastName: string;
-  diagnosis: string[];
+  planName: string;
+  status: string;
+  months: number;
+  startedAt: string;
+  currentPeriodEnd: string;
+  renewalCount: number;
+  moduleAccess: string[];
+  toolQuota: number | null;
 }
 
 interface SessionRow {
   id: string;
   status: string;
   scheduledAt: string;
-  startedAt: string | null;
-  endedAt: string | null;
   durationMinutes: number | null;
-  client: { id: string; firstName: string; lastName: string } | null;
+  client: { id: string; name: string } | null;
 }
 
+interface PhiClient {
+  id: string;
+  name: string;
+  dateOfBirth: string;
+  gender: string | null;
+  diagnosis: string[];
+  parentEmail: string | null;
+  phoneNumber: string | null;
+  email: string | null;
+}
+
+interface AuditEntry {
+  id: string;
+  action: string;
+  actorEmail: string | null;
+  actorUid: string;
+  createdAt: string;
+  after: unknown;
+}
+
+type UsageType = 'AI_ANALYSIS' | 'TRANSCRIPTION' | 'MODULE_LAUNCH';
+type Tab = 'overview' | 'clients' | 'sessions' | 'billing' | 'usage' | 'activity';
+
+const SESSION_TONE: Record<string, Tone> = { ACTIVE: 'good', SCHEDULED: 'info', COMPLETED: 'neutral', CANCELLED: 'bad' };
+const SUB_TONE: Record<string, Tone> = { ACTIVE: 'good', EXPIRED: 'neutral', CANCELLED: 'bad' };
+
 export default function TherapistDetailPage() {
-  const { uid, role, profile } = useAuthStore();
-  const router = useRouter();
-  const params = useParams<{ therapistId: string }>();
-  const therapistId = params.therapistId;
+  const { therapistId } = useParams<{ therapistId: string }>();
+  const { can } = useAdmin();
+  const { data, loading, error, reload } = useAdminQuery<Detail>(`/api/admin/therapists/${therapistId}`);
+  const [tab, setTab] = useState<Tab>('overview');
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
 
-  const [therapist, setTherapist] = useState<TherapistDetail | null>(null);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [clients, setClients] = useState<ClientRow[]>([]);
-  const [sessions, setSessions] = useState<SessionRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const t = data?.therapist;
+  const suspended = t?.status === 'SUSPENDED';
+  const canMessage = can('support') || can('people.write');
 
-  useEffect(() => {
-    if (!uid) { router.push('/auth'); return; }
-    if (role && role !== 'ADMIN') { router.push('/'); return; }
-    if (role === 'ADMIN') loadData();
-  }, [uid, role, therapistId]);
-
-  const loadData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await apiFetch(`/api/admin/therapists/${therapistId}`);
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.error || `Request failed (${res.status})`);
-      }
-      const data = await res.json();
-      setTherapist(data.therapist);
-      setStats(data.stats);
-      setClients(data.clients || []);
-      setSessions(data.sessions || []);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString() : '—');
-  const fmtDateTime = (d: string | null) =>
-    d ? new Date(d).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
-  const fmtMinutes = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`);
-
-  const statusColor = (status: string) => {
-    if (status === 'ACTIVE') return { background: 'var(--sage-light)', color: 'var(--sage)' };
-    if (status === 'COMPLETED') return { background: 'var(--glass-bg)', color: 'var(--ink-muted)' };
-    return { background: 'var(--c-accent-bg)', color: 'var(--c-accent)' };
+  const setStatus = async (reason: string) => {
+    await adminFetch(`/api/admin/users/${t!.userId}/status`, {
+      method: 'PATCH',
+      json: { action: suspended ? 'reactivate' : 'suspend', reason },
+    });
+    toast(suspended ? 'Account reactivated' : 'Account suspended');
+    reload();
   };
 
   return (
-    <DashboardLayout role={role} profile={profile}>
-      <div className="space-y-6">
-        <button
-          onClick={() => router.push('/admin/professionals')}
-          className="flex items-center gap-1.5 text-sm font-semibold"
-          style={{ color: 'var(--ink-muted)' }}
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to Professionals
-        </button>
-
-        {error && (
-          <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-600">{error}</div>
-        )}
-
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-[var(--sage)] border-t-transparent" />
-          </div>
-        ) : !therapist ? (
-          <div className={`${CARD_BASE} p-10 text-center`}>
-            <p className="font-medium" style={{ color: 'var(--ink-muted)' }}>Therapist not found.</p>
-          </div>
+    <AdminPage
+      permission="people.read"
+      back={{ href: '/admin/professionals', label: 'Back to Professionals' }}
+      title={
+        t ? (
+          <span className="inline-flex flex-wrap items-center gap-2">
+            {t.name || 'Unnamed'}
+            <Badge tone={suspended ? 'bad' : 'good'}>{suspended ? 'Suspended' : 'Active'}</Badge>
+          </span>
         ) : (
+          'Professional'
+        )
+      }
+      description={t?.email}
+      actions={
+        t && (
           <>
-            {/* Profile header */}
-            <div className={`${CARD_BASE} p-6`}>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
-                  <div
-                    className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-lg font-bold text-white"
-                    style={{ background: 'linear-gradient(135deg, var(--sage), var(--sage-mid))' }}
-                  >
-                    {therapist.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() || '🙂'}
-                  </div>
-                  <div>
-                    <h1 className="font-heading text-2xl" style={{ color: 'var(--ink)' }}>{therapist.name || 'Unnamed'}</h1>
-                    <p className="flex items-center gap-1.5 text-sm font-medium mt-0.5" style={{ color: 'var(--ink-muted)' }}>
-                      <Mail className="h-3.5 w-3.5" /> {therapist.email}
-                    </p>
-                  </div>
-                </div>
-                <span
-                  className="rounded-full px-3 py-1 text-xs font-semibold self-start sm:self-auto"
-                  style={
-                    therapist.access.allModulesAllowed
-                      ? { background: 'var(--sage-light)', color: 'var(--sage)' }
-                      : { background: 'var(--c-accent-bg)', color: 'var(--c-accent)' }
-                  }
-                >
-                  {therapist.access.allModulesAllowed
-                    ? 'All modules'
-                    : `${therapist.access.allowedCount}/${therapist.access.totalModules} modules`}
-                </span>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {(therapist.specialty || []).map((s) => (
-                  <span key={s} className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: 'var(--c-accent-bg)', color: 'var(--c-accent)' }}>
-                    {s}
-                  </span>
-                ))}
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm" style={{ color: 'var(--ink-muted)' }}>
-                {therapist.qualification && (
-                  <div><span className="font-semibold" style={{ color: 'var(--ink)' }}>Qualification: </span>{therapist.qualification}</div>
-                )}
-                {therapist.experience != null && (
-                  <div><span className="font-semibold" style={{ color: 'var(--ink)' }}>Experience: </span>{therapist.experience} yrs</div>
-                )}
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="h-3.5 w-3.5" />
-                  <span className="font-semibold" style={{ color: 'var(--ink)' }}>Joined: </span>{fmtDate(therapist.joinedAt)}
-                </div>
-              </div>
-
-              {therapist.bio && (
-                <p className="mt-4 text-sm" style={{ color: 'var(--ink-muted)' }}>{therapist.bio}</p>
-              )}
-            </div>
-
-            {/* Stat cards */}
-            {stats && (
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                {[
-                  { icon: Users, label: 'Clients', value: stats.clients },
-                  { icon: Activity, label: 'Total sessions', value: stats.sessions.total },
-                  { icon: Clock, label: 'Session time', value: fmtMinutes(stats.totalMinutes) },
-                  { icon: Sparkles, label: 'AI analyses', value: stats.ai.analyses },
-                ].map(({ icon: Icon, label, value }) => (
-                  <div key={label} className={`${CARD_BASE} p-5`}>
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--sage-light)', color: 'var(--sage)' }}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <p className="mt-3 font-heading text-3xl" style={{ color: 'var(--ink)' }}>{value}</p>
-                    <p className="text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>{label}</p>
-                  </div>
-                ))}
-              </div>
+            {canMessage && (
+              <Btn variant="ghost" icon={<Mail className="h-4 w-4" />} onClick={() => setEmailOpen(true)}>Email</Btn>
             )}
+            {can('people.write') && (
+              <Btn
+                variant={suspended ? 'ghost' : 'danger'}
+                icon={suspended ? <UserCheck className="h-4 w-4" /> : <UserX className="h-4 w-4" />}
+                onClick={() => setStatusOpen(true)}
+              >
+                {suspended ? 'Reactivate' : 'Suspend'}
+              </Btn>
+            )}
+          </>
+        )
+      }
+    >
+      {error && <ErrorBanner message={error} onRetry={reload} />}
+      {loading && !data ? (
+        <div className="flex justify-center py-20"><Spinner /></div>
+      ) : data && t ? (
+        <>
+          {suspended && (
+            <ErrorBanner message={`Suspended ${fmtDate(t.suspendedAt)}${t.suspendReason ? ` — ${t.suspendReason}` : ''}. They can't sign in.`} />
+          )}
+          <Tabs<Tab>
+            value={tab}
+            onChange={setTab}
+            tabs={[
+              { value: 'overview', label: 'Overview' },
+              { value: 'clients', label: `Clients (${data.clients.length})` },
+              { value: 'sessions', label: `Sessions (${data.sessions.length})` },
+              { value: 'billing', label: 'Billing' },
+              { value: 'usage', label: 'Usage' },
+              { value: 'activity', label: 'Activity' },
+            ]}
+          />
+          {tab === 'overview' && <Overview data={data} />}
+          {tab === 'clients' && <ClientsTab therapistId={t.id} clients={data.clients} />}
+          {tab === 'sessions' && <SessionsTab sessions={data.sessions} />}
+          {tab === 'billing' && <BillingTab therapistId={t.id} billing={data.billing} onChanged={reload} />}
+          {tab === 'usage' && <UsageTab usage={data.usageDaily} />}
+          {tab === 'activity' && <ActivityTab therapistId={t.id} />}
 
-            {/* Sessions breakdown + clients */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <div className={`${CARD_BASE} overflow-hidden`}>
-                  <div className="p-5 pb-0">
-                    <h2 className="font-heading text-lg" style={{ color: 'var(--ink)' }}>Sessions</h2>
-                  </div>
-                  {sessions.length === 0 ? (
-                    <p className="p-6 text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>No sessions yet.</p>
-                  ) : (
-                    <div className="overflow-x-auto mt-3">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr style={{ borderBottom: '1px solid var(--glass-border)', color: 'var(--ink-muted)' }}>
-                            {['Client', 'Status', 'Scheduled', 'Duration'].map((h) => (
-                              <th key={h} className="px-5 py-2 text-left font-semibold" style={{ fontSize: 12 }}>{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sessions.map((s) => (
-                            <tr key={s.id} style={{ borderBottom: '1px solid var(--glass-border)', color: 'var(--ink)' }}>
-                              <td className="px-5 py-3 font-medium">
-                                {s.client ? `${s.client.firstName} ${s.client.lastName}` : '—'}
-                              </td>
-                              <td className="px-5 py-3">
-                                <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={statusColor(s.status)}>
-                                  {s.status}
-                                </span>
-                              </td>
-                              <td className="px-5 py-3 whitespace-nowrap text-xs" style={{ color: 'var(--ink-muted)' }}>
-                                {fmtDateTime(s.scheduledAt)}
-                              </td>
-                              <td className="px-5 py-3 whitespace-nowrap text-xs" style={{ color: 'var(--ink-muted)' }}>
-                                {s.durationMinutes != null ? fmtMinutes(s.durationMinutes) : '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
+          <EmailModal open={emailOpen} onClose={() => setEmailOpen(false)} therapistId={t.id} email={t.email} />
+          <ConfirmDialog
+            open={statusOpen}
+            onClose={() => setStatusOpen(false)}
+            title={suspended ? 'Reactivate account?' : 'Suspend account?'}
+            body={
+              suspended
+                ? `${t.name} will be able to sign in again.`
+                : `${t.name} will be signed out and blocked from the app until reactivated. Their data is kept.`
+            }
+            confirmLabel={suspended ? 'Reactivate' : 'Suspend'}
+            danger={!suspended}
+            reasonLabel={suspended ? undefined : 'Reason (shown in the audit log)'}
+            onConfirm={setStatus}
+          />
+        </>
+      ) : !loading && !error ? (
+        <EmptyState title="Professional not found" />
+      ) : null}
+    </AdminPage>
+  );
+}
 
-                {stats && stats.topModules.length > 0 && (
-                  <div className={`${CARD_BASE} p-5`}>
-                    <h2 className="font-heading text-lg mb-3 flex items-center gap-2" style={{ color: 'var(--ink)' }}>
-                      <Puzzle className="h-4 w-4" /> Top modules used
-                    </h2>
-                    <div className="space-y-2">
-                      {stats.topModules.map((m) => (
-                        <div key={m.id} className="flex items-center justify-between text-sm">
-                          <span style={{ color: 'var(--ink)' }}>{m.id}</span>
-                          <span className="font-semibold" style={{ color: 'var(--sage)' }}>{m.count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+// ─── Overview ────────────────────────────────────────────────────────────────
+
+function Overview({ data }: { data: Detail }) {
+  const { therapist: t, stats } = data;
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Clients" value={num(stats.clients)} hint={`${num(stats.invites.pending)} invites pending`} icon={<Users className="h-4 w-4" />} />
+        <StatCard label="Sessions" value={num(stats.sessions.total)} hint={`${num(stats.sessions.completed)} completed · ${num(stats.sessions.scheduled)} scheduled`} icon={<Activity className="h-4 w-4" />} />
+        <StatCard label="Session time" value={fmtMinutes(stats.totalMinutes)} icon={<Clock className="h-4 w-4" />} />
+        <StatCard label="AI analyses" value={num(stats.ai.analyses)} hint={`${num(stats.ai.moduleLaunches)} module launches`} icon={<Sparkles className="h-4 w-4" />} />
+      </div>
+      <Card>
+        <KV
+          items={[
+            { label: 'Email', value: t.email || '—' },
+            { label: 'Joined', value: fmtDate(t.joinedAt) },
+            { label: 'Last seen', value: timeAgo(t.lastSeenAt) },
+            { label: 'Last session activity', value: timeAgo(stats.lastActive) },
+            { label: 'Qualification', value: t.qualification || '—' },
+            { label: 'Experience', value: t.experience ? `${t.experience} yrs` : '—' },
+            { label: 'Specialties', value: t.specialty?.length ? t.specialty.join(', ') : '—' },
+            {
+              label: 'Module access',
+              value: t.access.allModulesAllowed ? 'All modules' : `${t.access.allowedCount} of ${t.access.totalModules} modules`,
+            },
+            { label: 'Documents uploaded', value: num(stats.documents) },
+            { label: 'Transcript lines', value: num(stats.ai.transcriptLines) },
+            { label: 'Invites claimed', value: num(stats.invites.claimed) },
+          ]}
+        />
+        {t.bio && <p className="mt-4 text-sm" style={{ color: 'var(--ink-muted)' }}>{t.bio}</p>}
+      </Card>
+      {stats.topModules.length > 0 && (
+        <ChartCard
+          title="Module launches by module"
+          subtitle="All time"
+          kind="bar"
+          horizontal
+          data={stats.topModules.slice(0, 10).map((m) => ({ label: moduleName(m.id), value: m.count }))}
+          height={Math.max(140, Math.min(10, stats.topModules.length) * 36)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Clients ─────────────────────────────────────────────────────────────────
+
+function ClientsTab({ therapistId, clients }: { therapistId: string; clients: Detail['clients'] }) {
+  const { can } = useAdmin();
+  const [phi, setPhi] = useState<Map<string, PhiClient> | null>(null);
+  const [revealing, setRevealing] = useState(false);
+
+  const reveal = async () => {
+    setRevealing(true);
+    try {
+      const d = await adminFetch<{ clients: PhiClient[] }>(`/api/admin/therapists/${therapistId}/phi`);
+      setPhi(new Map(d.clients.map((c) => [c.id, c])));
+    } catch (e: any) {
+      toast(e.message, 'error');
+    } finally {
+      setRevealing(false);
+    }
+  };
+
+  const columns: Column<Detail['clients'][number]>[] = [
+    {
+      key: 'name',
+      header: 'Client',
+      render: (c) => (
+        <Link href={`/admin/clients/${c.id}`} className="font-semibold hover:underline">
+          {phi?.get(c.id)?.name ?? c.name}
+        </Link>
+      ),
+    },
+    { key: 'sessions', header: 'Sessions', align: 'right', render: (c) => num(c.sessions) },
+    { key: 'last', header: 'Last session', render: (c) => fmtDate(c.lastSession) },
+    ...(phi
+      ? ([
+          { key: 'dob', header: 'Date of birth', render: (c) => fmtDate(phi.get(c.id)?.dateOfBirth) },
+          { key: 'gender', header: 'Gender', render: (c) => phi.get(c.id)?.gender || '—' },
+          {
+            key: 'dx',
+            header: 'Diagnosis',
+            render: (c) => (
+              <div className="flex flex-wrap gap-1">
+                {(phi.get(c.id)?.diagnosis || []).map((d) => <Badge key={d} tone="info">{d}</Badge>)}
               </div>
+            ),
+          },
+          {
+            key: 'contact',
+            header: 'Contact',
+            render: (c) => {
+              const p = phi.get(c.id);
+              return <span className="text-xs">{[p?.email, p?.parentEmail, p?.phoneNumber].filter(Boolean).join(' · ') || '—'}</span>;
+            },
+          },
+        ] as Column<Detail['clients'][number]>[])
+      : []),
+  ];
 
-              <div className={`${CARD_BASE} p-5`}>
-                <h2 className="font-heading text-lg mb-3 flex items-center gap-2" style={{ color: 'var(--ink)' }}>
-                  <Users className="h-4 w-4" /> Clients ({clients.length})
-                </h2>
-                {clients.length === 0 ? (
-                  <p className="text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>No clients yet.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {clients.map((c) => (
-                      <div key={c.id} className="rounded-lg p-3" style={{ background: 'var(--sage-light)', border: '1px solid var(--glass-border)' }}>
-                        <p className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{c.firstName} {c.lastName}</p>
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {(c.diagnosis || []).map((tag) => (
-                            <span key={tag} className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'var(--c-accent-bg)', color: 'var(--c-accent)' }}>
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+  return (
+    <Section
+      title="Clients"
+      description={phi ? 'Showing full client details. This view was recorded in the audit log.' : 'Names are shown as initials. Clinical details are hidden.'}
+      actions={
+        can('phi.read') &&
+        (phi ? (
+          <Btn variant="ghost" size="sm" onClick={() => setPhi(null)}>Hide details</Btn>
+        ) : (
+          <Btn variant="ghost" size="sm" icon={<Eye className="h-3.5 w-3.5" />} loading={revealing} onClick={reveal} title="Each reveal is logged">
+            Reveal names (logged)
+          </Btn>
+        ))
+      }
+    >
+      <DataTable columns={columns} rows={clients} rowKey={(c) => c.id} empty="No clients yet." />
+    </Section>
+  );
+}
 
-                {stats && (
-                  <div className="mt-4 pt-4 space-y-2 text-sm" style={{ borderTop: '1px solid var(--glass-border)', color: 'var(--ink-muted)' }}>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5"><FileText className="h-3.5 w-3.5" /> Documents</span>
-                      <span className="font-semibold" style={{ color: 'var(--ink)' }}>{stats.documents}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Invites claimed</span>
-                      <span className="font-semibold" style={{ color: 'var(--ink)' }}>{stats.invites.claimed}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Invites pending</span>
-                      <span className="font-semibold" style={{ color: 'var(--ink)' }}>{stats.invites.pending}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Last active</span>
-                      <span className="font-semibold" style={{ color: 'var(--ink)' }}>{fmtDate(stats.lastActive)}</span>
+// ─── Sessions ────────────────────────────────────────────────────────────────
+
+function SessionsTab({ sessions }: { sessions: SessionRow[] }) {
+  const [status, setStatus] = useState('');
+  const rows = status ? sessions.filter((s) => s.status === status) : sessions;
+  return (
+    <Section
+      title="Sessions"
+      actions={
+        <Select
+          ariaLabel="Filter by status"
+          value={status}
+          onChange={setStatus}
+          options={[
+            { value: '', label: 'All statuses' },
+            { value: 'SCHEDULED', label: 'Scheduled' },
+            { value: 'ACTIVE', label: 'Active' },
+            { value: 'COMPLETED', label: 'Completed' },
+            { value: 'CANCELLED', label: 'Cancelled' },
+          ]}
+        />
+      }
+    >
+      <DataTable
+        rowKey={(s) => s.id}
+        rows={rows}
+        empty="No sessions."
+        columns={[
+          { key: 'when', header: 'Scheduled', render: (s) => <span className="whitespace-nowrap">{fmtDateTime(s.scheduledAt)}</span> },
+          { key: 'client', header: 'Client', render: (s) => (s.client ? <Link href={`/admin/clients/${s.client.id}`} className="hover:underline">{s.client.name}</Link> : '—') },
+          { key: 'status', header: 'Status', render: (s) => <Badge tone={SESSION_TONE[s.status] ?? 'neutral'}>{s.status.toLowerCase()}</Badge> },
+          { key: 'duration', header: 'Duration', align: 'right', render: (s) => (s.durationMinutes != null ? fmtMinutes(s.durationMinutes) : '—') },
+        ]}
+      />
+    </Section>
+  );
+}
+
+// ─── Billing ─────────────────────────────────────────────────────────────────
+
+function BillingTab({ therapistId, billing, onChanged }: { therapistId: string; billing: Detail['billing']; onChanged: () => void }) {
+  const { can } = useAdmin();
+  const [grantOpen, setGrantOpen] = useState(false);
+  const cur = billing.current;
+  const pending = billing.pendingRequest;
+
+  return (
+    <div className="space-y-6">
+      <Section
+        title="Current plan"
+        actions={can('billing.write') && <Btn size="sm" icon={<Gift className="h-3.5 w-3.5" />} onClick={() => setGrantOpen(true)}>Grant plan</Btn>}
+      >
+        <Card>
+          {cur ? (
+            <KV
+              items={[
+                { label: 'Plan', value: cur.planName },
+                { label: 'Status', value: <Badge tone={SUB_TONE[cur.status] ?? 'neutral'}>{cur.status.toLowerCase()}</Badge> },
+                { label: 'Renews / ends', value: fmtDate(cur.currentPeriodEnd) },
+                {
+                  label: 'Tools',
+                  value: cur.toolQuota == null ? 'All tools' : cur.moduleAccess.map(moduleName).join(', ') || '—',
+                },
+              ]}
+            />
+          ) : (
+            <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>Free tier — no active plan.</p>
+          )}
+        </Card>
+      </Section>
+
+      {pending && (
+        <Section title="Pending request" actions={<Link href="/admin/subscriptions" className="text-sm font-semibold" style={{ color: 'var(--sage)' }}>Review in Subscriptions</Link>}>
+          <Card>
+            <KV
+              items={[
+                { label: 'Plan', value: pending.planName },
+                { label: 'Months', value: pending.months },
+                { label: 'Requested', value: fmtDateTime(pending.createdAt) },
+                { label: 'Tools', value: pending.toolQuota == null ? 'All tools' : pending.modules.map(moduleName).join(', ') || '—' },
+                ...(pending.note ? [{ label: 'Note', value: pending.note }] : []),
+              ]}
+            />
+          </Card>
+        </Section>
+      )}
+
+      <Section title="Plan history">
+        <DataTable
+          rowKey={(s) => s.id}
+          rows={billing.history}
+          empty="No plans yet."
+          columns={[
+            { key: 'plan', header: 'Plan', render: (s) => <span className="font-semibold">{s.planName}</span> },
+            { key: 'status', header: 'Status', render: (s) => <Badge tone={SUB_TONE[s.status] ?? 'neutral'}>{s.status.toLowerCase()}</Badge> },
+            { key: 'months', header: 'Months', align: 'right', render: (s) => s.months },
+            { key: 'start', header: 'Started', render: (s) => fmtDate(s.startedAt) },
+            { key: 'end', header: 'Ends', render: (s) => fmtDate(s.currentPeriodEnd) },
+            { key: 'renewals', header: 'Renewals', align: 'right', render: (s) => s.renewalCount },
+          ]}
+        />
+      </Section>
+
+      {can('billing.write') && (
+        <GrantModal open={grantOpen} onClose={() => setGrantOpen(false)} therapistId={therapistId} onGranted={onChanged} />
+      )}
+    </div>
+  );
+}
+
+interface Plan {
+  id: string;
+  name: string;
+  durationMonths: number;
+  toolQuota: number | null;
+  isActive: boolean;
+}
+
+function GrantModal({ open, onClose, therapistId, onGranted }: { open: boolean; onClose: () => void; therapistId: string; onGranted: () => void }) {
+  const { data, loading, error } = useAdminQuery<{ plans: Plan[] }>(open ? '/api/admin/plans' : null);
+  const [planId, setPlanId] = useState('');
+  const [months, setMonths] = useState('1');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const plans = data?.plans ?? [];
+  const plan = plans.find((p) => p.id === planId);
+  const quota = plan?.toolQuota ?? null;
+
+  const pickPlan = (id: string) => {
+    setPlanId(id);
+    setSelected(new Set());
+    const p = plans.find((x) => x.id === id);
+    if (p) setMonths(String(p.durationMonths || 1));
+  };
+
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else if (quota == null || next.size < quota) next.add(id);
+      return next;
+    });
+
+  const submit = async () => {
+    setBusy(true);
+    setErr('');
+    try {
+      await adminFetch(`/api/admin/therapists/${therapistId}/grant`, {
+        method: 'POST',
+        json: { planId, months: Number(months), modules: Array.from(selected) },
+      });
+      toast(`${plan?.name} granted for ${months} month${months === '1' ? '' : 's'}`);
+      onGranted();
+      onClose();
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const m = Number(months);
+  const valid = !!plan && Number.isInteger(m) && m >= 1 && m <= 36 && (quota == null || selected.size > 0);
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      wide
+      title="Grant plan"
+      description="Starts a new term now, without payment. Any active term is ended."
+      footer={
+        <>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+          <Btn onClick={submit} loading={busy} disabled={!valid}>Grant</Btn>
+        </>
+      }
+    >
+      {error && <ErrorBanner message={error} />}
+      {loading && !data ? (
+        <div className="flex justify-center py-6"><Spinner /></div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Plan">
+              <Select
+                ariaLabel="Plan"
+                className="w-full"
+                value={planId}
+                onChange={pickPlan}
+                options={[
+                  { value: '', label: 'Choose a plan…' },
+                  ...plans.map((p) => ({ value: p.id, label: `${p.name}${p.isActive ? '' : ' (inactive)'}${p.toolQuota == null ? ' · all tools' : ` · ${p.toolQuota} tools`}` })),
+                ]}
+              />
+            </Field>
+            <Field label="Months" hint="1 to 36">
+              <Input type="number" min={1} max={36} value={months} onChange={(e) => setMonths(e.target.value)} />
+            </Field>
+          </div>
+          {plan && quota == null && (
+            <p className="rounded-lg p-3 text-sm font-medium" style={{ background: 'var(--sage-light)', color: 'var(--ink)' }}>
+              Unlimited plan — grants access to all tools.
+            </p>
+          )}
+          {plan && quota != null && (
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold" style={{ color: 'var(--ink-muted)' }}>Tools to grant</span>
+                <span className="text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>{selected.size} / {quota}</span>
+              </div>
+              <div className="mt-2 space-y-4">
+                {MODULE_CATEGORIES.map((cat) => (
+                  <div key={cat.id}>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--ink-muted)' }}>{cat.emoji} {cat.name}</p>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {cat.modules.map((mod) => {
+                        const checked = selected.has(mod.id);
+                        const full = !checked && selected.size >= quota;
+                        return (
+                          <label
+                            key={mod.id}
+                            className="flex items-center gap-2 rounded-lg p-2"
+                            style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', cursor: full ? 'not-allowed' : 'pointer', opacity: full ? 0.45 : 1 }}
+                          >
+                            <input type="checkbox" checked={checked} disabled={full} onChange={() => toggle(mod.id)} style={{ accentColor: 'var(--sage)', width: 15, height: 15 }} />
+                            <span className="text-sm" style={{ color: 'var(--ink)' }}>{mod.emoji} {mod.name}</span>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
-                )}
+                ))}
               </div>
             </div>
-          </>
-        )}
-      </div>
-    </DashboardLayout>
+          )}
+        </>
+      )}
+      {err && <ErrorBanner message={err} />}
+    </Modal>
+  );
+}
+
+// ─── Usage ───────────────────────────────────────────────────────────────────
+
+const USAGE_CHARTS: { type: UsageType; title: string }[] = [
+  { type: 'AI_ANALYSIS', title: 'AI analyses per day' },
+  { type: 'TRANSCRIPTION', title: 'Transcript lines per day' },
+  { type: 'MODULE_LAUNCH', title: 'Module launches per day' },
+];
+
+function UsageTab({ usage }: { usage: Detail['usageDaily'] }) {
+  const series = useMemo(
+    () =>
+      USAGE_CHARTS.map((c) => ({
+        ...c,
+        data: (usage[c.type] || []).map((d) => ({
+          label: new Date(`${d.date}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+          value: d.count,
+        })),
+      })),
+    [usage]
+  );
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {series.map((s) => {
+        const total = s.data.reduce((n, p) => n + p.value, 0);
+        return <ChartCard key={s.type} title={s.title} subtitle={`Last 90 days · ${num(total)} total`} kind="bar" data={s.data} />;
+      })}
+    </div>
+  );
+}
+
+// ─── Activity ────────────────────────────────────────────────────────────────
+
+function ActivityTab({ therapistId }: { therapistId: string }) {
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
+  const { data, loading, error, reload } = useAdminQuery<{ entries: AuditEntry[]; total: number }>(
+    `/api/admin/therapists/${therapistId}/activity?page=${page}&pageSize=${pageSize}`
+  );
+  return (
+    <Section title="Admin activity" description="Admin actions taken on this account, newest first.">
+      {error && <ErrorBanner message={error} onRetry={reload} />}
+      <DataTable
+        loading={loading}
+        rowKey={(e) => e.id}
+        rows={data?.entries ?? []}
+        empty="No admin actions recorded for this account."
+        columns={[
+          { key: 'when', header: 'When', render: (e) => <span className="whitespace-nowrap" title={fmtDateTime(e.createdAt)}>{timeAgo(e.createdAt)}</span> },
+          { key: 'action', header: 'Action', render: (e) => <Badge tone={e.action === 'phi.reveal' ? 'warn' : 'info'}>{e.action}</Badge> },
+          { key: 'actor', header: 'By', render: (e) => e.actorEmail || e.actorUid },
+          { key: 'detail', header: 'Detail', render: (e) => <span className="text-xs" style={{ color: 'var(--ink-muted)' }}>{summarize(e.after)}</span> },
+        ]}
+      />
+      <Pagination page={page} pageSize={pageSize} total={data?.total ?? 0} onPage={setPage} />
+    </Section>
+  );
+}
+
+function summarize(v: unknown) {
+  if (!v || typeof v !== 'object') return '—';
+  const parts = Object.entries(v as Record<string, unknown>)
+    .filter(([k]) => k !== 'clientIds')
+    .map(([k, val]) => `${k}: ${Array.isArray(val) ? val.length : typeof val === 'object' ? '…' : String(val)}`);
+  return parts.join(' · ').slice(0, 140) || '—';
+}
+
+// ─── Email ───────────────────────────────────────────────────────────────────
+
+function EmailModal({ open, onClose, therapistId, email }: { open: boolean; onClose: () => void; therapistId: string; email: string }) {
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const send = async () => {
+    setBusy(true);
+    setErr('');
+    try {
+      await adminFetch(`/api/admin/therapists/${therapistId}/message`, { method: 'POST', json: { subject, body } });
+      toast('Email sent');
+      setSubject('');
+      setBody('');
+      onClose();
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Email professional"
+      description={`Sends from the STAAD address to ${email}.`}
+      footer={
+        <>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+          <Btn onClick={send} loading={busy} disabled={!subject.trim() || !body.trim()}>Send</Btn>
+        </>
+      }
+    >
+      <Field label="Subject">
+        <Input value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={200} />
+      </Field>
+      <Field label="Message">
+        <Textarea rows={7} value={body} onChange={(e) => setBody(e.target.value)} />
+      </Field>
+      {err && <ErrorBanner message={err} />}
+    </Modal>
   );
 }
