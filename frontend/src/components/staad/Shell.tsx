@@ -7,6 +7,8 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useAuthStore } from '@/store/useAuthStore';
 import { initials, fullName } from '@/lib/practice';
+import { adminNavFor } from '@/lib/adminNav';
+import { ADMIN_ROLE_LABELS, adminRoleOf } from '@/lib/adminRoles';
 import {
   IconClients,
   IconCollapse,
@@ -51,7 +53,21 @@ const COLLAPSE_KEY = 'staad-sidebar-collapsed';
 /** The design collapses the rail on its own below this width. */
 const AUTO_COLLAPSE_AT = 900;
 
-export function StaadShell({ children }: { children: React.ReactNode }) {
+/** Admin items use lucide icons; wrap each once so it takes our `size` prop
+ *  with the design's stroke weight (and keeps a stable component identity). */
+const adminIcons = new Map<string, NavItem['Icon']>();
+function adminNav(profile: any): NavItem[] {
+  return adminNavFor(profile).map(({ href, label, icon: Lucide }) => {
+    let Icon = adminIcons.get(href);
+    if (!Icon) {
+      Icon = ({ size = 20 }: { size?: number }) => <Lucide size={size} strokeWidth={1.8} />;
+      adminIcons.set(href, Icon);
+    }
+    return { href, label, Icon };
+  });
+}
+
+export function StaadShell({ children, className }: { children: React.ReactNode; className?: string }) {
   const { role, profile } = useAuthStore();
   const pathname = usePathname();
   const router = useRouter();
@@ -81,9 +97,12 @@ export function StaadShell({ children }: { children: React.ReactNode }) {
       return !c;
     });
 
-  const nav = role === 'CLIENT' ? CLIENT_NAV : THERAPIST_NAV;
+  const isAdmin = role === 'ADMIN';
+  const nav = isAdmin ? adminNav(profile) : role === 'CLIENT' ? CLIENT_NAV : THERAPIST_NAV;
+  const home = isAdmin ? '/admin' : '/';
+  // Home routes match exactly; everything else also owns its sub-routes.
   const isActive = (href: string) =>
-    href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
+    href === home ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 
   const handleLogout = async () => {
     try {
@@ -97,12 +116,12 @@ export function StaadShell({ children }: { children: React.ReactNode }) {
   const isCollapsed = collapsed || autoCollapsed;
 
   return (
-    <div className={`staad-ui app${isCollapsed ? ' collapsed' : ''}`}>
+    <div className={`staad-ui app${isCollapsed ? ' collapsed' : ''}${className ? ` ${className}` : ''}`}>
       <nav className="sb" aria-label="Main">
         {/* Real STAAD brand mark. The emblem stays in the circle so it still
             reads when the rail collapses to 84px; the wordmark is the design's
             own Sora treatment, which animates away on collapse. */}
-        <Link href="/" className="sb-brand" aria-label="STAAD home">
+        <Link href={home} className="sb-brand" aria-label="STAAD home">
           <span className="sb-mark sb-mark--logo">
             <img src="/assests/staad-emblem.svg" alt="" width={30} height={30} />
           </span>
@@ -116,7 +135,11 @@ export function StaadShell({ children }: { children: React.ReactNode }) {
               {name}
             </span>
             <span style={{ fontSize: 11, lineHeight: '16px', fontWeight: 700, color: 'var(--muted)' }}>
-              {role ? role.charAt(0) + role.slice(1).toLowerCase() : '—'}
+              {isAdmin
+                ? `Admin · ${ADMIN_ROLE_LABELS[adminRoleOf(profile)].label}`
+                : role
+                  ? role.charAt(0) + role.slice(1).toLowerCase()
+                  : '—'}
             </span>
           </span>
         </div>

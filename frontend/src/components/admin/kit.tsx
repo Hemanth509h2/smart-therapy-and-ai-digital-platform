@@ -1,8 +1,9 @@
 'use client';
 
 // Shared building blocks for the admin portal: page guard + layout, cards,
-// tables, filters, dialogs and the step-up password prompt. Styled with the
-// same glass tokens as the original admin pages.
+// tables, filters, dialogs and the step-up password prompt. Pages render in
+// the STAAD shell (same look as the therapist app); the glass tokens used
+// below are remapped to the STAAD palette in staad-extras.css (.admin-ui).
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -10,7 +11,8 @@ import { useRouter } from 'next/navigation';
 import { EmailAuthProvider, GoogleAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup } from 'firebase/auth';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Loader2, Lock, Search, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import DashboardLayout from '@/components/layout/DashboardLayout';
+import { StaadShell } from '@/components/staad/Shell';
+import { Toaster } from '@/components/practice/ui';
 import { useAuthStore } from '@/store/useAuthStore';
 import { auth } from '@/lib/firebase';
 import { adminFetch, registerReauthPrompt } from '@/lib/adminApi';
@@ -18,8 +20,7 @@ import { adminRoleOf, canAdmin, type AdminPermission } from '@/lib/adminRoles';
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
 
-export const CARD =
-  'rounded-[14px] border-[0.5px] border-[var(--glass-border)] shadow-[var(--glass-shadow)] bg-[var(--glass-bg)] dark:bg-[#16221e]';
+export const CARD = 'rounded-[24px] border border-[var(--glass-border)] bg-[var(--glass-bg)]';
 const inputStyle = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--ink)' } as const;
 
 // ─── Access ──────────────────────────────────────────────────────────────────
@@ -66,34 +67,28 @@ export function AdminPage({
   const allowed = !permission || can(permission);
 
   return (
-    <DashboardLayout role={role} profile={profile}>
+    <StaadShell className="admin-ui">
       <ReauthPrompt />
-      <div className="relative z-10 space-y-6">
-        {back && (
-          <Link href={back.href} className="inline-flex items-center gap-1 text-sm font-semibold" style={{ color: 'var(--ink-muted)' }}>
-            <ChevronLeft className="h-4 w-4" /> {back.label}
-          </Link>
-        )}
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div className="min-w-0">
-            <h1 className="font-heading text-[28px] leading-tight" style={{ color: 'var(--ink)' }}>
-              {title}
-            </h1>
-            {description && (
-              <p className="mt-1 text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>
-                {description}
-              </p>
-            )}
-          </div>
-          {allowed && actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      <Toaster />
+      {back && (
+        <Link href={back.href} className="inline-flex items-center gap-1 text-sm font-semibold" style={{ color: 'var(--ink-muted)' }}>
+          <ChevronLeft className="h-4 w-4" /> {back.label}
+        </Link>
+      )}
+      <div className="phead">
+        <div className="min-w-0">
+          <div className="eyebrow">Admin</div>
+          <h1 className="phead__title">{title}</h1>
+          {description && <p className="phead__lead">{description}</p>}
         </div>
-        {allowed ? (
-          children
-        ) : (
-          <EmptyState icon={<Lock className="h-5 w-5" />} title="No access" body="Your admin role doesn't include this page. Ask a super admin if you need it." />
-        )}
+        {allowed && actions && <div className="phead__acts">{actions}</div>}
       </div>
-    </DashboardLayout>
+      {allowed ? (
+        <div className="space-y-6">{children}</div>
+      ) : (
+        <EmptyState icon={<Lock className="h-5 w-5" />} title="No access" body="Your admin role doesn't include this page. Ask a super admin if you need it." />
+      )}
+    </StaadShell>
   );
 }
 
@@ -320,7 +315,7 @@ export function Btn({
   ...rest
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'danger'; size?: 'sm' | 'md'; icon?: React.ReactNode; loading?: boolean }) {
   const styles = {
-    primary: { background: 'var(--sage)', color: '#fff', border: '1px solid transparent' },
+    primary: { background: 'var(--sage)', color: 'var(--on-sage, #fff)', border: '1px solid transparent' },
     ghost: { background: 'var(--glass-bg)', color: 'var(--ink)', border: '1px solid var(--glass-border)' },
     danger: { background: 'rgba(220,38,38,0.1)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.25)' },
   }[variant];
@@ -330,8 +325,8 @@ export function Btn({
       {...rest}
       disabled={rest.disabled || loading}
       className={cx(
-        'btn-press inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-opacity disabled:opacity-50',
-        size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-4 py-2.5 text-sm',
+        'btn-press inline-flex items-center justify-center gap-1.5 rounded-full font-bold transition-opacity disabled:opacity-50',
+        size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-5 py-2.5 text-[13.5px]',
         className
       )}
       style={{ ...styles, ...rest.style }}
@@ -418,15 +413,15 @@ export function KV({ items }: { items: { label: string; value: React.ReactNode }
 
 export function Tabs<T extends string>({ value, onChange, tabs }: { value: T; onChange: (v: T) => void; tabs: { value: T; label: React.ReactNode }[] }) {
   return (
-    <div role="tablist" className="flex gap-1 overflow-x-auto rounded-xl p-1" style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}>
+    <div role="tablist" className="flex gap-1 overflow-x-auto rounded-full p-1" style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}>
       {tabs.map((t) => (
         <button
           key={t.value}
           role="tab"
           aria-selected={value === t.value}
           onClick={() => onChange(t.value)}
-          className="whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors"
-          style={value === t.value ? { background: 'var(--sage)', color: '#fff' } : { color: 'var(--ink-muted)' }}
+          className="whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors"
+          style={value === t.value ? { background: 'var(--sage)', color: 'var(--on-sage, #fff)' } : { color: 'var(--ink-muted)' }}
         >
           {t.label}
         </button>

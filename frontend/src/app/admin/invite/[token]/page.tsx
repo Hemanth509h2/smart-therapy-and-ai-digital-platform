@@ -95,9 +95,9 @@ export default function AdminInvitePage({ params }: { params: { token: string } 
   const role = invite ? ADMIN_ROLE_LABELS[invite.adminRole] : null;
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center px-4 py-10" style={{ background: 'var(--page-bg)' }}>
+    <div className="staad-ui admin-ui flex min-h-screen w-full items-center justify-center px-4 py-10">
       <div
-        className="w-full max-w-md space-y-5 rounded-2xl border bg-white p-6 shadow-[var(--glass-shadow)] dark:bg-[#16221e] animate-scale-in"
+        className="w-full max-w-md space-y-5 rounded-2xl border bg-[var(--glass-bg)] p-6 shadow-[var(--glass-shadow)] animate-scale-in"
         style={{ borderColor: 'var(--glass-border)' }}
       >
         <div className="flex flex-col items-center gap-2 text-center">

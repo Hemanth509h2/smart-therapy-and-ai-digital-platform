@@ -322,7 +322,7 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | 'new' | null; onCl
                 </li>
               ))}
             </ul>
-            <div className="rounded-xl py-2 text-center text-xs font-semibold" style={{ background: 'var(--sage)', color: '#fff' }}>
+            <div className="rounded-xl py-2 text-center text-xs font-semibold" style={{ background: 'var(--sage)', color: 'var(--on-sage, #fff)' }}>
               Request {form.name.trim() || 'plan'}
             </div>
           </div>

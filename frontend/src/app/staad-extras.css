@@ -755,3 +755,58 @@
   .staad-ui .cgrid { grid-template-columns: minmax(0, 1fr); }
   .staad-ui .chead__name { font-size: 26px; line-height: 30px; }
 }
+
+/* ─── Admin portal on the STAAD design ──────────────────────────────────────
+ * Admin pages were built on the older "glass" tokens (--ink-muted, --glass-*,
+ * --sage). While the admin shell (.admin-ui) is on the page, those tokens are
+ * remapped to the STAAD palette at the root, so dialogs portalled outside the
+ * shell match too. Chart colors were checked with the dataviz validator
+ * against the STAAD card surfaces (#fff light, #232323 dark). */
+:root:has(.admin-ui) {
+  --ink: #0b0b0b;
+  --ink-muted: #85858a;
+  --glass-bg: #ffffff;
+  --glass-strong: #ffffff;
+  --glass-border: rgba(11, 11, 11, 0.1);
+  --glass-shadow: none;
+  --sage: #0b0b0b;
+  --sage-light: #f1f1ef;
+  --on-sage: #ffffff;
+  --viz-series: #5e8c00;
+  --viz-grid: rgba(11, 11, 11, 0.08);
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]):has(.admin-ui) {
+    --ink: #f3f3f1;
+    --ink-muted: #8b8b8b;
+    --glass-bg: #232323;
+    --glass-strong: #232323;
+    --glass-border: rgba(255, 255, 255, 0.09);
+    --sage: #c6f43a;
+    --sage-light: #191919;
+    --on-sage: #0b0b0b;
+    --viz-series: #6e9e14;
+    --viz-grid: rgba(255, 255, 255, 0.08);
+  }
+}
+html[data-theme="dark"]:has(.admin-ui) {
+  --ink: #f3f3f1;
+  --ink-muted: #8b8b8b;
+  --glass-bg: #232323;
+  --glass-strong: #232323;
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --sage: #c6f43a;
+  --sage-light: #191919;
+  --on-sage: #0b0b0b;
+  --viz-series: #6e9e14;
+  --viz-grid: rgba(255, 255, 255, 0.08);
+}
+/* Headings use the STAAD display face; dialogs (portalled) use the text face. */
+:root:has(.admin-ui) .font-heading {
+  font-family: "Sora", "Segoe UI", system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+:root:has(.admin-ui) [role="dialog"] {
+  font-family: "Manrope", "Segoe UI", system-ui, sans-serif;
+}
