@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
 import { audit } from '@/lib/audit';
-import { parseFeatures } from '@/lib/subscriptions';
+import { parseFeatures, parsePlanLimits } from '@/lib/subscriptions';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,8 +42,9 @@ export async function GET(request: Request) {
 }
 
 // POST /api/admin/plans — create a plan.
-// Body: { name, description?, priceMonthly?, durationMonths?, toolQuota?, sortOrder?, features? }
-// toolQuota null/empty ⇒ unlimited (all tools). features: up to 10 card bullets.
+// Body: { name, description?, priceMonthly?, durationMonths?, toolQuota?, sortOrder?, features?,
+//         maxClients?, maxSessionsPerMonth?, maxAiReportsPerMonth? }
+// toolQuota / limits null or empty ⇒ unlimited. features: up to 10 card bullets.
 export async function POST(request: Request) {
   try {
     const auth = await requireAdmin(request, 'billing.write');
@@ -54,6 +55,9 @@ export async function POST(request: Request) {
 
     const features = parseFeatures(body.features);
     if (typeof features === 'string') return NextResponse.json({ error: features }, { status: 400 });
+
+    const limits = parsePlanLimits(body);
+    if (typeof limits === 'string') return NextResponse.json({ error: limits }, { status: 400 });
 
     const quotaRaw = body.toolQuota;
     const toolQuota =
@@ -71,6 +75,7 @@ export async function POST(request: Request) {
         sortOrder: Number(body.sortOrder) || 0,
         isActive: body.isActive === undefined ? true : Boolean(body.isActive),
         features: features ?? [],
+        ...limits,
       },
     });
 

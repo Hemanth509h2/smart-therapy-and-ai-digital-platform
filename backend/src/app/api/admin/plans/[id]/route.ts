@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin, requireRecentLogin } from '@/lib/apiAuth';
 import { audit } from '@/lib/audit';
-import { parseFeatures } from '@/lib/subscriptions';
+import { parseFeatures, parsePlanLimits } from '@/lib/subscriptions';
 
 export const dynamic = 'force-dynamic';
 
 // PATCH /api/admin/plans/[id] — update a plan (name, pricing, quota, features,
-// active flag). A body that only flips isActive is audited as archive/unarchive.
+// usage limits, active flag). A body that only flips isActive is audited as archive/unarchive.
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
     const auth = await requireAdmin(request, 'billing.write');
@@ -31,6 +31,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const features = parseFeatures(body.features);
     if (typeof features === 'string') return NextResponse.json({ error: features }, { status: 400 });
     if (features !== undefined) data.features = features;
+    const limits = parsePlanLimits(body);
+    if (typeof limits === 'string') return NextResponse.json({ error: limits }, { status: 400 });
+    Object.assign(data, limits);
 
     const before = await prisma.plan.findUnique({ where: { id: params.id } });
     if (!before) return NextResponse.json({ error: 'Plan not found' }, { status: 404 });

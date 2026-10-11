@@ -95,3 +95,32 @@ export function parseFeatures(raw: unknown): string[] | string | undefined {
   }
   return list;
 }
+
+// Plan usage limits (null = unlimited). See docx/PLANS.md.
+export const PLAN_LIMIT_FIELDS = ['maxClients', 'maxSessionsPerMonth', 'maxAiReportsPerMonth'] as const;
+export type PlanLimitField = (typeof PLAN_LIMIT_FIELDS)[number];
+const PLAN_LIMIT_LABELS: Record<PlanLimitField, string> = {
+  maxClients: 'Client limit',
+  maxSessionsPerMonth: 'Sessions per month',
+  maxAiReportsPerMonth: 'AI reports per month',
+};
+
+// Reads the limit fields present in a request body. Blank/null = unlimited.
+// Returns the values to save, or an error message.
+export function parsePlanLimits(body: Record<string, unknown>): Partial<Record<PlanLimitField, number | null>> | string {
+  const out: Partial<Record<PlanLimitField, number | null>> = {};
+  for (const field of PLAN_LIMIT_FIELDS) {
+    const raw = body[field];
+    if (raw === undefined) continue;
+    if (raw === null || raw === '') {
+      out[field] = null;
+      continue;
+    }
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 0 || n > 100_000) {
+      return `${PLAN_LIMIT_LABELS[field]} must be a whole number from 0 to 100000, or blank for unlimited.`;
+    }
+    out[field] = n;
+  }
+  return out;
+}

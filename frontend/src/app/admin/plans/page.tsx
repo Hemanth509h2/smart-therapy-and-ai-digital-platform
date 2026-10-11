@@ -19,6 +19,9 @@ interface Plan {
   isActive: boolean;
   sortOrder: number;
   features: string[];
+  maxClients: number | null;
+  maxSessionsPerMonth: number | null;
+  maxAiReportsPerMonth: number | null;
   subscriberCount: number;
   requestCount: number;
   pendingRequestCount: number;
@@ -37,16 +40,27 @@ const blankForm = {
   sortOrder: '0',
   isActive: true,
   features: [] as string[],
+  // Usage limits as typed; blank = unlimited.
+  maxClients: '',
+  maxSessionsPerMonth: '',
+  maxAiReportsPerMonth: '',
 };
 type Form = typeof blankForm;
 
+type Limits = { maxClients: number | null; maxSessionsPerMonth: number | null; maxAiReportsPerMonth: number | null };
+
+const limitText = (n: number | null, unit: string, unlimited: string) =>
+  n == null ? unlimited : `${n.toLocaleString('en-IN')} ${unit}`;
+
 // Same fallback bullets the therapist /plans page shows when a plan has no
 // features of its own — keep in sync with planFeatures() in app/plans/page.tsx.
-function builtInFeatures(toolQuota: number | null, durationMonths: number) {
+function builtInFeatures(toolQuota: number | null, durationMonths: number, limits: Limits) {
   return [
     toolQuota == null ? 'Every therapy tool, including new ones' : `Any ${toolQuota} therapy tools you choose`,
-    'Unlimited clients & sessions',
-    'Session notes & AI session reports',
+    limitText(limits.maxClients, limits.maxClients === 1 ? 'active client' : 'active clients', 'Unlimited clients'),
+    limitText(limits.maxSessionsPerMonth, 'sessions a month', 'Unlimited sessions'),
+    limitText(limits.maxAiReportsPerMonth, 'AI session reports a month', 'Unlimited AI session reports'),
+    'Session notes',
     'Progress tracking with PDF/CSV export',
     durationMonths > 1 ? `${durationMonths}-month default term` : 'Flexible terms from 1 to 12 months',
   ];
@@ -105,6 +119,9 @@ export default function AdminPlansPage() {
               <dl className="grid grid-cols-2 gap-2 text-sm">
                 <Stat label="Tools" value={p.toolQuota == null ? 'Unlimited' : num(p.toolQuota)} />
                 <Stat label="Default term" value={`${p.durationMonths} mo`} />
+                <Stat label="Clients" value={p.maxClients == null ? 'Unlimited' : num(p.maxClients)} />
+                <Stat label="Sessions / mo" value={p.maxSessionsPerMonth == null ? 'Unlimited' : num(p.maxSessionsPerMonth)} />
+                <Stat label="AI reports / mo" value={p.maxAiReportsPerMonth == null ? 'Unlimited' : num(p.maxAiReportsPerMonth)} />
                 <Stat label="Subscribers" value={num(p.subscriberCount)} />
                 <Stat label="Requests" value={p.pendingRequestCount ? `${num(p.requestCount)} (${num(p.pendingRequestCount)} pending)` : num(p.requestCount)} />
               </dl>
@@ -177,6 +194,9 @@ function toForm(p: Plan | 'new' | null): Form {
     sortOrder: String(p.sortOrder),
     isActive: p.isActive,
     features: [...p.features],
+    maxClients: p.maxClients == null ? '' : String(p.maxClients),
+    maxSessionsPerMonth: p.maxSessionsPerMonth == null ? '' : String(p.maxSessionsPerMonth),
+    maxAiReportsPerMonth: p.maxAiReportsPerMonth == null ? '' : String(p.maxAiReportsPerMonth),
   };
 }
 
@@ -202,6 +222,18 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | 'new' | null; onCl
   const save = async () => {
     if (!form.name.trim()) { setError('Name is required.'); return; }
     if (!form.unlimited && !(Number(form.toolQuota) >= 1)) { setError('Enter a tool quota of at least 1, or tick Unlimited.'); return; }
+    const limitFields = [
+      ['maxClients', 'Client limit'],
+      ['maxSessionsPerMonth', 'Sessions per month'],
+      ['maxAiReportsPerMonth', 'AI reports per month'],
+    ] as const;
+    for (const [key, label] of limitFields) {
+      const v = form[key].trim();
+      if (v && !(Number.isInteger(Number(v)) && Number(v) >= 0)) {
+        setError(`${label} must be a whole number, or blank for unlimited.`);
+        return;
+      }
+    }
     const features = form.features.map((f) => f.trim()).filter(Boolean);
     if (features.some((f) => f.length > MAX_FEATURE_LENGTH)) { setError(`Each feature must be ${MAX_FEATURE_LENGTH} characters or fewer.`); return; }
     setSaving(true);
@@ -215,6 +247,7 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | 'new' | null; onCl
       sortOrder: Number(form.sortOrder) || 0,
       isActive: form.isActive,
       features,
+      ...parseLimits(form),
     };
     try {
       if (isNew) await adminFetch('/api/admin/plans', { method: 'POST', json });
@@ -232,7 +265,7 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | 'new' | null; onCl
   const quota = form.unlimited ? null : Number(form.toolQuota) || 0;
   const price = Number(form.priceMonthly) || 0;
   const custom = form.features.map((f) => f.trim()).filter(Boolean);
-  const previewFeatures = custom.length ? custom : builtInFeatures(quota, Number(form.durationMonths) || 1);
+  const previewFeatures = custom.length ? custom : builtInFeatures(quota, Number(form.durationMonths) || 1, parseLimits(form));
 
   return (
     <Modal
@@ -269,6 +302,13 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | 'new' | null; onCl
               <Input type="number" value={form.sortOrder} onChange={(e) => set('sortOrder', e.target.value)} />
             </Field>
           </div>
+          <Field label="Usage limits" hint="Leave a box blank for unlimited.">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <LimitInput label="Active clients" value={form.maxClients} onChange={(v) => set('maxClients', v)} />
+              <LimitInput label="Sessions / month" value={form.maxSessionsPerMonth} onChange={(v) => set('maxSessionsPerMonth', v)} />
+              <LimitInput label="AI reports / month" value={form.maxAiReportsPerMonth} onChange={(v) => set('maxAiReportsPerMonth', v)} />
+            </div>
+          </Field>
           <div className="flex flex-wrap gap-4">
             <Checkbox checked={form.unlimited} onChange={(v) => set('unlimited', v)} label="Unlimited (all tools)" />
             <Checkbox checked={form.isActive} onChange={(v) => set('isActive', v)} label="Active (visible to professionals)" />
@@ -329,5 +369,24 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | 'new' | null; onCl
         </div>
       </div>
     </Modal>
+  );
+}
+
+// Blank boxes mean unlimited (null).
+function parseLimits(form: Form): Limits {
+  const v = (s: string) => (s.trim() === '' ? null : Number(s));
+  return {
+    maxClients: v(form.maxClients),
+    maxSessionsPerMonth: v(form.maxSessionsPerMonth),
+    maxAiReportsPerMonth: v(form.maxAiReportsPerMonth),
+  };
+}
+
+function LimitInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="space-y-1">
+      <span className="block text-xs font-semibold" style={{ color: 'var(--ink-muted)' }}>{label}</span>
+      <Input type="number" min={0} step={1} inputMode="numeric" placeholder="Unlimited" value={value} onChange={(e) => onChange(e.target.value)} />
+    </label>
   );
 }

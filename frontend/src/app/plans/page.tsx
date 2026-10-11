@@ -20,6 +20,9 @@ interface Plan {
   durationMonths: number;
   toolQuota: number | null;
   features?: string[];
+  maxClients?: number | null;
+  maxSessionsPerMonth?: number | null;
+  maxAiReportsPerMonth?: number | null;
 }
 interface Current {
   planName: string;
@@ -44,10 +47,16 @@ const MONTH_OPTIONS = [1, 3, 6, 12] as const;
 type Term = (typeof MONTH_OPTIONS)[number];
 
 // Admin-written bullets win; otherwise the built-in list.
+const limitText = (n: number | null | undefined, unit: string, unlimited: string) =>
+  n == null ? unlimited : `${n.toLocaleString('en-IN')} ${unit}`;
+
+// Keep in sync with builtInFeatures() in app/admin/plans/page.tsx (its preview).
 const planFeatures = (p: Plan) => Array.isArray(p.features) && p.features.length ? p.features : [
   p.toolQuota == null ? 'Every therapy tool, including new ones' : `Any ${p.toolQuota} therapy tools you choose`,
-  'Unlimited clients & sessions',
-  'Session notes & AI session reports',
+  limitText(p.maxClients, p.maxClients === 1 ? 'active client' : 'active clients', 'Unlimited clients'),
+  limitText(p.maxSessionsPerMonth, 'sessions a month', 'Unlimited sessions'),
+  limitText(p.maxAiReportsPerMonth, 'AI session reports a month', 'Unlimited AI session reports'),
+  'Session notes',
   'Progress tracking with PDF/CSV export',
   p.durationMonths > 1 ? `${p.durationMonths}-month default term` : 'Flexible terms from 1 to 12 months',
 ];
