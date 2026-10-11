@@ -271,6 +271,8 @@ export default function PlansPage() {
 
   const reqTotal = reqPlan ? reqPlan.priceMonthly * months : 0;
   const reqIsPaid = !!reqPlan && reqPlan.priceMonthly > 0;
+  // "Manage Plan" opens this same dialog for the plan they're already on.
+  const managing = !!reqPlan && current?.planName === reqPlan.name;
 
   const toolsAvailable = resolveAllowedModuleIds(profile).length;
 
@@ -487,16 +489,39 @@ export default function PlansPage() {
       <DsDialog
         open={!!reqPlan}
         onOpenChange={(o) => !o && setReqPlan(null)}
-        title={reqPlan ? `${reqIsPaid ? 'Get' : 'Request'} ${reqPlan.name}` : ''}
+        title={reqPlan ? `${managing ? 'Manage' : reqIsPaid ? 'Get' : 'Request'} ${reqPlan.name}` : ''}
         description={
-          reqIsPaid
-            ? 'Pay securely with Cashfree (UPI, cards, netbanking). Your plan starts as soon as payment is confirmed.'
-            : 'An admin reviews every plan change before it takes effect.'
+          managing && current?.cancelledAt
+            ? `Cancelled — you keep this plan until ${fmtDate(current.currentPeriodEnd)}. Undo below to keep it going.`
+            : reqIsPaid
+              ? 'Pay securely with Cashfree (UPI, cards, netbanking). Your plan starts as soon as payment is confirmed.'
+              : 'An admin reviews every plan change before it takes effect.'
         }
         footer={
           <>
+            {managing &&
+              (current?.cancelledAt ? (
+                <button
+                  className="ds-btn ds-btn-outline sm:mr-auto"
+                  onClick={() => setCancelled(true).then(() => setReqPlan(null))}
+                  disabled={cancelBusy}
+                >
+                  {cancelBusy ? 'Saving…' : 'Undo cancellation'}
+                </button>
+              ) : (
+                <button
+                  className="ds-btn ds-btn-danger sm:mr-auto"
+                  onClick={() => {
+                    setReqPlan(null);
+                    setCancelError('');
+                    setCancelOpen(true);
+                  }}
+                >
+                  Cancel plan
+                </button>
+              ))}
             <button className="ds-btn ds-btn-ghost" onClick={() => setReqPlan(null)}>
-              Cancel
+              {managing ? 'Close' : 'Cancel'}
             </button>
             {reqIsPaid ? (
               <button className="ds-btn ds-btn-clay" onClick={pay} disabled={submitting}>
