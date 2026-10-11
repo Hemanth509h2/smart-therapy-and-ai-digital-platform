@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
+import { requireActivePlan } from '@/lib/subscriptions';
 import { normalizeWhatsAppNumber } from '@/lib/whatsapp-cloud-api';
 
 export const dynamic = 'force-dynamic';
@@ -35,6 +36,8 @@ export async function POST(request: Request) {
     if (!therapist || therapist.userId !== auth.uid) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+    const noPlan = await requireActivePlan({ therapistId });
+    if (noPlan) return noPlan;
 
     const client = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({

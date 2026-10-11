@@ -41,6 +41,7 @@ import StaadWhiteboard from '@/components/session/StaadWhiteboard';
 import ModuleStage from '@/components/session/ModuleStage';
 import { ModuleContent } from '@/components/GlassModulePanel';
 import { apiFetch } from '@/lib/api';
+import ErrorScreen from '@/components/ErrorScreen';
 
 interface SessionState {
   sessionId: string;
@@ -115,6 +116,8 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   const [activeModule, setActiveModule] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionEnded, setSessionEnded] = useState(false);
+  // The server refused to start the session: the therapist has no active plan.
+  const [planBlocked, setPlanBlocked] = useState(false);
   const [endedSession, setEndedSession] = useState<{
     clientName: string; therapistName: string; scheduledAt?: string; startedAt?: string; endedAt?: string;
   } | null>(null);
@@ -456,11 +459,15 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     // simply fires once the documents appear.
     const joinSession = async () => {
       try {
-        await apiFetch(`/api/sessions/${sessionId}`, {
+        const res = await apiFetch(`/api/sessions/${sessionId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'start' }),
         });
+        if (res.status === 402) {
+          setPlanBlocked(true);
+          return;
+        }
       } catch {
         // Provisioning failure is surfaced by the participant write below
         // failing; the room simply stays in its loading state.
@@ -880,6 +887,20 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       clearTimeout(timer);
     };
   }, [sessionEnded, isTherapist]);
+
+  if (planBlocked) {
+    return (
+      <ErrorScreen
+        code="402"
+        title={isTherapist ? 'You need an active plan' : "This session can't start yet"}
+        message={
+          isTherapist
+            ? 'Sessions can only be started on an active plan. Choose a plan from the Plans page, then come back to this session.'
+            : 'Your therapist needs to sort out their account before this session can start. Please check with them.'
+        }
+      />
+    );
+  }
 
   if (loading) {
     return (

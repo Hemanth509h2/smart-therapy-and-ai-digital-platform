@@ -1,5 +1,7 @@
 // Shared subscription helpers used by the therapist, admin and payment routes.
+import { NextResponse } from 'next/server';
 import type { Prisma, Subscription, Plan } from '@prisma/client';
+import { prisma } from '@/lib/db';
 import { ALL_MODULE_IDS } from '@/lib/modules';
 
 // Add whole months to a date (term length math). June 15 + 1mo -> July 15.
@@ -74,6 +76,39 @@ export function resolveCurrent(
     .filter((s) => s.status === 'ACTIVE' && s.currentPeriodEnd.getTime() > now.getTime())
     .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
   return active[0] ?? null;
+}
+
+// True when the therapist (ProfileTherapist.id) has a term that is ACTIVE and
+// not past its end date — the same rule as resolveCurrent.
+export async function hasActivePlan(therapistId: string): Promise<boolean> {
+  const sub = await prisma.subscription.findFirst({
+    where: { therapistId, status: 'ACTIVE', currentPeriodEnd: { gt: new Date() } },
+    select: { id: true },
+  });
+  return !!sub;
+}
+
+// Without an active plan a therapist can look around but not act. Call this in
+// any therapist write route; it returns a 402 to send back, or null to go on.
+// Pass the ProfileTherapist id, or the Firebase uid when that's all you have
+// (a uid with no therapist profile is not gated). The frontend's apiFetch
+// recognises code PLAN_REQUIRED and points the therapist to /plans.
+export async function requireActivePlan(
+  who: { therapistId: string } | { userId: string }
+): Promise<NextResponse | null> {
+  let therapistId: string;
+  if ('therapistId' in who) {
+    therapistId = who.therapistId;
+  } else {
+    const t = await prisma.profileTherapist.findUnique({ where: { userId: who.userId }, select: { id: true } });
+    if (!t) return null;
+    therapistId = t.id;
+  }
+  if (await hasActivePlan(therapistId)) return null;
+  return NextResponse.json(
+    { error: 'You need an active plan to do this. Choose a plan to continue.', code: 'PLAN_REQUIRED' },
+    { status: 402 }
+  );
 }
 
 // Shape a subscription row for the client UI.

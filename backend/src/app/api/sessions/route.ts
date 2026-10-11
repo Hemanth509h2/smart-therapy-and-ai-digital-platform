@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireActivePlan } from '@/lib/subscriptions';
 import { sendSessionBookedWhatsApp } from '@/lib/session-whatsapp';
 
 export const dynamic = 'force-dynamic';
@@ -46,6 +47,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { therapistId, clientId, scheduledAt, booking } = await request.json();
+    const noPlan = await requireActivePlan({ therapistId });
+    if (noPlan) return noPlan;
 
     // If clientId is a userId (firebase UID), look up the profile ID
     let finalClientId = clientId;

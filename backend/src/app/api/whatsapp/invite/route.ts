@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { requireAuth } from '@/lib/apiAuth'
+import { requireActivePlan } from '@/lib/subscriptions'
 import { prisma } from '@/lib/db'
 import { sendWhatsAppInvite } from '@/lib/whatsapp-bot'
 
@@ -27,6 +28,8 @@ export async function POST(request: Request) {
     if (!therapist || therapist.userId !== auth.uid) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+    const noPlan = await requireActivePlan({ therapistId: String(therapistId) })
+    if (noPlan) return noPlan
 
     const url = new URL(String(inviteLink))
     if (url.protocol !== 'https:' && url.hostname !== 'localhost') {

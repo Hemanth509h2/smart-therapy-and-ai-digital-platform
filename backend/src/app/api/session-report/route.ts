@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { requireActivePlan } from '@/lib/subscriptions'
 import { generateSessionReport } from '@/lib/report/generate'
 import { getReportStats } from '@/lib/report/session-data'
 
@@ -38,6 +39,8 @@ export async function POST(req: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     }
+    const noPlan = await requireActivePlan({ therapistId: session.therapistId })
+    if (noPlan) return noPlan
 
     const priorCount = await prisma.session.count({
       where: {
@@ -93,6 +96,15 @@ export async function PATCH(req: NextRequest) {
         { status: 400 }
       )
     }
+    const existing = await prisma.sessionReport.findUnique({
+      where: { sessionId },
+      select: { therapistId: true },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: 'Report not found' }, { status: 404 })
+    }
+    const noPlan = await requireActivePlan({ therapistId: existing.therapistId })
+    if (noPlan) return noPlan
     const report = await prisma.sessionReport.update({
       where: { sessionId },
       data: { content, editedByTherapist: true, editedAt: new Date() },

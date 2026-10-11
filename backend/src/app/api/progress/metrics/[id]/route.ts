@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireTherapist } from '@/lib/progressAuth';
+import { requireActivePlan } from '@/lib/subscriptions';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,8 @@ export const dynamic = 'force-dynamic';
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const auth = await requireTherapist(request);
   if (!auth.ok) return auth.response;
+  const noPlan = await requireActivePlan({ therapistId: auth.therapist.id });
+  if (noPlan) return noPlan;
 
   try {
     const { id } = params;
@@ -51,6 +54,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   const auth = await requireTherapist(request);
   if (!auth.ok) return auth.response;
+  const noPlan = await requireActivePlan({ therapistId: auth.therapist.id });
+  if (noPlan) return noPlan;
 
   try {
     const { id } = params;

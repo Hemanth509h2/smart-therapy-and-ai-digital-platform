@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireActivePlan } from '@/lib/subscriptions';
 import { provisionSessionDocs } from '@/lib/session-provisioning';
 import { markSessionEnded } from '@/lib/session-provisioning';
 import { sendSessionLinkWhatsApp } from '@/lib/session-whatsapp';
@@ -51,6 +52,14 @@ export async function PATCH(
     });
     if (!existing) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    // No plan: no new or rescheduled sessions. Cancelling and ending stay open
+    // so existing bookings can be wound down, and a call already live can be
+    // rejoined.
+    if (finalAction === 'reschedule' || (finalAction === 'start' && existing.status !== 'ACTIVE')) {
+      const noPlan = await requireActivePlan({ therapistId: existing.therapistId });
+      if (noPlan) return noPlan;
     }
 
     const now = new Date();

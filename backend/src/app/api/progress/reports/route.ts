@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireTherapist } from '@/lib/progressAuth';
+import { requireActivePlan } from '@/lib/subscriptions';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const auth = await requireTherapist(request);
   if (!auth.ok) return auth.response;
+  const noPlan = await requireActivePlan({ therapistId: auth.therapist.id });
+  if (noPlan) return noPlan;
 
   try {
     const body = await request.json();

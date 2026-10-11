@@ -6,6 +6,25 @@ import { auth } from '@/lib/firebase';
  */
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
+/** Fired on window when the backend refuses an action because the therapist has no active plan. */
+export const PLAN_REQUIRED_EVENT = 'staad:plan-required';
+
+// The backend answers therapist actions with 402 + code PLAN_REQUIRED when
+// there is no active plan. Announce it so the dashboard can say why, whichever
+// page made the call. Reads a clone so the caller still gets the body.
+function notifyPlanRequired(res: Response) {
+  if (typeof window === 'undefined') return;
+  res
+    .clone()
+    .json()
+    .then((body) => {
+      if (body?.code === 'PLAN_REQUIRED') {
+        window.dispatchEvent(new CustomEvent(PLAN_REQUIRED_EVENT, { detail: body.error }));
+      }
+    })
+    .catch(() => {});
+}
+
 /**
  * Drop-in replacement for `fetch` for calls to the backend's `/api/*`
  * routes. Prepends NEXT_PUBLIC_API_URL so the frontend and backend can run
@@ -34,7 +53,9 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
       headers.set('x-dev-uid', user.uid);
       if (user.email) headers.set('x-dev-email', user.email);
     }
-    return fetch(`${API_URL}${input}`, { ...init, headers });
+    const res = await fetch(`${API_URL}${input}`, { ...init, headers });
+    if (res.status === 402) notifyPlanRequired(res);
+    return res;
   }
   return fetch(input, init);
 }

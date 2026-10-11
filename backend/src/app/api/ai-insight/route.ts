@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { requireActivePlan } from '@/lib/subscriptions'
 import { runAnalysis } from '@/lib/rag/analysis'
 import { checkAIConsent, getSessionTranscript, appendCopilotEvent } from '@/lib/rag/transcript-store'
 import type { ClientProfile } from '@/lib/rag/retrieval'
@@ -23,6 +24,9 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
+    // therapistId here is the Firebase uid.
+    const noPlan = await requireActivePlan({ userId: therapistId })
+    if (noPlan) return noPlan
 
     if (!clientProfile || typeof clientProfile !== 'object') {
       return NextResponse.json(

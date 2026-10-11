@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
+import { requireActivePlan } from '@/lib/subscriptions';
 import { getOrCreateGuestInvite, sendSessionLinkWhatsApp } from '@/lib/session-whatsapp';
 
 // POST /api/sessions/[sessionId]/guest-link — create (or reuse) a patient
@@ -23,6 +24,8 @@ export async function POST(request: Request, { params }: { params: { sessionId: 
     if (session.therapist.userId !== auth.uid) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+    const noPlan = await requireActivePlan({ therapistId: session.therapistId });
+    if (noPlan) return noPlan;
 
     const invite = await getOrCreateGuestInvite(session);
     await sendSessionLinkWhatsApp(session.id, request);
