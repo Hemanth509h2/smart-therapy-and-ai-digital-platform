@@ -87,7 +87,7 @@ export async function POST(request: Request) {
         where: { id: delivery.id },
         data: {
           status: 'SENT',
-          providerMessageId: message.id,
+          providerMessageId: message.id || null,
           sentAt: new Date(),
           providerStatusAt: new Date(),
           updatedAt: new Date(),

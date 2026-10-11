@@ -4,9 +4,14 @@ import { runAnalysis } from '@/lib/rag/analysis'
 import { checkAIConsent, getSessionTranscript, appendCopilotEvent } from '@/lib/rag/transcript-store'
 import type { ClientProfile } from '@/lib/rag/retrieval'
 import type { AIInsight } from '@/lib/rag/types'
+import { getSetting } from '@/lib/settings'
 
 export async function POST(request: Request) {
   try {
+    if (!(await getSetting('features.aiInsights'))) {
+      return NextResponse.json({ error: 'AI insights are turned off by an admin.' }, { status: 503 })
+    }
+
     const body = await request.json()
     const { sessionId, therapistId, clientProfile, transcriptWindowMinutes } = body
 
@@ -121,13 +126,35 @@ export async function POST(request: Request) {
 
     // Log AI analysis as a usage event for the admin dashboard (therapistId here
     // is the Firebase uid; resolve to the therapist profile). Never block on this.
+    let therapistProfileId: string | null = null
     try {
       const t = await prisma.profileTherapist.findUnique({ where: { userId: therapistId }, select: { id: true } })
+      therapistProfileId = t?.id ?? null
       if (t) {
         await prisma.usageEvent.create({ data: { therapistId: t.id, sessionId, type: 'AI_ANALYSIS' } })
       }
     } catch (e) {
       console.error('Failed to log AI usage event:', e)
+    }
+
+    // Persist risk flags for the admin Sessions monitor. The copilot re-runs
+    // every few minutes, so skip a flag already raised (and not yet
+    // acknowledged) for this session at this level in the last 30 minutes.
+    const level = insight.riskLevel
+    if (insight.riskFlag && (level === 'watch' || level === 'urgent')) {
+      try {
+        const recent = await prisma.riskFlag.findFirst({
+          where: { sessionId, level, acknowledgedAt: null, raisedAt: { gte: new Date(Date.now() - 30 * 60_000) } },
+          select: { id: true },
+        })
+        if (!recent) {
+          await prisma.riskFlag.create({
+            data: { sessionId, therapistId: therapistProfileId, level, detail: insight.riskDetail || null },
+          })
+        }
+      } catch (e) {
+        console.error('Failed to record risk flag:', e)
+      }
     }
 
     return NextResponse.json({ insight })

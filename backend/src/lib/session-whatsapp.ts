@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import type { Session } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { appUrl } from '@/lib/app-url';
+import { getSetting } from '@/lib/settings';
 import { sendSessionScheduledMessage, sendWhatsAppInvite } from '@/lib/whatsapp-bot';
 
 // WhatsApp rules for sessions:
@@ -41,6 +42,8 @@ export async function getOrCreateGuestInvite(session: Session) {
 
 type MessageType = 'SESSION_SCHEDULED' | 'SESSION_STARTED';
 
+export const WHATSAPP_OFF = 'WhatsApp messaging is turned off by an admin.';
+
 // Records the attempt in whatsAppMessage, sends, and marks SENT/FAILED.
 // Best-effort: never throws, so a WhatsApp failure can't break the caller.
 async function deliver(
@@ -53,6 +56,15 @@ async function deliver(
 ) {
   const now = new Date();
   try {
+    // Admin kill switch: record the message as SKIPPED instead of sending.
+    if (!(await getSetting('features.whatsapp'))) {
+      await prisma.whatsAppMessage.upsert({
+        where: { sessionId_messageType: { sessionId, messageType } },
+        create: { id: randomUUID(), sessionId, clientId, phoneNumber, generatedLink, messageType, status: 'SKIPPED', errorMessage: WHATSAPP_OFF, updatedAt: now },
+        update: { phoneNumber, generatedLink, status: 'SKIPPED', errorMessage: WHATSAPP_OFF, updatedAt: now },
+      });
+      return;
+    }
     const delivery = await prisma.whatsAppMessage.upsert({
       where: { sessionId_messageType: { sessionId, messageType } },
       create: {
@@ -83,7 +95,7 @@ async function deliver(
       where: { id: delivery.id },
       data: {
         status: 'SENT',
-        providerMessageId: message.id,
+        providerMessageId: message.id || null, // bot may return no id; "" would collide on the unique column
         sentAt: new Date(),
         providerStatusAt: new Date(),
         updatedAt: new Date(),
@@ -145,4 +157,52 @@ export async function sendSessionLinkWhatsApp(sessionId: string, request: Reques
       therapistName: `${session.therapist.firstName} ${session.therapist.lastName}`.trim(),
     })
   );
+}
+
+/** Admin retry of one logged message (any type), re-using its stored link.
+ *  Returns the updated row; a send failure is recorded on the row as FAILED. */
+export async function retryWhatsAppMessage(id: string) {
+  const msg = await prisma.whatsAppMessage.findUniqueOrThrow({
+    where: { id },
+    include: {
+      invite: { include: { therapist: true } },
+      session: { include: { client: true, therapist: true } },
+    },
+  });
+  const fullName = (p?: { firstName: string; lastName: string } | null) => (p ? `${p.firstName} ${p.lastName}`.trim() : undefined);
+
+  let phone = msg.phoneNumber;
+  let send: () => Promise<{ id: string }>;
+  if (msg.messageType === 'CLIENT_INVITE') {
+    if (!msg.invite) throw new Error('The invite for this message no longer exists.');
+    const invite = msg.invite;
+    phone = invite.phoneNumber || phone;
+    send = () => sendWhatsAppInvite({ to: phone, patientName: invite.firstName, inviteLink: msg.generatedLink, therapistName: fullName(invite.therapist) });
+  } else {
+    if (!msg.session) throw new Error('The session for this message no longer exists.');
+    const session = msg.session;
+    phone = session.client.phoneNumber || phone;
+    send =
+      msg.messageType === 'SESSION_SCHEDULED'
+        ? () => sendSessionScheduledMessage({ to: phone, patientName: session.client.firstName, scheduledAt: session.scheduledAt, therapistName: fullName(session.therapist) })
+        : () => sendWhatsAppInvite({ to: phone, patientName: session.client.firstName, inviteLink: msg.generatedLink, therapistName: fullName(session.therapist) });
+  }
+
+  const now = new Date();
+  await prisma.whatsAppMessage.update({
+    where: { id },
+    data: { phoneNumber: phone, status: 'SENDING', attempts: { increment: 1 }, lastAttemptAt: now, errorCode: null, errorMessage: null, updatedAt: now },
+  });
+  try {
+    const sent = await send();
+    return await prisma.whatsAppMessage.update({
+      where: { id },
+      data: { status: 'SENT', providerMessageId: sent.id || null, sentAt: new Date(), providerStatusAt: new Date(), updatedAt: new Date() },
+    });
+  } catch (error: any) {
+    return prisma.whatsAppMessage.update({
+      where: { id },
+      data: { status: 'FAILED', errorMessage: error?.message || 'WhatsApp send failed', updatedAt: new Date() },
+    });
+  }
 }

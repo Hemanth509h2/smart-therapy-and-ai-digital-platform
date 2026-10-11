@@ -1,8 +1,14 @@
 import { normalizeWhatsAppNumber } from './whatsapp-cloud-api'
+import { getSetting } from './settings'
 
 // Messages are delivered by the self-hosted Baileys bot (whatapps/), which
 // exposes POST /send guarded by the shared x-bot-secret header.
 async function sendViaBot(to: string, text: string): Promise<WhatsAppMessageResult> {
+  // Admin kill switch (Settings → features.whatsapp). Callers record the
+  // thrown error on the message row.
+  if (!(await getSetting('features.whatsapp'))) {
+    throw new Error('WhatsApp messaging is turned off by an admin.')
+  }
   const url = process.env.WHATSAPP_BOT_URL
   const secret = process.env.WHATSAPP_BOT_SECRET
   if (!url || !secret) {
