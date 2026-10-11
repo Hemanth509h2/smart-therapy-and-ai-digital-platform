@@ -286,7 +286,7 @@ model Plan {
   id             String   @id @default(uuid())
   name           String   @unique
   description    String?
-  priceMonthly   Int      @default(0) // display only (INR)
+  priceMonthly   Int      @default(0) // INR per month; charged via Cashfree (0 = free, request-only)
   durationMonths Int      @default(1) // suggested default term length
   toolQuota      Int? // null = unlimited (all tools); else max tools allowed
   isActive       Boolean  @default(true)
@@ -313,6 +313,9 @@ model Subscription {
   currentPeriodEnd DateTime
   renewedAt        DateTime?
   renewalCount     Int                @default(0)
+  // Set when the therapist cancels. Status stays ACTIVE and access continues
+  // until currentPeriodEnd (already paid for); the term just won't be renewed.
+  cancelledAt      DateTime?
   moduleAccess     String[]           @default([]) // tools granted by this term
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
@@ -436,9 +439,18 @@ model Payment {
   paymentMessage String?
   paidAt         DateTime?
   lastWebhookAt  DateTime?
+  // What the payment buys: a plan for a therapist. Null for /payment-test orders.
+  planId         String?
+  therapistId    String?
+  months         Int?
+  modules        String[]  @default([])
+  // Set when the paid plan is activated; the unique claim on this column is
+  // what stops duplicate webhooks from activating the same payment twice.
+  subscriptionId String?   @unique
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   @@index([userId])
   @@index([orderStatus])
+  @@index([therapistId])
 }

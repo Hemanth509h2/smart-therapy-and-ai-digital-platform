@@ -30,6 +30,8 @@ export async function GET(request: Request, { params }: { params: { orderId: str
       orderStatus: saved?.orderStatus ?? order.order_status,
       orderAmount: order.order_amount,
       orderCurrency: order.order_currency,
+      // For plan purchases: true once the paid plan has been activated.
+      planActivated: Boolean(saved?.subscriptionId),
       payments: payments.map((p: any) => ({
         cfPaymentId: p.cf_payment_id,
         status: p.payment_status,

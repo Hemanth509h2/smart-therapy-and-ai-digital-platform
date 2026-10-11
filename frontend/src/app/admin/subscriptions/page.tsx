@@ -23,6 +23,7 @@ interface Current {
   renewed: boolean;
   renewalCount: number;
   toolQuota: number | null;
+  cancelledAt: string | null;
 }
 interface Professional {
   therapistId: string;
@@ -235,7 +236,7 @@ export default function AdminSubscriptionsPage() {
                         <td className="px-4 py-3 whitespace-nowrap">
                           {p.current ? (p.current.renewed ? `Yes ×${p.current.renewalCount}` : 'No') : '—'}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: 'var(--ink-muted)' }}>{p.current?.status ?? '—'}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: 'var(--ink-muted)' }}>{p.current ? (p.current.cancelledAt ? 'Cancelled (until end)' : p.current.status) : '—'}</td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           {p.current && (
                             <div className="flex gap-1.5">

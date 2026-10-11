@@ -36,6 +36,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           currentPeriodEnd: addMonths(base, addMo),
           renewedAt: now,
           renewalCount: { increment: 1 },
+          cancelledAt: null, // renewing undoes a therapist's cancellation
         },
       });
       return NextResponse.json({ subscription: updated });
@@ -44,7 +45,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (action === 'reactivate') {
       const updated = await prisma.subscription.update({
         where: { id: sub.id },
-        data: { status: 'ACTIVE' },
+        data: { status: 'ACTIVE', cancelledAt: null },
       });
       return NextResponse.json({ subscription: updated });
     }

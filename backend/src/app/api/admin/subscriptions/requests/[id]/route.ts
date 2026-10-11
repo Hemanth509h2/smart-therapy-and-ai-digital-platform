@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules';
-import { addMonths } from '@/lib/subscriptions';
+import { activatePlan } from '@/lib/subscriptions';
 
 // POST /api/admin/subscriptions/requests/[id] — approve or reject a plan request.
 // Body: { action: 'approve' | 'reject', modules?, months? }
@@ -58,39 +58,18 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
 
     const months_ = Math.max(1, Math.min(36, Number(months) || req.months || 1));
-    const now = new Date();
-    const grantedModules = unlimited ? [] : cleaned;
 
     await prisma.$transaction(async (tx) => {
-      // Supersede any existing active terms.
-      await tx.subscription.updateMany({
-        where: { therapistId: req.therapistId, status: 'ACTIVE' },
-        data: { status: 'EXPIRED' },
-      });
-
-      await tx.subscription.create({
-        data: {
-          therapistId: req.therapistId,
-          planId: req.planId,
-          months: months_,
-          startedAt: now,
-          currentPeriodEnd: addMonths(now, months_),
-          moduleAccess: grantedModules,
-        },
-      });
-
-      // Apply tool access to the therapist (the in-session gate reads these).
-      await tx.profileTherapist.update({
-        where: { id: req.therapistId },
-        data: {
-          allModulesAllowed: unlimited,
-          moduleAccess: grantedModules,
-        },
+      const { grantedModules } = await activatePlan(tx, {
+        therapistId: req.therapistId,
+        plan,
+        months: months_,
+        modules: cleaned,
       });
 
       await tx.subscriptionRequest.update({
         where: { id: req.id },
-        data: { status: 'APPROVED', reviewedAt: now, modules: grantedModules },
+        data: { status: 'APPROVED', reviewedAt: new Date(), modules: grantedModules },
       });
     });
 

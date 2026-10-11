@@ -10,27 +10,7 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '@/lib/api'
 import { useAuthStore } from '@/store/useAuthStore'
-
-const SDK_URL = 'https://sdk.cashfree.com/js/v3/cashfree.js'
-
-declare global {
-  interface Window {
-    Cashfree?: (opts: { mode: 'sandbox' | 'production' }) => {
-      checkout: (opts: { paymentSessionId: string; redirectTarget?: string }) => Promise<any>
-    }
-  }
-}
-
-function loadSdk(): Promise<void> {
-  if (window.Cashfree) return Promise.resolve()
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script')
-    s.src = SDK_URL
-    s.onload = () => resolve()
-    s.onerror = () => reject(new Error('Failed to load the Cashfree SDK'))
-    document.body.appendChild(s)
-  })
-}
+import { openCashfreeCheckout } from '@/lib/cashfree'
 
 interface OrderStatus {
   orderId: string
@@ -90,19 +70,14 @@ export default function PaymentTestPage() {
       if (!res.ok) throw new Error(order.error || 'Failed to create order')
       addLog(`Order ${order.orderId} created (${order.environment})`)
 
-      await loadSdk()
-      const cashfree = window.Cashfree!({ mode: order.environment })
       addLog('Opening Cashfree checkout…')
-      const result = await cashfree.checkout({
-        paymentSessionId: order.paymentSessionId,
-        redirectTarget: '_modal',
-      })
+      const result = await openCashfreeCheckout(order)
 
-      if (result?.error) addLog(`Checkout closed: ${result.error.message || 'cancelled'}`)
-      else if (result?.redirect) addLog('Redirecting for payment…')
-      else if (result?.paymentDetails) addLog(`Checkout: ${result.paymentDetails.paymentMessage}`)
+      if (result.closedMessage) addLog(`Checkout closed: ${result.closedMessage}`)
+      else if (result.redirected) addLog('Redirecting for payment…')
+      else if (result.paymentMessage) addLog(`Checkout: ${result.paymentMessage}`)
 
-      if (!result?.redirect) await verify(order.orderId)
+      if (!result.redirected) await verify(order.orderId)
     } catch (e: any) {
       setError(e.message)
       addLog(`Error: ${e.message}`)
