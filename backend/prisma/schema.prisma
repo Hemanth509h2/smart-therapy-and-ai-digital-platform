@@ -419,3 +419,26 @@ model TherapistNote {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 }
+
+// One row per Cashfree order. `orderStatus` mirrors Cashfree's order_status
+// (ACTIVE, PAID, EXPIRED, TERMINATED, ...) and is only ever written from a
+// server-side Get Order call, never from what the browser reports.
+model Payment {
+  id             String    @id // Cashfree order_id
+  userId         String // Firebase Auth UID of the payer
+  amount         Decimal   @db.Decimal(12, 2)
+  currency       String    @default("INR")
+  orderStatus    String    @default("ACTIVE")
+  environment    String // sandbox | production
+  cfPaymentId    String?
+  paymentStatus  String? // SUCCESS | FAILED | USER_DROPPED | ... (latest attempt)
+  paymentMethod  String?
+  paymentMessage String?
+  paidAt         DateTime?
+  lastWebhookAt  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([orderStatus])
+}
