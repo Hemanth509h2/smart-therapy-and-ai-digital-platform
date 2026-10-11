@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
@@ -27,15 +27,41 @@ function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get('invite');
-  const { uid } = useAuthStore();
+  const { uid, setRoleAndProfile } = useAuthStore();
+  const redirecting = useRef(false);
 
   const [inviteInfo, setInviteInfo] = useState<{ firstName: string; therapistName: string; status: string } | null>(null);
 
+  // Single place that routes a signed-in user (email, Google, signup, or
+  // arriving here already signed in). The role is loaded BEFORE navigating:
+  // AuthProvider skips the profile fetch on /auth, so pushing straight to '/'
+  // rendered the therapist/client dashboard until the role arrived and its
+  // guard bounced admins to /admin.
   useEffect(() => {
-    if (uid) {
-      router.push('/');
-    }
-  }, [uid, router]);
+    if (!uid || redirecting.current) return;
+    redirecting.current = true;
+    (async () => {
+      try {
+        const res = await apiFetch('/api/users/profile');
+        if (res.status === 404) {
+          router.replace(onboardingUrl(role));
+          return;
+        }
+        const user = res.ok ? (await res.json()).user : null;
+        if (user) {
+          const profile =
+            user.role === 'THERAPIST' ? user.therapist
+            : user.role === 'ADMIN' ? user.admin
+            : user.client;
+          setRoleAndProfile(user.role, profile);
+        }
+        router.replace(user?.role === 'ADMIN' ? '/admin' : '/');
+      } catch {
+        router.replace('/');
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid]);
 
   // When arriving via an invite link, switch to signup as a CLIENT and load the invite.
   useEffect(() => {
@@ -64,13 +90,12 @@ function AuthForm() {
     setError(null);
     setLoading(true);
 
+    // Redirect happens in the uid effect above once Firebase reports the user.
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
-        router.push('/');
       } else {
         await createUserWithEmailAndPassword(auth, email, password);
-        router.push(onboardingUrl(role));
       }
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please try again.');
@@ -84,15 +109,8 @@ function AuthForm() {
     setLoading(true);
     const provider = new GoogleAuthProvider();
     try {
+      // Redirect (by role, or to onboarding) happens in the uid effect above.
       await signInWithPopup(auth, provider);
-      // apiFetch attaches the Firebase ID token; the backend verifies it and
-      // returns the caller's own profile.
-      const checkProfile = await apiFetch('/api/users/profile');
-      if (checkProfile.ok) {
-        router.push('/');
-      } else {
-        router.push(onboardingUrl(inviteToken ? 'CLIENT' : role));
-      }
     } catch (err: any) {
       setError(err.message || 'Google Auth failed');
     } finally {
