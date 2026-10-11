@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/apiAuth';
 import { prisma } from '@/lib/db';
 import { mintSttToken } from '@/lib/stt-token';
+import { getSetting } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +10,10 @@ export async function GET(request: Request) {
   try {
     const auth = await requireAuth(request);
     if (!auth.ok) return auth.response;
+
+    if (!(await getSetting('features.transcription'))) {
+      return NextResponse.json({ error: 'Transcription is turned off by an admin.' }, { status: 503 });
+    }
 
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('sessionId');

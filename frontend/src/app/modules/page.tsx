@@ -20,6 +20,7 @@ import { IconArrowRightXs, IconModules, IconPlus } from '@/components/staad/icon
 import { toast } from '@/components/practice/ui';
 import { AddClientDialog, StartSessionDialog } from '@/components/practice/dialogs';
 import { MODULE_CATEGORIES, resolveAllowedModuleIds } from '@/lib/modules';
+import { useModuleSettings } from '@/hooks/useModuleSettings';
 import { type Tone } from '@/lib/practice';
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -149,9 +150,12 @@ function ModulesInner() {
 
   // Per-therapist module access is real: locked modules cannot be launched.
   const allowed = useMemo(() => new Set(resolveAllowedModuleIds(profile)), [profile]);
+  // Modules an admin switched off globally are hidden; featured ones are badged.
+  const { disabled, featured } = useModuleSettings();
+  const available = useMemo(() => MODULES.filter((m) => !disabled.has(m.id)), [disabled]);
 
   const q = search.trim().toLowerCase();
-  const filtered = MODULES.filter((m) => {
+  const filtered = available.filter((m) => {
     if (filter === 'Saved') return saved.has(m.id);
     if (filter === 'CBT' || filter === 'DBT') return m.approaches.includes(filter as 'CBT' | 'DBT');
     return filter === 'All' || m.category === filter;
@@ -160,17 +164,17 @@ function ModulesInner() {
   );
 
   const counts: Record<string, number> = {
-    All: MODULES.length,
+    All: available.length,
     Saved: saved.size,
-    CBT: MODULES.filter((m) => m.approaches.includes('CBT')).length,
-    DBT: MODULES.filter((m) => m.approaches.includes('DBT')).length,
+    CBT: available.filter((m) => m.approaches.includes('CBT')).length,
+    DBT: available.filter((m) => m.approaches.includes('DBT')).length,
   };
 
   const chipOptions = ['All', 'Saved', 'CBT', 'DBT', ...MODULE_CATEGORIES.map((c) => CATEGORY_LABEL[c.id] ?? c.name)].map(
     (key) => ({
       key,
       label: key,
-      count: counts[key] ?? MODULES.filter((m) => m.category === key).length,
+      count: counts[key] ?? available.filter((m) => m.category === key).length,
     })
   );
 
@@ -266,6 +270,8 @@ function ModulesInner() {
                   <div className="mod__meta">
                     {locked ? (
                       <Badge tone="gray">Locked</Badge>
+                    ) : featured.has(m.id) ? (
+                      <Badge tone="green">Featured</Badge>
                     ) : (
                       <span>{m.focus}</span>
                     )}

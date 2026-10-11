@@ -26,6 +26,7 @@ import { SkillModuleView } from '@/components/GlassModulePanel';
 import SkillDevLayout from '@/components/session/SkillDevLayout';
 import ReactionOverlay from '@/components/ReactionOverlay';
 import { resolveAllowedModuleIds, isSkillModule, moduleName as moduleDisplayName } from '@/lib/modules';
+import { loadModuleSettings } from '@/hooks/useModuleSettings';
 import { RC, SIDEBAR_WIDTH } from '@/components/session/roomTheme';
 import type { SidebarPanel } from '@/components/session/sessionPanels';
 import CaptionOverlay from '@/components/session/CaptionOverlay';
@@ -537,7 +538,11 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       showToast('That module is not included in your plan');
       return;
     }
-    handleModuleLaunch(requested, moduleDisplayName(requested));
+    // Modules an admin switched off globally can't be launched by link either.
+    loadModuleSettings().then(({ disabled }) => {
+      if (disabled.has(requested)) showToast('That module is currently unavailable');
+      else handleModuleLaunch(requested, moduleDisplayName(requested));
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isTherapist, sessionState, profile]);
 
