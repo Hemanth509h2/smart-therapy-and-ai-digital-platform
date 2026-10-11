@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
+import { audit } from '@/lib/audit';
 import { ALL_MODULE_IDS } from '@/lib/modules';
 
 // PATCH /api/admin/therapists/[id]/access — set a therapist's module access.
@@ -10,7 +11,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireAdmin(request, 'people.write');
     if (!auth.ok) return auth.response;
     const { allModulesAllowed, moduleAccess } = await request.json();
 
@@ -31,6 +32,11 @@ export async function PATCH(
         moduleAccess: cleaned,
       },
       select: { id: true, allModulesAllowed: true, moduleAccess: true },
+    });
+
+    await audit(request, auth, 'therapist.access.update', { type: 'ProfileTherapist', id: params.id }, {
+      before: { allModulesAllowed: therapist.allModulesAllowed, moduleAccess: therapist.moduleAccess },
+      after: { allModulesAllowed: updated.allModulesAllowed, moduleAccess: updated.moduleAccess },
     });
 
     return NextResponse.json({ therapist: updated });

@@ -6,7 +6,7 @@ import { ALL_MODULE_IDS } from '@/lib/modules';
 // GET /api/admin/overview — per-therapist resource usage for the admin dashboard.
 export async function GET(request: Request) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireAdmin(request, 'people.read');
     if (!auth.ok) return auth.response;
     const therapists = await prisma.profileTherapist.findMany({
       include: { user: { select: { email: true } } },
