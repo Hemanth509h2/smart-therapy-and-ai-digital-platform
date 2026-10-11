@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 
-// GET /api/plans — list active subscription plans (therapist + admin facing).
+// GET /api/plans — list active subscription plans (therapist + admin facing),
+// full rows including `features` (the admin-written card bullets).
 // Pass ?all=1 to include inactive plans (admin catalog management).
 export const dynamic = 'force-dynamic';
 

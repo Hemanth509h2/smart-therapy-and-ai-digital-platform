@@ -1,16 +1,41 @@
 import { NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
-import { resolveCurrent, serializeSubscription } from '@/lib/subscriptions';
+import { listParams } from '@/lib/adminList';
+import { daysUntil, resolveCurrent, serializeSubscription, subscriptionState } from '@/lib/subscriptions';
+
+export const dynamic = 'force-dynamic';
 
 // GET /api/admin/subscriptions — every professional with their current plan
 // (months / period end / renewed) plus all pending plan requests to review.
+// Filters: ?status=active|expiring7|expiring30|expired|none, ?planId= (current
+// plan), ?q= (therapist name/email), ?sort=name|ends|joined. Paginated
+// (?page=&pageSize=, adds `total`) only when `page` is passed; without it every
+// professional is returned, as before.
 export async function GET(request: Request) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireAdmin(request, 'billing.read');
     if (!auth.ok) return auth.response;
+
+    const { sp, skip, take, sort, dir, q } = listParams(request, { sortable: ['name', 'ends', 'joined'], defaultSort: 'joined' });
+    const status = sp.get('status') || '';
+    const planId = sp.get('planId') || '';
+    const paginate = sp.has('page');
+
+    const where: Prisma.ProfileTherapistWhereInput = q
+      ? {
+          OR: [
+            { firstName: { contains: q, mode: 'insensitive' } },
+            { lastName: { contains: q, mode: 'insensitive' } },
+            { user: { email: { contains: q, mode: 'insensitive' } } },
+          ],
+        }
+      : {};
+
     const [therapists, requests] = await Promise.all([
       prisma.profileTherapist.findMany({
+        where,
         include: {
           user: { select: { email: true } },
           subscriptions: { include: { plan: true }, orderBy: { startedAt: 'desc' } },
@@ -24,8 +49,12 @@ export async function GET(request: Request) {
       }),
     ]);
 
-    const professionals = therapists.map((t) => {
-      const current = resolveCurrent(t.subscriptions);
+    const now = new Date();
+    let professionals = therapists.map((t) => {
+      const current = resolveCurrent(t.subscriptions, now);
+      // Most recent term of any status — what renew/reactivate act on when
+      // there is no current one.
+      const latest = t.subscriptions[0] ?? null;
       return {
         therapistId: t.id,
         name: `${t.firstName} ${t.lastName}`.trim(),
@@ -33,9 +62,39 @@ export async function GET(request: Request) {
         allModulesAllowed: t.allModulesAllowed,
         moduleAccessCount: t.moduleAccess.length,
         current: serializeSubscription(current),
+        latest: current ? null : serializeSubscription(latest),
+        state: subscriptionState(current, latest, now),
+        daysLeft: current ? daysUntil(current.currentPeriodEnd, now) : null,
         termCount: t.subscriptions.length,
+        joinedAt: t.createdAt,
       };
     });
+
+    professionals = professionals.filter((p) => {
+      if (planId && p.current?.planId !== planId) return false;
+      switch (status) {
+        case 'active': return !!p.current;
+        case 'expiring7': return p.daysLeft != null && p.daysLeft <= 7;
+        case 'expiring30': return p.daysLeft != null && p.daysLeft <= 30;
+        case 'expired': return p.state === 'expired' || p.state === 'cancelled';
+        case 'none': return p.state === 'none';
+        default: return true;
+      }
+    });
+
+    if (sort !== 'joined' || dir === 'desc') {
+      const key = (p: (typeof professionals)[number]): number | string =>
+        sort === 'name'
+          ? p.name.toLowerCase()
+          : sort === 'ends'
+            ? new Date(p.current?.currentPeriodEnd ?? p.latest?.currentPeriodEnd ?? 0).getTime()
+            : new Date(p.joinedAt).getTime();
+      const sign = dir === 'asc' ? 1 : -1;
+      professionals.sort((a, b) => (key(a) < key(b) ? -sign : key(a) > key(b) ? sign : 0));
+    }
+
+    const total = professionals.length;
+    if (paginate) professionals = professionals.slice(skip, skip + take);
 
     const pending = requests.map((r) => ({
       id: r.id,
@@ -51,7 +110,7 @@ export async function GET(request: Request) {
       createdAt: r.createdAt,
     }));
 
-    return NextResponse.json({ professionals, requests: pending });
+    return NextResponse.json({ professionals, total, requests: pending });
   } catch (error: any) {
     console.error('Admin subscriptions GET error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
