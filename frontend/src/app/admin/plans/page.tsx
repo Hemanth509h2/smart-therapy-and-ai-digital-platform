@@ -21,11 +21,20 @@ interface Plan {
   priceMonthly: number;
   durationMonths: number;
   toolQuota: number | null;
+  maxClients: number | null;
+  maxSessionsPerMonth: number | null;
+  maxAiReportsPerMonth: number | null;
   isActive: boolean;
   sortOrder: number;
 }
 
-const blankForm = { name: '', description: '', priceMonthly: '', durationMonths: '1', toolQuota: '', unlimited: false, sortOrder: '0', isActive: true };
+// Usage limits are kept as typed; blank = unlimited.
+const blankForm = { name: '', description: '', priceMonthly: '', durationMonths: '1', toolQuota: '', unlimited: false, sortOrder: '0', isActive: true, maxClients: '', maxSessionsPerMonth: '', maxAiReportsPerMonth: '' };
+const LIMITS = [
+  { key: 'maxClients', label: 'Active clients', unit: 'clients' },
+  { key: 'maxSessionsPerMonth', label: 'Sessions / month', unit: 'sessions/mo' },
+  { key: 'maxAiReportsPerMonth', label: 'AI reports / month', unit: 'AI reports/mo' },
+] as const;
 
 export default function AdminPlansPage() {
   const { uid, role, profile } = useAuthStore();
@@ -66,6 +75,9 @@ export default function AdminPlansPage() {
       toolQuota: p.toolQuota == null ? '' : String(p.toolQuota),
       unlimited: p.toolQuota == null,
       sortOrder: String(p.sortOrder),
+      maxClients: p.maxClients == null ? '' : String(p.maxClients),
+      maxSessionsPerMonth: p.maxSessionsPerMonth == null ? '' : String(p.maxSessionsPerMonth),
+      maxAiReportsPerMonth: p.maxAiReportsPerMonth == null ? '' : String(p.maxAiReportsPerMonth),
       isActive: p.isActive,
     });
     setError('');
@@ -80,12 +92,20 @@ export default function AdminPlansPage() {
       return;
     }
     setSaving(true);
+    for (const { key, label } of LIMITS) {
+      const v = form[key].trim();
+      if (v && !(Number.isInteger(Number(v)) && Number(v) >= 0)) {
+        setError(`${label} must be a whole number, or blank for unlimited.`);
+        return;
+      }
+    }
     const body = {
       name: form.name.trim(),
       description: form.description.trim(),
       priceMonthly: Number(form.priceMonthly) || 0,
       durationMonths: Number(form.durationMonths) || 1,
       toolQuota: form.unlimited ? null : Number(form.toolQuota),
+      ...Object.fromEntries(LIMITS.map(({ key }) => [key, form[key].trim() === '' ? null : Number(form[key])])),
       sortOrder: Number(form.sortOrder) || 0,
       isActive: form.isActive,
     };
@@ -111,7 +131,7 @@ export default function AdminPlansPage() {
           <div>
             <h1 className="font-heading text-[28px]" style={{ color: 'var(--ink)' }}>Plans</h1>
             <p className="text-sm font-medium mt-1" style={{ color: 'var(--ink-muted)' }}>
-              Define the subscription plans therapists can request. Pricing is display-only.
+              Define the subscription plans therapists can buy or request, with their usage limits.
             </p>
           </div>
           <Button onClick={openNew} className="btn-press rounded-xl flex items-center gap-2 py-5 px-4 shadow-sm" style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}>
@@ -145,6 +165,11 @@ export default function AdminPlansPage() {
                   <span className="rounded-full px-2 py-0.5" style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--ink-muted)' }}>
                     {p.durationMonths} mo default
                   </span>
+                  {LIMITS.map(({ key, unit }) => (
+                    <span key={key} className="rounded-full px-2 py-0.5" style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--ink-muted)' }}>
+                      {p[key] == null ? `Unlimited ${unit}` : `${p[key]} ${unit}`}
+                    </span>
+                  ))}
                 </div>
                 <button onClick={() => openEdit(p)} className="btn-press mt-4 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold" style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--ink)' }}>
                   <Pencil className="h-3.5 w-3.5" /> Edit
@@ -183,6 +208,16 @@ export default function AdminPlansPage() {
                 <input type="number" value={form.durationMonths} onChange={(e) => setForm({ ...form, durationMonths: e.target.value })} className="w-full rounded-xl p-3 text-sm focus-visible:outline-none" style={inputStyle} />
               </Field>
             </div>
+            <Field label="Usage limits (blank = unlimited)">
+              <div className="grid grid-cols-3 gap-2">
+                {LIMITS.map(({ key, label }) => (
+                  <label key={key} className="space-y-1">
+                    <span className="block text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>{label}</span>
+                    <input type="number" min={0} step={1} inputMode="numeric" placeholder="Unlimited" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} className="w-full rounded-xl p-3 text-sm focus-visible:outline-none" style={inputStyle} />
+                  </label>
+                ))}
+              </div>
+            </Field>
             <Field label="Tool quota">
               <div className="flex items-center gap-3">
                 <input type="number" disabled={form.unlimited} value={form.unlimited ? '' : form.toolQuota} onChange={(e) => setForm({ ...form, toolQuota: e.target.value })} placeholder="5" className="w-24 rounded-xl p-3 text-sm focus-visible:outline-none" style={{ ...inputStyle, opacity: form.unlimited ? 0.5 : 1 }} />

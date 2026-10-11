@@ -283,16 +283,20 @@ model UsageEvent {
 // priceMonthly is display-only. `toolQuota` caps how many therapy tools a plan
 // grants (null = all tools / unlimited).
 model Plan {
-  id             String   @id @default(uuid())
-  name           String   @unique
-  description    String?
-  priceMonthly   Int      @default(0) // INR per month; charged via Cashfree (0 = free, request-only)
-  durationMonths Int      @default(1) // suggested default term length
-  toolQuota      Int? // null = unlimited (all tools); else max tools allowed
-  isActive       Boolean  @default(true)
-  sortOrder      Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                   String   @id @default(uuid())
+  name                 String   @unique
+  description          String?
+  priceMonthly         Int      @default(0) // INR per month; charged via Cashfree (0 = free, request-only)
+  durationMonths       Int      @default(1) // suggested default term length
+  toolQuota            Int? // null = unlimited (all tools); else max tools allowed
+  isActive             Boolean  @default(true)
+  sortOrder            Int      @default(0)
+  // Usage limits per plan; null = unlimited. Documented in docx/PLANS.md.
+  maxClients           Int? // active clients at once
+  maxSessionsPerMonth  Int? // video sessions per calendar month
+  maxAiReportsPerMonth Int? // AI session analyses per calendar month
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   subscriptions Subscription[]
   requests      SubscriptionRequest[]

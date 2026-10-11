@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
+import { parsePlanLimits } from '@/lib/subscriptions';
 
-// PATCH /api/admin/plans/[id] — update a plan (name, pricing, quota, active flag).
+// PATCH /api/admin/plans/[id] — update a plan (name, pricing, quota, usage limits, active flag).
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
     const auth = await requireAdmin(request);
@@ -20,6 +21,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       const q = body.toolQuota;
       data.toolQuota = q === null || q === '' ? null : Math.max(1, Number(q));
     }
+    const limits = parsePlanLimits(body);
+    if (typeof limits === 'string') return NextResponse.json({ error: limits }, { status: 400 });
+    Object.assign(data, limits);
 
     const plan = await prisma.plan.update({ where: { id: params.id }, data });
     return NextResponse.json({ plan });
