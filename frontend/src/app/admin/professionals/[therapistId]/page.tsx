@@ -106,7 +106,7 @@ export default function TherapistDetailPage() {
     <DashboardLayout role={role} profile={profile}>
       <div className="space-y-6">
         <button
-          onClick={() => router.push('/admin')}
+          onClick={() => router.push('/admin/professionals')}
           className="flex items-center gap-1.5 text-sm font-semibold"
           style={{ color: 'var(--ink-muted)' }}
         >

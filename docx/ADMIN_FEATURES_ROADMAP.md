@@ -2,6 +2,13 @@
 
 Date: 2026-10-11 · Branch: `admin`
 
+> **Branch split (2026-10-11):** `admin` and the payment branch (`sub` →
+> `origin/payment`) are kept separate. Admin features that need Cashfree
+> payments — the Payments & Revenue page (§2.2), refunds, invoices, coupons,
+> multi-month plan discounts, "paid vs granted" and "cancelled" badges on
+> Subscriptions, and real revenue/MRR — are built on the payment branch, not
+> here. Everything else is built on `admin`.
+
 Everything we can add to the admin portal, page by page: improvements to the
 5 pages that exist today, and the new pages to build. Builds on
 [`ADMIN_PORTAL_AUDIT.md`](./ADMIN_PORTAL_AUDIT.md) (2026-10-06) — that file has

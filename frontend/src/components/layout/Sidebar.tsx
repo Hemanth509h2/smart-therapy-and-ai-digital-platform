@@ -24,9 +24,20 @@ import {
   LogOut,
   ChevronsLeft,
   ChevronsRight,
+  LayoutDashboard,
+  MessageSquare,
+  Gauge,
+  ScrollText,
+  Settings,
+  Boxes,
+  HeartPulse,
+  FileDown,
+  Video,
+  Inbox,
 } from 'lucide-react';
 import { cx } from '@/components/practice/ui';
 import { initials as toInitials } from '@/lib/practice';
+import { adminRoleOf, canAdmin, type AdminPermission } from '@/lib/adminRoles';
 
 interface SidebarProps {
   role: 'THERAPIST' | 'CLIENT' | 'ADMIN' | null;
@@ -58,12 +69,24 @@ const clientNav = [
   { href: '/help', label: 'Help & Support', icon: LifeBuoy },
 ];
 
-const adminNav = [
-  { href: '/admin', label: 'Professionals', icon: Users },
-  { href: '/admin/subscriptions', label: 'Subscriptions', icon: Receipt },
-  { href: '/admin/plans', label: 'Plans', icon: Layers },
-  { href: '/admin/admins', label: 'Admins', icon: Shield },
-  { href: '/help', label: 'Help & Support', icon: LifeBuoy },
+// Each admin item lists the permission it needs (lib/adminRoles.ts); items
+// the signed-in admin's role can't use are hidden.
+const adminNav: { href: string; label: string; icon: typeof Home; permission?: AdminPermission }[] = [
+  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/professionals', label: 'Professionals', icon: Users, permission: 'people.read' },
+  { href: '/admin/clients', label: 'Clients', icon: User, permission: 'people.read' },
+  { href: '/admin/sessions', label: 'Sessions', icon: Video, permission: 'people.read' },
+  { href: '/admin/subscriptions', label: 'Subscriptions', icon: Receipt, permission: 'billing.read' },
+  { href: '/admin/plans', label: 'Plans', icon: Layers, permission: 'billing.read' },
+  { href: '/admin/support', label: 'Support inbox', icon: Inbox, permission: 'support' },
+  { href: '/admin/messages', label: 'Messages', icon: MessageSquare, permission: 'support' },
+  { href: '/admin/usage', label: 'Usage & AI cost', icon: Gauge, permission: 'people.read' },
+  { href: '/admin/modules', label: 'Module library', icon: Boxes, permission: 'content' },
+  { href: '/admin/reports', label: 'Reports', icon: FileDown, permission: 'people.read' },
+  { href: '/admin/audit', label: 'Audit log', icon: ScrollText, permission: 'audit.read' },
+  { href: '/admin/health', label: 'System health', icon: HeartPulse, permission: 'settings' },
+  { href: '/admin/settings', label: 'Settings', icon: Settings, permission: 'settings' },
+  { href: '/admin/admins', label: 'Admins', icon: Shield, permission: 'admins.manage' },
 ];
 
 export default function Sidebar({
@@ -78,7 +101,13 @@ export default function Sidebar({
   const router = useRouter();
   const { theme, toggle: toggleTheme } = useTheme();
 
-  const navItems = role === 'ADMIN' ? adminNav : role === 'THERAPIST' ? therapistNav : clientNav;
+  const adminRole = adminRoleOf(profile);
+  const navItems =
+    role === 'ADMIN'
+      ? adminNav.filter((i) => !i.permission || canAdmin(adminRole, i.permission))
+      : role === 'THERAPIST'
+        ? therapistNav
+        : clientNav;
   const roleLabel = role === 'ADMIN' ? 'Admin' : role === 'THERAPIST' ? 'Therapist' : 'Client';
 
   // '/' and '/admin' only match exactly; everything else also owns its sub-routes
