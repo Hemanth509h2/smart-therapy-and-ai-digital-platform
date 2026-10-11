@@ -449,7 +449,7 @@ export function Modal({
 }) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className={cx('rounded-2xl', wide ? 'max-w-3xl' : 'max-w-md')} style={{ background: 'var(--glass-strong)', backdropFilter: 'blur(24px)', border: '1px solid var(--glass-border)' }}>
+      <DialogContent className={cx('rounded-2xl', wide ? 'sm:max-w-3xl' : 'sm:max-w-md')} style={{ background: 'var(--glass-strong)', backdropFilter: 'blur(24px)', border: '1px solid var(--glass-border)' }}>
         <DialogHeader>
           <DialogTitle className="font-heading text-2xl" style={{ color: 'var(--ink)' }}>{title}</DialogTitle>
           {description && <DialogDescription className="font-medium" style={{ color: 'var(--ink-muted)' }}>{description}</DialogDescription>}
