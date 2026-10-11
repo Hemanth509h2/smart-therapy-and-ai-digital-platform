@@ -4,6 +4,15 @@ import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { normalizeWhatsAppNumber } from '@/lib/whatsapp-cloud-api';
 
+// The caller must own the therapist profile or be an ADMIN.
+async function mayAccessTherapist(uid: string, therapistId: string) {
+  const [therapist, user] = await Promise.all([
+    prisma.profileTherapist.findUnique({ where: { id: therapistId }, select: { userId: true } }),
+    prisma.user.findUnique({ where: { id: uid }, select: { role: true } }),
+  ]);
+  return therapist?.userId === uid || user?.role === 'ADMIN';
+}
+
 export const dynamic = 'force-dynamic';
 
 // POST /api/clients — therapist adds a client directly (name + diagnosis +
@@ -73,8 +82,18 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
+
     const { searchParams } = new URL(request.url);
     const therapistId = searchParams.get('therapistId');
+    // Without a therapistId this lists every client: admins only.
+    const allowed = therapistId
+      ? await mayAccessTherapist(auth.uid, therapistId)
+      : (await prisma.user.findUnique({ where: { id: auth.uid }, select: { role: true } }))?.role === 'ADMIN';
+    if (!allowed) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     if (therapistId) {
       // Clients of this therapist: directly added ones PLUS any linked via sessions.

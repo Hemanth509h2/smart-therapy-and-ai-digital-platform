@@ -1,14 +1,36 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireAuth } from '@/lib/apiAuth';
 import { sendSessionBookedWhatsApp } from '@/lib/session-whatsapp';
+
+// The caller must own the referenced therapist/client profile or be an ADMIN.
+async function mayAccess(uid: string, ref: { therapistId?: string | null; clientId?: string | null }) {
+  const [therapist, client, user] = await Promise.all([
+    ref.therapistId
+      ? prisma.profileTherapist.findUnique({ where: { id: ref.therapistId }, select: { userId: true } })
+      : null,
+    ref.clientId
+      ? prisma.profileClient.findUnique({ where: { id: ref.clientId }, select: { userId: true } })
+      : null,
+    prisma.user.findUnique({ where: { id: uid }, select: { role: true } }),
+  ]);
+  if (user?.role === 'ADMIN') return true;
+  return ref.therapistId ? therapist?.userId === uid : client?.userId === uid;
+}
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
+
     const { searchParams } = new URL(request.url);
     const therapistId = searchParams.get('therapistId');
     const clientId = searchParams.get('clientId');
+    if ((therapistId || clientId) && !(await mayAccess(auth.uid, { therapistId, clientId }))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     if (therapistId) {
       // Note count + report presence let the UI flag completed sessions whose
@@ -45,7 +67,13 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
+
     const { therapistId, clientId, scheduledAt, booking } = await request.json();
+    if (!therapistId || !(await mayAccess(auth.uid, { therapistId }))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     // If clientId is a userId (firebase UID), look up the profile ID
     let finalClientId = clientId;

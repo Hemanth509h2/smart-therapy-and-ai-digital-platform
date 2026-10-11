@@ -40,6 +40,17 @@ function AuthForm() {
   useEffect(() => {
     if (!uid || redirecting.current) return;
     redirecting.current = true;
+    // Pages that sent the user here to sign in (e.g. an admin invite) leave
+    // their path behind; only same-site paths are honoured.
+    let next: string | null = null;
+    try {
+      next = sessionStorage.getItem('staad-post-auth-redirect');
+      sessionStorage.removeItem('staad-post-auth-redirect');
+    } catch {}
+    if (next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\')) {
+      router.replace(next);
+      return;
+    }
     (async () => {
       try {
         const res = await apiFetch('/api/users/profile');

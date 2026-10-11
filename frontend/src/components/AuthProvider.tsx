@@ -28,7 +28,14 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         }
 
         // Skip profile fetch on pages that handle their own auth flow
-        if (pathname === '/auth' || pathname === '/onboarding' || pathname.startsWith('/join')) {
+        // (/admin/invite/<token>: the invitee may have no profile yet, and
+        // must not be sent to onboarding).
+        if (
+          pathname === '/auth' ||
+          pathname === '/onboarding' ||
+          pathname.startsWith('/join') ||
+          pathname.startsWith('/admin/invite/')
+        ) {
           setLoading(false);
           return;
         }
@@ -63,7 +70,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         const devPreview =
           process.env.NODE_ENV !== 'production' && pathname === '/session/preview';
         // /join/<token> is the public guest invite page — no session needed.
-        const guestInvite = pathname.startsWith('/join');
+        // /admin/invite/<token> explains how to sign in before accepting.
+        const guestInvite = pathname.startsWith('/join') || pathname.startsWith('/admin/invite/');
         if (pathname !== '/auth' && pathname !== '/onboarding' && !devPreview && !guestInvite) {
           router.push('/auth');
         }
