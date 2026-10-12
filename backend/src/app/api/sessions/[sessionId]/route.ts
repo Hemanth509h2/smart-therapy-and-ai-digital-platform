@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { provisionSessionDocs } from '@/lib/session-provisioning';
 import { markSessionEnded } from '@/lib/session-provisioning';
+import { sendSessionLinkWhatsApp } from '@/lib/session-whatsapp';
 
 // GET /api/sessions/[sessionId] — fetch a single session (with client + therapist).
 export async function GET(
@@ -136,6 +137,12 @@ export async function PATCH(
       data,
       include: { client: true, therapist: true },
     });
+
+    // Send the patient join link when the session starts. Skipped if the
+    // "Start a new session" dialog already sent it for this session.
+    if (finalAction === 'start' && session.status === 'ACTIVE') {
+      await sendSessionLinkWhatsApp(session.id, request);
+    }
 
     // Trigger n8n webhook when session is completed
     if (finalAction === 'end' && session.status === 'COMPLETED') {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { sendSessionBookedWhatsApp } from '@/lib/session-whatsapp';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +72,10 @@ export async function POST(request: Request) {
         therapist: true,
       },
     });
+
+    // A booking gets a date/time confirmation (no link). Instant sessions get
+    // nothing here — the join link is sent when the session is started.
+    if (booking) await sendSessionBookedWhatsApp(session.id);
 
     return NextResponse.json({ session });
   } catch (error: any) {

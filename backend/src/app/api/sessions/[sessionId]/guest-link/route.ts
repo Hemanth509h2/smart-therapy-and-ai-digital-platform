@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
-import { getOrCreateGuestInvite } from '@/lib/guest-invite';
+import { getOrCreateGuestInvite, sendSessionLinkWhatsApp } from '@/lib/session-whatsapp';
 
 // POST /api/sessions/[sessionId]/guest-link — create (or reuse) a patient
 // join link for an already-created session ("Start a new session"). The
 // invite is marked CLAIMED with claimedClientId = session.clientId, so opening
 // the link lands the patient in THIS session's room (no new session is
-// created on join).
+// created on join). The link is also sent to the patient on WhatsApp.
 export async function POST(request: Request, { params }: { params: { sessionId: string } }) {
   try {
     const auth = await requireAuth(request);
@@ -25,6 +25,7 @@ export async function POST(request: Request, { params }: { params: { sessionId: 
     }
 
     const invite = await getOrCreateGuestInvite(session);
+    await sendSessionLinkWhatsApp(session.id, request);
 
     return NextResponse.json({ token: invite.token });
   } catch (error: any) {
