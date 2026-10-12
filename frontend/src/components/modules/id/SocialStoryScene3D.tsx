@@ -844,10 +844,12 @@ function Kid({ target, start, scale = 1, mood, says, walkMs, look, action, posOu
                   </group>
                 </>
               ) : (
-                <group ref={bowl} position={[0.08, -0.52, 0.08]} visible={false}>
-                  <mesh scale={[1, 0.6, 1]}><sphereGeometry args={[0.16, 18, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} /><Mat color="#ffffff" rough={0.4} /></mesh>
-                  {[['#f2c94c', -0.05, 0.02], ['#e86a6a', 0.04, -0.03], ['#8e6bd8', 0.02, 0.05]].map(([c, bx, bz], i) => (
-                    <mesh key={i} position={[bx as number, 0.0, bz as number]}><sphereGeometry args={[0.04, 8, 6]} /><Mat color={c as string} /></mesh>
+                <group ref={bowl} position={[0.06, -0.5, 0.1]} rotation={[1.25, 0, 0]} visible={false}>
+                  {/* a shallow cereal bowl, open side up toward her */}
+                  <mesh scale={[1, 0.45, 1]}><sphereGeometry args={[0.12, 18, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} /><meshStandardMaterial color="#7cc3d6" roughness={0.4} side={THREE.DoubleSide} /></mesh>
+                  <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, 0]}><circleGeometry args={[0.115, 18]} /><Mat color="#fff4dc" /></mesh>
+                  {[['#f2c94c', -0.04, 0.02], ['#e86a6a', 0.035, -0.03], ['#8e6bd8', 0.01, 0.045]].map(([c, bx, bz], i) => (
+                    <mesh key={i} position={[bx as number, 0.01, bz as number]}><sphereGeometry args={[0.025, 8, 6]} /><Mat color={c as string} /></mesh>
                   ))}
                 </group>
               )}
@@ -1487,7 +1489,9 @@ function Scene({ storyId, spots, kidAt, mood, kidSays, guideId, showCaptions, wa
         <FloorGlow key={`g-${s.id}`} pos={layout.stand.get(s.id)!} color={s.status === 'done' ? '#2f9e62' : s.color} dim={s.status === 'done'} />
       ))}
       {guideTo && mood !== 'walk' && <Footprints from={kidTarget} to={guideTo} />}
-      {spots.map(s => (
+      {/* Bubbles step aside while the camera is in close on her (walking or
+          acting): nothing can be picked then anyway, and they'd cover her face. */}
+      {mood !== 'walk' && mood !== 'act' && spots.filter(s => !(s.id === kidAt && s.status === 'done')).map(s => (
         <SpotBubble key={`b-${s.id}`} spot={s} at={layout.bubble.get(s.id)!} showCaption={showCaptions && !isHome} onSpot={onSpot} />
       ))}
 

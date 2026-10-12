@@ -447,8 +447,6 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     () => [...activePanels].sort((a, b) => a.correctIndex - b.correctIndex),
     [activePanels],
   )
-  const orderedRef = useRef(orderedPanels)
-  orderedRef.current = orderedPanels
   /** Changes only when the story's actual content does, unlike the array identity. */
   const replaySig = useMemo(
     () => `${storyId}::${orderedPanels.map(p => `${p.correctIndex}:${p.caption}`).join('|')}`,
