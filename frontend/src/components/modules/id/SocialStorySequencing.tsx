@@ -134,6 +134,10 @@ const ACTION_SAYS: Record<string, string> = {
   s1p3: 'My school uniform! 👕',
   s1p4: 'Yum, breakfast! 🥣',
   s1p5: 'Bye! Off to school! 👋',
+  s2p1: 'Oh, someone new! 👀',
+  s2p2: 'Hello! 😊',
+  s2p3: "Hi, I'm Maya! 🤝",
+  s2p4: "What's your name? 🗣️",
 }
 
 /** Where each story happens, for the header. The 3D room itself is drawn in SocialStoryScene3D. */

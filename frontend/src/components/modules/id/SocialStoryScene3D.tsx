@@ -533,8 +533,10 @@ export interface KidLook {
   backpack: boolean
 }
 
-function Kid({ target, start, scale = 1, mood, says, walkMs, look, action, posOut }: {
+function Kid({ target, start, scale = 1, facing = 0, mood, says, walkMs, look, action, posOut }: {
   target: THREE.Vector3; start: THREE.Vector3; scale?: number; mood: KidMood; says: string; walkMs: number
+  /** Which way she faces when standing still (radians; 0 = toward the camera). */
+  facing?: number
   look: KidLook
   /** The step being acted out right now, for its own animation. */
   action: string | null
@@ -670,7 +672,7 @@ function Kid({ target, start, scale = 1, mood, says, walkMs, look, action, posOu
     // uniform spin overrides this while it plays.
     const dir = new THREE.Vector3().subVectors(w.to, w.from)
     const walkingNotRising = moving && !(w.rising && k < 0.6)
-    let want = walkingNotRising && dir.lengthSq() > 0.0001 ? Math.atan2(dir.x, dir.z) : 0
+    let want = walkingNotRising && dir.lengthSq() > 0.0001 ? Math.atan2(dir.x, dir.z) : facing
     if (acting && action === 's1p5' && since > 1.0) want = Math.PI * 0.85 // turn to the door and go
     if (acting && action === 's1p3' && since < 0.9) {
       r.rotation.y = (since / 0.9) * Math.PI * 2
@@ -720,6 +722,29 @@ function Kid({ target, start, scale = 1, mood, says, walkMs, look, action, posOu
           armSwingR = -2.7
           armOutR = -0.3 + Math.sin(t * 14) * 0.35
           lift = since < 0.5 ? Math.sin((since / 0.5) * Math.PI) * 0.2 : 0
+          break
+        case 's2p1': // spots someone new: a little hop, points and leans in
+          lift = since < 0.4 ? Math.sin((since / 0.4) * Math.PI) * 0.16 : 0
+          armSwingR = -1.5; armOutR = -0.12
+          armSwingL = -0.2
+          headNod = 0.06
+          break
+        case 's2p2': // smile and wave hello
+          armSwingR = -2.6
+          armOutR = -0.25 + Math.sin(t * 14) * 0.3
+          armSwingL = -0.2
+          headTilt = 0.08
+          break
+        case 's2p3': // handshake: hand out level, shaking gently
+          armSwingR = -1.45 + Math.sin(t * 10) * 0.1; armOutR = -0.55
+          armSwingL = -0.3
+          headNod = 0.1
+          break
+        case 's2p4': // ask their name: open hands, head tilted to listen
+          armSwingL = -1.1; armOutL = 0.5
+          armSwingR = -1.1; armOutR = -0.5
+          headTilt = 0.14
+          headNod = Math.sin(t * 3) * 0.05
           break
         default:
           lift = since < 0.55 ? Math.sin((since / 0.55) * Math.PI) * 0.38 : 0
@@ -1232,6 +1257,206 @@ function SchoolRoom({ look, ate }: { look: KidLook; ate: boolean }) {
 
 // --- Spots, footprints, camera --------------------------------------------
 
+/* ---------- "Meeting Someone New": the park in front of school ---------- */
+
+const PARK_SPOTS: Record<string, SchoolSpot> = {
+  s2p1: { bubble: [-4.4, 2.7, -0.45], stand: [-4.2, 0, -0.45] },  // spots the new kid from a distance
+  s2p2: { bubble: [-2.7, 3.3, -0.45], stand: [-2.4, 0, -0.45] },  // close enough to wave hello
+  s2p3: { bubble: [-1.0, 2.7, -0.45], stand: [-1.0, 0, -0.45] },  // handshake distance
+  s2p4: { bubble: [0.8, 3.3, -0.45], stand: [-1.3, 0, -0.45] },   // chatting
+}
+const PARK_START = new THREE.Vector3(-6.4, 0, -0.45)
+/** She faces the new kid (+x); the new kid faces her (-x). */
+const PARK_FACING = Math.PI / 2
+const FRIEND_POS: [number, number, number] = [0.1, 0, -0.45]
+const FRIEND_SAYS: Record<string, string> = {
+  s2p2: 'Hello! 😊',
+  s2p3: 'Nice to meet you! 🤝',
+  s2p4: "I'm Riya! 🌸",
+}
+
+/** A second person for the park: the new friend (animated by the step being
+    acted out) or a background kid (just breathing and swaying a little). */
+function Person({ pos, rotY = 0, scale = 1.1, shirt, pants = '#3b5d8f', hair = '#4a3226', bag, sit = false, long = true, action = null, says = '', seed = 0, active = false }: {
+  pos: [number, number, number]; rotY?: number; scale?: number; shirt: string; pants?: string; hair?: string; bag?: string
+  sit?: boolean; long?: boolean; action?: string | null; says?: string; seed?: number; active?: boolean
+}) {
+  const body = useRef<THREE.Group>(null)
+  const head = useRef<THREE.Group>(null)
+  const armL = useRef<THREE.Group>(null)
+  const armR = useRef<THREE.Group>(null)
+  const t0 = useRef(0)
+  const lastAction = useRef<string | null>(null)
+  const seat = sit ? 0.48 : 0
+
+  useFrame(({ clock }, dt) => {
+    if (!body.current || !head.current || !armL.current || !armR.current) return
+    const t = clock.elapsedTime + seed
+    if (action !== lastAction.current) { lastAction.current = action; t0.current = clock.elapsedTime }
+    const since = clock.elapsedTime - t0.current
+    let aL = sit ? -0.5 : 0, aR = sit ? -0.5 : 0, oL = 0.08, oR = -0.08, nod = 0, yaw = Math.sin(t * 0.5) * 0.25, tilt = 0, lift = Math.sin(t * 2.2) * 0.01
+    if (active && action) {
+      yaw = 0
+      switch (action) {
+        case 's2p1': // glances up, a little surprised
+          lift = since < 0.4 ? Math.sin((since / 0.4) * Math.PI) * 0.1 : 0
+          tilt = 0.1
+          break
+        case 's2p2': // waves back
+          aR = -2.6; oR = -0.25 + Math.sin(t * 14) * 0.3
+          break
+        case 's2p3': // shakes hands
+          aR = -1.45 + Math.sin(t * 10) * 0.1; oR = -0.55
+          nod = 0.1
+          break
+        case 's2p4': // chats: nods, hands open
+          nod = Math.sin(t * 5) * 0.08
+          aL = -0.9; oL = 0.4; aR = -0.7; oR = -0.4
+          break
+        default: // cheering with her
+          lift = Math.abs(Math.sin(t * 5)) * 0.14
+          aL = -2.8; aR = -2.8; oL = 0.35; oR = -0.35
+      }
+    }
+    const k = Math.min(1, dt * 12)
+    armL.current.rotation.x += (aL - armL.current.rotation.x) * k
+    armR.current.rotation.x += (aR - armR.current.rotation.x) * k
+    armL.current.rotation.z += (oL - armL.current.rotation.z) * k
+    armR.current.rotation.z += (oR - armR.current.rotation.z) * k
+    head.current.rotation.x += (nod - head.current.rotation.x) * k
+    head.current.rotation.y += (yaw - head.current.rotation.y) * k
+    head.current.rotation.z += (tilt - head.current.rotation.z) * k
+    body.current.position.y += (lift - body.current.position.y) * Math.min(1, dt * 20)
+  })
+
+  return (
+    <group position={pos} rotation={[0, rotY, 0]} scale={scale}>
+      <group ref={body} position={[0, seat, 0]}>
+        {[-0.11, 0.11].map(x => (
+          <group key={x} position={[x, 0.78, 0]} rotation={[sit ? -Math.PI / 2 : 0, 0, 0]}>
+            <mesh position={[0, -0.32, 0]}><capsuleGeometry args={[0.085, 0.42, 6, 12]} /><Mat color={pants} /></mesh>
+            <mesh position={[0, -0.66, 0.06]} scale={[1, 0.6, 1.5]}><sphereGeometry args={[0.1, 14, 10]} /><Mat color="#f4f4f4" rough={0.5} /></mesh>
+          </group>
+        ))}
+        <mesh position={[0, 0.98, 0]} scale={[1, 1, 0.78]}><capsuleGeometry args={[0.25, 0.3, 8, 16]} /><Mat color={shirt} /></mesh>
+        {bag && (
+          <group position={[0, 0.68, -0.28]} scale={0.62}>
+            <Box size={[0.55, 0.7, 0.32]} pos={[0, 0.36, 0]} color={bag} r={0.14} />
+          </group>
+        )}
+        {[[-0.31, armL], [0.31, armR]].map(([x, ref]) => (
+          <group key={x as number} ref={ref as React.RefObject<THREE.Group>} position={[x as number, 1.17, 0]}>
+            <mesh position={[0, -0.22, 0]}><capsuleGeometry args={[0.072, 0.32, 6, 12]} /><Mat color={shirt} /></mesh>
+            <mesh position={[0, -0.45, 0]}><sphereGeometry args={[0.07, 12, 10]} /><Mat color={SKIN} /></mesh>
+          </group>
+        ))}
+        <group ref={head} position={[0, 1.56, 0]} scale={1.22}>
+          <mesh><sphereGeometry args={[0.27, 28, 22]} /><Mat color={SKIN} rough={0.7} /></mesh>
+          <mesh position={[0, 0.04, -0.02]} rotation={[-0.45, 0, 0]}><sphereGeometry args={[0.29, 28, 18, 0, Math.PI * 2, 0, Math.PI * 0.56]} /><Mat color={hair} rough={0.6} /></mesh>
+          {long && <mesh position={[0, -0.12, -0.2]} scale={[0.9, 1.5, 0.45]}><sphereGeometry args={[0.2, 16, 12]} /><Mat color={hair} rough={0.6} /></mesh>}
+          <group position={[0, 0, 0.245]}>
+            {[-0.09, 0.09].map(x => (
+              <mesh key={x} position={[x, 0, 0]} scale={[1, 1.25, 0.6]}><sphereGeometry args={[0.04, 14, 10]} /><Mat color="#2b2f33" rough={0.3} /></mesh>
+            ))}
+          </group>
+          {[-0.16, 0.16].map(x => (
+            <mesh key={x} position={[x, -0.07, 0.215]} scale={[1, 0.6, 0.3]}><sphereGeometry args={[0.05, 12, 8]} /><meshStandardMaterial color="#f2a29a" transparent opacity={0.7} /></mesh>
+          ))}
+          <mesh position={[0, -0.1, 0.255]} rotation={[0, 0, Math.PI]}><torusGeometry args={[0.045, 0.012, 6, 16, Math.PI]} /><Mat color="#7a3b2e" /></mesh>
+        </group>
+      </group>
+      {says && (
+        <group position={[0, 2.5, 0]} rotation={[0, -rotY, 0]}>
+          <Html center zIndexRange={[25, 20]} style={{ pointerEvents: 'none' }}>
+            <div key={says} style={{
+              position: 'relative', background: '#fff', color: '#173a5e', fontSize: 13, fontWeight: 700, padding: '6px 11px', borderRadius: 12,
+              boxShadow: '0 4px 12px rgba(23,58,94,.18)', whiteSpace: 'nowrap', animation: 'ss-say3 .25s ease-out',
+            }}>
+              {says}
+              <span style={{ position: 'absolute', top: '100%', left: '50%', marginLeft: -6, borderWidth: 6, borderStyle: 'solid', borderColor: '#fff transparent transparent transparent' }} />
+            </div>
+          </Html>
+        </group>
+      )}
+    </group>
+  )
+}
+
+function Bench({ pos, rotY = 0 }: { pos: [number, number, number]; rotY?: number }) {
+  return (
+    <group position={pos} rotation={[0, rotY, 0]}>
+      <Box size={[1.7, 0.08, 0.55]} pos={[0, 0.45, 0]} color="#b97f4e" r={0.03} />
+      <Box size={[1.7, 0.5, 0.07]} pos={[0, 0.78, -0.26]} color="#b97f4e" r={0.03} />
+      {[-0.75, 0.75].map(x => <Box key={x} size={[0.07, 0.45, 0.5]} pos={[x, 0.22, 0]} color="#4a4f58" r={0.02} />)}
+    </group>
+  )
+}
+
+function LampPost({ pos }: { pos: [number, number, number] }) {
+  return (
+    <group position={pos}>
+      <mesh position={[0, 1.6, 0]}><cylinderGeometry args={[0.06, 0.09, 3.2, 10]} /><Mat color="#2d3139" /></mesh>
+      <mesh position={[0, 3.35, 0]}><sphereGeometry args={[0.22, 14, 10]} /><meshStandardMaterial color="#fff4d0" emissive="#ffe9a8" emissiveIntensity={0.7} /></mesh>
+      <mesh position={[0, 3.6, 0]}><coneGeometry args={[0.3, 0.2, 12]} /><Mat color="#2d3139" /></mesh>
+    </group>
+  )
+}
+
+function Hedge({ pos, w = 3 }: { pos: [number, number, number]; w?: number }) {
+  return <Box size={[w, 0.8, 0.7]} pos={pos} color="#4f9a56" r={0.3} />
+}
+
+function ParkScene({ friendAction, friendSays, mood }: { friendAction: string | null; friendSays: string; mood: KidMood }) {
+  const windows: [number, number][] = []
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 6; c++) windows.push([-5.5 + c * 2.2, 2.2 + r * 2.1])
+  return (
+    <group>
+      {/* grass, with a paved path across the front and one up to the doors */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, -3]}><planeGeometry args={[60, 30]} /><Mat color="#8fcb78" rough={0.95} /></mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, -0.45]}><planeGeometry args={[24, 2.8]} /><Mat color="#e4d6bb" /></mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.011, -4.2]}><planeGeometry args={[3, 5]} /><Mat color="#e4d6bb" /></mesh>
+
+      {/* the school */}
+      <group position={[0, 0, -8.2]}>
+        <Box size={[15, 6, 2.2]} pos={[0, 3, 0]} color="#c98466" r={0.08} />
+        <Box size={[15.4, 0.4, 2.6]} pos={[0, 6.1, 0]} color="#a8614a" r={0.05} />
+        <Box size={[3.6, 4.4, 0.6]} pos={[0, 2.2, 1.3]} color="#d9b79a" r={0.06} />
+        <Box size={[1.9, 2.5, 0.12]} pos={[0, 1.3, 1.65]} color="#3e5a6e" r={0.03} />
+        <Box size={[1.9, 0.08, 0.14]} pos={[0, 1.3, 1.67]} color="#d9e6ee" r={0.01} />
+        {windows.map(([x, y], i) => (Math.abs(x) < 1.8 && y < 3 ? null : (
+          <Box key={i} size={[1.2, 1.2, 0.1]} pos={[x, y + 0.5, 1.12]} color="#9cc7de" r={0.03} />
+        )))}
+        <Poster pos={[0, 4.55, 1.62]} size={[3.2, 0.7]} lines={['SCHOOL']} bg="#f1e8d8" ink="#2f5d8a" />
+      </group>
+
+      {/* trees, hedges, a lamp post and a cloud or two */}
+      <Tree pos={[-8.2, 0, -3.6]} s={1.6} />
+      <Tree pos={[8.4, 0, -3.4]} s={1.5} />
+      <Tree pos={[-4.8, 0, -5.4]} s={1.2} />
+      <Tree pos={[5.2, 0, -5.6]} s={1.3} />
+      <Tree pos={[-10.5, 0, -1.2]} s={1.4} />
+      <Hedge pos={[-3.0, 0.4, -2.3]} w={4} />
+      <Hedge pos={[4.4, 0.4, -2.2]} w={4.4} />
+      <LampPost pos={[2.7, 0, -1.8]} />
+      <Cloud pos={[-5, 7.2, -12]} s={1.6} />
+      <Cloud pos={[5.5, 8, -13]} s={1.3} />
+
+      {/* a bench with someone reading, and two kids chatting */}
+      <Bench pos={[5.6, 0, -1.4]} rotY={0} />
+      <Person pos={[5.9, 0, -1.4]} sit shirt="#3d5a99" pants="#2f3b55" hair="#2a1d17" long={false} seed={1.3} />
+      <Person pos={[-6.0, 0, -2.9]} rotY={0.7} shirt="#5d6b86" pants="#3a4f7a" hair="#2a1d17" long={false} bag="#27344f" seed={2.1} />
+      <Person pos={[-5.0, 0, -2.9]} rotY={-0.7} shirt="#e8dccb" pants="#3b5d8f" hair="#3a2a22" seed={0.4} />
+      <Person pos={[-4.0, 0, -3.0]} rotY={-1.0} shirt="#6fa06a" pants="#3a4f7a" hair="#2a1d17" long={false} bag="#27344f" seed={3.3} />
+
+      {/* the new kid */}
+      <Person
+        pos={FRIEND_POS} rotY={-Math.PI / 2} shirt="#f4ede0" pants="#3b5d8f" hair="#5a3a2a" bag="#4b7d6a"
+        action={friendAction} says={friendSays} active={mood === 'act' || mood === 'cheer'}
+      />
+    </group>
+  )
+}
+
 function FloorGlow({ pos, color, dim }: { pos: THREE.Vector3; color: string; dim: boolean }) {
   const ref = useRef<THREE.MeshStandardMaterial>(null)
   useFrame(({ clock }) => {
@@ -1372,11 +1597,16 @@ const ACTION_SHOTS: Record<string, [number, number, number]> = {
   s1p5: [-1.5, 1.8, 3.4],  // leaving: wide enough to see the door open
 }
 const DEFAULT_SHOT: [number, number, number] = [0.3, 1.7, 3.3]
+const PARK_FRAMING: Framing = { halfW: 7.4, halfH: 3.1, z0: -0.9, baseY: 1.4, elev: 0.3, look: [-0.5, 1.7, -1.5], follow: 0.1 }
+// Park close-ups sit in front of the pair (she is left, the new kid right).
+Object.assign(ACTION_SHOTS, { s2p1: [1.4, 1.7, 4.4], s2p2: [1.2, 1.6, 3.8], s2p3: [0.7, 1.5, 3.1], s2p4: [0.8, 1.6, 3.3] })
 
 /** A little film director: wide shot while choosing, tracking shot while she
     walks, close-up while she does the step, then back out to the whole room. */
-function CameraRig({ kidPos, framing, mood, action, asleep }: {
+function CameraRig({ kidPos, framing, mood, action, asleep, focusDx = 0 }: {
   kidPos: React.MutableRefObject<THREE.Vector3>; framing: Framing; mood: KidMood; action: string | null; asleep: boolean
+  /** Close-ups aim this far to the side of her (the park centres on the pair). */
+  focusDx?: number
 }) {
   const { camera, size } = useThree()
   const look = useRef(new THREE.Vector3(...framing.look))
@@ -1407,7 +1637,8 @@ function CameraRig({ kidPos, framing, mood, action, asleep }: {
       if (mood === 'act' && action === 's1p3') off.applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.sin(since * 1.2) * 0.5)
       else off.multiplyScalar(1 - Math.min(0.12, since * 0.06))
       want.copy(kp).add(off)
-      wantLook.set(kp.x, eyeY, kp.z - 0.3)
+      want.x += focusDx
+      wantLook.set(kp.x + focusDx, eyeY, kp.z - 0.3)
     } else {
       const dist = Math.max(framing.halfH / half, framing.halfW / (half * aspect))
       want.set(kp.x * framing.follow, framing.baseY + dist * framing.elev, framing.z0 + dist)
@@ -1429,14 +1660,15 @@ function Scene({ storyId, spots, kidAt, mood, kidSays, guideId, showCaptions, wa
   // The school story is a whole home with each step in its real place; the
   // others put their steps on a row of stands in a themed room.
   const isHome = storyId === 'getting-ready-school' && spots.length > 0 && spots.every(s => SCHOOL_SPOTS[s.id])
+  const isPark = storyId === 'meeting-someone-new' && spots.length > 0 && spots.every(s => PARK_SPOTS[s.id])
 
   const layout = useMemo(() => {
     const station = new Map<string, THREE.Vector3>()
     const stand = new Map<string, THREE.Vector3>()
     const bubble = new Map<string, THREE.Vector3>()
     spots.forEach((s, i) => {
-      if (isHome) {
-        const h = SCHOOL_SPOTS[s.id]
+      if (isHome || isPark) {
+        const h = isPark ? PARK_SPOTS[s.id] : SCHOOL_SPOTS[s.id]
         stand.set(s.id, new THREE.Vector3(...h.stand))
         bubble.set(s.id, new THREE.Vector3(...h.bubble))
       } else {
@@ -1450,9 +1682,9 @@ function Scene({ storyId, spots, kidAt, mood, kidSays, guideId, showCaptions, wa
     return { station, stand, bubble }
     // Positions depend on which steps exist and their order, not their status.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHome, spots.map(s => s.id).join('|')])
+  }, [isHome, isPark, spots.map(s => s.id).join('|')])
 
-  const start = isHome ? SCHOOL_START : START
+  const start = isHome ? SCHOOL_START : isPark ? PARK_START : START
 
   /* What the story has changed so far. Waking up counts at once (getting out of
      bed IS the walk over); the rest show once she has arrived to do them, so the
@@ -1490,13 +1722,19 @@ function Scene({ storyId, spots, kidAt, mood, kidSays, guideId, showCaptions, wa
       <pointLight position={[0, 3.5, 2]} intensity={0.4} color="#fff3dc" />
 
       <Shadowed>
-        {isHome ? <SchoolRoom look={look} ate={ate} /> : <Room storyId={storyId} theme={theme} />}
-        {!isHome && spots.map(s => (
+        {isHome ? <SchoolRoom look={look} ate={ate} /> : isPark ? (
+          <ParkScene
+            friendAction={actionId}
+            friendSays={mood === 'act' && actionId ? FRIEND_SAYS[actionId] ?? '' : mood === 'cheer' ? "Let's be friends! 💛" : ''}
+            mood={mood}
+          />
+        ) : <Room storyId={storyId} theme={theme} />}
+        {!isHome && !isPark && spots.map(s => (
           <group key={s.id} position={layout.station.get(s.id)!}>
             <StepProp id={s.id} color={s.color} />
           </group>
         ))}
-        <Kid key={isHome ? 'home' : 'row'} target={kidTarget} start={start} scale={isHome ? 1.2 : 1} mood={mood} says={kidSays} walkMs={walkMs} look={look} action={actionId} posOut={kidPos} />
+        <Kid key={isHome ? 'home' : isPark ? 'park' : 'row'} target={kidTarget} start={start} scale={isHome ? 1.2 : isPark ? 1.1 : 1} facing={isPark ? PARK_FACING : 0} mood={mood} says={kidSays} walkMs={walkMs} look={look} action={actionId} posOut={kidPos} />
       </Shadowed>
 
       {spots.map(s => (
@@ -1506,11 +1744,11 @@ function Scene({ storyId, spots, kidAt, mood, kidSays, guideId, showCaptions, wa
       {/* Bubbles step aside while the camera is in close on her (walking or
           acting): nothing can be picked then anyway, and they'd cover her face. */}
       {mood !== 'walk' && mood !== 'act' && spots.filter(s => !(s.id === kidAt && s.status === 'done')).map(s => (
-        <SpotBubble key={`b-${s.id}`} spot={s} at={layout.bubble.get(s.id)!} showCaption={showCaptions && !isHome} onSpot={onSpot} />
+        <SpotBubble key={`b-${s.id}`} spot={s} at={layout.bubble.get(s.id)!} showCaption={showCaptions && !isHome && !isPark} onSpot={onSpot} />
       ))}
 
       <ContactShadows position={[0, 0.015, 0]} scale={24} blur={2.4} opacity={0.35} far={4} resolution={512} />
-      <CameraRig kidPos={kidPos} framing={isHome ? SCHOOL_FRAMING : ROW_FRAMING} mood={mood} action={actionId} asleep={look.asleep} />
+      <CameraRig kidPos={kidPos} framing={isHome ? SCHOOL_FRAMING : isPark ? PARK_FRAMING : ROW_FRAMING} mood={mood} action={actionId} asleep={look.asleep} focusDx={isPark ? 0.7 : 0} />
     </>
   )
 }
