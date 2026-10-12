@@ -712,7 +712,7 @@ function Kid({ target, start, scale = 1, mood, says, walkMs, look, action, posOu
         case 's1p4': { // bowl in one hand, spoon to mouth with the other
           armSwingL = -1.25; armOutL = 0.4
           const bite = (Math.sin(t * 6.5) + 1) / 2
-          armSwingR = -1.1 - bite * 0.6; armOutR = -0.65
+          armSwingR = -1.5 - bite * 0.6; armOutR = 0
           headNod = bite * 0.08
           break
         }
@@ -841,7 +841,7 @@ function Kid({ target, start, scale = 1, mood, says, walkMs, look, action, posOu
                     <Box size={[0.05, 0.07, 0.06]} pos={[0, -0.26, 0.03]} color="#ffffff" r={0.015} />
                   </group>
                   {/* spoon */}
-                  <group ref={spoon} position={[0, -0.5, 0.04]} rotation={[-1.1, 0, 0]} visible={false}>
+                  <group ref={spoon} position={[0, -0.5, 0.04]} rotation={[-0.3, 0, -1.6]} visible={false}>
                     <Box size={[0.025, 0.24, 0.02]} pos={[0, -0.08, 0]} color="#c9ced4" r={0.008} />
                     <mesh position={[0, -0.22, 0.01]} scale={[1, 1.3, 0.5]}><sphereGeometry args={[0.04, 10, 8]} /><meshStandardMaterial color="#c9ced4" metalness={0.6} roughness={0.3} /></mesh>
                   </group>
