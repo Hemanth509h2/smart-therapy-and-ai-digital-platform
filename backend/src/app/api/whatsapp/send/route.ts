@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { sendViaBot } from '@/lib/whatsapp-bot';
-import { normalizeWhatsAppNumber } from '@/lib/whatsapp-cloud-api';
+import { normalizeWhatsAppNumber, sendCloudApiInteractive } from '@/lib/whatsapp-cloud-api';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,21 +57,7 @@ export async function POST(request: Request) {
       if (type === 'text') {
         result = await sendViaBot(normalizedTo, textBody);
       } else {
-        // For interactive, we need to adapt sendViaBot or call bot directly
-        const url = process.env.WHATSAPP_BOT_URL;
-        const secret = process.env.WHATSAPP_BOT_SECRET;
-        if (!url || !secret) {
-          throw new Error('WhatsApp bot not configured');
-        }
-        const res = await fetch(`${url.replace(/\/+$/, '')}/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-bot-secret': secret },
-          body: JSON.stringify({ to: normalizedTo, interactive }),
-          signal: AbortSignal.timeout(15_000),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || `WhatsApp bot responded ${res.status}`);
-        result = { id: data.id ?? '', status: 'sent', to: normalizedTo };
+        result = await sendCloudApiInteractive(normalizedTo, interactive);
       }
 
       // Update tracking record

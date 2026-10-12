@@ -1,23 +1,21 @@
-import { normalizeWhatsAppNumber } from './whatsapp-cloud-api'
+import {
+  normalizeWhatsAppNumber,
+  sendCloudApiText,
+  sendCloudApiTemplate,
+} from './whatsapp-cloud-api'
 
-// Messages are delivered by the self-hosted Baileys bot (whatapps/), which
-// exposes POST /send guarded by the shared x-bot-secret header.
+// Messages go out through the official WhatsApp Business Cloud API (Meta).
+// Free-form text only reaches people who messaged us in the last 24 hours, so
+// set WHATSAPP_INVITE_TEMPLATE / WHATSAPP_SCHEDULED_TEMPLATE to approved
+// template names to reach patients cold. Without them we fall back to text.
+const TEMPLATE_LANG = () => process.env.WHATSAPP_TEMPLATE_LANGUAGE || 'en'
+
+function bodyParams(values: string[]) {
+  return [{ type: 'body', parameters: values.map((text) => ({ type: 'text', text })) }]
+}
+
 export async function sendViaBot(to: string, text: string): Promise<WhatsAppMessageResult> {
-  const url = process.env.WHATSAPP_BOT_URL
-  const secret = process.env.WHATSAPP_BOT_SECRET
-  if (!url || !secret) {
-    throw new Error('WhatsApp bot not configured. Set WHATSAPP_BOT_URL and WHATSAPP_BOT_SECRET')
-  }
-
-  const res = await fetch(`${url.replace(/\/+$/, '')}/send`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-bot-secret': secret },
-    body: JSON.stringify({ to, text }),
-    signal: AbortSignal.timeout(15_000),
-  })
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || `WhatsApp bot responded ${res.status}`)
-  return { id: data.id ?? '', status: 'sent', to }
+  return sendCloudApiText(to, text)
 }
 
 export interface WhatsAppInviteInput {
@@ -56,25 +54,17 @@ Tap the link below to join — no sign-up needed:
 
 See you there. 🌿`
 
-  const url = process.env.N8N_INVITE_WEBHOOK_URL
-  if (!url) throw new Error('N8N_INVITE_WEBHOOK_URL is not configured')
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const template = process.env.WHATSAPP_INVITE_TEMPLATE
+  if (template) {
+    // Template body variables: {{1}} patient name, {{2}} therapist, {{3}} link
+    return sendCloudApiTemplate(
       to,
-      patientName: input.patientName || '',
-      therapistName: input.therapistName || '',
-      inviteLink: input.inviteLink,
-      text,
-    }),
-  })
-  if (!res.ok) {
-    const detail = (await res.text().catch(() => '')).slice(0, 300)
-    throw new Error(`n8n invite webhook responded ${res.status} (${new URL(url).pathname}): ${detail}`)
+      template,
+      TEMPLATE_LANG(),
+      bodyParams([name, input.therapistName || 'Your therapist', input.inviteLink])
+    )
   }
-  return { id: `n8n-${Date.now()}`, status: 'sent', to }
+  return sendViaBot(to, text)
 }
 
 /**
@@ -98,5 +88,15 @@ We'll send you the link to join when your session starts.
 
 Take a deep breath — we'll see you there. 🌿`
 
+  const template = process.env.WHATSAPP_SCHEDULED_TEMPLATE
+  if (template) {
+    // Template body variables: {{1}} patient name, {{2}} therapist, {{3}} date/time
+    return sendCloudApiTemplate(
+      to,
+      template,
+      TEMPLATE_LANG(),
+      bodyParams([name, input.therapistName || 'your therapist', when])
+    )
+  }
   return sendViaBot(to, text)
 }
