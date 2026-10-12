@@ -70,7 +70,10 @@ See you there. 🌿`
       text,
     }),
   })
-  if (!res.ok) throw new Error(`n8n invite webhook responded ${res.status}`)
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => '')).slice(0, 300)
+    throw new Error(`n8n invite webhook responded ${res.status} (${new URL(url).pathname}): ${detail}`)
+  }
   return { id: `n8n-${Date.now()}`, status: 'sent', to }
 }
 
