@@ -20,6 +20,7 @@ function OnboardingForm() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [specialtyInput, setSpecialtyInput] = useState('');
+  const [phone, setPhone] = useState('');
 
   // Client profile fields
   const [dob, setDob] = useState('');
@@ -76,6 +77,7 @@ function OnboardingForm() {
           firstName,
           lastName,
           specialty,
+          phoneNumber: role === 'THERAPIST' ? phone : undefined,
           dateOfBirth: dob || undefined,
           diagnosis,
           inviteToken: inviteToken || undefined,
@@ -173,7 +175,21 @@ function OnboardingForm() {
             </div>
 
             {role === 'THERAPIST' ? (
-              <div className="space-y-1 animate-fadeIn">
+              <div className="space-y-4 animate-fadeIn">
+              <div className="space-y-1">
+                <Label htmlFor="phone" className="font-medium" style={{ color: 'var(--ink-muted)' }}>WhatsApp Phone Number</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  required
+                  className="rounded-xl border"
+                  style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)' }}
+                />
+              </div>
+              <div className="space-y-1">
                 <Label htmlFor="specialty" className="font-medium" style={{ color: 'var(--ink-muted)' }}>Specialties (comma-separated)</Label>
                 <Input 
                   id="specialty" 
@@ -183,6 +199,7 @@ function OnboardingForm() {
                   className="rounded-xl border"
                   style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)' }}
                 />
+              </div>
               </div>
             ) : (
               <div className="space-y-4 animate-fadeIn">
