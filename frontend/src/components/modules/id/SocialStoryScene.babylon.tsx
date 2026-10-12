@@ -81,6 +81,8 @@ interface HumanCfg {
   sit?: boolean
   accessory?: 'stethoscope' | 'hat'
   scrunchie?: string
+  /** Which hand carries the toy / gift / letter (the camera-side hand shows it). */
+  propHand?: 'L' | 'R'
 }
 
 function buildHuman(scene: Scene, name: string, c: HumanCfg): Human {
@@ -125,7 +127,8 @@ function buildHuman(scene: Scene, name: string, c: HumanCfg): Human {
   const [armL, armR] = arms
 
   // Things she carries, hung on the right hand; shown only at the steps that need them.
-  const mk = (n: string) => { const g = new TransformNode(`${name}-${n}`, scene); g.parent = armR; g.setEnabled(false); return g }
+  const hand = c.propHand === 'L' ? armL : armR
+  const mk = (n: string) => { const g = new TransformNode(`${name}-${n}`, scene); g.parent = hand; g.setEnabled(false); return g }
   const toy = mk('toy'); toy.position.set(0, -0.55, 0.08)
   add(MeshBuilder.CreateBox('toy-a', { width: 0.2, height: 0.1, depth: 0.12 }, scene), toy, [0, 0, 0], pbr(scene, '#e45b5b', 0.5))
   add(MeshBuilder.CreateBox('toy-b', { width: 0.1, height: 0.08, depth: 0.1 }, scene), toy, [0.02, 0.08, 0], pbr(scene, '#f4a64a', 0.5))
@@ -173,7 +176,7 @@ const damp = (cur: number, want: number, k: number) => cur + (want - cur) * k
 
 /* ---------- the component ---------- */
 
-const STORY_FRAMING = { halfW: 7.4, halfH: 3.1, z0: -0.9, baseY: 1.4, elev: 0.3, look: [-0.5, 1.7, -1.5] as V3, follow: 0.1 }
+const STORY_FRAMING = { halfW: 8.3, halfH: 3.1, z0: -0.9, baseY: 1.4, elev: 0.3, look: [-0.5, 1.7, -1.5] as V3, follow: 0.1 }
 const DEFAULT_SHOT: V3 = [0.9, 1.6, 3.5]
 
 export default function SocialStoryScene(props: SocialStoryScene3DProps) {
@@ -266,7 +269,7 @@ export default function SocialStoryScene(props: SocialStoryScene3DProps) {
       .catch(() => { if (!disposed) setFailed(true) })
 
     // The girl and the cast.
-    const kid = buildHuman(scene, 'kid', { shirt: HOODIE, pants: '#353944', hair: HAIR, scrunchie: HOODIE })
+    const kid = buildHuman(scene, 'kid', { shirt: HOODIE, pants: '#353944', hair: HAIR, scrunchie: HOODIE, propHand: 'L' })
     kid.meshes.forEach(m => { m.receiveShadows = !low; if (!low) shadows.addShadowCaster(m) })
     const npcs = story.npcs.map((n: NpcDef) => {
       const h = buildHuman(scene, `npc-${n.key}`, { shirt: n.shirt, pants: n.pants, hair: n.hair, bag: n.bag, long: n.long, sit: n.sit, accessory: n.accessory })
@@ -418,10 +421,12 @@ export default function SocialStoryScene(props: SocialStoryScene3DProps) {
       }
       kid.legL.rotation.x = damp(kid.legL.rotation.x, legSwing, kd)
       kid.legR.rotation.x = damp(kid.legR.rotation.x, -legSwing, kd)
-      kid.armL.rotation.x = damp(kid.armL.rotation.x, aL, kd)
-      kid.armR.rotation.x = damp(kid.armR.rotation.x, aR, kd)
-      kid.armL.rotation.z = damp(kid.armL.rotation.z, oL, kd)
-      kid.armR.rotation.z = damp(kid.armR.rotation.z, oR, kd)
+      // She faces right with her left side to the camera, so her poses (written for the
+      // right arm) are mirrored onto the left: the arm doing the gesture is the one you see.
+      kid.armL.rotation.x = damp(kid.armL.rotation.x, aR, kd)
+      kid.armR.rotation.x = damp(kid.armR.rotation.x, aL, kd)
+      kid.armL.rotation.z = damp(kid.armL.rotation.z, -oR, kd)
+      kid.armR.rotation.z = damp(kid.armR.rotation.z, -oL, kd)
       kid.head.rotation.x = damp(kid.head.rotation.x, nod, kd)
       kid.head.rotation.y = damp(kid.head.rotation.y, yaw, kd)
       kid.head.rotation.z = damp(kid.head.rotation.z, tilt, kd)
