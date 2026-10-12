@@ -1299,7 +1299,7 @@ function Person({ pos, rotY = 0, scale = 1.1, shirt, pants = '#3b5d8f', hair = '
   const armR = useRef<THREE.Group>(null)
   const t0 = useRef(0)
   const lastAction = useRef<string | null>(null)
-  const seat = sit ? 0.48 : 0
+  const seat = sit ? -0.3 : 0
 
   useFrame(({ clock }, dt) => {
     if (!body.current || !head.current || !armL.current || !armR.current) return
@@ -1385,7 +1385,7 @@ function Person({ pos, rotY = 0, scale = 1.1, shirt, pants = '#3b5d8f', hair = '
 
 /* ---------- The other stories: a themed world each, with a cast ---------- */
 
-interface StoryDef extends Omit<StoryData, 'start'> {
+export interface StoryDef extends Omit<StoryData, 'start'> {
   start: THREE.Vector3
   env: (p: { action: string | null; mood: KidMood }) => ReactNode
 }
@@ -1722,7 +1722,7 @@ const STORY_ENVS: Record<string, StoryDef['env']> = {
   'birthday-party': Party,
 }
 
-const STORY_SCENES: Record<string, StoryDef> = Object.fromEntries(
+export const STORY_SCENES: Record<string, StoryDef> = Object.fromEntries(
   Object.entries(STORY_DATA).map(([k, d]) => [k, { ...d, start: new THREE.Vector3(...d.start), env: STORY_ENVS[k] }])
 )
 

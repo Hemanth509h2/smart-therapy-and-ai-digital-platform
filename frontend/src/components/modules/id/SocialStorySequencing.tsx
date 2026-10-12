@@ -7,10 +7,22 @@ import { deleteField, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import type { KidMood, SceneSpot } from './SocialStoryScene3D'
+import { STORY_DATA } from './socialStoryShared'
 import { ModuleHeaderSlot } from '@/components/session/moduleHeaderSlot'
 
 // three.js only runs in the browser, and only this module needs it.
 const Scene3D = dynamic(() => import('./SocialStoryScene3D'), {
+  ssr: false,
+  loading: () => (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(23,58,94,0.5)', fontSize: 14 }}>
+      Building the room…
+    </div>
+  ),
+})
+
+// The themed stories (everything but the school home) run on Babylon.js with
+// real lighting and shadows; the school home and custom stories stay on three.js.
+const SceneBabylon = dynamic(() => import('./SocialStoryScene.babylon'), {
   ssr: false,
   loading: () => (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(23,58,94,0.5)', fontSize: 14 }}>
@@ -750,6 +762,9 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     }]
   }), [resolvedShuffled, panelMap, spots, slotOf, wrongSlots, correctSlots, instantFeedback, completed, showAnswer, playIdx, orderedPanels, kid, acting, showGuide, nextCorrectId, hintPanel, canDrop, placedCount])
 
+  const storyData = STORY_DATA[storyId]
+  const SceneView = storyData && sceneSpots.length > 0 && sceneSpots.every(s => storyData.spots[s.id]) ? SceneBabylon : Scene3D
+
   const onSpot = useCallback((id: string) => {
     const slot = slotOf.get(id)
     if (slot !== undefined) removeFromSlot(slot)
@@ -943,7 +958,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
             background: 'linear-gradient(180deg,#e8f3fb,#d6e6f4)',
             boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.06), 0 6px 18px rgba(23,58,94,0.08)',
           }}>
-            <Scene3D
+            <SceneView
               storyId={storyId}
               spots={sceneSpots}
               kidAt={kid.at}
