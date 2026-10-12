@@ -558,6 +558,9 @@ function Kid({ target, start, scale = 1, facing = 0, mood, says, walkMs, look, a
   const foam = useRef<THREE.Group>(null)
   const bowl = useRef<THREE.Group>(null)
   const spoon = useRef<THREE.Group>(null)
+  const toy = useRef<THREE.Group>(null)
+  const gift = useRef<THREE.Group>(null)
+  const letter = useRef<THREE.Group>(null)
 
   // The current walk: from where to where, started when, and whether it began
   // in bed (then it is a getting-up, not a walk). Kept in refs so the frame
@@ -629,6 +632,10 @@ function Kid({ target, start, scale = 1, facing = 0, mood, says, walkMs, look, a
     }
     if (bowl.current) bowl.current.visible = acting && action === 's1p4'
     if (spoon.current) spoon.current.visible = acting && action === 's1p4'
+    const held = acting && action ? HELD[action] : undefined
+    if (toy.current) toy.current.visible = held === 'toy'
+    if (gift.current) gift.current.visible = held === 'gift'
+    if (letter.current) letter.current.visible = held === 'letter'
 
     // Asleep: lying in bed, eyes shut, breathing.
     if (look.asleep) {
@@ -692,7 +699,12 @@ function Kid({ target, start, scale = 1, facing = 0, mood, says, walkMs, look, a
       armSwingR = Math.sin(ph) * 0.55
       lift = Math.abs(Math.sin(ph)) * 0.06
     } else if (acting) {
-      switch (action) {
+      const gp = action ? KID_POSES[action] : undefined
+      if (gp) {
+        const o = evalPose(gp, t, since)
+        armSwingR = o.aR; armOutR = o.oR; armSwingL = o.aL; armOutL = o.oL
+        headNod = o.nod; headTilt = o.tilt; lift = o.lift
+      } else switch (action) {
         case 's1p1': // big morning stretch and a yawn
           armSwingL = -2.9; armSwingR = -2.9
           armOutL = 0.35 + Math.sin(t * 3) * 0.08; armOutR = -0.35 - Math.sin(t * 3) * 0.08
@@ -722,29 +734,6 @@ function Kid({ target, start, scale = 1, facing = 0, mood, says, walkMs, look, a
           armSwingR = -2.7
           armOutR = -0.3 + Math.sin(t * 14) * 0.35
           lift = since < 0.5 ? Math.sin((since / 0.5) * Math.PI) * 0.2 : 0
-          break
-        case 's2p1': // spots someone new: a little hop, points and leans in
-          lift = since < 0.4 ? Math.sin((since / 0.4) * Math.PI) * 0.16 : 0
-          armSwingR = -1.5; armOutR = -0.12
-          armSwingL = -0.2
-          headNod = 0.06
-          break
-        case 's2p2': // smile and wave hello
-          armSwingR = -2.6
-          armOutR = -0.25 + Math.sin(t * 14) * 0.3
-          armSwingL = -0.2
-          headTilt = 0.08
-          break
-        case 's2p3': // handshake: hand out level, shaking gently
-          armSwingR = -1.45 + Math.sin(t * 10) * 0.1; armOutR = -0.55
-          armSwingL = -0.3
-          headNod = 0.1
-          break
-        case 's2p4': // ask their name: open hands, head tilted to listen
-          armSwingL = -1.1; armOutL = 0.5
-          armSwingR = -1.1; armOutR = -0.5
-          headTilt = 0.14
-          headNod = Math.sin(t * 3) * 0.05
           break
         default:
           lift = since < 0.55 ? Math.sin((since / 0.55) * Math.PI) * 0.38 : 0
@@ -864,6 +853,17 @@ function Kid({ target, start, scale = 1, facing = 0, mood, says, walkMs, look, a
                   <group ref={brush} position={[0, -0.5, 0.05]} rotation={[-0.8, 0, -1.6]} visible={false}>
                     <Box size={[0.035, 0.3, 0.035]} pos={[0, -0.1, 0]} color="#5fa8e0" r={0.012} />
                     <Box size={[0.05, 0.07, 0.06]} pos={[0, -0.26, 0.03]} color="#ffffff" r={0.015} />
+                  </group>
+                  {/* things she carries in the other stories */}
+                  <group ref={toy} position={[0, -0.55, 0.08]} visible={false}>
+                    <Box size={[0.2, 0.1, 0.12]} pos={[0, 0, 0]} color="#e45b5b" r={0.03} />
+                    <Box size={[0.1, 0.08, 0.1]} pos={[0.02, 0.08, 0]} color="#f4a64a" r={0.03} />
+                    {[-0.07, 0.07].map(x => <mesh key={x} position={[x, -0.05, 0.07]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.04, 0.04, 0.03, 10]} /><Mat color="#33414f" /></mesh>)}
+                  </group>
+                  <group ref={gift} position={[0, -0.7, 0.12]} visible={false}><Gift pos={[0, 0, 0]} color="#e86a9a" s={0.55} /></group>
+                  <group ref={letter} position={[0, -0.52, 0.08]} visible={false}>
+                    <Box size={[0.2, 0.14, 0.02]} pos={[0, 0, 0]} color="#ffffff" r={0.005} />
+                    <mesh position={[0, 0, 0.012]}><sphereGeometry args={[0.022, 8, 6]} /><Mat color="#e45b87" /></mesh>
                   </group>
                   {/* spoon */}
                   <group ref={spoon} position={[0, -0.5, 0.04]} rotation={[-0.3, 0, -1.6]} visible={false}>
@@ -1257,29 +1257,37 @@ function SchoolRoom({ look, ate }: { look: KidLook; ate: boolean }) {
 
 // --- Spots, footprints, camera --------------------------------------------
 
-/* ---------- "Meeting Someone New": the park in front of school ---------- */
-
-const PARK_SPOTS: Record<string, SchoolSpot> = {
-  s2p1: { bubble: [-4.4, 2.7, -0.45], stand: [-4.2, 0, -0.45] },  // spots the new kid from a distance
-  s2p2: { bubble: [-2.7, 3.3, -0.45], stand: [-2.4, 0, -0.45] },  // close enough to wave hello
-  s2p3: { bubble: [-1.0, 2.7, -0.45], stand: [-1.0, 0, -0.45] },  // handshake distance
-  s2p4: { bubble: [0.8, 3.3, -0.45], stand: [-1.3, 0, -0.45] },   // chatting
-}
-const PARK_START = new THREE.Vector3(-6.4, 0, -0.45)
-/** She faces the new kid (+x); the new kid faces her (-x). */
-const PARK_FACING = Math.PI / 2
-const FRIEND_POS: [number, number, number] = [0.1, 0, -0.45]
-const FRIEND_SAYS: Record<string, string> = {
-  s2p2: 'Hello! 😊',
-  s2p3: 'Nice to meet you! 🤝',
-  s2p4: "I'm Riya! 🌸",
+function Bench({ pos, rotY = 0 }: { pos: [number, number, number]; rotY?: number }) {
+  return (
+    <group position={pos} rotation={[0, rotY, 0]}>
+      <Box size={[1.7, 0.08, 0.55]} pos={[0, 0.45, 0]} color="#b97f4e" r={0.03} />
+      <Box size={[1.7, 0.5, 0.07]} pos={[0, 0.78, -0.26]} color="#b97f4e" r={0.03} />
+      {[-0.75, 0.75].map(x => <Box key={x} size={[0.07, 0.45, 0.5]} pos={[x, 0.22, 0]} color="#4a4f58" r={0.02} />)}
+    </group>
+  )
 }
 
-/** A second person for the park: the new friend (animated by the step being
-    acted out) or a background kid (just breathing and swaying a little). */
-function Person({ pos, rotY = 0, scale = 1.1, shirt, pants = '#3b5d8f', hair = '#4a3226', bag, sit = false, long = true, action = null, says = '', seed = 0, active = false }: {
-  pos: [number, number, number]; rotY?: number; scale?: number; shirt: string; pants?: string; hair?: string; bag?: string
-  sit?: boolean; long?: boolean; action?: string | null; says?: string; seed?: number; active?: boolean
+function LampPost({ pos }: { pos: [number, number, number] }) {
+  return (
+    <group position={pos}>
+      <mesh position={[0, 1.6, 0]}><cylinderGeometry args={[0.06, 0.09, 3.2, 10]} /><Mat color="#2d3139" /></mesh>
+      <mesh position={[0, 3.35, 0]}><sphereGeometry args={[0.22, 14, 10]} /><meshStandardMaterial color="#fff4d0" emissive="#ffe9a8" emissiveIntensity={0.7} /></mesh>
+      <mesh position={[0, 3.6, 0]}><coneGeometry args={[0.3, 0.2, 12]} /><Mat color="#2d3139" /></mesh>
+    </group>
+  )
+}
+
+function Hedge({ pos, w = 3 }: { pos: [number, number, number]; w?: number }) {
+  return <Box size={[w, 0.8, 0.7]} pos={pos} color="#4f9a56" r={0.3} />
+}
+
+/** A second person for the stories: a cast member who reacts to the step being
+    acted out (poses + speech bubble), or a background kid just breathing and
+    swaying a little. */
+function Person({ pos, rotY = 0, scale = 1.1, shirt, pants = '#3b5d8f', hair = '#4a3226', bag, sit = false, long = true, accessory, poses, action = null, says = '', seed = 0, active = false, cheer = false }: {
+  pos: V3; rotY?: number; scale?: number; shirt: string; pants?: string; hair?: string; bag?: string
+  sit?: boolean; long?: boolean; accessory?: 'stethoscope' | 'hat'; poses?: Record<string, Pose>
+  action?: string | null; says?: string; seed?: number; active?: boolean; cheer?: boolean
 }) {
   const body = useRef<THREE.Group>(null)
   const head = useRef<THREE.Group>(null)
@@ -1295,28 +1303,15 @@ function Person({ pos, rotY = 0, scale = 1.1, shirt, pants = '#3b5d8f', hair = '
     if (action !== lastAction.current) { lastAction.current = action; t0.current = clock.elapsedTime }
     const since = clock.elapsedTime - t0.current
     let aL = sit ? -0.5 : 0, aR = sit ? -0.5 : 0, oL = 0.08, oR = -0.08, nod = 0, yaw = Math.sin(t * 0.5) * 0.25, tilt = 0, lift = Math.sin(t * 2.2) * 0.01
-    if (active && action) {
+    const gp = active && action ? poses?.[action] : undefined
+    if (gp) {
+      const o = evalPose(gp, t, since)
       yaw = 0
-      switch (action) {
-        case 's2p1': // glances up, a little surprised
-          lift = since < 0.4 ? Math.sin((since / 0.4) * Math.PI) * 0.1 : 0
-          tilt = 0.1
-          break
-        case 's2p2': // waves back
-          aR = -2.6; oR = -0.25 + Math.sin(t * 14) * 0.3
-          break
-        case 's2p3': // shakes hands
-          aR = -1.45 + Math.sin(t * 10) * 0.1; oR = -0.55
-          nod = 0.1
-          break
-        case 's2p4': // chats: nods, hands open
-          nod = Math.sin(t * 5) * 0.08
-          aL = -0.9; oL = 0.4; aR = -0.7; oR = -0.4
-          break
-        default: // cheering with her
-          lift = Math.abs(Math.sin(t * 5)) * 0.14
-          aL = -2.8; aR = -2.8; oL = 0.35; oR = -0.35
-      }
+      aR = o.aR; oR = o.oR; aL = o.aL; oL = o.oL; nod = o.nod; tilt = o.tilt; lift = o.lift
+    } else if (cheer) {
+      yaw = 0
+      lift = Math.abs(Math.sin(t * 5)) * 0.14
+      aL = -2.8; aR = -2.8; oL = 0.35; oR = -0.35
     }
     const k = Math.min(1, dt * 12)
     armL.current.rotation.x += (aL - armL.current.rotation.x) * k
@@ -1326,7 +1321,7 @@ function Person({ pos, rotY = 0, scale = 1.1, shirt, pants = '#3b5d8f', hair = '
     head.current.rotation.x += (nod - head.current.rotation.x) * k
     head.current.rotation.y += (yaw - head.current.rotation.y) * k
     head.current.rotation.z += (tilt - head.current.rotation.z) * k
-    body.current.position.y += (lift - body.current.position.y) * Math.min(1, dt * 20)
+    body.current.position.y += (lift + seat - body.current.position.y) * Math.min(1, dt * 20)
   })
 
   return (
@@ -1339,6 +1334,7 @@ function Person({ pos, rotY = 0, scale = 1.1, shirt, pants = '#3b5d8f', hair = '
           </group>
         ))}
         <mesh position={[0, 0.98, 0]} scale={[1, 1, 0.78]}><capsuleGeometry args={[0.25, 0.3, 8, 16]} /><Mat color={shirt} /></mesh>
+        {accessory === 'stethoscope' && <mesh position={[0, 1.2, 0.1]} rotation={[Math.PI / 2.4, 0, 0]}><torusGeometry args={[0.13, 0.022, 8, 16]} /><Mat color="#33414f" /></mesh>}
         {bag && (
           <group position={[0, 0.68, -0.28]} scale={0.62}>
             <Box size={[0.55, 0.7, 0.32]} pos={[0, 0.36, 0]} color={bag} r={0.14} />
@@ -1354,6 +1350,7 @@ function Person({ pos, rotY = 0, scale = 1.1, shirt, pants = '#3b5d8f', hair = '
           <mesh><sphereGeometry args={[0.27, 28, 22]} /><Mat color={SKIN} rough={0.7} /></mesh>
           <mesh position={[0, 0.04, -0.02]} rotation={[-0.45, 0, 0]}><sphereGeometry args={[0.29, 28, 18, 0, Math.PI * 2, 0, Math.PI * 0.56]} /><Mat color={hair} rough={0.6} /></mesh>
           {long && <mesh position={[0, -0.12, -0.2]} scale={[0.9, 1.5, 0.45]}><sphereGeometry args={[0.2, 16, 12]} /><Mat color={hair} rough={0.6} /></mesh>}
+          {accessory === 'hat' && <mesh position={[0, 0.38, 0]} rotation={[-0.1, 0, 0.1]}><coneGeometry args={[0.16, 0.4, 16]} /><Mat color="#ef6b6b" /></mesh>}
           <group position={[0, 0, 0.245]}>
             {[-0.09, 0.09].map(x => (
               <mesh key={x} position={[x, 0, 0]} scale={[1, 1.25, 0.6]}><sphereGeometry args={[0.04, 14, 10]} /><Mat color="#2b2f33" rough={0.3} /></mesh>
@@ -1382,77 +1379,592 @@ function Person({ pos, rotY = 0, scale = 1.1, shirt, pants = '#3b5d8f', hair = '
   )
 }
 
-function Bench({ pos, rotY = 0 }: { pos: [number, number, number]; rotY?: number }) {
-  return (
-    <group position={pos} rotation={[0, rotY, 0]}>
-      <Box size={[1.7, 0.08, 0.55]} pos={[0, 0.45, 0]} color="#b97f4e" r={0.03} />
-      <Box size={[1.7, 0.5, 0.07]} pos={[0, 0.78, -0.26]} color="#b97f4e" r={0.03} />
-      {[-0.75, 0.75].map(x => <Box key={x} size={[0.07, 0.45, 0.5]} pos={[x, 0.22, 0]} color="#4a4f58" r={0.02} />)}
-    </group>
-  )
+/* ---------- The other stories: a themed world each, with a cast ---------- */
+
+type V3 = [number, number, number]
+
+/** One arm pose: [swing, out] per arm (right arm out + = away from the body,
+    left arm out - = away), head nod/tilt and the little motions on top. */
+interface Pose {
+  r?: [number, number]
+  l?: [number, number]
+  nod?: number
+  tilt?: number
+  /** A single hop as the step starts. */
+  hop?: number
+  /** Continuous bouncing / slow breathing / trembling. */
+  bounce?: number
+  breathe?: number
+  jitter?: number
+  /** Right hand waving (out swing) / shaking (forward swing), and head nodding. */
+  waveR?: number
+  shakeR?: number
+  nodWob?: number
 }
 
-function LampPost({ pos }: { pos: [number, number, number] }) {
-  return (
-    <group position={pos}>
-      <mesh position={[0, 1.6, 0]}><cylinderGeometry args={[0.06, 0.09, 3.2, 10]} /><Mat color="#2d3139" /></mesh>
-      <mesh position={[0, 3.35, 0]}><sphereGeometry args={[0.22, 14, 10]} /><meshStandardMaterial color="#fff4d0" emissive="#ffe9a8" emissiveIntensity={0.7} /></mesh>
-      <mesh position={[0, 3.6, 0]}><coneGeometry args={[0.3, 0.2, 12]} /><Mat color="#2d3139" /></mesh>
-    </group>
-  )
+function evalPose(p: Pose, t: number, since: number) {
+  const r = p.r ?? [0, -0.08]
+  const l = p.l ?? [0, 0.08]
+  return {
+    aR: r[0] + Math.sin(t * 10) * (p.shakeR ?? 0),
+    oR: r[1] + Math.sin(t * 14) * (p.waveR ?? 0),
+    aL: l[0],
+    oL: l[1],
+    nod: (p.nod ?? 0) + Math.sin(t * 3) * (p.nodWob ?? 0),
+    tilt: p.tilt ?? 0,
+    lift:
+      (since < 0.4 ? Math.sin((since / 0.4) * Math.PI) * (p.hop ?? 0) : 0) +
+      Math.abs(Math.sin(t * 5)) * (p.bounce ?? 0) +
+      ((Math.sin(t * 1.6) + 1) / 2) * (p.breathe ?? 0) +
+      Math.abs(Math.sin(t * 14)) * (p.jitter ?? 0),
+  }
 }
 
-function Hedge({ pos, w = 3 }: { pos: [number, number, number]; w?: number }) {
-  return <Box size={[w, 0.8, 0.7]} pos={pos} color="#4f9a56" r={0.3} />
+const WAVE: Pose = { r: [-2.6, -0.25], l: [-0.2, 0.08], waveR: 0.3, tilt: 0.08 }
+const OPEN_HANDS: Pose = { r: [-1.1, -0.5], l: [-1.1, 0.5], tilt: 0.14, nodWob: 0.05 }
+const HAND_UP: Pose = { r: [-3.05, -0.12], l: [-0.2, 0.08] }
+const CHEER_ARMS: Pose = { r: [-2.9, -0.35], l: [-2.9, 0.35] }
+
+/** What she does at each step (hand-tuned arm angles; the brush and spoon
+    steps of the school story have their own, in Kid). */
+const KID_POSES: Record<string, Pose> = {
+  // meeting someone new
+  s2p1: { r: [-1.5, -0.12], l: [-0.2, 0.08], nod: 0.06, hop: 0.16 },
+  s2p2: WAVE,
+  s2p3: { r: [-1.45, -0.55], l: [-0.3, 0.08], shakeR: 0.1, nod: 0.1 },
+  s2p4: OPEN_HANDS,
+  // when I feel angry
+  s3p1: { r: [-0.2, 0.35], l: [-0.2, -0.35], shakeR: 0.12, nod: 0.25, bounce: 0.05 },
+  s3p2: { r: [-1.5, 0.05], l: [-1.5, -0.05], breathe: 0.07 },
+  s3p3: { r: [-2.0, -0.55], l: [-0.2, 0.08], tilt: 0.12, nod: -0.05 },
+  s3p4: OPEN_HANDS,
+  s3p5: { r: [-0.1, -0.05], l: [-0.1, 0.05], breathe: 0.03, tilt: 0.05 },
+  // going to the doctor
+  s4p1: WAVE,
+  s4p2: { r: [-0.9, -0.5], l: [-0.9, 0.5], breathe: 0.015 },
+  s4p3: { ...HAND_UP, nod: 0.05, hop: 0.1 },
+  s4p4: { r: [-0.3, 0.5], l: [-0.3, -0.5], breathe: 0.04 },
+  s4p5: { ...WAVE, nod: 0.15 },
+  // sharing with a friend
+  s5p1: { r: [-1.2, -0.5], l: [-1.0, 0.4], bounce: 0.03 },
+  s5p2: { r: [-1.2, -0.5], l: [-1.0, 0.4], tilt: 0.1, nod: 0.05 },
+  s5p3: { r: [-1.5, -0.1], l: [-0.4, 0.1], nod: 0.08, hop: 0.08 },
+  s5p4: { r: [-1.0, -0.3], l: [-0.9, 0.3], shakeR: 0.25, bounce: 0.08 },
+  // asking for help
+  s6p1: { r: [-2.9, -0.15], l: [-0.2, 0.08], waveR: 0.12, tilt: 0.12 },
+  s6p2: { ...HAND_UP, hop: 0.06 },
+  s6p3: OPEN_HANDS,
+  s6p4: { r: [-2.9, 0.3], l: [-0.2, 0.08], waveR: 0.2, hop: 0.12, bounce: 0.05 },
+  // handling disappointment
+  s7p1: { ...CHEER_ARMS, bounce: 0.14 },
+  s7p2: { r: [-0.1, 0.1], l: [-0.1, -0.1], nod: 0.3, tilt: 0.1 },
+  s7p3: { r: [-2.0, -0.55], l: [-2.0, 0.55], nod: 0.25, jitter: 0.01 },
+  s7p4: { r: [-1.3, -0.75], l: [-0.2, 0.08], tilt: 0.1, nod: 0.1, breathe: 0.04 },
+  s7p5: { r: [-2.9, -0.35], l: [-0.2, 0.08], nod: -0.2, tilt: 0.05, bounce: 0.06 },
+  // going to a birthday party
+  s8p1: { r: [-1.4, -0.5], l: [-1.1, 0.4], nod: 0.3, hop: 0.1 },
+  s8p2: { r: [-1.2, -0.5], l: [-0.2, 0.08], hop: 0.08 },
+  s8p3: { r: [-1.2, -0.5], l: [-0.3, 0.08], bounce: 0.04 },
+  s8p4: { r: [-1.45, -0.1], l: [-0.2, 0.08], hop: 0.1 },
+  s8p5: { ...CHEER_ARMS, bounce: 0.12 },
+  s8p6: WAVE,
 }
 
-function ParkScene({ friendAction, friendSays, mood }: { friendAction: string | null; friendSays: string; mood: KidMood }) {
-  const windows: [number, number][] = []
-  for (let r = 0; r < 2; r++) for (let c = 0; c < 6; c++) windows.push([-5.5 + c * 2.2, 2.2 + r * 2.1])
+/** What she carries in her right hand at a step. */
+const HELD: Record<string, 'toy' | 'gift' | 'letter'> = {
+  s5p1: 'toy', s5p2: 'toy', s5p3: 'toy',
+  s8p1: 'letter', s8p2: 'gift', s8p3: 'gift', s8p4: 'gift',
+}
+
+interface NpcDef {
+  key: string
+  pos: V3
+  rotY?: number
+  shirt: string
+  pants?: string
+  hair?: string
+  bag?: string
+  long?: boolean
+  sit?: boolean
+  accessory?: 'stethoscope' | 'hat'
+  /** How they react while she does each step, and what they say. */
+  poses?: Record<string, Pose>
+  says?: Record<string, string>
+  /** Cheers along when the whole story is done. */
+  cheerSays?: string
+}
+
+interface StoryDef {
+  spots: Record<string, SchoolSpot>
+  start: THREE.Vector3
+  sky: string
+  halfW?: number
+  /** Close-ups aim this far to the side of her. */
+  focusDx: number
+  env: (p: { action: string | null; mood: KidMood }) => ReactNode
+  npcs: NpcDef[]
+  /** Close-up camera offset per step; anything missing gets a friendly front shot. */
+  shots?: Record<string, V3>
+}
+
+const spotAt = (x: number, by: number): SchoolSpot => ({ stand: [x, 0, -0.45], bubble: [x, by, -0.45] })
+/** She always walks along the path facing right (+x), toward whoever is there. */
+const PARK_FACING = Math.PI / 2
+const NPC_FACES_KID = -Math.PI / 2
+
+/** Back wall and floor for the indoor stories. */
+function RoomShell({ wall, floor, trim = '#ffffff' }: { wall: string; floor: string; trim?: string }) {
   return (
     <group>
-      {/* grass, with a paved path across the front and one up to the doors */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, -3]}><planeGeometry args={[60, 30]} /><Mat color="#8fcb78" rough={0.95} /></mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, -0.45]}><planeGeometry args={[24, 2.8]} /><Mat color="#e4d6bb" /></mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.011, -4.2]}><planeGeometry args={[3, 5]} /><Mat color="#e4d6bb" /></mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, -3]}><planeGeometry args={[60, 30]} /><Mat color={floor} rough={0.9} /></mesh>
+      <mesh position={[0, 3.5, -4.7]}><planeGeometry args={[60, 10]} /><Mat color={wall} /></mesh>
+      <Box size={[60, 0.3, 0.12]} pos={[0, 0.15, -4.62]} color={trim} r={0.02} />
+    </group>
+  )
+}
 
-      {/* the school */}
-      <group position={[0, 0, -8.2]}>
-        <Box size={[15, 6, 2.2]} pos={[0, 3, 0]} color="#c98466" r={0.08} />
-        <Box size={[15.4, 0.4, 2.6]} pos={[0, 6.1, 0]} color="#a8614a" r={0.05} />
-        <Box size={[3.6, 4.4, 0.6]} pos={[0, 2.2, 1.3]} color="#d9b79a" r={0.06} />
-        <Box size={[1.9, 2.5, 0.12]} pos={[0, 1.3, 1.65]} color="#3e5a6e" r={0.03} />
-        <Box size={[1.9, 0.08, 0.14]} pos={[0, 1.3, 1.67]} color="#d9e6ee" r={0.01} />
-        {windows.map(([x, y], i) => (Math.abs(x) < 1.8 && y < 3 ? null : (
-          <Box key={i} size={[1.2, 1.2, 0.1]} pos={[x, y + 0.5, 1.12]} color="#9cc7de" r={0.03} />
-        )))}
-        <Poster pos={[0, 4.55, 1.62]} size={[3.2, 0.7]} lines={['SCHOOL']} bg="#f1e8d8" ink="#2f5d8a" />
+function Desk({ pos, rotY = 0 }: { pos: V3; rotY?: number }) {
+  return (
+    <group position={pos} rotation={[0, rotY, 0]}>
+      <Box size={[1.3, 0.08, 0.8]} pos={[0, 0.72, 0]} color="#e2c18f" r={0.03} />
+      {[[-0.55, -0.32], [0.55, -0.32], [-0.55, 0.32], [0.55, 0.32]].map(([x, z], i) => <Box key={i} size={[0.06, 0.7, 0.06]} pos={[x, 0.35, z]} color="#8a8f99" r={0.02} />)}
+      <Box size={[0.32, 0.05, 0.24]} pos={[-0.25, 0.78, 0.05]} color="#d9573f" r={0.01} />
+    </group>
+  )
+}
+
+function RainDrops({ x, z }: { x: number; z: number }) {
+  const refs = useRef<(THREE.Mesh | null)[]>([])
+  useFrame(({ clock }) => {
+    refs.current.forEach((m, i) => {
+      if (m) m.position.y = 3.7 - ((clock.elapsedTime * 2.2 + i * 0.37) % 1) * 3.6
+    })
+  })
+  return (
+    <group position={[x, 0, z]}>
+      {Array.from({ length: 16 }, (_, i) => (
+        <mesh key={i} ref={el => { refs.current[i] = el }} position={[((i * 37) % 11) / 8 - 0.7, 2, ((i * 53) % 7) / 8 - 0.4]}>
+          <cylinderGeometry args={[0.012, 0.012, 0.22, 5]} /><meshBasicMaterial color="#6fa8dc" />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+function LivingRoom() {
+  // A bright, open lounge: big windows onto greenery, a blue sofa and round
+  // coffee table, a yellow armchair, a desk with a laptop, planters, posters.
+  return (
+    <group>
+      <RoomShell wall="#efe6dc" floor="#e6d3bb" trim="#ffffff" />
+      {/* big windows with trees outside */}
+      <Box size={[6.2, 3.1, 0.12]} pos={[-0.2, 3.0, -4.6]} color="#ffffff" r={0.05} />
+      <mesh position={[-0.2, 3.0, -4.52]}><planeGeometry args={[5.9, 2.8]} /><Mat color="#bfe6ff" emissive="#d9f1ff" ei={0.6} /></mesh>
+      <mesh position={[-1.6, 2.4, -4.5]}><sphereGeometry args={[0.9, 14, 10]} /><Mat color="#6cbb74" /></mesh>
+      <mesh position={[1.3, 2.7, -4.5]}><sphereGeometry args={[1.1, 14, 10]} /><Mat color="#58a463" /></mesh>
+      <Box size={[0.08, 2.9, 0.06]} pos={[-0.2, 3.0, -4.45]} color="#ffffff" r={0.02} />
+      <Box size={[2.2, 2.6, 0.12]} pos={[6.4, 3.0, -4.6]} color="#ffffff" r={0.05} />
+      <mesh position={[6.4, 3.0, -4.52]}><planeGeometry args={[1.95, 2.35]} /><Mat color="#bfe6ff" emissive="#d9f1ff" ei={0.6} /></mesh>
+      <Poster pos={[-5.6, 3.6, -4.6]} size={[1.7, 1.3]} lines={['Small choices', 'build big', 'confidence']} bg="#efe6dc" ink="#4a4f58" />
+      <Poster pos={[3.7, 3.6, -4.6]} size={[1.5, 1.1]} lines={['Better Days', 'Ahead :)']} bg="#efe6dc" ink="#4a4f58" />
+      {/* bookshelf */}
+      <group position={[-6.9, 0, -4.2]}>
+        <Box size={[2.2, 2.8, 0.45]} pos={[0, 1.4, 0]} color="#c99a6b" r={0.04} />
+        {[0.45, 1.05, 1.65, 2.25].map((y, r) => (
+          <group key={y}>{[-0.8, -0.5, -0.2, 0.1, 0.4, 0.7].map((x, i) => <Box key={x} size={[0.18, 0.42, 0.3]} pos={[x, y + 0.12, 0.08]} color={['#d9573f', '#5fa8e0', '#f6d65a', '#7cc77a', '#9a7fe0'][(i + r) % 5]} r={0.02} />)}</group>
+        ))}
       </group>
+      {/* blue sofa and round coffee table */}
+      <group position={[-3.6, 0, -2.7]}>
+        <Box size={[3.0, 0.5, 1.1]} pos={[0, 0.3, 0]} color="#3f6fa5" r={0.1} />
+        <Box size={[3.0, 0.95, 0.28]} pos={[0, 0.82, -0.5]} color="#36628f" r={0.1} />
+        <Box size={[0.28, 0.75, 1.1]} pos={[-1.5, 0.5, 0]} color="#36628f" r={0.1} />
+        <Box size={[0.28, 0.75, 1.1]} pos={[1.5, 0.5, 0]} color="#36628f" r={0.1} />
+      </group>
+      <mesh position={[-3.6, 0.4, -1.5]}><cylinderGeometry args={[0.7, 0.7, 0.07, 24]} /><Mat color="#c99a6b" /></mesh>
+      <mesh position={[-3.6, 0.2, -1.5]}><cylinderGeometry args={[0.07, 0.07, 0.4, 8]} /><Mat color="#8a5a3c" /></mesh>
+      {/* yellow armchair, round platform with a planter */}
+      <group position={[1.6, 0, -3.4]} rotation={[0, -0.4, 0]}>
+        <Box size={[1.1, 0.5, 1.0]} pos={[0, 0.3, 0]} color="#e8b63f" r={0.1} />
+        <Box size={[1.1, 0.9, 0.25]} pos={[0, 0.8, -0.42]} color="#e0ab30" r={0.1} />
+      </group>
+      <mesh position={[0.2, 0.15, -3.0]}><cylinderGeometry args={[1.5, 1.5, 0.3, 28]} /><Mat color="#e8cfa6" /></mesh>
+      <Plant pos={[0.2, 0.3, -3.0]} s={0.9} />
+      {/* a desk with a laptop */}
+      <group position={[5.2, 0, -2.6]}>
+        <Box size={[2.2, 0.08, 1.0]} pos={[0, 0.88, 0]} color="#d9a874" r={0.03} />
+        {[-1.0, 1.0].map(x => <Box key={x} size={[0.07, 0.86, 0.9]} pos={[x, 0.43, 0]} color="#b98a5a" r={0.02} />)}
+        <Box size={[0.6, 0.04, 0.42]} pos={[0, 0.94, 0.05]} color="#8a8f99" r={0.01} />
+        <Box size={[0.6, 0.4, 0.03]} pos={[0, 1.15, -0.15]} color="#33414f" r={0.01} />
+      </group>
+      <Plant pos={[-7.6, 0, -1.6]} s={1.3} />
+      <Plant pos={[7.6, 0, -1.2]} s={1.2} />
+    </group>
+  )
+}
 
-      {/* trees, hedges, a lamp post and a cloud or two */}
-      <Tree pos={[-8.2, 0, -3.6]} s={1.6} />
-      <Tree pos={[8.4, 0, -3.4]} s={1.5} />
-      <Tree pos={[-4.8, 0, -5.4]} s={1.2} />
-      <Tree pos={[5.2, 0, -5.6]} s={1.3} />
-      <Tree pos={[-10.5, 0, -1.2]} s={1.4} />
-      <Hedge pos={[-3.0, 0.4, -2.3]} w={4} />
-      <Hedge pos={[4.4, 0.4, -2.2]} w={4.4} />
-      <LampPost pos={[2.7, 0, -1.8]} />
-      <Cloud pos={[-5, 7.2, -12]} s={1.6} />
-      <Cloud pos={[5.5, 8, -13]} s={1.3} />
+function Clinic() {
+  return (
+    <group>
+      <RoomShell wall="#d6efe9" floor="#d3dcdf" />
+      <Box size={[0.9, 0.3, 0.1]} pos={[-6.6, 3.4, -4.6]} color="#e45b5b" r={0.03} />
+      <Box size={[0.3, 0.9, 0.1]} pos={[-6.6, 3.4, -4.6]} color="#e45b5b" r={0.03} />
+      <Poster pos={[-1.0, 3.2, -4.6]} size={[1.2, 1.5]} lines={['E', 'F P', 'T O Z']} bg="#ffffff" ink="#33414f" />
+      {/* reception desk */}
+      <group position={[-3.8, 0, -2.6]}>
+        <Box size={[2.4, 1.0, 0.8]} pos={[0, 0.5, 0]} color="#ffffff" r={0.05} />
+        <Box size={[2.5, 0.1, 0.95]} pos={[0, 1.03, 0]} color="#58b5a6" r={0.04} />
+      </group>
+      {/* waiting chairs */}
+      {[-1.9, -1.1, -0.3].map(x => <Chair key={x} pos={[x, 0, -2.9]} color="#5aa6d6" />)}
+      {/* exam bed */}
+      <group position={[3.7, 0, -2.7]}>
+        <Box size={[2.2, 0.6, 1.0]} pos={[0, 0.3, 0]} color="#c8d3d6" r={0.05} />
+        <Box size={[2.2, 0.12, 1.0]} pos={[0, 0.66, 0]} color="#ffffff" r={0.05} />
+        <Box size={[0.5, 0.14, 0.7]} pos={[-0.8, 0.78, 0]} color="#bfe0f0" r={0.06} />
+      </group>
+      {/* exit door */}
+      <Box size={[1.5, 2.7, 0.12]} pos={[6.4, 1.35, -4.5]} color="#8fbf9f" r={0.04} />
+      <Poster pos={[6.4, 3.0, -4.5]} size={[0.9, 0.4]} lines={['EXIT']} bg="#2f9e62" ink="#ffffff" />
+      <Plant pos={[7.5, 0, -3.8]} s={1.1} />
+    </group>
+  )
+}
 
-      {/* a bench with someone reading, and two kids chatting */}
-      <Bench pos={[5.6, 0, -1.4]} rotY={0} />
-      <Person pos={[5.9, 0, -1.4]} sit shirt="#3d5a99" pants="#2f3b55" hair="#2a1d17" long={false} seed={1.3} />
-      <Person pos={[-6.0, 0, -2.9]} rotY={0.7} shirt="#5d6b86" pants="#3a4f7a" hair="#2a1d17" long={false} bag="#27344f" seed={2.1} />
-      <Person pos={[-5.0, 0, -2.9]} rotY={-0.7} shirt="#e8dccb" pants="#3b5d8f" hair="#3a2a22" seed={0.4} />
-      <Person pos={[-4.0, 0, -3.0]} rotY={-1.0} shirt="#6fa06a" pants="#3a4f7a" hair="#2a1d17" long={false} bag="#27344f" seed={3.3} />
+function PlayRoom({ action }: { action: string | null }) {
+  return (
+    <group>
+      <RoomShell wall="#fbe9bd" floor="#e6b48a" trim="#fffaf0" />
+      <Window pos={[-2.6, 3.4, -4.55]} />
+      <Frame pos={[2.6, 3.4, -4.6]} art="#f2a3b6" />
+      <Rug pos={[-0.3, 0, -1.2]} r={2.8} color="#f2a3b6" ring="#fbd3de" />
+      {/* toy shelf with a box of blocks */}
+      <group position={[-6.4, 0, -4.1]}>
+        <Box size={[2.2, 2.0, 0.5]} pos={[0, 1.0, 0]} color="#d9a874" r={0.04} />
+        {[0.3, 1.0, 1.7].map((y, r) => <Box key={y} size={[1.9, 0.06, 0.45]} pos={[0, y, 0.04]} color="#fffaf0" r={0.02} />)}
+        {[[-0.6, 0.55, '#d9573f'], [0, 0.55, '#5fa8e0'], [0.6, 0.55, '#f6d65a'], [-0.4, 1.25, '#7cc77a'], [0.4, 1.25, '#9a7fe0']].map(([x, y, c], i) => (
+          <Box key={i} size={[0.4, 0.4, 0.35]} pos={[x as number, y as number, 0.05]} color={c as string} r={0.06} />
+        ))}
+      </group>
+      <Box size={[1.4, 0.7, 0.9]} pos={[5.8, 0.35, -3.6]} color="#5aa6d6" r={0.08} />
+      {[['#d9573f', 5.4], ['#f6d65a', 5.8], ['#7cc77a', 6.2]].map(([c, x], i) => <Box key={i} size={[0.4, 0.4, 0.4]} pos={[x as number, 0.9, -3.6]} color={c as string} r={0.05} />)}
+      {/* the toy, on the rug once they play with it together */}
+      {action === 's5p4' && (
+        <group position={[-0.5, 0, -0.45]}>
+          <Box size={[0.55, 0.22, 0.28]} pos={[0, 0.2, 0]} color="#e45b5b" r={0.06} />
+          <Box size={[0.3, 0.18, 0.26]} pos={[0.05, 0.38, 0]} color="#f4a64a" r={0.05} />
+          {[-0.2, 0.2].map(x => <mesh key={x} position={[x, 0.1, 0.15]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.09, 0.09, 0.06, 12]} /><Mat color="#33414f" /></mesh>)}
+        </group>
+      )}
+    </group>
+  )
+}
 
-      {/* the new kid */}
-      <Person
-        pos={FRIEND_POS} rotY={-Math.PI / 2} shirt="#f4ede0" pants="#3b5d8f" hair="#5a3a2a" bag="#4b7d6a"
-        action={friendAction} says={friendSays} active={mood === 'act' || mood === 'cheer'}
-      />
+function Classroom() {
+  return (
+    <group>
+      <RoomShell wall="#dcebc7" floor="#cfa77a" trim="#fbf8ef" />
+      {/* chalkboard */}
+      <Box size={[5.4, 2.7, 0.12]} pos={[0.6, 3.0, -4.55]} color="#b98a5a" r={0.04} />
+      <Poster pos={[0.6, 3.0, -4.46]} size={[5, 2.3]} lines={['2 + 3 = ?']} bg="#2f5f4a" ink="#ffffff" />
+      {/* cork board with notes, left */}
+      <Box size={[3.2, 2.2, 0.1]} pos={[-5.4, 3.0, -4.55]} color="#c99a6b" r={0.04} />
+      {[[-6.2, 3.5, '#ffffff'], [-5.4, 3.7, '#f6e58a'], [-4.7, 3.3, '#bfe0f0'], [-5.9, 2.7, '#f6e58a'], [-5.0, 2.6, '#ffffff']].map(([x, y, c], i) => (
+        <Box key={i} size={[0.55, 0.7, 0.03]} pos={[x as number, y as number, -4.47]} color={c as string} r={0.01} />
+      ))}
+      {/* windows on the right with a sunlight poster */}
+      <Window pos={[6.2, 3.3, -4.55]} />
+      <Poster pos={[4.1, 3.3, -4.55]} size={[1.1, 1.5]} lines={['NATURAL', 'SUNLIGHT']} bg="#f6d65a" ink="#8a5a3c" />
+      <group position={[-2.6, 3.9, -4.6]}>
+        <mesh><circleGeometry args={[0.42, 24]} /><Mat color="#ffffff" /></mesh>
+        <Box size={[0.04, 0.3, 0.02]} pos={[0, 0.12, 0.02]} color="#33414f" r={0.005} />
+        <Box size={[0.22, 0.04, 0.02]} pos={[0.1, 0, 0.02]} color="#33414f" r={0.005} />
+      </group>
+      {/* bookshelf */}
+      <group position={[3.0, 0, -4.3]}>
+        <Box size={[1.9, 2.4, 0.45]} pos={[0, 1.2, 0]} color="#b98a5a" r={0.04} />
+        {[0.45, 1.05, 1.65].map((y, r) => (
+          <group key={y}>{[-0.6, -0.3, 0.0, 0.3, 0.6].map((x, i) => <Box key={x} size={[0.18, 0.4, 0.3]} pos={[x, y + 0.12, 0.08]} color={['#d9573f', '#5fa8e0', '#f6d65a', '#7cc77a'][(i + r) % 4]} r={0.02} />)}</group>
+        ))}
+      </group>
+      {/* desks: hers in front, others behind with students */}
+      <Desk pos={[-3.0, 0, -1.1]} />
+      {[-3.8, -2.0, 4.6].map(x => <Desk key={x} pos={[x, 0, -3.0]} />)}
+      <Chair pos={[-3.8, 0, -3.9]} rotY={Math.PI} color="#6c93bb" />
+      <Chair pos={[-2.0, 0, -3.9]} rotY={Math.PI} color="#6c93bb" />
+      <Plant pos={[-7.4, 0, -1.4]} s={1.3} />
+    </group>
+  )
+}
+
+function Garden({ action, mood }: { action: string | null; mood: KidMood }) {
+  const sad = action === 's7p2' || action === 's7p3' || action === 's7p4'
+  const hopeful = action === 's7p5' || mood === 'cheer'
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, -3]}><planeGeometry args={[60, 30]} /><Mat color="#a9cf8c" rough={0.95} /></mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, -0.45]}><planeGeometry args={[24, 2.4]} /><Mat color="#e4d6bb" /></mesh>
+      <Tree pos={[-8, 0, -3.4]} s={1.5} />
+      <Tree pos={[8.2, 0, -3.8]} s={1.6} />
+      <Tree pos={[-4.2, 0, -5.4]} s={1.2} />
+      <Tree pos={[5.4, 0, -5.8]} s={1.2} />
+      {Array.from({ length: 18 }, (_, i) => (
+        <group key={i} position={[-7 + i * 0.85, 0, -2.2 - (i % 3) * 0.35]}>
+          <mesh position={[0, 0.25, 0]}><cylinderGeometry args={[0.015, 0.015, 0.5, 5]} /><Mat color="#4f9a56" /></mesh>
+          <mesh position={[0, 0.52, 0]}><sphereGeometry args={[0.09, 8, 6]} /><Mat color={['#f2a3b6', '#f6d65a', '#ffffff', '#c79cf0'][i % 4]} /></mesh>
+        </group>
+      ))}
+      {/* wooden fence, benches, hedges and a little playground behind */}
+      {Array.from({ length: 22 }, (_, i) => <Box key={i} size={[0.5, 2.0, 0.1]} pos={[-10 + i * 0.95, 1.0, -7.4]} color="#b98a5a" r={0.03} />)}
+      <Box size={[21, 0.12, 0.1]} pos={[0, 1.6, -7.3]} color="#a97a50" r={0.02} />
+      <Hedge pos={[-6.6, 0.4, -6.4]} w={3.4} />
+      <Hedge pos={[2.6, 0.4, -6.4]} w={4} />
+      <Bench pos={[-5.4, 0, -4.1]} rotY={0} />
+      <Bench pos={[1.4, 0, -4.6]} rotY={0} />
+      <group position={[6.4, 0, -5.2]}>
+        <Box size={[0.12, 2.4, 0.12]} pos={[-0.7, 1.2, 0]} color="#e45b5b" r={0.03} />
+        <Box size={[0.12, 2.4, 0.12]} pos={[0.7, 1.2, 0]} color="#e45b5b" r={0.03} />
+        <Box size={[1.6, 0.1, 0.1]} pos={[0, 2.4, 0]} color="#e45b5b" r={0.03} />
+        <Box size={[0.5, 0.06, 0.9]} pos={[0, 1.1, 0.35]} color="#5fa8e0" r={0.02} />
+      </group>
+      {/* the picnic they were looking forward to */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[3.0, 0.02, -2.0]}><planeGeometry args={[2.2, 1.6]} /><Mat color="#e86a6a" /></mesh>
+      <Box size={[0.6, 0.35, 0.4]} pos={[3.0, 0.2, -2.0]} color="#b98a5a" r={0.05} />
+      {/* the weather follows how she feels */}
+      {!sad && <mesh position={[-6, 6.4, -12]}><sphereGeometry args={[0.9, 20, 16]} /><meshStandardMaterial color="#ffe27a" emissive="#ffd34d" emissiveIntensity={0.9} /></mesh>}
+      {!sad && <Cloud pos={[2, 6.2, -12]} s={1.5} />}
+      {sad && (
+        <group>
+          <group position={[-2.5, 4.2, -0.6]} scale={1.5}>
+            {[[0, 0, 0, 0.6], [0.6, -0.1, 0, 0.45], [-0.6, -0.1, 0, 0.45], [0.25, 0.3, 0, 0.42]].map(([x, y, z, r], i) => (
+              <mesh key={i} position={[x, y, z]}><sphereGeometry args={[r, 16, 12]} /><Mat color="#7d8794" /></mesh>
+            ))}
+          </group>
+          <RainDrops x={-2.5} z={-0.6} />
+        </group>
+      )}
+      {hopeful && <Rainbow pos={[3.4, 0.2, -6.5]} s={2.4} />}
+    </group>
+  )
+}
+
+function Party() {
+  // A pink party room: bunting, balloons, windows onto the garden, a table
+  // with a cake, a gift table and a front door.
+  const flags = Array.from({ length: 17 }, (_, i) => i)
+  return (
+    <group>
+      <RoomShell wall="#f3b8cf" floor="#d9a47a" trim="#ffffff" />
+      <Window pos={[-7.0, 3.2, -4.55]} />
+      <Window pos={[7.2, 3.2, -4.55]} />
+      <mesh position={[-7.0, 3.2, -4.6]}><sphereGeometry args={[1.0, 12, 8]} /><Mat color="#6cbb74" /></mesh>
+      {/* bunting across the wall */}
+      {flags.map(i => (
+        <mesh key={i} position={[-6.8 + i * 0.85, 4.7 - Math.sin((i / 16) * Math.PI) * 0.35, -4.4]} rotation={[0, 0, Math.PI]}>
+          <coneGeometry args={[0.17, 0.32, 3]} /><Mat color={['#ef6b6b', '#f6d65a', '#5fa8e0', '#7cc77a'][i % 4]} />
+        </mesh>
+      ))}
+      <Poster pos={[0.8, 3.5, -4.55]} size={[4.2, 0.8]} lines={['HAPPY BIRTHDAY!']} bg="#fff3dc" ink="#d9573f" />
+      {[['#ef6b6b', -6.0], ['#5fa8e0', -5.5], ['#f6d65a', 6.0], ['#9a7fe0', 6.6]].map(([c, x], i) => <Balloon key={i} pos={[x as number, 2.6 + (i % 2) * 0.3, -3.4]} color={c as string} />)}
+      {/* front door */}
+      <Box size={[1.5, 2.6, 0.12]} pos={[-0.4, 1.3, -4.5]} color="#8a5a3c" r={0.04} />
+      <mesh position={[0.1, 1.2, -4.42]}><sphereGeometry args={[0.07, 8, 6]} /><Mat color="#f6d65a" /></mesh>
+      {/* invitations on a side table */}
+      <group position={[-5.4, 0, -2.2]}>
+        <Table pos={[0, 0, 0]} w={1.3} d={0.8} color="#f4d6a0" />
+        <Box size={[0.4, 0.03, 0.28]} pos={[0, 0.85, 0]} color="#ffffff" r={0.01} />
+        <Box size={[0.1, 0.035, 0.1]} pos={[0, 0.87, 0]} color="#e45b87" r={0.02} />
+      </group>
+      {/* gift table */}
+      <group position={[-2.8, 0, -2.5]}>
+        <Table pos={[0, 0, 0]} w={2.2} d={0.9} color="#f6d65a" />
+        <Gift pos={[-0.6, 0.83, 0]} color="#e86a9a" s={0.7} />
+        <Gift pos={[0, 0.83, 0.05]} color="#5fa8e0" ribbon="#f6d65a" s={0.8} />
+        <Gift pos={[0.65, 0.83, 0]} color="#7cc77a" s={0.65} />
+      </group>
+      {/* cake table with party hats */}
+      <group position={[4.2, 0, -2.0]}>
+        <Table pos={[0, 0, 0]} w={2.0} d={0.95} color="#f6d65a" />
+        <mesh position={[0, 1.0, 0]}><cylinderGeometry args={[0.45, 0.5, 0.3, 24]} /><Mat color="#f7c5d8" /></mesh>
+        <mesh position={[0, 1.27, 0]}><cylinderGeometry args={[0.3, 0.34, 0.25, 24]} /><Mat color="#fff3dc" /></mesh>
+        {[-0.1, 0.1].map(x => (
+          <group key={x} position={[x, 1.52, 0]}>
+            <mesh position={[0, 0.07, 0]}><cylinderGeometry args={[0.02, 0.02, 0.16, 6]} /><Mat color="#f6d65a" /></mesh>
+            <mesh position={[0, 0.2, 0]}><sphereGeometry args={[0.035, 8, 6]} /><meshBasicMaterial color="#ffb347" /></mesh>
+          </group>
+        ))}
+        {[[-0.8, '#5fa8e0'], [0.8, '#ef6b6b']].map(([x, c], i) => <mesh key={i} position={[x as number, 0.98, 0.1]}><coneGeometry args={[0.1, 0.25, 12]} /><Mat color={c as string} /></mesh>)}
+      </group>
+      <Gift pos={[7.2, 0, -1.4]} color="#9a7fe0" s={1.1} />
+      <Gift pos={[-7.6, 0, -1.0]} color="#e86a9a" s={1.2} />
+      {/* exit */}
+      <Box size={[1.5, 2.6, 0.12]} pos={[6.3, 1.3, -4.5]} color="#c9a37a" r={0.04} />
+    </group>
+  )
+}
+
+const MUM_POSES: Record<string, Pose> = { s3p1: { tilt: 0.1 }, s3p4: { nod: 0.1, l: [-0.5, 0.3] }, s3p5: { tilt: 0.08, nodWob: 0.04 } }
+
+const STORY_SCENES: Record<string, StoryDef> = {
+  'meeting-someone-new': {
+    spots: { s2p1: spotAt(-4.2, 2.7), s2p2: spotAt(-2.4, 3.3), s2p3: spotAt(-1.0, 2.7), s2p4: spotAt(-1.3, 3.3) },
+    start: new THREE.Vector3(-6.4, 0, -0.45), sky: '#bfe3ff', focusDx: 0.7,
+    shots: { s2p1: [1.4, 1.7, 4.4], s2p2: [1.2, 1.6, 3.8], s2p3: [0.7, 1.5, 3.1], s2p4: [0.8, 1.6, 3.3] },
+    env: function Park() {
+      const windows: [number, number][] = []
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 6; c++) windows.push([-5.5 + c * 2.2, 2.2 + r * 2.1])
+      return (
+        <group>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, -3]}><planeGeometry args={[60, 30]} /><Mat color="#8fcb78" rough={0.95} /></mesh>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, -0.45]}><planeGeometry args={[24, 2.8]} /><Mat color="#e4d6bb" /></mesh>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.011, -4.2]}><planeGeometry args={[3, 5]} /><Mat color="#e4d6bb" /></mesh>
+          <group position={[0, 0, -8.2]}>
+            <Box size={[15, 6, 2.2]} pos={[0, 3, 0]} color="#c98466" r={0.08} />
+            <Box size={[15.4, 0.4, 2.6]} pos={[0, 6.1, 0]} color="#a8614a" r={0.05} />
+            <Box size={[3.6, 4.4, 0.6]} pos={[0, 2.2, 1.3]} color="#d9b79a" r={0.06} />
+            <Box size={[1.9, 2.5, 0.12]} pos={[0, 1.3, 1.65]} color="#3e5a6e" r={0.03} />
+            {windows.map(([x, y], i) => (Math.abs(x) < 1.8 && y < 3 ? null : <Box key={i} size={[1.2, 1.2, 0.1]} pos={[x, y + 0.5, 1.12]} color="#9cc7de" r={0.03} />))}
+            <Poster pos={[0, 4.55, 1.62]} size={[3.2, 0.7]} lines={['SCHOOL']} bg="#f1e8d8" ink="#2f5d8a" />
+          </group>
+          <Tree pos={[-8.2, 0, -3.6]} s={1.6} />
+          <Tree pos={[8.4, 0, -3.4]} s={1.5} />
+          <Tree pos={[-4.8, 0, -5.4]} s={1.2} />
+          <Tree pos={[5.2, 0, -5.6]} s={1.3} />
+          <Hedge pos={[-3.0, 0.4, -2.3]} w={4} />
+          <Hedge pos={[4.4, 0.4, -2.2]} w={4.4} />
+          <LampPost pos={[2.7, 0, -1.8]} />
+          <Cloud pos={[-5, 7.2, -12]} s={1.6} />
+          <Cloud pos={[5.5, 8, -13]} s={1.3} />
+          <Bench pos={[5.6, 0, -1.4]} />
+        </group>
+      )
+    },
+    npcs: [
+      { key: 'reader', pos: [5.9, 0, -1.4], shirt: '#3d5a99', pants: '#2f3b55', hair: '#2a1d17', long: false, sit: true },
+      { key: 'g1', pos: [-6.0, 0, -2.9], rotY: 0.7, shirt: '#5d6b86', pants: '#3a4f7a', hair: '#2a1d17', long: false, bag: '#27344f' },
+      { key: 'g2', pos: [-5.0, 0, -2.9], rotY: -0.7, shirt: '#e8dccb', pants: '#3b5d8f', hair: '#3a2a22' },
+      { key: 'g3', pos: [-4.0, 0, -3.0], rotY: -1.0, shirt: '#6fa06a', pants: '#3a4f7a', hair: '#2a1d17', long: false, bag: '#27344f' },
+      {
+        key: 'friend', pos: [0.1, 0, -0.45], rotY: NPC_FACES_KID, shirt: '#f4ede0', hair: '#5a3a2a', bag: '#4b7d6a',
+        poses: { s2p1: { tilt: 0.1, hop: 0.1 }, s2p2: WAVE, s2p3: { r: [-1.45, -0.55], shakeR: 0.1, nod: 0.1 }, s2p4: { nodWob: 0.08, l: [-0.9, 0.4], r: [-0.7, -0.4] } },
+        says: { s2p2: 'Hello! 😊', s2p3: 'Nice to meet you! 🤝', s2p4: "I'm Riya! 🌸" },
+        cheerSays: "Let's be friends! 💛",
+      },
+    ],
+  },
+
+  'when-i-feel-angry': {
+    spots: { s3p1: spotAt(-5.2, 2.8), s3p2: spotAt(-3.8, 3.4), s3p3: spotAt(-2.4, 2.8), s3p4: spotAt(1.2, 3.4), s3p5: spotAt(-0.2, 2.8) },
+    start: new THREE.Vector3(-7.2, 0, -0.45), sky: '#f3dcc6', focusDx: 0.4,
+    env: LivingRoom,
+    npcs: [
+      { key: 'sofa', pos: [-4.2, 0, -2.8], rotY: 0.3, shirt: '#3b3b46', pants: '#c9b79a', hair: '#1f1812', long: false, sit: true },
+      { key: 'laptop', pos: [5.2, 0, -3.5], rotY: 0, shirt: '#2f3b55', pants: '#2f3b55', hair: '#1f1812', long: false, sit: true },
+      {
+        key: 'helper', pos: [2.4, 0, -0.45], rotY: NPC_FACES_KID, shirt: '#e0e6f2', pants: '#6b7a8f', hair: '#3a2a22', bag: '#3b4252',
+        poses: MUM_POSES, says: { s3p4: 'Thank you for telling me 💛', s3p5: "I'm proud of you! 🌟" }, cheerSays: "I'm proud of you! 🌟",
+      },
+    ],
+  },
+
+  'going-to-doctor': {
+    spots: { s4p1: spotAt(-4.9, 2.8), s4p2: spotAt(-2.8, 3.4), s4p3: spotAt(-0.6, 2.8), s4p4: spotAt(0.6, 3.4), s4p5: spotAt(3.3, 2.8) },
+    start: new THREE.Vector3(-7.2, 0, -0.45), sky: '#d6efe9', focusDx: 0.6,
+    env: Clinic,
+    npcs: [
+      {
+        key: 'reception', pos: [-3.8, 0, -3.5], rotY: 0, shirt: '#58b5a6', hair: '#2a1d17',
+        poses: { s4p1: WAVE }, says: { s4p1: 'Welcome! Please take a seat 😊' },
+      },
+      { key: 'patient', pos: [-1.1, 0, -2.9], rotY: 0, shirt: '#c9a0dc', pants: '#4a5a7a', hair: '#2a1d17', long: false, sit: true },
+      {
+        key: 'doctor', pos: [1.7, 0, -0.45], rotY: NPC_FACES_KID, shirt: '#ffffff', pants: '#58b5a6', hair: '#2a1d17', long: false, accessory: 'stethoscope',
+        poses: { s4p3: { ...WAVE, waveR: 0.2 }, s4p4: { r: [-1.3, -0.5], nodWob: 0.04 }, s4p5: WAVE },
+        says: { s4p3: 'Maya? Come in please!', s4p4: 'Deep breath… good!', s4p5: 'Bye, take care! 👋' }, cheerSays: 'Well done! 🌟',
+      },
+    ],
+  },
+
+  'sharing-with-friend': {
+    spots: { s5p1: spotAt(-4.8, 2.8), s5p2: spotAt(-2.2, 3.4), s5p3: spotAt(-1.0, 2.8), s5p4: spotAt(-1.2, 3.4) },
+    start: new THREE.Vector3(-7.2, 0, -0.45), sky: '#fff6df', focusDx: 0.7,
+    env: PlayRoom,
+    npcs: [{
+      key: 'friend', pos: [0.2, 0, -0.45], rotY: NPC_FACES_KID, shirt: '#5aa6d6', pants: '#3a4f7a', hair: '#2a1d17', long: false,
+      poses: {
+        s5p1: { tilt: 0.1 },
+        s5p2: { r: [-2.8, -0.3], waveR: 0.25, bounce: 0.06 },
+        s5p3: { r: [-1.4, -0.1], hop: 0.1 },
+        s5p4: { bounce: 0.1, l: [-1.0, 0.3], r: [-1.0, -0.3], shakeR: 0.2 },
+      },
+      says: { s5p2: 'Can I play too? 🙋', s5p3: 'Thank you! 🤗', s5p4: 'This is fun! 🎉' }, cheerSays: 'Best friends! 💛',
+    }],
+  },
+
+  'asking-for-help': {
+    spots: { s6p1: spotAt(-4.4, 2.8), s6p2: spotAt(-3.9, 3.4), s6p3: spotAt(-0.8, 2.8), s6p4: spotAt(-0.3, 3.4) },
+    start: new THREE.Vector3(-7.0, 0, -0.45), sky: '#f0f7e6', focusDx: 0.6,
+    env: Classroom,
+    npcs: [
+      { key: 's1', pos: [-3.6, 0, -3.0], rotY: 2.7, shirt: '#e8b98a', hair: '#2a1d17', sit: true },
+      { key: 's2', pos: [-1.8, 0, -3.0], rotY: 2.7, shirt: '#7cc77a', pants: '#3a4f7a', hair: '#3a2a22', long: false, sit: true },
+      {
+        key: 'teacher', pos: [1.3, 0, -0.5], rotY: NPC_FACES_KID, shirt: '#8e6bd8', pants: '#3a3f55', hair: '#3a2a22',
+        poses: { s6p2: { r: [-1.5, -0.1], nod: 0.1 }, s6p3: { nodWob: 0.06, l: [-0.8, 0.4], tilt: 0.1 }, s6p4: { r: [-2.9, 0.3], bounce: 0.05 } },
+        says: { s6p2: 'Yes? Do you have a question?', s6p3: 'Of course, let me help!', s6p4: 'Great job asking! ⭐' }, cheerSays: 'Great job! ⭐',
+      },
+    ],
+  },
+
+  'handling-disappointment': {
+    spots: { s7p1: spotAt(-4.6, 2.8), s7p2: spotAt(-3.0, 3.4), s7p3: spotAt(-2.5, 2.8), s7p4: spotAt(-1.0, 3.4), s7p5: spotAt(1.0, 2.8) },
+    start: new THREE.Vector3(-7.2, 0, -0.45), sky: '#d5e1f3', focusDx: 0.4,
+    env: Garden,
+    npcs: [
+      { key: 'p1', pos: [6.0, 0, -3.0], rotY: -2.2, shirt: '#f6c445', pants: '#3b5d8f', hair: '#2a1d17' },
+      { key: 'p2', pos: [7.4, 0, -3.2], rotY: 2.2, shirt: '#5aa6d6', pants: '#3a4f7a', hair: '#2a1d17', long: false },
+      { key: 'p3', pos: [-6.8, 0, -3.3], rotY: 0.6, shirt: '#ef8fb0', pants: '#3b5d8f', hair: '#5a3a2a' },
+    ],
+  },
+
+  'birthday-party': {
+    spots: {
+      s8p1: spotAt(-5.9, 2.8), s8p2: spotAt(-3.5, 3.4), s8p3: spotAt(-1.0, 2.8),
+      s8p4: spotAt(0.5, 3.4), s8p5: spotAt(2.9, 2.8), s8p6: spotAt(5.5, 3.4),
+    },
+    start: new THREE.Vector3(-7.8, 0, -0.45), sky: '#bfe3ff', focusDx: 0.6, halfW: 8.6,
+    env: Party,
+    npcs: [
+      {
+        key: 'shop', pos: [-2.8, 0, -3.5], rotY: 0, shirt: '#f4a64a', hair: '#3a2a22', long: false,
+        poses: { s8p2: { ...WAVE, waveR: 0.2 } }, says: { s8p2: "Here's a present for you! 🎁" },
+      },
+      {
+        key: 'birthday', pos: [1.7, 0, -0.45], rotY: NPC_FACES_KID, shirt: '#f6c445', pants: '#b36ac8', hair: '#2a1d17', accessory: 'hat',
+        poses: { s8p3: WAVE, s8p4: { ...CHEER_ARMS, hop: 0.2 }, s8p5: { ...CHEER_ARMS, bounce: 0.12 }, s8p6: WAVE },
+        says: { s8p3: 'Welcome to my party! 🎉', s8p4: 'Thank you! 🎁', s8p5: 'Cake time! 🎂', s8p6: 'Bye! Thanks for coming! 👋' }, cheerSays: 'Best party ever! 🎉',
+      },
+      { key: 'guest1', pos: [4.9, 0, -2.7], rotY: 0.3, shirt: '#7cc77a', pants: '#3a4f7a', hair: '#2a1d17', long: false },
+      { key: 'guest2', pos: [3.3, 0, -2.9], rotY: -0.3, shirt: '#ef8fb0', pants: '#3b5d8f', hair: '#5a3a2a' },
+    ],
+  },
+}
+
+/** The whole themed world for a story: its scenery plus the cast. */
+function StoryWorld({ def, action, mood }: { def: StoryDef; action: string | null; mood: KidMood }) {
+  const Env = def.env
+  const acting = mood === 'act' && !!action
+  return (
+    <group>
+      <Env action={action} mood={mood} />
+      {def.npcs.map(n => (
+        <Person
+          key={n.key} pos={n.pos} rotY={n.rotY} shirt={n.shirt} pants={n.pants} hair={n.hair} bag={n.bag} long={n.long} sit={n.sit}
+          accessory={n.accessory} poses={n.poses} action={action} active={acting} seed={n.pos[0]}
+          says={acting ? n.says?.[action!] ?? '' : mood === 'cheer' ? n.cheerSays ?? '' : ''}
+          cheer={mood === 'cheer' && !!n.cheerSays}
+        />
+      ))}
     </group>
   )
 }
@@ -1597,9 +2109,11 @@ const ACTION_SHOTS: Record<string, [number, number, number]> = {
   s1p5: [-1.5, 1.8, 3.4],  // leaving: wide enough to see the door open
 }
 const DEFAULT_SHOT: [number, number, number] = [0.3, 1.7, 3.3]
-const PARK_FRAMING: Framing = { halfW: 7.4, halfH: 3.1, z0: -0.9, baseY: 1.4, elev: 0.3, look: [-0.5, 1.7, -1.5], follow: 0.1 }
-// Park close-ups sit in front of the pair (she is left, the new kid right).
-Object.assign(ACTION_SHOTS, { s2p1: [1.4, 1.7, 4.4], s2p2: [1.2, 1.6, 3.8], s2p3: [0.7, 1.5, 3.1], s2p4: [0.8, 1.6, 3.3] })
+const STORY_FRAMING: Framing = { halfW: 7.4, halfH: 3.1, z0: -0.9, baseY: 1.4, elev: 0.3, look: [-0.5, 1.7, -1.5], follow: 0.1 }
+// Close-ups for the other stories sit in front of her and whoever she is with.
+for (const def of Object.values(STORY_SCENES)) {
+  for (const id of Object.keys(def.spots)) ACTION_SHOTS[id] = def.shots?.[id] ?? [0.9, 1.6, 3.5]
+}
 
 /** A little film director: wide shot while choosing, tracking shot while she
     walks, close-up while she does the step, then back out to the whole room. */
@@ -1660,7 +2174,8 @@ function Scene({ storyId, spots, kidAt, mood, kidSays, guideId, showCaptions, wa
   // The school story is a whole home with each step in its real place; the
   // others put their steps on a row of stands in a themed room.
   const isHome = storyId === 'getting-ready-school' && spots.length > 0 && spots.every(s => SCHOOL_SPOTS[s.id])
-  const isPark = storyId === 'meeting-someone-new' && spots.length > 0 && spots.every(s => PARK_SPOTS[s.id])
+  const storyDef = STORY_SCENES[storyId]
+  const isPark = !!storyDef && spots.length > 0 && spots.every(s => storyDef.spots[s.id])
 
   const layout = useMemo(() => {
     const station = new Map<string, THREE.Vector3>()
@@ -1668,7 +2183,7 @@ function Scene({ storyId, spots, kidAt, mood, kidSays, guideId, showCaptions, wa
     const bubble = new Map<string, THREE.Vector3>()
     spots.forEach((s, i) => {
       if (isHome || isPark) {
-        const h = isPark ? PARK_SPOTS[s.id] : SCHOOL_SPOTS[s.id]
+        const h = isPark ? storyDef.spots[s.id] : SCHOOL_SPOTS[s.id]
         stand.set(s.id, new THREE.Vector3(...h.stand))
         bubble.set(s.id, new THREE.Vector3(...h.bubble))
       } else {
@@ -1684,7 +2199,7 @@ function Scene({ storyId, spots, kidAt, mood, kidSays, guideId, showCaptions, wa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHome, isPark, spots.map(s => s.id).join('|')])
 
-  const start = isHome ? SCHOOL_START : isPark ? PARK_START : START
+  const start = isHome ? SCHOOL_START : isPark ? storyDef.start : START
 
   /* What the story has changed so far. Waking up counts at once (getting out of
      bed IS the walk over); the rest show once she has arrived to do them, so the
@@ -1709,8 +2224,8 @@ function Scene({ storyId, spots, kidAt, mood, kidSays, guideId, showCaptions, wa
 
   return (
     <>
-      <color attach="background" args={[isHome ? '#e8f3fb' : theme.sky]} />
-      <fog attach="fog" args={[isHome ? '#e8f3fb' : theme.sky, 22, 40]} />
+      <color attach="background" args={[isHome ? '#e8f3fb' : isPark ? storyDef.sky : theme.sky]} />
+      <fog attach="fog" args={[isHome ? '#e8f3fb' : isPark ? storyDef.sky : theme.sky, 22, 40]} />
       <hemisphereLight args={['#ffffff', '#f3e7d6', 1.1]} />
       <ambientLight intensity={0.35} />
       <directionalLight position={[0, 4, 12]} intensity={0.55} />
@@ -1723,11 +2238,7 @@ function Scene({ storyId, spots, kidAt, mood, kidSays, guideId, showCaptions, wa
 
       <Shadowed>
         {isHome ? <SchoolRoom look={look} ate={ate} /> : isPark ? (
-          <ParkScene
-            friendAction={actionId}
-            friendSays={mood === 'act' && actionId ? FRIEND_SAYS[actionId] ?? '' : mood === 'cheer' ? "Let's be friends! 💛" : ''}
-            mood={mood}
-          />
+          <StoryWorld def={storyDef} action={actionId} mood={mood} />
         ) : <Room storyId={storyId} theme={theme} />}
         {!isHome && !isPark && spots.map(s => (
           <group key={s.id} position={layout.station.get(s.id)!}>
@@ -1748,7 +2259,7 @@ function Scene({ storyId, spots, kidAt, mood, kidSays, guideId, showCaptions, wa
       ))}
 
       <ContactShadows position={[0, 0.015, 0]} scale={24} blur={2.4} opacity={0.35} far={4} resolution={512} />
-      <CameraRig kidPos={kidPos} framing={isHome ? SCHOOL_FRAMING : isPark ? PARK_FRAMING : ROW_FRAMING} mood={mood} action={actionId} asleep={look.asleep} focusDx={isPark ? 0.7 : 0} />
+      <CameraRig kidPos={kidPos} framing={isHome ? SCHOOL_FRAMING : isPark ? { ...STORY_FRAMING, halfW: storyDef.halfW ?? STORY_FRAMING.halfW } : ROW_FRAMING} mood={mood} action={actionId} asleep={look.asleep} focusDx={isPark ? storyDef.focusDx : 0} />
     </>
   )
 }
