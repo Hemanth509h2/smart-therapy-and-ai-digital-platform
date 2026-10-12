@@ -2,7 +2,7 @@ import { normalizeWhatsAppNumber } from './whatsapp-cloud-api'
 
 // Messages are delivered by the self-hosted Baileys bot (whatapps/), which
 // exposes POST /send guarded by the shared x-bot-secret header.
-async function sendViaBot(to: string, text: string): Promise<WhatsAppMessageResult> {
+export async function sendViaBot(to: string, text: string): Promise<WhatsAppMessageResult> {
   const url = process.env.WHATSAPP_BOT_URL
   const secret = process.env.WHATSAPP_BOT_SECRET
   if (!url || !secret) {

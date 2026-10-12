@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createHash, timingSafeEqual } from 'crypto';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/db';
 
@@ -117,4 +118,33 @@ export async function requireAdmin(request: Request) {
     };
   }
   return { ok: true as const, uid: auth.uid, email: auth.email };
+}
+
+/**
+ * For server-to-server callers (the n8n automations), which have no Firebase
+ * user: they send the shared secret N8N_API_KEY in an `x-api-key` header.
+ *
+ * Fails closed: if N8N_API_KEY isn't configured, every request is refused, so
+ * a missing env var can never leave these routes open.
+ */
+export function requireServiceKey(request: Request) {
+  const expected = process.env.N8N_API_KEY;
+  if (!expected) {
+    console.error(`[auth] 503 ${request.url} — N8N_API_KEY is not configured`);
+    return {
+      ok: false as const,
+      response: NextResponse.json({ error: 'Service API key not configured' }, { status: 503 }),
+    };
+  }
+  const given = request.headers.get('x-api-key') ?? '';
+  const a = createHash('sha256').update(given).digest();
+  const b = createHash('sha256').update(expected).digest();
+  if (!timingSafeEqual(a, b)) {
+    console.warn(`[auth] 401 ${request.url} — bad or missing x-api-key`);
+    return {
+      ok: false as const,
+      response: NextResponse.json({ error: 'Missing or invalid x-api-key header' }, { status: 401 }),
+    };
+  }
+  return { ok: true as const };
 }
