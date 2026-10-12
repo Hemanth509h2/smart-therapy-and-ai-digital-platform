@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 // GET /api/n8n/morning-brief
 // One ready-to-send WhatsApp message per therapist with a phone number:
 //   { items: [{ to, type: 'text', body, therapistId, therapistName }], skipped }
-// In n8n: HTTP Request → Split Out `items` → POST each to /api/whatsapp/send.
+// In n8n: HTTP Request → Split Out `items` → send each via your WhatsApp node.
 // Therapists without a (valid) phone number are counted in `skipped`.
 export async function GET(request: Request) {
   try {

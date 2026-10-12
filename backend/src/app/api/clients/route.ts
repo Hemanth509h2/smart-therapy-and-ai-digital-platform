@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
-import { normalizeWhatsAppNumber } from '@/lib/whatsapp-cloud-api';
+import { normalizePhoneNumber } from '@/lib/phone';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
           diagnosis: Array.isArray(diagnosis) ? diagnosis : [],
           phoneNumber:
             typeof phoneNumber === 'string' && phoneNumber.trim()
-              ? normalizeWhatsAppNumber(phoneNumber)
+              ? normalizePhoneNumber(phoneNumber)
               : null,
           dateOfBirth: dob ?? new Date(),
           gender: typeof gender === 'string' && gender.trim() ? gender.trim() : null,

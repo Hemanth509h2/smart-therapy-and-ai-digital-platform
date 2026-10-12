@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 // POST /api/n8n/command
 // Body: { from: "<therapist's WhatsApp number>", text: "CLIENTS" | "WEEK" | "PENDING" | "SESSION <id>" | "HELP" }
-// Returns the reply, ready to POST to /api/whatsapp/send:
+// Returns the reply:
 //   { to, type: 'text', body, therapistId }
 // Only replies about the therapist that owns the sending number.
 export async function POST(request: Request) {

@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules';
-import { normalizeWhatsAppNumber } from '@/lib/whatsapp-cloud-api';
+import { normalizePhoneNumber } from '@/lib/phone';
 
 // A malformed stored number must not break the whole overview.
 function toE164(raw: string | null): string | null {
   if (!raw) return null;
   try {
-    return normalizeWhatsAppNumber(raw);
+    return normalizePhoneNumber(raw);
   } catch {
     return null;
   }

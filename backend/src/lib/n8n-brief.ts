@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { normalizeWhatsAppNumber } from '@/lib/whatsapp-cloud-api';
+import { normalizePhoneNumber } from '@/lib/phone';
 
 // Message builders for the n8n WhatsApp assistant: the morning brief and the
 // replies to therapist commands (CLIENTS, WEEK, PENDING, SESSION <id>, HELP).
@@ -33,7 +33,7 @@ const doctor = (t: { firstName: string; lastName: string }) => `Dr. ${fullName(t
 /** E.164 (+91…) for sending; therapists may be stored with or without the +. */
 export function phoneForms(raw: string): { e164: string; forms: string[] } | null {
   try {
-    const e164 = normalizeWhatsAppNumber(raw);
+    const e164 = normalizePhoneNumber(raw);
     return { e164, forms: [e164, e164.slice(1)] };
   } catch {
     return null;
