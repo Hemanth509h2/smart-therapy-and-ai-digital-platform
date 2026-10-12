@@ -698,9 +698,11 @@ function Kid({ target, start, scale = 1, mood, says, walkMs, look, action, posOu
           yawning = since > 0.2 && since < 1.3
           break
         case 's1p2': // brush, brush, brush
-          armSwingR = -2.25 + Math.sin(t * 28) * 0.12
-          armOutR = 0.55
-          armSwingL = -0.4
+          // Forearm raised in front of the chest, hand tucked in toward the
+          // midline so the brush tip meets her mouth (not out beside her head).
+          armSwingR = -1.55 + Math.sin(t * 28) * 0.07
+          armOutR = -0.75 + Math.sin(t * 28) * 0.05
+          armSwingL = -0.3
           break
         case 's1p3': // spin into the uniform
           armOutL = 0.6; armOutR = -0.6
@@ -833,7 +835,7 @@ function Kid({ target, start, scale = 1, mood, says, walkMs, look, action, posOu
               {(x as number) > 0 ? (
                 <>
                   {/* toothbrush */}
-                  <group ref={brush} position={[0, -0.5, 0.05]} visible={false}>
+                  <group ref={brush} position={[0, -0.5, 0.05]} rotation={[-1.5, 0, 0]} visible={false}>
                     <Box size={[0.035, 0.3, 0.035]} pos={[0, -0.1, 0]} color="#5fa8e0" r={0.012} />
                     <Box size={[0.05, 0.07, 0.06]} pos={[0, -0.26, 0.03]} color="#ffffff" r={0.015} />
                   </group>
