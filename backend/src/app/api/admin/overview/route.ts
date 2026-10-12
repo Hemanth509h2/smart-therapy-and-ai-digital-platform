@@ -2,6 +2,17 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules';
+import { normalizeWhatsAppNumber } from '@/lib/whatsapp-cloud-api';
+
+// A malformed stored number must not break the whole overview.
+function toE164(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    return normalizeWhatsAppNumber(raw);
+  } catch {
+    return null;
+  }
+}
 
 // GET /api/admin/overview — per-therapist resource usage for the admin dashboard.
 export async function GET(request: Request) {
@@ -64,6 +75,9 @@ export async function GET(request: Request) {
           id: t.id,
           userId: t.userId,
           name: `${t.firstName} ${t.lastName}`.trim(),
+          firstName: t.firstName,
+          lastName: t.lastName,
+          phoneNumber: toE164(t.phoneNumber),
           email: t.user?.email ?? '',
           specialty: t.specialty,
           clients: clientGroups.length,
