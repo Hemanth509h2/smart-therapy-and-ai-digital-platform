@@ -643,7 +643,8 @@ function Kid({ target, start, scale = 1, mood, says, walkMs, look, action, posOu
       if (eyes.current) eyes.current.scale.y = 0.12
       if (mouth.current) mouth.current.rotation.z = Math.PI
       if (yawn.current) yawn.current.visible = false
-      anchor.current?.position.set(BED_POSE.x - 1.8 * scale, BED_POSE.y + 0.9, BED_POSE.z)
+      // Above the covers, well inside the frame (her head is near the left edge).
+      anchor.current?.position.set(BED_POSE.x - 0.2, BED_POSE.y + 1.25, BED_POSE.z)
       return
     }
     body.current.scale.set(1, 1, 1)
@@ -698,10 +699,10 @@ function Kid({ target, start, scale = 1, mood, says, walkMs, look, action, posOu
           yawning = since > 0.2 && since < 1.3
           break
         case 's1p2': // brush, brush, brush
-          // Forearm raised in front of the chest, hand tucked in toward the
-          // midline so the brush tip meets her mouth (not out beside her head).
-          armSwingR = -1.55 + Math.sin(t * 28) * 0.07
-          armOutR = -0.75 + Math.sin(t * 28) * 0.05
+          // Hand beside her mouth, brush held level and pointing in at her
+          // teeth, scrubbing side to side.
+          armSwingR = -2.1 + Math.sin(t * 28) * 0.05
+          armOutR = Math.sin(t * 28) * 0.08
           armSwingL = -0.3
           break
         case 's1p3': // spin into the uniform
@@ -709,9 +710,9 @@ function Kid({ target, start, scale = 1, mood, says, walkMs, look, action, posOu
           lift = since < 0.9 ? Math.sin((since / 0.9) * Math.PI) * 0.25 : 0
           break
         case 's1p4': { // bowl in one hand, spoon to mouth with the other
-          armSwingL = -1.25; armOutL = -0.35
+          armSwingL = -1.25; armOutL = 0.4
           const bite = (Math.sin(t * 6.5) + 1) / 2
-          armSwingR = -1.5 - bite * 0.95; armOutR = 0.35
+          armSwingR = -1.1 - bite * 0.6; armOutR = -0.65
           headNod = bite * 0.08
           break
         }
@@ -835,12 +836,12 @@ function Kid({ target, start, scale = 1, mood, says, walkMs, look, action, posOu
               {(x as number) > 0 ? (
                 <>
                   {/* toothbrush */}
-                  <group ref={brush} position={[0, -0.5, 0.05]} rotation={[-1.5, 0, 0]} visible={false}>
+                  <group ref={brush} position={[0, -0.5, 0.05]} rotation={[-0.8, 0, -1.6]} visible={false}>
                     <Box size={[0.035, 0.3, 0.035]} pos={[0, -0.1, 0]} color="#5fa8e0" r={0.012} />
                     <Box size={[0.05, 0.07, 0.06]} pos={[0, -0.26, 0.03]} color="#ffffff" r={0.015} />
                   </group>
                   {/* spoon */}
-                  <group ref={spoon} position={[0, -0.5, 0.04]} visible={false}>
+                  <group ref={spoon} position={[0, -0.5, 0.04]} rotation={[-1.1, 0, 0]} visible={false}>
                     <Box size={[0.025, 0.24, 0.02]} pos={[0, -0.08, 0]} color="#c9ced4" r={0.008} />
                     <mesh position={[0, -0.22, 0.01]} scale={[1, 1.3, 0.5]}><sphereGeometry args={[0.04, 10, 8]} /><meshStandardMaterial color="#c9ced4" metalness={0.6} roughness={0.3} /></mesh>
                   </group>
@@ -886,6 +887,17 @@ function Kid({ target, start, scale = 1, mood, says, walkMs, look, action, posOu
           </group>
         </group>
       </group>
+      {look.asleep && (
+        <group position={[BED_POSE.x - 0.9, BED_POSE.y + 0.55, BED_POSE.z]}>
+          <Html center zIndexRange={[24, 20]} style={{ pointerEvents: 'none' }}>
+            <div style={{ position: 'relative', width: 60, height: 70, fontWeight: 800, color: '#4a6fa5', fontFamily: 'inherit' }}>
+              {[0, 1, 2].map(i => (
+                <span key={i} style={{ position: 'absolute', left: 8 + i * 14, bottom: 0, fontSize: 16 + i * 6, animation: `ss-zzz 2.4s ease-in-out ${i * 0.8}s infinite`, opacity: 0 }}>Z</span>
+              ))}
+            </div>
+          </Html>
+        </group>
+      )}
       <group ref={anchor}>
         {(tickle || says) && (
           <Html center zIndexRange={[25, 20]} style={{ pointerEvents: 'none' }}>

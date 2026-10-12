@@ -835,6 +835,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
         @keyframes ss-burst{0%{transform:translate(-50%,0) scale(.3);opacity:0}30%{opacity:1}100%{transform:translate(-50%,-70px) scale(1.25);opacity:0}}
         @keyframes ss-spark{0%{transform:translate(0,0) scale(.4);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}
         @keyframes ss-say3{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+        @keyframes ss-zzz{0%{transform:translate(0,0) scale(.7);opacity:0}25%{opacity:1}100%{transform:translate(18px,-46px) scale(1.15);opacity:0}}
         @keyframes ss-chip{0%{transform:scale(0)}70%{transform:scale(1.25)}100%{transform:scale(1)}}
         .ss-spot3{transition:transform .15s}
         .ss-spot3:not(:disabled):hover{transform:scale(1.12)!important}
