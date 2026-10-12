@@ -39,7 +39,7 @@ export interface SessionScheduledInput {
 }
 
 /**
- * Send the patient invite by posting it to the n8n webhook, which delivers it on WhatsApp
+ * Send the patient invite on WhatsApp
  */
 export async function sendWhatsAppInvite(input: WhatsAppInviteInput): Promise<WhatsAppMessageResult> {
   const to = normalizeWhatsAppNumber(input.to)

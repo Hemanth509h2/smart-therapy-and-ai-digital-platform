@@ -7,7 +7,7 @@ import { normalizeWhatsAppNumber, sendCloudApiInteractive } from '@/lib/whatsapp
 export const dynamic = 'force-dynamic';
 
 // POST /api/whatsapp/send
-// Generic WhatsApp send endpoint for n8n automation (no auth — open by request).
+// Generic WhatsApp send endpoint (no auth — open by request).
 // Body: { to, type: 'text' | 'interactive', body?, interactive?, therapistId? }
 // If therapistId provided, logs to WhatsAppMessage table for tracking
 export async function POST(request: Request) {

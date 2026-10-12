@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
     const roleEnum = role === 'THERAPIST' ? 'THERAPIST' : 'CLIENT';
 
-    // Stored as digits with country code (default 91), matching /api/therapists/by-phone.
+    // Stored as digits with country code (default 91).
     let therapistPhone: string | null = null;
     if (roleEnum === 'THERAPIST') {
       const digits = String(phoneNumber ?? '').replace(/\D/g, '');

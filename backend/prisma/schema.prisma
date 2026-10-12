@@ -88,7 +88,7 @@ model ProfileTherapist {
   qualification     String?
   experience        String?
   bio               String?
-  phoneNumber       String?  @unique // E.164 format; used for WhatsApp notifications & n8n lookup
+  phoneNumber       String?  @unique // E.164 format; used for WhatsApp notifications
   // Per-therapist module/tool access. When allModulesAllowed is true the
   // therapist may launch any module; otherwise only those listed in moduleAccess.
   allModulesAllowed Boolean  @default(true)
