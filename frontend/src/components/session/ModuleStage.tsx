@@ -12,10 +12,11 @@
 // Video feeds are NOT drawn here: the session page shows them in its movable
 // participants popup, so the module gets the full canvas.
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { X, Lock, Unlock } from 'lucide-react'
 import { RC } from './roomTheme'
 import { MODULE_CATEGORIES } from '@/lib/modules'
+import { ModuleHeaderSlot } from './moduleHeaderSlot'
 
 /** Floor for the activity canvas; below this the stage scrolls instead of squeezing.
     Kept low enough that the whole stage — video row, header, canvas and the
@@ -26,6 +27,10 @@ import { MODULE_CATEGORIES } from '@/lib/modules'
     Raised from 360 alongside the larger camera tiles and type: the activity
     body now needs more room before it starts clipping its own controls. */
 const MODULE_MIN_HEIGHT = 450
+
+/** Modules that put their own controls in the top row (via ModuleHeaderSlot),
+    so the stage shows one combined bar instead of two stacked ones. */
+const OWN_HEADER = new Set(['social-story-sequencing'])
 
 /** Registry lookup: the module's display identity and its category tint. */
 function moduleIdentity(moduleId: string | null) {
@@ -72,6 +77,8 @@ export default function ModuleStage({
   children,
 }: ModuleStageProps) {
   const id = moduleIdentity(activeModule)
+  const ownHeader = !!activeModule && OWN_HEADER.has(activeModule)
+  const [slot, setSlot] = useState<HTMLElement | null>(null)
 
   const headerBtn: React.CSSProperties = {
     display: 'flex',
@@ -118,9 +125,48 @@ export default function ModuleStage({
         ['--glass-border' as string]: 'rgba(0,0,0,0.10)',
       } as React.CSSProperties}
     >
-      {/* ---- Header: module identity (left) · controls (right). The module's
+      {ownHeader ? (
+        /* ---- One combined row: the module's own header (portalled into the
+            slot) · live status · controls. ---- */
+        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '8px 14px', borderBottom: `1px solid ${RC.border}` }}>
+          <div ref={setSlot} style={{ flex: 1, minWidth: 0 }} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              {isTherapist && (
+                <button
+                  onClick={onLockToggle}
+                  title={isLocked ? 'Client interaction locked' : 'Client can interact'}
+                  style={{
+                    ...headerBtn,
+                    background: isLocked ? RC.tile : RC.tileActive,
+                    color: isLocked ? RC.inkMuted : RC.greenDark,
+                    borderColor: isLocked ? RC.border : RC.green,
+                  }}
+                >
+                  {isLocked ? <Lock size={13} /> : <Unlock size={13} />}
+                  {isLocked ? 'Locked' : 'Unlocked'}
+                </button>
+              )}
+              {isTherapist && (
+                <button onClick={onClose} title="Close activity" style={{ ...headerBtn, padding: 6 }}>
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: RC.red, display: 'inline-block' }} />
+              <span style={{ fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: RC.ink, fontFamily: 'monospace' }}>{timerStr}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 600, color: RC.greenDark }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: RC.green, display: 'inline-block' }} />
+                {onlineCount} online
+              </span>
+            </div>
+          </div>
+        </div>
+      ) : (
+      /* ---- Header: module identity (left) · controls (right). The module's
           own title lives here, so modules render only their activity body.
-          Video feeds live in the page's movable participants popup. ---- */}
+          Video feeds live in the page's movable participants popup. ---- */
       <div
         style={{
           flexShrink: 0,
@@ -220,6 +266,8 @@ export default function ModuleStage({
         </div>
       </div>
 
+      )}
+
       {/* ---- The module itself, full canvas width ---- */}
       <div
         className="module-stage-body"
@@ -234,7 +282,9 @@ export default function ModuleStage({
         {/* Grows to fill a tall window, but never shrinks below a workable
             height — that floor is what stops the packed-in look. */}
         <div style={{ flex: '1 0 auto', minHeight: MODULE_MIN_HEIGHT, display: 'flex', flexDirection: 'column' }}>
-          {children}
+          <ModuleHeaderSlot.Provider value={ownHeader ? slot : null}>
+            {children}
+          </ModuleHeaderSlot.Provider>
         </div>
       </div>
     </div>

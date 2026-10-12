@@ -1,9 +1,23 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, useContext } from 'react'
+import { createPortal } from 'react-dom'
+import dynamic from 'next/dynamic'
 import { deleteField, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import type { KidMood, SceneSpot } from './SocialStoryScene3D'
+import { ModuleHeaderSlot } from '@/components/session/moduleHeaderSlot'
+
+// three.js only runs in the browser, and only this module needs it.
+const Scene3D = dynamic(() => import('./SocialStoryScene3D'), {
+  ssr: false,
+  loading: () => (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(23,58,94,0.5)', fontSize: 14 }}>
+      Building the room…
+    </div>
+  ),
+})
 
 interface SocialStorySequencingProps {
   sessionId: string
@@ -28,10 +42,10 @@ const STORIES: Story[] = [
   {
     id: 'getting-ready-school', title: 'Getting Ready for School',
     panels: [
-      { id: 's1p1', emoji: '😴', caption: 'Wake up when the alarm rings', correctIndex: 0 },
-      { id: 's1p2', emoji: '🦷', caption: 'Brush teeth and wash face', correctIndex: 1 },
+      { id: 's1p1', emoji: '⏰', caption: 'Wake up when the alarm rings', correctIndex: 0 },
+      { id: 's1p2', emoji: '🪥', caption: 'Brush teeth and wash face', correctIndex: 1 },
       { id: 's1p3', emoji: '👕', caption: 'Put on school clothes', correctIndex: 2 },
-      { id: 's1p4', emoji: '🍳', caption: 'Eat breakfast', correctIndex: 3 },
+      { id: 's1p4', emoji: '🥣', caption: 'Eat breakfast', correctIndex: 3 },
       { id: 's1p5', emoji: '🎒', caption: 'Pack bag and go to school', correctIndex: 4 },
     ],
   },
@@ -105,11 +119,43 @@ const STORIES: Story[] = [
   },
 ]
 
+
 const PICKER_EMOJIS = ['😊','😢','😡','😕','🤩','😞','😌','😰','🙋','👀','🤝','🗣️','👋','✋','💭','🌈','🏠','🏥','🎒','🪑','👨‍⚕️','🩺','🎮','🎁','🎈','🎂','🍳','🦷','👕','💌','👦','🦁','🐶','🐱','🌻','📚','🎵','🏆','🌟','🎉']
 
-const PLAY_DUR = 1200
-const TRANS_DUR = 300
+/* The character walks to a spot, then does the action there. */
+const WALK_MS = 900
+const ACT_MS = 1700
+/** How long a wrong pick stays on the board before it goes back (Guided / Standard). */
+const WRONG_HOLD_MS = 1100
+/** What the character says while acting out a school step. */
+const ACTION_SAYS: Record<string, string> = {
+  s1p1: 'Good morning! ☀️',
+  s1p2: 'Brush, brush, brush! 🪥',
+  s1p3: 'My school uniform! 👕',
+  s1p4: 'Yum, breakfast! 🥣',
+  s1p5: 'Bye! Off to school! 👋',
+}
 
+/** Where each story happens, for the header. The 3D room itself is drawn in SocialStoryScene3D. */
+const PLACES: Record<string, string> = {
+  'getting-ready-school': 'At home',
+  'meeting-someone-new': 'At the park',
+  'when-i-feel-angry': 'In the living room',
+  'going-to-doctor': 'At the clinic',
+  'sharing-with-friend': 'In the play room',
+  'asking-for-help': 'In the classroom',
+  'handling-disappointment': 'In the garden',
+  'birthday-party': 'At the party',
+  custom: 'Story time',
+}
+
+/* Pastel card / glow colours, assigned by position on screen (never by the
+   correct order, which would give the answer away). */
+const SPOT_COLORS = ['#26b0a1', '#f0a22e', '#2a9ed6', '#3bb26d', '#8a6be0', '#e5677a']
+const CARD_COLORS = [
+  { bg: '#e4f4fc', bd: '#86c9e6' }, { bg: '#efe9fc', bd: '#b3a1e3' }, { bg: '#e3f6ed', bd: '#80cba5' },
+  { bg: '#fdf4d8', bd: '#e8c970' }, { bg: '#ebe7fc', bd: '#a39ae2' }, { bg: '#fde8e8', bd: '#e7a0a0' },
+]
 /** Cheap deep-equality for the plain JSON the session doc round-trips. */
 function same(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
@@ -136,34 +182,32 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
   const [showedAnswer, setShowedAnswer] = useState(false)
   const [customStory, setCustomStory] = useState<Story | null>(null)
 
-  const [dragItem, setDragItem] = useState<string | null>(null)
-  const [hoverSlot, setHoverSlot] = useState<number | null>(null)
   const [wrongSlots, setWrongSlots] = useState<Set<number>>(new Set())
   const [correctSlots, setCorrectSlots] = useState<Set<number>>(new Set())
   const [playIdx, setPlayIdx] = useState(-1)
   const [hintPanel, setHintPanel] = useState<string | null>(null)
   const [showAnswer, setShowAnswer] = useState(false)
-  const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null)
   const [showCustomForm, setShowCustomForm] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  /** The session room's top row, when it offers one: the header goes there, so there's one bar, not two. */
+  const headerSlot = useContext(ModuleHeaderSlot)
   const [customTitle, setCustomTitle] = useState('')
   const [customPanels, setCustomPanels] = useState<{ emoji: string; caption: string }[]>(Array.from({ length: 4 }, () => ({ emoji: '😊', caption: '' })))
   const [toast, setToast] = useState<{ msg: string } | null>(null)
-  /* Tap-to-place: tap a card, then tap the slot it belongs in. Dragging still
-     works; this is for small hands and touch screens where a drag is hard. */
-  const [selectedCard, setSelectedCard] = useState<string | null>(null)
-  /* The slot that just received a card, for the pop-in animation. */
-  const [justPlaced, setJustPlaced] = useState<{ idx: number; k: number } | null>(null)
   // The celebration replay runs on the board itself; `waiting` flips to true only
   // once every panel has been walked through and read, and that is what reveals
   // the same-set / new-set choice.
   const [waiting, setWaiting] = useState(false)
 
-  const cRef = useRef<HTMLDivElement>(null)
-  const isDrag = useRef(false)
-  const dragId = useRef<string | null>(null)
+  /* The character: which step it is standing at (null = the start of the room)
+     and whether it is mid-walk. Derived from the shared placement, so both
+     screens animate the same moves. */
+  const [kid, setKid] = useState<{ at: string | null; walking: boolean }>({ at: null, walking: false })
+  const [acting, setActing] = useState(false)
+
   const toastT = useRef<ReturnType<typeof setTimeout>>()
-  const playT = useRef<ReturnType<typeof setTimeout>>()
   const chain = useRef<ReturnType<typeof setTimeout>[]>([])
+  const revertT = useRef<ReturnType<typeof setTimeout>>()
   // Bumped whenever a replay is superseded (new story, reset, skip, unmount) so
   // timers and speech callbacks still in flight from the old run bail out.
   const replayRun = useRef(0)
@@ -212,6 +256,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
 
   useEffect(() => () => {
     if (toastT.current) clearTimeout(toastT.current)
+    if (revertT.current) clearTimeout(revertT.current)
     chain.current.forEach(t => clearTimeout(t))
     chain.current = []
   }, [])
@@ -261,6 +306,17 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     return true
   }, [placed, slotCount, panelMap, allFilled])
 
+  /* Guided and Standard give feedback the moment a step is picked — the
+     character does it, or shakes its head and the pick goes back. Challenge
+     waits for Check, which is what makes it the hard mode. */
+  const instantFeedback = difficulty !== 'challenge'
+
+  /** The step a pick goes into: the first empty one. */
+  const firstEmpty = useMemo(() => {
+    for (let i = 0; i < slotCount; i++) if (!placed[String(i)]) return i
+    return -1
+  }, [placed, slotCount])
+
   const loadStory = useCallback((sid: string) => {
     // 'custom' lives on the session, not in STORIES — without this the custom
     // chip did nothing and the only way onto that story was re-saving the form.
@@ -276,29 +332,53 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
       'moduleState.ssCompleted': false,
       'moduleState.ssShowedAnswer': false,
     })
+    // Optimistic, so the new room appears at once instead of after the round trip.
+    setStoryId(sid)
+    setPanels(story.panels)
+    setShuffled(ord)
+    setPlaced({})
+    setAttempts(0)
+    setCompleted(false)
     setWrongSlots(new Set())
     setCorrectSlots(new Set())
     setHintPanel(null)
     setShowAnswer(false)
     setPlayIdx(-1)
-    setSelectedCard(null)
   }, [write, customStory])
 
   const handleDrop = useCallback((panelId: string, slotIdx: number) => {
-    if (!canDrop || completed) return
+    if (!canDrop || completed || slotIdx < 0) return
     if (Object.values(placed).includes(panelId)) return
     const slotKey = String(slotIdx)
     // A filled slot is not overwritten — tap it first to send its card back.
     if (placed[slotKey]) return
     lastDropMine.current = true
-    // Optimistic, so the card lands at once instead of after the round trip.
+    // Optimistic, so the step lands at once instead of after the round trip.
     setPlaced(prev => ({ ...prev, [slotKey]: panelId }))
     write({ [`moduleState.ssPlaced.${slotKey}`]: panelId })
-    setSelectedCard(null)
-    setJustPlaced({ idx: slotIdx, k: Date.now() })
     setWrongSlots(prev => { const n = new Set(prev); n.delete(slotIdx); return n })
     setCorrectSlots(prev => { const n = new Set(prev); n.delete(slotIdx); return n })
-  }, [canDrop, completed, placed, write])
+
+    // A wrong pick in Guided/Standard: let the character walk over and shake its
+    // head, then send the step back. Only the screen that picked it does this,
+    // so the attempt is counted once.
+    if (instantFeedback && panelMap.get(panelId)?.correctIndex !== slotIdx) {
+      const na = (attempts || 0) + 1
+      setAttempts(na)
+      write({ 'moduleState.ssAttempts': na })
+      if (revertT.current) clearTimeout(revertT.current)
+      revertT.current = setTimeout(() => {
+        setPlaced(prev => {
+          if (prev[slotKey] !== panelId) return prev
+          const n = { ...prev }; delete n[slotKey]; return n
+        })
+        write({ [`moduleState.ssPlaced.${slotKey}`]: deleteField() })
+      }, WALK_MS + WRONG_HOLD_MS)
+    }
+  }, [canDrop, completed, placed, write, instantFeedback, panelMap, attempts])
+
+  /** Pick a step: it always goes into the next empty place in the story. */
+  const pick = useCallback((panelId: string) => handleDrop(panelId, firstEmpty), [handleDrop, firstEmpty])
 
   const removeFromSlot = useCallback((slotIdx: number) => {
     if (!canDrop || completed) return
@@ -326,6 +406,8 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     if (wrong.size === 0) {
       setCorrectSlots(correct)
       write({ 'moduleState.ssCompleted': true, 'moduleState.ssStoriesCompleted': storiesDone + 1 })
+      setCompleted(true)
+      setStoriesDone(storiesDone + 1)
       const storyTitle = customStory && storyId === 'custom'
         ? customStory.title
         : STORIES.find(s => s.id === storyId)?.title ?? storyId
@@ -334,15 +416,15 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
         type: 'story_completed',
         detail: `Sequenced "${storyTitle}" correctly in ${(attempts || 0) + 1} attempt${(attempts || 0) + 1 === 1 ? '' : 's'}`,
       })
-      showToast('🌟 You got the story right!')
       // The replay itself is driven by the effect below, so both therapist and
       // client walk through the finished story, not just whoever hit Check.
     } else {
       setWrongSlots(wrong)
       setCorrectSlots(correct)
       const na = (attempts || 0) + 1
+      setAttempts(na)
       write({ 'moduleState.ssAttempts': na })
-      showToast('Almost! Try moving the highlighted panels')
+      showToast('Almost! Tap the red steps to try them again')
       if (na >= 2) {
         const firstWrong = Array.from(wrong)[0]
         const correctPanelId = activePanels.find(p => p.correctIndex === firstWrong)?.id
@@ -351,20 +433,15 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     }
   }, [allFilled, placed, slotCount, panelMap, write, storiesDone, showToast, activePanels, attempts, sessionId, storyId, customStory])
 
-  /* Guided and Standard give feedback the moment a card lands — green ✓ in the
-     right slot, red ✗ and a shake in the wrong one — straight from the shared
-     placement, so both screens show the same marks. Challenge still waits for
-     Check, which is what makes it the hard mode. */
-  const instantFeedback = difficulty !== 'challenge'
-
-  /* When the last card lands, check automatically (only on the screen that
-     placed it, so the result is written once). */
+  /* When the last step lands right, finish automatically (only on the screen
+     that placed it, so the result is written once). Wrong picks never get here
+     in these modes — they are sent back instead. */
   useEffect(() => {
-    if (!instantFeedback || !allFilled || completed || showAnswer) return
+    if (!instantFeedback || !isCorrect || completed || showAnswer) return
     if (!lastDropMine.current) return
     lastDropMine.current = false
     handleCheck()
-  }, [instantFeedback, allFilled, completed, showAnswer, handleCheck])
+  }, [instantFeedback, isCorrect, completed, showAnswer, handleCheck])
 
   const orderedPanels = useMemo(
     () => [...activePanels].sort((a, b) => a.correctIndex - b.correctIndex),
@@ -384,9 +461,9 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     chain.current = []
   }, [])
 
-  // Once the story is right, hold on the board and walk the panels in order,
-  // lighting each one up in turn, before offering the same-set / new-set choice.
-  // Silent by design: the voice read-back was removed at the clinic's request.
+  // Once the story is right, let the last step's action finish playing, then
+  // show the celebration. (The whole story used to replay first; removed at the
+  // clinic's request — the child has just done every step.)
   useEffect(() => {
     if (!completed) {
       stopReplay()
@@ -397,25 +474,12 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
 
     const run = ++replayRun.current
     const alive = () => replayRun.current === run
-    const ordered = orderedRef.current
     const after = (ms: number, fn: () => void) => {
       const t = setTimeout(() => { if (alive()) fn() }, ms)
       chain.current.push(t)
     }
 
-    let i = 0
-    const step = () => {
-      if (i >= ordered.length) {
-        setPlayIdx(-1)
-        after(600, () => setWaiting(true))
-        return
-      }
-      i += 1
-      setPlayIdx(i - 1)
-      after(PLAY_DUR + TRANS_DUR, step)
-    }
-
-    after(700, step)
+    after(WALK_MS + ACT_MS + 300, () => setWaiting(true))
 
     return () => {
       replayRun.current += 1
@@ -427,12 +491,6 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     // array, restart this effect and cancel the line that was mid-sentence.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [completed, replaySig, stopReplay])
-
-  const skipReplay = useCallback(() => {
-    stopReplay()
-    setPlayIdx(-1)
-    setWaiting(true)
-  }, [stopReplay])
 
   useEffect(() => {
     if (completed && waiting && !showAnswer) {
@@ -447,6 +505,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     const newPlaced: Record<string, string> = {}
     p.forEach((panel, i) => { newPlaced[String(i)] = panel.id })
     write({ 'moduleState.ssPlaced': newPlaced })
+    setPlaced(newPlaced)
     setShowAnswer(true)
     setWrongSlots(new Set())
     setCorrectSlots(new Set())
@@ -462,6 +521,10 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
       'moduleState.ssShowedAnswer': false,
     })
     stopReplay()
+    setShuffled(ord)
+    setPlaced({})
+    setAttempts(0)
+    setCompleted(false)
     setPlayIdx(-1)
     setWrongSlots(new Set())
     setCorrectSlots(new Set())
@@ -479,6 +542,17 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     setWaiting(false)
     setShowCustomForm(false)
   }, [storyId, loadStory, stopReplay])
+
+  const setLevel = useCallback((d: string) => {
+    write({ 'moduleState.ssDifficulty': d, 'moduleState.ssPlaced': {}, 'moduleState.ssAttempts': 0, 'moduleState.ssCompleted': false })
+    setDifficulty(d)
+    setPlaced({})
+    setAttempts(0)
+    setCompleted(false)
+    setHintPanel(null)
+    setWrongSlots(new Set())
+    setCorrectSlots(new Set())
+  }, [write])
 
   /** Drop the session's custom story and fall back to a built-in one. */
   const clearCustomStory = useCallback(() => {
@@ -504,144 +578,276 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
       'moduleState.ssCompleted': false,
       'moduleState.ssShowedAnswer': false,
     })
+    setCustomStory({ id: 'custom', title: customTitle.trim(), panels: ps })
+    setStoryId('custom')
+    setPanels(ps)
+    setShuffled(ord)
+    setPlaced({})
+    setAttempts(0)
+    setCompleted(false)
     setShowCustomForm(false)
   }, [customTitle, customPanels, write, showToast])
 
-  // --- HTML5 Drag ---
-  const onDragStart = useCallback((e: React.DragEvent, panelId: string) => {
-    if (!canDrop || completed) return
-    isDrag.current = true
-    dragId.current = panelId
-    e.dataTransfer.setData('text/plain', panelId)
-    e.dataTransfer.effectAllowed = 'move'
-  }, [canDrop, completed])
+  // --- The scene ---
 
-  const onDragEnd = useCallback(() => { isDrag.current = false; dragId.current = null; setHoverSlot(null) }, [])
+  const place = PLACES[storyId] ?? PLACES.custom
 
-  const onSlotDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }, [])
-  const onSlotDragEnter = useCallback((e: React.DragEvent, idx: number) => { e.preventDefault(); setHoverSlot(idx) }, [])
-  const onSlotDragLeave = useCallback(() => setHoverSlot(null), [])
+  /** Each step's on-screen position (the shuffled order, never its answer). */
+  const spots = useMemo(() => {
+    const m = new Map<string, { i: number }>()
+    resolvedShuffled.forEach((id, i) => m.set(id, { i }))
+    return m
+  }, [resolvedShuffled])
 
-  const onSlotDrop = useCallback((e: React.DragEvent, idx: number) => {
-    e.preventDefault()
-    const id = e.dataTransfer.getData('text/plain') || dragId.current
-    setHoverSlot(null)
-    if (id) handleDrop(id, idx)
-  }, [handleDrop])
+  /** Which step each panel was picked for, if any. */
+  const slotOf = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const [k, pid] of Object.entries(placed)) m.set(pid, Number(k))
+    return m
+  }, [placed])
 
-  // --- Touch ---
+  const nextCorrectId = firstEmpty >= 0 ? orderedPanels[firstEmpty]?.id ?? null : null
+  // Guided always shows the way; Standard starts showing it after two misses.
+  const showGuide = !completed && !showAnswer && (difficulty === 'guided' || (difficulty === 'standard' && (attempts || 0) >= 2))
+  const liveWrongSlot = instantFeedback
+    ? Object.entries(placed).find(([k, pid]) => panelMap.get(pid)?.correctIndex !== Number(k))
+    : undefined
+
+  /* The step the character should be standing at: during the replay, the step
+     being played; otherwise the most recent step in the story. */
+  const targetId = useMemo<string | null>(() => {
+    if (completed && playIdx >= 0 && orderedPanels[playIdx]) return orderedPanels[playIdx].id
+    let last = -1
+    for (const k of Object.keys(placed)) last = Math.max(last, Number(k))
+    return last >= 0 ? placed[String(last)] ?? null : null
+  }, [completed, playIdx, orderedPanels, placed])
+
+  /* Only a new step (or the replay) earns the action on arrival — walking back
+     after a wrong pick is sent home is just a walk. */
+  // Decided once per move and remembered, so running the effect twice (React
+  // StrictMode in dev) doesn't turn a new step into "nothing new".
+  const arrival = useRef<{ key: string; count: number; grew: boolean }>({ key: '', count: placedCount, grew: false })
   useEffect(() => {
-    const el = cRef.current
-    if (!el) return
-    const onTM = (e: TouchEvent) => {
-      if (!isDrag.current || !dragId.current) return
-      e.preventDefault()
-      const t = e.touches[0]
-      setGhostPos({ x: t.clientX, y: t.clientY })
-      const el2 = document.elementFromPoint(t.clientX, t.clientY)
-      const slotEl = el2?.closest('[data-slot]')
-      setHoverSlot(slotEl ? parseInt(slotEl.getAttribute('data-slot')!) : null)
+    const key = `${targetId}|${playIdx}`
+    if (arrival.current.key !== key) {
+      arrival.current = { key, count: placedCount, grew: placedCount > arrival.current.count || (completed && playIdx >= 0) }
     }
-    const onTE = (e: TouchEvent) => {
-      if (!isDrag.current || !dragId.current) return
-      const t = e.changedTouches[0]
-      const el2 = document.elementFromPoint(t.clientX, t.clientY)
-      const slotEl = el2?.closest('[data-slot]')
-      if (slotEl) handleDrop(dragId.current, parseInt(slotEl.getAttribute('data-slot')!))
-      isDrag.current = false
-      dragId.current = null
-      setGhostPos(null)
-      setHoverSlot(null)
-    }
-    el.addEventListener('touchmove', onTM, { passive: false })
-    el.addEventListener('touchend', onTE)
-    el.addEventListener('touchcancel', onTE)
-    return () => { el.removeEventListener('touchmove', onTM); el.removeEventListener('touchend', onTE); el.removeEventListener('touchcancel', onTE) }
-  }, [handleDrop])
+    const grew = arrival.current.grew
+    setKid(prev => (prev.at === targetId ? prev : { at: targetId, walking: true }))
+    setActing(false)
+    const t1 = setTimeout(() => {
+      setKid(k => ({ ...k, walking: false }))
+      if (grew && targetId) setActing(true)
+    }, WALK_MS)
+    const t2 = setTimeout(() => setActing(false), WALK_MS + ACT_MS)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+    // Keyed on where to stand, not on every placement change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetId, playIdx])
 
-  const onTouchStart = useCallback((panelId: string) => (e: React.TouchEvent) => {
-    if (!canDrop || completed) return
-    e.preventDefault()
-    isDrag.current = true
-    dragId.current = panelId
-    setGhostPos({ x: e.touches[0].clientX, y: e.touches[0].clientY })
-  }, [canDrop, completed])
+  const mood: KidMood = completed && waiting ? 'cheer'
+    : kid.walking ? 'walk'
+    : liveWrongSlot ? 'oops'
+    : acting ? 'act'
+    : 'idle'
+
+  /* Steps the 3D room should show as done: during the replay the morning
+     starts over (asleep, hoodie on) and fills back in step by step. */
+  const doneIds = useMemo<string[]>(() => {
+    if (completed) return orderedPanels.map(p => p.id)
+    return Object.entries(placed)
+      .filter(([k, pid]) => !instantFeedback || panelMap.get(pid)?.correctIndex === Number(k))
+      .map(([, pid]) => pid)
+  }, [completed, waiting, playIdx, orderedPanels, placed, instantFeedback, panelMap])
+  // In the school story she starts the morning asleep in bed.
+  const asleep = storyId === 'getting-ready-school' && !doneIds.includes('s1p1')
+
+  /** What the character says, in a speech bubble above its head. */
+  const kidSays = (() => {
+    if (asleep) {
+      if (completed) return ''
+      return liveWrongSlot && !kid.walking ? "Zzz… I'm still asleep! 😴" : 'Zzz… 💤'
+    }
+    if (kid.walking) return ''
+    if (completed && playIdx >= 0 && !waiting) {
+      const p = orderedPanels[playIdx]
+      if (acting && p && ACTION_SAYS[p.id]) return ACTION_SAYS[p.id]
+      return p ? (difficulty === 'challenge' ? `Step ${playIdx + 1}!` : p.caption) : ''
+    }
+    if (completed) return waiting ? 'I did it! 🎉' : ''
+    if (liveWrongSlot) return 'Hmm… not yet! 🤔'
+    if (acting && kid.at && ACTION_SAYS[kid.at]) return ACTION_SAYS[kid.at]
+    if (acting) return instantFeedback ? 'Done! ✓' : 'Okay!'
+    if (!canDrop) return 'Wait for your turn…'
+    if (!instantFeedback && allFilled) return 'Ready? Press Check!'
+    if (placedCount === 0) return 'What should I do first?'
+    return "What's next?"
+  })()
+
+  const hintText = completed
+    ? 'Watch the story from start to finish!'
+    : difficulty === 'guided'
+      ? 'Follow the glowing footsteps to what comes next.'
+      : difficulty === 'challenge'
+        ? 'Pick every step in order, then press Check.'
+        : 'Explore the room and choose what to do next.'
+
+  /* What the 3D room needs to know about each step spot. */
+  const sceneSpots = useMemo<SceneSpot[]>(() => resolvedShuffled.flatMap(id => {
+    const panel = panelMap.get(id)
+    const spot = spots.get(id)
+    if (!panel || !spot) return []
+    const slot = slotOf.get(id)
+    const isPlaced = slot !== undefined
+    const right = isPlaced && panel.correctIndex === slot
+    const wrongNow = isPlaced && (wrongSlots.has(slot!) || (instantFeedback && !right))
+    const doneNow = isPlaced && !wrongNow && (instantFeedback || correctSlots.has(slot!) || completed || showAnswer)
+    const isPlay = completed && playIdx >= 0 && orderedPanels[playIdx]?.id === id
+    const here = !kid.walking && !wrongNow && kid.at === id && (acting || isPlay)
+    return [{
+      id,
+      emoji: panel.emoji,
+      caption: panel.caption,
+      color: SPOT_COLORS[spot.i % SPOT_COLORS.length],
+      status: wrongNow ? 'wrong' : doneNow ? 'done' : isPlaced ? 'placed' : 'open',
+      badge: isPlaced ? (wrongNow ? '✗' : instantFeedback ? '✓' : String(slot! + 1)) : null,
+      ring: !isPlaced && ((showGuide && id === nextCorrectId) || hintPanel === id),
+      playing: isPlay,
+      clickable: canDrop && !completed && (!isPlaced || !(instantFeedback && right)),
+      burst: here,
+      burstKey: `${playIdx}-${placedCount}`,
+    }]
+  }), [resolvedShuffled, panelMap, spots, slotOf, wrongSlots, correctSlots, instantFeedback, completed, showAnswer, playIdx, orderedPanels, kid, acting, showGuide, nextCorrectId, hintPanel, canDrop, placedCount])
+
+  const onSpot = useCallback((id: string) => {
+    const slot = slotOf.get(id)
+    if (slot !== undefined) removeFromSlot(slot)
+    else pick(id)
+  }, [slotOf, removeFromSlot, pick])
 
   const canCheck = allFilled && !completed && !showAnswer
 
-  // A card in hand that the other screen has just placed is no longer in hand.
-  useEffect(() => {
-    if (selectedCard && !unplacedIds.includes(selectedCard)) setSelectedCard(null)
-  }, [selectedCard, unplacedIds])
+  /* The header row: story (therapists switch it here), progress, hint, difficulty.
+     Rendered into the session room's top row when there is one, else inline. */
+  const header = currentStory && (
+    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '1 1 230px', minWidth: 0, position: 'relative' }}>
+        <div style={{ width: 44, height: 44, borderRadius: 13, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, background: 'linear-gradient(160deg,#eef6fd,#d3e6f5)', boxShadow: 'inset 0 0 0 1px rgba(42,158,214,.25)' }}>📖</div>
+        <div style={{ minWidth: 0 }}>
+          {isT ? (
+            <button onClick={() => setPickerOpen(o => !o)} title="Choose a story"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 21, fontWeight: 800, color: '#173a7a', lineHeight: 1.15, maxWidth: '100%' }}>
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentStory.title}</span>
+              <span style={{ fontSize: 13, color: 'rgba(23,58,122,0.6)' }}>▾</span>
+            </button>
+          ) : (
+            <div style={{ fontSize: 21, fontWeight: 800, color: '#173a7a', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentStory.title}</div>
+          )}
+          <div style={{ fontSize: 13, color: 'rgba(23,58,94,0.6)', whiteSpace: 'nowrap' }}>Social Story Sequencing · {place}</div>
+        </div>
+        {isT && pickerOpen && (
+          <div style={{ position: 'absolute', top: '100%', left: 54, marginTop: 6, zIndex: 60, minWidth: 260, padding: 6, borderRadius: 14, background: '#fff', border: '1px solid #d6e6f4', boxShadow: '0 12px 30px rgba(23,58,94,0.18)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {STORIES.map(st => (
+              <button key={st.id} onClick={() => { loadStory(st.id); setPickerOpen(false) }}
+                style={{ textAlign: 'left', padding: '7px 10px', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: 14, background: storyId === st.id ? '#e6f4f1' : 'transparent', color: '#173a5e', fontWeight: storyId === st.id ? 700 : 500 }}
+              >{st.title}</button>
+            ))}
+            {customStory && (
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <button onClick={() => { loadStory('custom'); setPickerOpen(false) }}
+                  style={{ flex: 1, textAlign: 'left', padding: '7px 10px', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: 14, background: storyId === 'custom' ? '#e6f4f1' : 'transparent', color: '#173a5e', fontWeight: storyId === 'custom' ? 700 : 500 }}
+                >📝 {customStory.title}</button>
+                <button onClick={clearCustomStory} title="Remove this custom story"
+                  style={{ padding: '4px 8px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, color: 'rgba(0,0,0,0.4)' }}>✕</button>
+              </div>
+            )}
+            <button onClick={() => { setShowCustomForm(true); setPickerOpen(false) }}
+              style={{ textAlign: 'left', padding: '7px 10px', borderRadius: 9, border: '1px dashed rgba(0,0,0,0.15)', cursor: 'pointer', fontSize: 14, background: 'transparent', color: 'rgba(23,58,94,0.7)', marginTop: 4 }}
+            >+ Create a custom story</button>
+          </div>
+        )}
+      </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, padding: '5px 12px', borderRadius: 14, background: '#f3f8fd', border: '1px solid #d6e6f4', flexShrink: 0 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#173a5e', whiteSpace: 'nowrap' }}>⭐ {Math.min(placedCount, slotCount)}/{slotCount} actions</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {Array.from({ length: slotCount }, (_, idx) => {
+                  const pid = placed[String(idx)]
+                  const panel = pid ? panelMap.get(pid) : null
+                  const right = !!panel && panel.correctIndex === idx
+                  const markWrong = wrongSlots.has(idx) || (instantFeedback && !!panel && !right)
+                  const markRight = correctSlots.has(idx) || (instantFeedback && right)
+                  const removable = canDrop && !completed && !!panel && !(instantFeedback && right)
+                  const isPlay = completed && playIdx === idx
+                  return (
+                    <button key={idx} disabled={!removable}
+                      onClick={() => removable && removeFromSlot(idx)}
+                      title={panel ? (removable ? 'Tap to take this step back' : panel.caption) : `Step ${idx + 1}`}
+                      style={{
+                        width: 22, height: 22, borderRadius: '50%', padding: 0, flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13,
+                        background: !panel ? '#dfe5eb' : markWrong ? '#fde3dd' : markRight ? '#dcf3e6' : '#fff',
+                        border: isPlay ? '2px solid #22a894' : !panel ? '1px solid transparent' : markWrong ? '1.5px solid #d4553a' : markRight ? '1.5px solid #2f9e62' : '1.5px solid #c5d3e0',
+                        cursor: removable ? 'pointer' : 'default',
+                        animation: panel ? 'ss-chip .35s ease' : undefined,
+                        transform: isPlay ? 'scale(1.2)' : undefined, transition: 'transform .2s',
+                      }}
+                    >{panel ? panel.emoji : ''}</button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 14, background: '#f3f8fd', border: '1px solid #d6e6f4', flex: '1 1 200px', minWidth: 0 }}>
+              <span style={{ fontSize: 20 }}>💡</span>
+              <span style={{ fontSize: 14, color: '#173a5e', lineHeight: 1.3 }}>{hintText}</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3, flexShrink: 0 }}>
+              <span style={{ fontSize: 12, color: '#173a5e', fontWeight: 600 }}>Difficulty:</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {['guided', 'standard', 'challenge'].map(d => (
+                  <button key={d} disabled={!isT} onClick={() => isT && setLevel(d)}
+                    title={isT ? undefined : 'The therapist sets the difficulty'}
+                    style={{
+                      padding: '4px 13px', borderRadius: 999, fontSize: 13, cursor: isT ? 'pointer' : 'default',
+                      border: difficulty === d ? '1px solid #1f9d8a' : '1px solid #dfe5eb',
+                      background: difficulty === d ? 'linear-gradient(180deg,#2bb7a1,#1f9d8a)' : '#ffffff',
+                      color: difficulty === d ? '#fff' : '#173a5e',
+                      fontWeight: difficulty === d ? 700 : 500,
+                      boxShadow: difficulty === d ? '0 3px 8px rgba(31,157,138,.3)' : '0 1px 3px rgba(0,0,0,.06)',
+                    }}
+                  >{d === 'challenge' ? 'Challenge' : d === 'standard' ? 'Standard' : 'Guided'}</button>
+                ))}
+              </div>
+            </div>
+    </div>
+  )
+
 
   return (
     <>
       <style>{`
-        @keyframes sf{0%{opacity:0;transform:scale(.8)}100%{opacity:1;transform:scale(1)}}
-        @keyframes sh{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
-        .pk-a{animation:sf .3s ease}
-        .sh-a{animation:sh .35s ease}
-        @keyframes pl{0%,100%{box-shadow:0 0 0 rgba(74,124,111,0)}50%{box-shadow:0 0 16px rgba(74,124,111,.4)}}
-        .hint-pulse{animation:pl 1s ease-in-out infinite}
         @keyframes ss-pop{0%{transform:scale(.4) rotate(-8deg);opacity:0}60%{transform:scale(1.15) rotate(2deg);opacity:1}100%{transform:scale(1) rotate(0)}}
-        @keyframes ss-badge{0%{transform:scale(0)}70%{transform:scale(1.3)}100%{transform:scale(1)}}
-        @keyframes ss-next{0%,100%{border-color:rgba(74,124,111,.25)}50%{border-color:rgba(74,124,111,.9)}}
-        @keyframes ss-lift{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
         @keyframes ss-fall{0%{transform:translateY(-20px) rotate(0);opacity:0}10%{opacity:1}100%{transform:translateY(420px) rotate(540deg);opacity:0}}
-        .ss-card:hover{transform:translateY(-3px) scale(1.04)!important;box-shadow:0 8px 18px rgba(0,0,0,.18)!important}
+        @keyframes ss-float3{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+        @keyframes ss-glow{0%,100%{box-shadow:0 0 0 3px rgba(255,255,255,.9),0 0 14px 4px var(--c)}50%{box-shadow:0 0 0 3px rgba(255,255,255,.9),0 0 26px 10px var(--c)}}
+        @keyframes ss-ring3{0%{transform:translate(-50%,-50%) scale(.8);opacity:.7}100%{transform:translate(-50%,-50%) scale(1.9);opacity:0}}
+        @keyframes ss-shake3{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+        @keyframes ss-burst{0%{transform:translate(-50%,0) scale(.3);opacity:0}30%{opacity:1}100%{transform:translate(-50%,-70px) scale(1.25);opacity:0}}
+        @keyframes ss-spark{0%{transform:translate(0,0) scale(.4);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}
+        @keyframes ss-say3{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+        @keyframes ss-chip{0%{transform:scale(0)}70%{transform:scale(1.25)}100%{transform:scale(1)}}
+        .ss-spot3{transition:transform .15s}
+        .ss-spot3:not(:disabled):hover{transform:scale(1.12)!important}
+        .ss-card{transition:transform .15s,box-shadow .15s}
+        .ss-card:not(:disabled):hover{transform:translateY(-3px) scale(1.03);box-shadow:0 8px 18px rgba(0,0,0,.14)!important}
+        @media (prefers-reduced-motion: reduce){
+          .ss-stage *{animation:none!important}
+        }
       `}</style>
 
-      {/* Therapist controls */}
-      {isT && (
-        <div style={{ flexShrink: 0, padding: '6px 10px', borderBottom: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13 }}>
-          <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'thin' }}>
-            {STORIES.map(s => (
-              <button key={s.id} onClick={() => loadStory(s.id)}
-                style={{
-                  whiteSpace: 'nowrap', padding: '3px 8px', borderRadius: 10, cursor: 'pointer', fontSize: 13,
-                  border: storyId === s.id ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.08)',
-                  background: storyId === s.id ? 'rgba(74,124,111,0.2)' : 'transparent',
-                  color: storyId === s.id ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.4)',
-                }}
-              >{s.title}</button>
-            ))}
-            {customStory && (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', flexShrink: 0, borderRadius: 10, overflow: 'hidden',
-                border: storyId === 'custom' ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.08)',
-                background: storyId === 'custom' ? 'rgba(74,124,111,0.2)' : 'transparent',
-              }}>
-                <button onClick={() => loadStory('custom')}
-                  style={{
-                    whiteSpace: 'nowrap', padding: '3px 4px 3px 8px', border: 'none', background: 'transparent',
-                    cursor: 'pointer', fontSize: 13,
-                    color: storyId === 'custom' ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.4)',
-                  }}
-                >📝 {customStory.title}</button>
-                <button onClick={clearCustomStory} title="Remove this custom story"
-                  style={{ padding: '3px 7px 3px 3px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, color: 'rgba(0,0,0,0.35)' }}
-                >✕</button>
-              </span>
-            )}
-            <button onClick={() => setShowCustomForm(true)}
-              style={{ whiteSpace: 'nowrap', padding: '3px 8px', borderRadius: 10, cursor: 'pointer', fontSize: 13, border: '1px dashed rgba(0,0,0,0.2)', background: 'transparent', color: 'rgba(0,0,0,0.4)' }}
-            >+ Custom</button>
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ color: 'rgba(0,0,0,0.4)' }}>Difficulty:</span>
-            {['guided', 'standard', 'challenge'].map(d => (
-              <button key={d} onClick={() => write({ 'moduleState.ssDifficulty': d, 'moduleState.ssPlaced': {}, 'moduleState.ssAttempts': 0, 'moduleState.ssCompleted': false })}
-                style={{
-                  padding: '2px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 13, textTransform: 'capitalize',
-                  border: difficulty === d ? '1px solid rgba(74,124,111,0.6)' : '1px solid rgba(0,0,0,0.08)',
-                  background: difficulty === d ? 'rgba(74,124,111,0.15)' : 'transparent',
-                  color: difficulty === d ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.35)',
-                }}
-              >{d === 'challenge' ? 'Challenge' : d === 'standard' ? 'Standard' : 'Guided'}</button>
-            ))}
-          </div>
-        </div>
-      )}
+      {headerSlot && header && createPortal(header, headerSlot)}
 
       {/* Custom story form */}
       {showCustomForm && (
@@ -696,206 +902,107 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
       )}
 
       {currentStory && (
-        <div ref={cRef} style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column', padding: 18, gap: 14, touchAction: 'none' }}>
-          {/* Story title */}
-          <div style={{ fontSize: 17.5, fontFamily: '"DM Serif Display", serif', color: 'rgba(0,0,0,0.8)', textAlign: 'center', flexShrink: 0 }}>
-            {currentStory.title}
+        <div style={{ flex: 1, position: 'relative', overflowX: 'hidden', overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', padding: 14, gap: 10 }}>
+          {!headerSlot && header}
+
+          {/* The 3D room */}
+          <div className="ss-stage" style={{
+            position: 'relative', flex: '1 0 380px', minHeight: 380, borderRadius: 18, overflow: 'hidden',
+            background: 'linear-gradient(180deg,#e8f3fb,#d6e6f4)',
+            boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.06), 0 6px 18px rgba(23,58,94,0.08)',
+          }}>
+            <Scene3D
+              storyId={storyId}
+              spots={sceneSpots}
+              kidAt={kid.at}
+              mood={mood}
+              kidSays={kidSays}
+              guideId={showGuide && !liveWrongSlot ? nextCorrectId : null}
+              showCaptions={difficulty !== 'challenge'}
+              walkMs={WALK_MS}
+              onSpot={onSpot}
+              doneIds={doneIds}
+              actionId={acting ? kid.at : null}
+            />
           </div>
 
-          {/* Sequence slots */}
-          <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
-            {Array.from({ length: slotCount }, (_, idx) => {
-              const pid = placed[String(idx)]
-              const panel = pid ? panelMap.get(pid) : null
-              const isHover = hoverSlot === idx
-              const liveRight = instantFeedback && !!panel && panel.correctIndex === idx
-              const liveWrong = instantFeedback && !!panel && panel.correctIndex !== idx
-              const isWrong = wrongSlots.has(idx) || liveWrong
-              const isCorrect = correctSlots.has(idx) || liveRight
-              const isPlay = playIdx === idx
-              const isOccupied = !!pid
-              // The first empty slot breathes when a card is in hand (tapped).
-              const firstEmpty = Array.from({ length: slotCount }, (_, j) => j).find(j => !placed[String(j)])
-              const isTarget = !isOccupied && !!selectedCard && idx === firstEmpty
-              const pop = justPlaced && justPlaced.idx === idx
-              return (
-                <div key={idx} data-slot={idx}
-                  onDragOver={onSlotDragOver}
-                  onDragEnter={e => onSlotDragEnter(e, idx)}
-                  onDragLeave={onSlotDragLeave}
-                  onDrop={e => onSlotDrop(e, idx)}
-                  style={{
-                    // minHeight rather than aspectRatio: with six panels each slot
-                    // is only ~55px wide, and a fixed ratio left no room for the
-                    // caption to wrap.
-                    flex: 1, minWidth: 0, minHeight: slotCount >= 5 ? 100 : 92, borderRadius: 12,
-                    background: isPlay ? 'rgba(74,124,111,0.2)' : isWrong ? 'rgba(200,96,42,0.15)' : isCorrect ? 'rgba(74,124,111,0.15)' : isHover ? 'rgba(74,124,111,0.1)' : 'rgba(0,0,0,0.04)',
-                    border: isPlay ? '2px solid #4a7c6f' : isWrong ? '1.5px solid rgba(200,96,42,0.5)' : isCorrect ? '1.5px solid rgba(74,124,111,0.6)' : isHover ? '1.5px solid rgba(74,124,111,0.4)' : '1.5px dashed rgba(0,0,0,0.15)',
-                    borderStyle: isHover ? 'solid' : isPlay ? 'solid' : isWrong ? 'solid' : isCorrect ? 'solid' : 'dashed',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '4px 3px',
-                    transition: 'all 0.2s', cursor: canDrop && (!isOccupied || !liveRight) ? 'pointer' : 'default',
-                    transform: isPlay ? 'scale(1.08)' : isHover ? 'scale(1.03)' : 'scale(1)',
-                    boxShadow: isPlay ? '0 0 16px rgba(74,124,111,0.3)' : 'none',
-                    position: 'relative',
-                    ...(isTarget ? { animation: 'ss-next 1s ease-in-out infinite', borderStyle: 'solid', borderWidth: 2 } : {}),
-                  }}
-                  onClick={() => {
-                    if (!canDrop || completed) return
-                    // Tap-to-place: a card is in hand and this slot is empty.
-                    if (!isOccupied && selectedCard) { handleDrop(selectedCard, idx); return }
-                    // A card already proven right stays put; anything else goes back.
-                    if (isOccupied && !liveRight) removeFromSlot(idx)
-                  }}
-                >
-                  {/* Step number, always visible, so the strip reads as 1-2-3. */}
-                  <span style={{
-                    position: 'absolute', top: 4, left: 6, fontSize: 11, fontWeight: 800,
-                    color: isCorrect ? '#1F7A44' : isWrong ? '#B4432C' : 'rgba(0,0,0,0.3)',
-                  }}>{idx + 1}</span>
-                  {(isCorrect || isWrong) && panel && (
-                    <span key={`${pid}-${isCorrect}`} style={{
-                      position: 'absolute', top: -8, right: -8, width: 22, height: 22, borderRadius: '50%',
-                      background: isCorrect ? '#1F7A44' : '#B4432C', color: '#fff', fontSize: 13, fontWeight: 900,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.25)', animation: 'ss-badge .3s ease', zIndex: 2,
-                    }}>{isCorrect ? '✓' : '✗'}</span>
-                  )}
-                  {panel ? (
-                    <div key={pop ? justPlaced!.k : pid} style={{
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                      animation: pop
-                        ? (liveWrong ? 'ss-pop .4s ease, sh .35s ease .4s 2' : 'ss-pop .4s ease')
-                        : isPlay ? 'ss-lift .6s ease-in-out infinite' : undefined,
-                    }}>
-                      <span style={{ fontSize: slotCount >= 5 ? 26 : 31.5, lineHeight: 1 }}>{panel.emoji}</span>
-                      {difficulty !== 'challenge' && (
-                        <span style={{ fontSize: slotCount >= 5 ? 9.5 : 11, color: 'rgba(0,0,0,0.7)', textAlign: 'center', lineHeight: 1.15, overflowWrap: 'anywhere' }}>{panel.caption}</span>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      {difficulty === 'guided' && (
-                        <span style={{ fontSize: 19.5, color: 'rgba(0,0,0,0.15)', fontWeight: 700 }}>{idx + 1}</span>
-                      )}
-                      <span style={{ fontSize: 12, color: isTarget ? '#1F7A44' : 'rgba(0,0,0,0.25)', fontWeight: isTarget ? 700 : 400 }}>
-                        {selectedCard ? 'Tap to place' : 'Drop here'}
+          {/* Action cards + suggested order */}
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', flexShrink: 0 }}>
+            <div style={{ flex: '3 1 360px', minWidth: 0, display: 'flex', gap: 12, padding: 12, borderRadius: 18, background: '#f7fafd', border: '1px solid #e1ebf4', overflowX: 'auto' }}>
+              {resolvedShuffled.map(id => {
+                const panel = panelMap.get(id)
+                const spot = spots.get(id)
+                if (!panel || !spot) return null
+                const used = slotOf.has(id)
+                const c = CARD_COLORS[spot.i % CARD_COLORS.length]
+                const clickable = canDrop && !completed && !used
+                return (
+                  <button key={id} className="ss-card" disabled={!clickable} onClick={() => clickable && pick(id)}
+                    aria-label={panel.caption}
+                    style={{
+                      flex: '1 0 110px', minHeight: 112, borderRadius: 16, padding: '10px 8px',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+                      background: c.bg, border: `2px solid ${c.bd}`, cursor: clickable ? 'pointer' : 'default',
+                      opacity: used ? 0.32 : 1, filter: used ? 'grayscale(.6)' : undefined,
+                      transform: used ? 'scale(.94)' : undefined,
+                      boxShadow: hintPanel === id && !used ? `0 0 0 3px ${c.bd}88` : '0 2px 6px rgba(0,0,0,0.06)',
+                    }}
+                  >
+                    <span style={{ fontSize: 42, lineHeight: 1 }}>{panel.emoji}</span>
+                    {difficulty !== 'challenge' && (
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#173a5e', textAlign: 'center', lineHeight: 1.25, overflowWrap: 'anywhere' }}>{panel.caption}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
+            {difficulty === 'guided' && (
+              <div style={{ flex: '1 1 220px', padding: '12px 16px', borderRadius: 18, background: '#f7fafd', border: '1px solid #e1ebf4', minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#173a5e', marginBottom: 8 }}>💡 Suggested Order</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                  {orderedPanels.map((p, i) => {
+                    const c = CARD_COLORS[(spots.get(p.id)?.i ?? i) % CARD_COLORS.length]
+                    const done = placed[String(i)] === p.id
+                    return (
+                      <span key={p.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <span title={p.caption} style={{
+                          width: 32, height: 32, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: done ? 16 : 15, fontWeight: 800, color: '#173a5e', background: done ? '#dcf3e6' : c.bg, border: `1.5px solid ${done ? '#2f9e62' : c.bd}`,
+                        }}>{done ? '✓' : i + 1}</span>
+                        {i < orderedPanels.length - 1 && <span style={{ color: 'rgba(23,58,94,0.35)', fontSize: 11 }}>›</span>}
                       </span>
-                    </>
-                  )}
-                  {isWrong && <div className="sh-a" style={{ position: 'absolute', inset: 0, borderRadius: 12, pointerEvents: 'none' }} />}
+                    )
+                  })}
                 </div>
-              )
-            })}
-          </div>
-
-          {/* What to do next, in words. */}
-          {!completed && (
-            <div style={{ textAlign: 'center', fontSize: 14, color: 'rgba(0,0,0,0.55)', flexShrink: 0 }}>
-              {selectedCard
-                ? '👆 Now tap the box where this card goes'
-                : unplacedIds.length
-                  ? `What happens next? Drag a card, or tap it then tap a box · ${placedCount} of ${slotCount} placed`
-                  : instantFeedback ? 'Fix any red ✗ cards — tap one to send it back' : 'All placed — press Check my story!'}
-            </div>
-          )}
-
-          {/* Shuffled panel cards */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, padding: 12, minHeight: 132, alignContent: 'flex-start', alignItems: 'flex-start', justifyContent: 'center', background: 'rgba(0,0,0,0.035)', borderRadius: 14, border: '1px dashed rgba(0,0,0,0.14)', flex: 1, overflowY: 'auto' }}>
-            {unplacedIds.map(id => {
-              const panel = panelMap.get(id)
-              if (!panel) return null
-              const isHint = hintPanel === id
-              const isSel = selectedCard === id
-              return (
-                <div key={id}
-                  draggable={canDrop && !completed}
-                  onDragStart={e => onDragStart(e, id)}
-                  onDragEnd={onDragEnd}
-                  onTouchStart={onTouchStart(id)}
-                  onClick={() => { if (canDrop && !completed) setSelectedCard(isSel ? null : id) }}
-                  className={`ss-card ${isHint ? 'hint-pulse' : ''}`}
-                  style={{
-                    // Sized to fit three per row in the 420px panel. Height is a
-                    // minimum, not a fixed box, and the caption is unclamped, so a
-                    // long line grows the card instead of ending in an ellipsis.
-                    width: 104, minHeight: difficulty === 'challenge' ? 76 : 112, borderRadius: 12,
-                    background: isSel ? 'rgba(74,124,111,0.18)' : '#ffffff',
-                    border: isSel ? '2.5px solid #1F7A44' : isHint ? '1.5px solid rgba(74,124,111,0.5)' : '1.5px solid rgba(0,0,0,0.12)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '8px 6px',
-                    cursor: canDrop && !completed ? 'grab' : 'default',
-                    transition: 'all 0.15s', userSelect: 'none', WebkitUserSelect: 'none',
-                    boxShadow: dragItem === id ? '0 8px 20px rgba(0,0,0,0.3)' : '0 2px 6px rgba(0,0,0,0.2)',
-                    opacity: dragItem === id ? 0.8 : 1,
-                    transform: dragItem === id || isSel ? 'scale(1.1)' : 'scale(1)',
-                  }}
-                >
-                  <span style={{ fontSize: 30, lineHeight: 1 }}>{panel.emoji}</span>
-                  {difficulty !== 'challenge' && (
-                    <span style={{ fontSize: 11, color: 'rgba(0,0,0,0.72)', textAlign: 'center', lineHeight: 1.25, overflowWrap: 'anywhere' }}>
-                      {panel.caption}
-                    </span>
-                  )}
+                <div style={{ fontSize: 13, color: 'rgba(23,58,94,0.75)', marginTop: 8, lineHeight: 1.45 }}>
+                  {orderedPanels.map(p => p.caption).join(' → ')}
                 </div>
-              )
-            })}
-            {unplacedIds.length === 0 && <div style={{ width: '100%', textAlign: 'center', color: 'rgba(0,0,0,0.2)', fontSize: 13, padding: 8 }}>All panels placed!</div>}
-          </div>
-
-          {/* Check button, or the read-back banner once the story is solved */}
-          {completed && !waiting ? (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
-              padding: '8px 12px', borderRadius: 8,
-              background: 'rgba(74,124,111,0.14)', border: '1px solid rgba(74,124,111,0.35)',
-            }}>
-              <span style={{ fontSize: 15, color: '#1F7A44' }}>
-                ▶ Playing your story in order… {Math.min(playIdx + 1, slotCount) || 1} of {slotCount}
-              </span>
-              <button onClick={skipReplay}
-                style={{ marginLeft: 'auto', padding: '4px 12px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.12)', background: 'rgba(255,255,255,0.5)', color: 'rgba(0,0,0,0.6)', cursor: 'pointer', fontSize: 14 }}
-              >Skip</button>
-            </div>
-          ) : (
-          <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
-            <button onClick={handleCheck}
-              disabled={!canCheck}
-              style={{
-                flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 16, cursor: canCheck ? 'pointer' : 'default',
-                background: canCheck ? 'rgba(74,124,111,0.3)' : 'rgba(0,0,0,0.04)',
-                border: canCheck ? '1px solid rgba(74,124,111,0.4)' : '1px solid rgba(0,0,0,0.08)',
-                color: canCheck ? '#1F7A44' : 'rgba(0,0,0,0.25)',
-                opacity: canCheck ? 1 : 0.4,
-              }}
-            >Check my story ✓</button>
-            {(attempts || 0) >= 3 && isT && !completed && (
-              <button onClick={revealAnswer}
-                style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(200,96,42,0.3)', background: 'rgba(200,96,42,0.1)', color: 'rgba(200,120,80,0.8)', cursor: 'pointer', fontSize: 14 }}
-              >Show answer</button>
+              </div>
             )}
           </div>
-          )}
 
-          {/* Score */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14, color: 'rgba(0,0,0,0.4)', flexShrink: 0 }}>
-            <span>🌟 {storiesDone} stories completed</span>
-            <span>🔄 Attempt {attempts || 0} on this story</span>
+          {/* Check / replay controls and score */}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
+            {completed ? null : !instantFeedback ? (
+              <button onClick={handleCheck} disabled={!canCheck}
+                style={{
+                  padding: '7px 18px', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: canCheck ? 'pointer' : 'default',
+                  background: canCheck ? '#22a894' : 'rgba(0,0,0,0.05)', border: 'none',
+                  color: canCheck ? '#fff' : 'rgba(0,0,0,0.3)',
+                }}
+              >Check my story ✓</button>
+            ) : null}
+            {(attempts || 0) >= 3 && isT && !completed && (
+              <button onClick={revealAnswer}
+                style={{ padding: '6px 12px', borderRadius: 10, border: '1px solid rgba(200,96,42,0.3)', background: 'rgba(200,96,42,0.1)', color: 'rgba(170,90,50,0.9)', cursor: 'pointer', fontSize: 13 }}
+              >Show answer</button>
+            )}
+            <span style={{ marginLeft: 'auto', fontSize: 13, color: 'rgba(0,0,0,0.45)', display: 'flex', gap: 14 }}>
+              <span>🌟 {storiesDone} stories completed</span>
+              <span>🔄 {attempts || 0} {attempts === 1 ? 'miss' : 'misses'}</span>
+            </span>
           </div>
-        </div>
-      )}
-
-      {/* Touch ghost */}
-      {ghostPos && dragId.current && panelMap.get(dragId.current) && (
-        <div style={{
-          position: 'fixed', left: ghostPos.x - 52, top: ghostPos.y - 76,
-          width: 104, minHeight: 112, borderRadius: 12, zIndex: 1000, pointerEvents: 'none',
-          background: 'rgba(74,124,111,0.15)', border: '1.5px solid rgba(74,124,111,0.4)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5,
-          boxShadow: '0 8px 20px rgba(0,0,0,0.3)', transform: 'scale(1.1)', opacity: 0.85, padding: '8px 6px',
-        }}>
-          <span style={{ fontSize: 30, lineHeight: 1 }}>{panelMap.get(dragId.current)!.emoji}</span>
-          {difficulty !== 'challenge' && (
-            <span style={{ fontSize: 11, color: 'rgba(0,0,0,0.72)', textAlign: 'center', lineHeight: 1.25, overflowWrap: 'anywhere' }}>{panelMap.get(dragId.current)!.caption}</span>
-          )}
         </div>
       )}
 
@@ -925,7 +1032,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
               </span>
             ))}
           </div>
-          <div style={{ fontSize: 16, color: 'rgba(0,0,0,0.5)' }}>Attempts: {attempts || 0}</div>
+          <div style={{ fontSize: 16, color: 'rgba(0,0,0,0.5)' }}>Misses: {attempts || 0}</div>
           <div style={{ fontSize: 14, color: 'rgba(0,0,0,0.45)', textAlign: 'center' }}>
             {isT ? 'Play the same set again, or move on to a new one.' : 'Play the same set again, or wait for a new one.'}
           </div>
