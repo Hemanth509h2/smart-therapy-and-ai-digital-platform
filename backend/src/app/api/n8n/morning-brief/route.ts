@@ -1,19 +1,15 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { requireServiceKey } from '@/lib/apiAuth';
 import { buildMorningBrief, phoneForms } from '@/lib/n8n-brief';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/n8n/morning-brief  (x-api-key required)
+// GET /api/n8n/morning-brief
 // One ready-to-send WhatsApp message per therapist with a phone number:
 //   { items: [{ to, type: 'text', body, therapistId, therapistName }], skipped }
 // In n8n: HTTP Request → Split Out `items` → POST each to /api/whatsapp/send.
 // Therapists without a (valid) phone number are counted in `skipped`.
 export async function GET(request: Request) {
-  const auth = requireServiceKey(request);
-  if (!auth.ok) return auth.response;
-
   try {
     const therapists = await prisma.profileTherapist.findMany({
       where: { phoneNumber: { not: null } },

@@ -1,17 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { requireServiceKey } from '@/lib/apiAuth';
 
 export const dynamic = 'force-dynamic';
 
 // GET /api/therapists/by-phone?phone=91XXXXXXXXXX
 // Returns therapist profile for n8n WhatsApp chatbot lookup
-// Called by n8n; requires the x-api-key header (N8N_API_KEY), since it
-// returns therapist contact details.
+// Called by n8n (no auth — open by request).
 export async function GET(request: Request) {
-  const auth = requireServiceKey(request);
-  if (!auth.ok) return auth.response;
-
   try {
     const { searchParams } = new URL(request.url);
     const phone = searchParams.get('phone');

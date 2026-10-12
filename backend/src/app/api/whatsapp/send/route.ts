@@ -3,19 +3,14 @@ import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { sendViaBot } from '@/lib/whatsapp-bot';
 import { normalizeWhatsAppNumber } from '@/lib/whatsapp-cloud-api';
-import { requireServiceKey } from '@/lib/apiAuth';
 
 export const dynamic = 'force-dynamic';
 
 // POST /api/whatsapp/send
-// Generic WhatsApp send endpoint for n8n automation. Requires the x-api-key
-// header (N8N_API_KEY) — without it anyone could message from our number.
+// Generic WhatsApp send endpoint for n8n automation (no auth — open by request).
 // Body: { to, type: 'text' | 'interactive', body?, interactive?, therapistId? }
 // If therapistId provided, logs to WhatsAppMessage table for tracking
 export async function POST(request: Request) {
-  const auth = requireServiceKey(request);
-  if (!auth.ok) return auth.response;
-
   try {
     const body = await request.json().catch(() => null);
     const { to, type, body: textBody, interactive, therapistId, sessionId, clientId, messageType } = body || {};

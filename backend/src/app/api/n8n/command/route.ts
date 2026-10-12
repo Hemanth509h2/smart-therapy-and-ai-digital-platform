@@ -1,18 +1,14 @@
 import { NextResponse } from 'next/server';
-import { requireServiceKey } from '@/lib/apiAuth';
 import { commandReply, findTherapistByPhone, phoneForms } from '@/lib/n8n-brief';
 
 export const dynamic = 'force-dynamic';
 
-// POST /api/n8n/command  (x-api-key required)
+// POST /api/n8n/command
 // Body: { from: "<therapist's WhatsApp number>", text: "CLIENTS" | "WEEK" | "PENDING" | "SESSION <id>" | "HELP" }
 // Returns the reply, ready to POST to /api/whatsapp/send:
 //   { to, type: 'text', body, therapistId }
 // Only replies about the therapist that owns the sending number.
 export async function POST(request: Request) {
-  const auth = requireServiceKey(request);
-  if (!auth.ok) return auth.response;
-
   try {
     const { from, text } = (await request.json().catch(() => null)) || {};
     if (!from || typeof from !== 'string') {
