@@ -11,6 +11,8 @@
     "prebuild": "npm run setup:mediapipe"
   },
   "dependencies": {
+    "@babylonjs/core": "^9.30.0",
+    "@babylonjs/loaders": "^9.30.0",
     "@base-ui/react": "^1.4.1",
     "@deepgram/sdk": "^3.0.0",
     "@excalidraw/excalidraw": "^0.18.1",
