@@ -41,9 +41,7 @@ export interface SessionScheduledInput {
 }
 
 /**
- * Send a WhatsApp invite message (free-form text)
- * Works within 24-hour customer service window
- * For first-time invites outside the window, use a template instead
+ * Send the patient invite by posting it to the n8n webhook, which delivers it on WhatsApp
  */
 export async function sendWhatsAppInvite(input: WhatsAppInviteInput): Promise<WhatsAppMessageResult> {
   const to = normalizeWhatsAppNumber(input.to)
@@ -58,7 +56,22 @@ Tap the link below to join — no sign-up needed:
 
 See you there. 🌿`
 
-  return sendViaBot(to, text)
+  const url = process.env.N8N_INVITE_WEBHOOK_URL
+  if (!url) throw new Error('N8N_INVITE_WEBHOOK_URL is not configured')
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to,
+      patientName: input.patientName || '',
+      therapistName: input.therapistName || '',
+      inviteLink: input.inviteLink,
+      text,
+    }),
+  })
+  if (!res.ok) throw new Error(`n8n invite webhook responded ${res.status}`)
+  return { id: `n8n-${Date.now()}`, status: 'sent', to }
 }
 
 /**
