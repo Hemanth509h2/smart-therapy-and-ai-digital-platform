@@ -144,6 +144,23 @@ export async function PATCH(
       await sendSessionLinkWhatsApp(session.id, request);
     }
 
+    // Trigger n8n webhook when session is completed
+    if (finalAction === 'end' && session.status === 'COMPLETED') {
+      const n8nWebhookUrl = process.env.N8N_SESSION_COMPLETED_WEBHOOK_URL;
+      if (n8nWebhookUrl) {
+        fetch(n8nWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: session.id,
+            therapistId: session.therapistId,
+            clientId: session.clientId,
+            completedAt: now.toISOString(),
+          }),
+        }).catch((e) => console.warn('n8n webhook failed:', e));
+      }
+    }
+
     // When the therapist ends the call, expire the invite link(s) that led to
     // this client so the link can never be used to rejoin after the session,
     // and flag the room as ended so the other participant's screen exits too.
