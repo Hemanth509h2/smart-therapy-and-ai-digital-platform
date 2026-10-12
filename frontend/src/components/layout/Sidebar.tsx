@@ -51,13 +51,6 @@ const therapistNav = [
   { href: '/help', label: 'Help & Support', icon: LifeBuoy },
 ];
 
-const clientNav = [
-  { href: '/', label: 'Home', icon: Home },
-  { href: '/my-sessions', label: 'My Sessions', icon: Calendar },
-  { href: '/profile', label: 'Profile', icon: User },
-  { href: '/help', label: 'Help & Support', icon: LifeBuoy },
-];
-
 const adminNav = [
   { href: '/admin', label: 'Professionals', icon: Users },
   { href: '/admin/subscriptions', label: 'Subscriptions', icon: Receipt },
@@ -78,7 +71,7 @@ export default function Sidebar({
   const router = useRouter();
   const { theme, toggle: toggleTheme } = useTheme();
 
-  const navItems = role === 'ADMIN' ? adminNav : role === 'THERAPIST' ? therapistNav : clientNav;
+  const navItems = role === 'ADMIN' ? adminNav : therapistNav;
   const roleLabel = role === 'ADMIN' ? 'Admin' : role === 'THERAPIST' ? 'Therapist' : 'Client';
 
   // '/' and '/admin' only match exactly; everything else also owns its sub-routes

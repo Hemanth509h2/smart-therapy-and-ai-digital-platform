@@ -39,13 +39,6 @@ const THERAPIST_NAV: NavItem[] = [
   { href: '/help', label: 'Help & Support', Icon: IconHelp },
 ];
 
-const CLIENT_NAV: NavItem[] = [
-  { href: '/', label: 'Home', Icon: IconDashboard },
-  { href: '/my-sessions', label: 'My Sessions', Icon: IconSessions },
-  { href: '/profile', label: 'Profile', Icon: IconProfile },
-  { href: '/help', label: 'Help & Support', Icon: IconHelp },
-];
-
 const COLLAPSE_KEY = 'staad-sidebar-collapsed';
 
 /** The design collapses the rail on its own below this width. */
@@ -81,7 +74,7 @@ export function StaadShell({ children }: { children: React.ReactNode }) {
       return !c;
     });
 
-  const nav = role === 'CLIENT' ? CLIENT_NAV : THERAPIST_NAV;
+  const nav = THERAPIST_NAV;
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
 
