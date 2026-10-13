@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { ALL_MODULE_IDS } from '@/lib/modules';
+import { errorResponse } from '@/lib/apiError';
 
 // POST /api/subscriptions/request — a therapist requests a plan (pending admin
 // approval). Body: { therapistId, planId, months?, modules?, note? }
@@ -63,7 +64,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, request: created });
   } catch (error: any) {
-    console.error('Subscription request POST error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Subscription request POST error');
   }
 }

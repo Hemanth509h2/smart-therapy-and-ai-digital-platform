@@ -12,6 +12,8 @@
  * - WHATSAPP_APP_SECRET: App Secret (optional, for token refresh)
  */
 
+import { PublicError } from '@/lib/apiError'
+
 const GRAPH_API_BASE = 'https://graph.facebook.com/v20.0'
 
 export interface WhatsAppMessageResult {
@@ -49,7 +51,7 @@ export function normalizeWhatsAppNumber(value: string): string {
       : `+${compact}`
 
   if (!/^\+[1-9]\d{7,14}$/.test(withCountryCode)) {
-    throw new Error('Enter a valid WhatsApp number with country code')
+    throw new PublicError('Enter a valid WhatsApp number with country code', 400)
   }
 
   return withCountryCode

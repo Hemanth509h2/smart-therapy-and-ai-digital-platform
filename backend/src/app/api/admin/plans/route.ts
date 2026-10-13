@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
+import { errorResponse } from '@/lib/apiError';
 
 // GET /api/admin/plans — list all plans (active + inactive) for catalog mgmt.
 export async function GET(request: Request) {
@@ -12,8 +13,7 @@ export async function GET(request: Request) {
     });
     return NextResponse.json({ plans });
   } catch (error: any) {
-    console.error('Admin plans GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin plans GET error');
   }
 }
 
@@ -51,7 +51,6 @@ export async function POST(request: Request) {
     if (error.code === 'P2002') {
       return NextResponse.json({ error: 'A plan with that name already exists.' }, { status: 409 });
     }
-    console.error('Admin plans POST error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin plans POST error');
   }
 }

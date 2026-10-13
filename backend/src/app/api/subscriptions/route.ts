@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { resolveCurrent, serializeSubscription } from '@/lib/subscriptions';
+import { errorResponse } from '@/lib/apiError';
 
 // GET /api/subscriptions?therapistId= — a therapist's current plan (or null for
 // free tier), any pending request, and their term history.
@@ -45,7 +46,6 @@ export async function GET(request: Request) {
       history: subs.map((s) => serializeSubscription({ ...s })),
     });
   } catch (error: any) {
-    console.error('Subscriptions GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Subscriptions GET error');
   }
 }

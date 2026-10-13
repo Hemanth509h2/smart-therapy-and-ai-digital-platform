@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
+import { errorResponse } from '@/lib/apiError';
 
 // PATCH /api/admin/plans/[id] — update a plan (name, pricing, quota, active flag).
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
@@ -30,8 +31,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (error.code === 'P2025') {
       return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
     }
-    console.error('Admin plan PATCH error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin plan PATCH error');
   }
 }
 
@@ -60,7 +60,6 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     if (error.code === 'P2025') {
       return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
     }
-    console.error('Admin plan DELETE error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin plan DELETE error');
   }
 }

@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { provisionSessionDocs } from '@/lib/session-provisioning';
+import { errorResponse } from '@/lib/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -118,7 +119,6 @@ export async function POST(request: Request, { params }: { params: { token: stri
       guestToken: await adminAuth().createCustomToken(guestUid),
     });
   } catch (error: any) {
-    console.error('[invites/join]', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, '[invites/join]');
   }
 }

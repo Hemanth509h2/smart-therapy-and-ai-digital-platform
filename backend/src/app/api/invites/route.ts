@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { normalizePhoneNumber } from '@/lib/phone';
+import { errorResponse } from '@/lib/apiError';
 
 // POST /api/invites — therapist creates a patient invite (name + diagnosis only).
 // Returns the generated token so the client can build a shareable link.
@@ -46,8 +47,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ token: invite.token, invite });
   } catch (error: any) {
-    console.error('Invite creation error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Invite creation error');
   }
 }
 
@@ -67,6 +67,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ invites });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'invites GET');
   }
 }

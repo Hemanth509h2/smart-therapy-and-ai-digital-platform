@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
+import { errorResponse } from '@/lib/apiError';
 
 // Where all helpdesk tickets are delivered.
 const SUPPORT_INBOX = 'om.cofounder@staad.in';
@@ -97,10 +98,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, ref });
   } catch (error: any) {
-    console.error('Support ticket error:', error);
-    return NextResponse.json(
-      { error: error?.message || 'Failed to send ticket' },
-      { status: 500 }
-    );
+    return errorResponse(error, 'Support ticket error', 'Failed to send ticket');
   }
 }

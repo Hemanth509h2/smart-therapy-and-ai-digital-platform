@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
 import { addMonths } from '@/lib/subscriptions';
+import { errorResponse } from '@/lib/apiError';
 
 // PATCH /api/admin/subscriptions/[id] — manage an existing term.
 // Body: { action: 'renew' | 'cancel' | 'reactivate', months? }
@@ -51,7 +52,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error: any) {
-    console.error('Subscription PATCH error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Subscription PATCH error');
   }
 }

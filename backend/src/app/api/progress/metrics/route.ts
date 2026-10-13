@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireTherapist } from '@/lib/progressAuth';
+import { errorResponse } from '@/lib/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,8 +44,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ metrics });
   } catch (error: any) {
-    console.error('Progress metrics GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Progress metrics GET error');
   }
 }
 
@@ -89,7 +89,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ metric }, { status: 201 });
   } catch (error: any) {
-    console.error('Progress metrics POST error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Progress metrics POST error');
   }
 }
