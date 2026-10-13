@@ -44,9 +44,13 @@ function seed() {
 
 // Minimal in-memory Prisma that honours the `where` shapes the route uses, so a
 // mis-scoped query would return the wrong rows rather than pass silently.
-function matches(row: any, where: any = {}) {
+function matches(row: any, where: any = {}): boolean {
   return Object.entries(where).every(([k, v]: [string, any]) =>
-    v && typeof v === 'object' && 'in' in v ? v.in.includes(row[k]) : row[k] === v
+    k === 'OR'
+      ? (v as any[]).some((w) => matches(row, w))
+      : v && typeof v === 'object' && 'in' in v
+        ? v.in.includes(row[k])
+        : row[k] === v
   )
 }
 
@@ -197,12 +201,13 @@ describe('GET /api/clients — ownership', () => {
     const clientCalls = prismaMock.profileClient.findMany.mock.calls.map(([args]) => args)
     // Never an unfiltered findMany (the old return-all fallback).
     for (const args of clientCalls) expect(args.where).toBeTruthy()
-    expect(clientCalls).toContainEqual({ where: { therapistId: 't1' }, select: { id: true } })
-    expect(clientCalls).toContainEqual({
-      where: { id: { in: expect.arrayContaining(['c1', 'c2']) } },
+    // Direct clients OR session-linked ones, in a single query scoped to t1.
+    expect(clientCalls).toHaveLength(1)
+    expect(clientCalls[0]).toEqual({
+      where: { OR: [{ therapistId: 't1' }, { id: { in: expect.arrayContaining(['c1', 'c2']) } }] },
       include: { user: { select: { email: true } } },
     })
-    const inIds = clientCalls.find((a) => a.where.id)!.where.id.in
+    const inIds = clientCalls[0].where.OR[1].id.in
     expect(inIds).not.toContain('c3')
   })
 })

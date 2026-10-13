@@ -86,46 +86,45 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Clients of this therapist: directly added ones PLUS any linked via sessions.
+    // One query for every session of this therapist; everything else is
+    // derived in memory (was: 3 queries + one per client).
     const sessions = await prisma.session.findMany({
       where: { therapistId },
-      select: { clientId: true },
-      distinct: ['clientId'],
+      orderBy: { scheduledAt: 'desc' },
+      select: { id: true, clientId: true, scheduledAt: true, status: true },
     });
-    const directClients = await prisma.profileClient.findMany({
-      where: { therapistId },
-      select: { id: true },
-    });
-    const clientIds = [...new Set([...sessions.map((s) => s.clientId), ...directClients.map((c) => c.id)])];
 
+    // Clients of this therapist: directly added ones PLUS any linked via sessions.
+    const sessionClientIds = [...new Set(sessions.map((s) => s.clientId))];
     const clients = await prisma.profileClient.findMany({
-      where: { id: { in: clientIds } },
+      where: { OR: [{ therapistId }, { id: { in: sessionClientIds } }] },
       include: { user: { select: { email: true } } },
     });
 
+    const byClient = new Map<string, typeof sessions>();
+    for (const s of sessions) {
+      const list = byClient.get(s.clientId);
+      if (list) list.push(s);
+      else byClient.set(s.clientId, [s]);
+    }
+
     // Attach session count, last held session and next scheduled session per client
     const now = new Date();
-    const clientsWithMeta = await Promise.all(
-      clients.map(async (client) => {
-        const clientSessions = await prisma.session.findMany({
-          where: { therapistId, clientId: client.id },
-          orderBy: { scheduledAt: 'desc' },
-          select: { id: true, scheduledAt: true, status: true },
-        });
-        const held = clientSessions.filter(
-          (s) => s.status !== 'CANCELLED' && (s.status !== 'SCHEDULED' || s.scheduledAt <= now)
-        );
-        const next = clientSessions
-          .filter((s) => s.status === 'SCHEDULED' && s.scheduledAt > now)
-          .at(-1);
-        return {
-          ...client,
-          sessionCount: clientSessions.length,
-          lastSession: held[0]?.scheduledAt || null,
-          nextSession: next ? { id: next.id, scheduledAt: next.scheduledAt } : null,
-        };
-      })
-    );
+    const clientsWithMeta = clients.map((client) => {
+      const clientSessions = byClient.get(client.id) ?? [];
+      const held = clientSessions.filter(
+        (s) => s.status !== 'CANCELLED' && (s.status !== 'SCHEDULED' || s.scheduledAt <= now)
+      );
+      const next = clientSessions
+        .filter((s) => s.status === 'SCHEDULED' && s.scheduledAt > now)
+        .at(-1);
+      return {
+        ...client,
+        sessionCount: clientSessions.length,
+        lastSession: held[0]?.scheduledAt || null,
+        nextSession: next ? { id: next.id, scheduledAt: next.scheduledAt } : null,
+      };
+    });
 
     return NextResponse.json({ clients: clientsWithMeta });
   } catch (error: any) {

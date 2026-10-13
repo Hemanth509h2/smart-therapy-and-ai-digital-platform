@@ -164,6 +164,9 @@ model Booking {
   status      String           @default("pending") // pending, confirmed, cancelled
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
+
+  @@index([therapistId, dateTime])
+  @@index([clientId, dateTime])
 }
 
 model Session {
@@ -183,6 +186,9 @@ model Session {
   notes            TherapistNote[]
   report           SessionReport?
   whatsAppMessages WhatsAppMessage[]
+
+  @@index([therapistId, scheduledAt])
+  @@index([clientId, scheduledAt])
 }
 
 // End-of-session AI clinical report. One per session. Generated from the full

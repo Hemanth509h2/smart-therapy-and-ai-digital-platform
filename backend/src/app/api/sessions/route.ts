@@ -2,16 +2,24 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { sendSessionBookedWhatsApp } from '@/lib/session-whatsapp';
 import { errorResponse } from '@/lib/apiError';
+import { requireAuth } from '@/lib/apiAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
+
     const { searchParams } = new URL(request.url);
     const therapistId = searchParams.get('therapistId');
     const clientId = searchParams.get('clientId');
 
     if (therapistId) {
+      const owner = await prisma.profileTherapist.findUnique({ where: { id: therapistId }, select: { userId: true } });
+      if (!owner || owner.userId !== auth.uid) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
       // Note count + report presence let the UI flag completed sessions whose
       // documentation is still outstanding ("Notes pending").
       const sessions = await prisma.session.findMany({
@@ -27,6 +35,13 @@ export async function GET(request: Request) {
     }
 
     if (clientId) {
+      const client = await prisma.profileClient.findUnique({
+        where: { id: clientId },
+        select: { userId: true, therapist: { select: { userId: true } } },
+      });
+      if (!client || (client.userId !== auth.uid && client.therapist?.userId !== auth.uid)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
       const sessions = await prisma.session.findMany({
         where: { clientId },
         include: {
