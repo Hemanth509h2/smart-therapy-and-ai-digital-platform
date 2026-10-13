@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { errorResponse } from '@/lib/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ error: 'Missing filter parameter' }, { status: 400 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'bookings GET');
   }
 }
 
@@ -52,6 +53,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ booking });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'bookings POST');
   }
 }

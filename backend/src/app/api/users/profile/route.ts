@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { requireAuth } from '@/lib/apiAuth';
+import { errorResponse } from '@/lib/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -120,8 +121,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, user: result.user, profile: result.profile, session: result.session });
   } catch (error: any) {
-    console.error('Error creating user profile in PostgreSQL:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Error creating user profile in PostgreSQL');
   }
 }
 
@@ -190,8 +190,7 @@ export async function PUT(request: Request) {
 
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
   } catch (error: any) {
-    console.error('Profile PUT error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Profile PUT error');
   }
 }
 
@@ -236,8 +235,7 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Profile DELETE error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Profile DELETE error');
   }
 }
 
@@ -265,6 +263,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ user });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'users/profile GET');
   }
 }

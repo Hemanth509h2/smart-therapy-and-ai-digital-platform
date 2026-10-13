@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules';
 import { addMonths } from '@/lib/subscriptions';
+import { errorResponse } from '@/lib/apiError';
 
 // POST /api/admin/subscriptions/requests/[id] — approve or reject a plan request.
 // Body: { action: 'approve' | 'reject', modules?, months? }
@@ -96,7 +97,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Subscription request review error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Subscription request review error');
   }
 }

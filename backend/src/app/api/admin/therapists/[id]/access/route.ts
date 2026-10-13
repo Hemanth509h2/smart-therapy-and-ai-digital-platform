@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules';
+import { errorResponse } from '@/lib/apiError';
 
 // PATCH /api/admin/therapists/[id]/access — set a therapist's module access.
 // Body: { allModulesAllowed: boolean, moduleAccess: string[] }
@@ -35,7 +36,6 @@ export async function PATCH(
 
     return NextResponse.json({ therapist: updated });
   } catch (error: any) {
-    console.error('Therapist access PATCH error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Therapist access PATCH error');
   }
 }

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules';
 import { normalizePhoneNumber } from '@/lib/phone';
+import { errorResponse } from '@/lib/apiError';
 
 // A malformed stored number must not break the whole overview.
 function toE164(raw: string | null): string | null {
@@ -104,7 +105,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ therapists: rows });
   } catch (error: any) {
-    console.error('Admin overview error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin overview error');
   }
 }

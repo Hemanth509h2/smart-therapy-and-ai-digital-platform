@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { errorResponse } from '@/lib/apiError';
 
 // GET /api/invites/[token] — fetch invite details for the signup banner + onboarding prefill.
 export async function GET(request: Request, { params }: { params: { token: string } }) {
@@ -28,6 +29,6 @@ export async function GET(request: Request, { params }: { params: { token: strin
       },
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'invites/[token] GET');
   }
 }

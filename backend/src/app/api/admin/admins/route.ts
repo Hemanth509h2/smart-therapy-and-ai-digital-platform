@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
 import { adminAuth } from '@/lib/firebaseAdmin';
+import { errorResponse } from '@/lib/apiError';
 
 // GET /api/admin/admins — list all admin accounts.
 export async function GET(request: Request) {
@@ -22,8 +23,7 @@ export async function GET(request: Request) {
       })),
     });
   } catch (error: any) {
-    console.error('Admins GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admins GET error');
   }
 }
 
@@ -82,7 +82,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, admin: { id: profile.id, userId: uid, email } });
   } catch (error: any) {
-    console.error('Admins POST error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admins POST error');
   }
 }
