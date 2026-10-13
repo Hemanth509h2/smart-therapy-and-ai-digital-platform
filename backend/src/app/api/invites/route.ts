@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
-import { normalizeWhatsAppNumber } from '@/lib/whatsapp-cloud-api';
+import { normalizePhoneNumber } from '@/lib/phone';
 
 // POST /api/invites — therapist creates a patient invite (name + diagnosis only).
 // Returns the generated token so the client can build a shareable link.
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     const normalizedPhoneNumber =
       typeof phoneNumber === 'string' && phoneNumber.trim()
-        ? normalizeWhatsAppNumber(phoneNumber)
+        ? normalizePhoneNumber(phoneNumber)
         : null;
 
     const invite = await prisma.invite.create({

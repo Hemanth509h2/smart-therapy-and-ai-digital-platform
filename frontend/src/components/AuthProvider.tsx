@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter, usePathname } from 'next/navigation';
@@ -41,11 +41,15 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
             const data = await res.json();
             if (data.user) {
               const role = data.user.role;
-              const profile =
-                role === 'THERAPIST' ? data.user.therapist
-                : role === 'ADMIN' ? data.user.admin
-                : data.user.client;
-              setRoleAndProfile(role, profile);
+              if (role === 'CLIENT') {
+                // Patients no longer have accounts; they join through the link their therapist sends.
+                await signOut(auth);
+                clearAuth();
+                router.push('/auth?clients=removed');
+                setLoading(false);
+                return;
+              }
+              setRoleAndProfile(role, role === 'THERAPIST' ? data.user.therapist : data.user.admin);
             }
           } else if (res.status === 404) {
             // Profile doesn't exist yet, needs onboarding

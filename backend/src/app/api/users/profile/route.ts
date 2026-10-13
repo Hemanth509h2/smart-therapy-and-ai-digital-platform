@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const uid = auth.uid;
     const email = auth.email;
 
-    const { role, firstName, lastName, specialty, dateOfBirth, diagnosis, inviteToken } = await request.json();
+    const { role, firstName, lastName, specialty, phoneNumber, dateOfBirth, diagnosis, inviteToken } = await request.json();
 
     if (!email || !role) {
       return NextResponse.json({ error: 'Missing core credentials' }, { status: 400 });
@@ -26,6 +26,20 @@ export async function POST(request: Request) {
     }
 
     const roleEnum = role === 'THERAPIST' ? 'THERAPIST' : 'CLIENT';
+
+    // Stored as digits with country code (default 91).
+    let therapistPhone: string | null = null;
+    if (roleEnum === 'THERAPIST') {
+      const digits = String(phoneNumber ?? '').replace(/\D/g, '');
+      if (digits.length < 10) {
+        return NextResponse.json({ error: 'A valid phone number is required' }, { status: 400 });
+      }
+      therapistPhone = digits.length === 10 ? `91${digits}` : digits;
+      const taken = await prisma.profileTherapist.findUnique({ where: { phoneNumber: therapistPhone }, select: { id: true } });
+      if (taken) {
+        return NextResponse.json({ error: 'This phone number is already registered' }, { status: 409 });
+      }
+    }
 
     // Create user and profile transactionally; claim invite if present.
     const result = await prisma.$transaction(async (tx) => {
@@ -44,6 +58,7 @@ export async function POST(request: Request) {
             firstName: firstName || 'Therapist',
             lastName: lastName || '',
             specialty: specialty || [],
+            phoneNumber: therapistPhone,
           },
         });
         return { user: u, profile, session: null };
@@ -118,7 +133,7 @@ export async function PUT(request: Request) {
     if (!auth.ok) return auth.response;
     const uid = auth.uid;
 
-    const { firstName, lastName, qualification, experience, specialty, bio, dateOfBirth, gender, diagnosis } = await request.json();
+    const { firstName, lastName, qualification, experience, specialty, bio, phoneNumber, dateOfBirth, gender, diagnosis } = await request.json();
 
     const user = await prisma.user.findUnique({ where: { id: uid }, select: { role: true } });
     if (!user) {
@@ -126,6 +141,23 @@ export async function PUT(request: Request) {
     }
 
     if (user.role === 'THERAPIST') {
+      // Stored as digits with country code (default 91), same as registration.
+      let therapistPhone: string | undefined;
+      if (phoneNumber !== undefined) {
+        const digits = String(phoneNumber).replace(/\D/g, '');
+        if (digits.length < 10) {
+          return NextResponse.json({ error: 'A valid phone number is required' }, { status: 400 });
+        }
+        therapistPhone = digits.length === 10 ? `91${digits}` : digits;
+        const taken = await prisma.profileTherapist.findFirst({
+          where: { phoneNumber: therapistPhone, NOT: { userId: uid } },
+          select: { id: true },
+        });
+        if (taken) {
+          return NextResponse.json({ error: 'This phone number is already registered' }, { status: 409 });
+        }
+      }
+
       const updated = await prisma.profileTherapist.update({
         where: { userId: uid },
         data: {
@@ -135,6 +167,7 @@ export async function PUT(request: Request) {
           ...(experience !== undefined && { experience }),
           ...(specialty !== undefined && { specialty }),
           ...(bio !== undefined && { bio }),
+          ...(therapistPhone !== undefined && { phoneNumber: therapistPhone }),
         },
       });
       return NextResponse.json({ profile: updated });

@@ -56,7 +56,7 @@ export function useTherapistGuard() {
   const router = useRouter();
   useEffect(() => {
     if (!uid) router.push('/auth');
-    else if (role && role !== 'THERAPIST') router.push(role === 'ADMIN' ? '/admin' : '/my-sessions');
+    else if (role && role !== 'THERAPIST') router.push(role === 'ADMIN' ? '/admin' : '/');
   }, [uid, role, router]);
 }
 

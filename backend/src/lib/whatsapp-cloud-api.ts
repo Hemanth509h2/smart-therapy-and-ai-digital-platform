@@ -147,6 +147,32 @@ export async function sendCloudApiTemplate(
 }
 
 /**
+ * Send an interactive message (buttons / list) via Cloud API
+ */
+export async function sendCloudApiInteractive(
+  toNumber: string,
+  interactive: Record<string, unknown>
+): Promise<WhatsAppMessageResult> {
+  const { accessToken, phoneNumberId } = getCloudApiConfig()
+  const to = normalizeWhatsAppNumber(toNumber)
+
+  const response = await fetch(`${GRAPH_API_BASE}/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'interactive', interactive }),
+    cache: 'no-store',
+  })
+  const payload = (await response.json().catch(() => ({}))) as {
+    messages?: Array<{ id: string }>
+    error?: { message: string }
+  }
+  if (!response.ok || !payload.messages?.[0]?.id) {
+    throw new Error(payload.error?.message || 'Cloud API could not send the interactive message')
+  }
+  return { id: payload.messages[0].id, status: 'sent', to }
+}
+
+/**
  * Check if Cloud API is configured
  */
 export function isCloudApiConfigured(): boolean {
