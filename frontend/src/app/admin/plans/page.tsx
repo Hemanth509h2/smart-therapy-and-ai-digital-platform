@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Loader2, Plus, Pencil, Layers } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, apiFetchCached } from '@/lib/api';
 
 const CARD_BASE =
   'rounded-[14px] border-[0.5px] border-[var(--glass-border)] shadow-[var(--glass-shadow)] bg-[var(--glass-bg)] dark:bg-[#16221e] animate-fade-up';
@@ -49,7 +49,7 @@ export default function AdminPlansPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch('/api/admin/plans');
+      const res = await apiFetchCached('/api/admin/plans', 30_000);
       if (res.ok) setPlans((await res.json()).plans || []);
     } catch (err) { console.error(err); }
     setLoading(false);

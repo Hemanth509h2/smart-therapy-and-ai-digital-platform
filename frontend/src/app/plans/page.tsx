@@ -10,7 +10,7 @@ import { IconArrowRightXs, IconTick } from '@/components/staad/icons';
 import { DsDialog, toast } from '@/components/practice/ui';
 import { ALL_MODULE_IDS, MODULE_CATEGORIES, resolveAllowedModuleIds } from '@/lib/modules';
 import { fmtDate } from '@/lib/practice';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, apiFetchCached } from '@/lib/api';
 
 interface Plan {
   id: string;
@@ -76,8 +76,8 @@ export default function PlansPage() {
     setLoading(true);
     try {
       const [pRes, sRes] = await Promise.all([
-        apiFetch('/api/plans'),
-        apiFetch(`/api/subscriptions?therapistId=${profile.id}`),
+        apiFetchCached('/api/plans'),
+        apiFetchCached(`/api/subscriptions?therapistId=${profile.id}`),
       ]);
       if (pRes.ok) setPlans((await pRes.json()).plans || []);
       if (sRes.ok) {

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Users, Activity, Sparkles, Puzzle, SlidersHorizontal, Loader2 } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { MODULE_CATEGORIES, ALL_MODULE_IDS } from '@/lib/modules';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, apiFetchCached } from '@/lib/api';
 
 const CARD_BASE =
   'rounded-[14px] border-[0.5px] border-[var(--glass-border)] shadow-[var(--glass-shadow)] bg-[var(--glass-bg)] dark:bg-[#16221e] animate-fade-up';
@@ -53,7 +53,7 @@ export default function AdminOverviewPage() {
   const fetchOverview = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch('/api/admin/overview');
+      const res = await apiFetchCached('/api/admin/overview', 30_000);
       if (res.ok) {
         const data = await res.json();
         setRows(data.therapists || []);

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { ArrowLeft, Mail, Calendar, Clock, Users, Activity, Sparkles, Puzzle, FileText } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
+import { apiFetchCached } from '@/lib/api';
 
 const CARD_BASE =
   'rounded-[14px] border-[0.5px] border-[var(--glass-border)] shadow-[var(--glass-shadow)] bg-[var(--glass-bg)] dark:bg-[#16221e]';
@@ -74,7 +74,7 @@ export default function TherapistDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch(`/api/admin/therapists/${therapistId}`);
+      const res = await apiFetchCached(`/api/admin/therapists/${therapistId}`, 30_000);
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || `Request failed (${res.status})`);

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Loader2, Check, X, RefreshCw, Ban, Inbox } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { MODULE_CATEGORIES, moduleName } from '@/lib/modules';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, apiFetchCached } from '@/lib/api';
 
 const CARD_BASE =
   'rounded-[14px] border-[0.5px] border-[var(--glass-border)] shadow-[var(--glass-shadow)] bg-[var(--glass-bg)] dark:bg-[#16221e] animate-fade-up';
@@ -75,7 +75,7 @@ export default function AdminSubscriptionsPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch('/api/admin/subscriptions');
+      const res = await apiFetchCached('/api/admin/subscriptions', 30_000);
       if (res.ok) {
         const d = await res.json();
         setPros(d.professionals || []);
