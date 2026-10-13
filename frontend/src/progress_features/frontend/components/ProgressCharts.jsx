@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { apiFetch } from '@/lib/api';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -28,7 +29,7 @@ export default function ProgressCharts({ clientId }) {
     if (!clientId) return;
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/progress-features/measurement/${clientId}`)
+    apiFetch(`/api/progress-features/measurement/${clientId}`)
       .then(async (res) => {
         if (!res.ok) {
           const d = await res.json().catch(() => ({}));

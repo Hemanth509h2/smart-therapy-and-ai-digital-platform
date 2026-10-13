@@ -6,18 +6,14 @@
 
 import { jsPDF } from 'jspdf';
 import { getClientMetrics } from '../measurement/measurementService.js';
-import { PublicError } from '@/lib/apiError';
 
-export async function generateClientReportPdf(prisma, clientId) {
-  const client = await prisma.profileClient.findUnique({ where: { id: clientId } });
-  if (!client) {
-    throw new PublicError('Client not found', 404);
-  }
-
-  const metrics = await getClientMetrics(prisma, clientId);
+// `client` must already be access-checked for `therapistId` (see
+// src/lib/clientAccess.ts); all data is scoped to that therapist.
+export async function generateClientReportPdf(prisma, client, therapistId) {
+  const metrics = await getClientMetrics(prisma, client.id, therapistId);
 
   const sessions = await prisma.session.findMany({
-    where: { clientId },
+    where: { clientId: client.id, therapistId },
     orderBy: { scheduledAt: 'desc' },
     take: 50, // most recent 50 — keeps the PDF a reasonable length
   });

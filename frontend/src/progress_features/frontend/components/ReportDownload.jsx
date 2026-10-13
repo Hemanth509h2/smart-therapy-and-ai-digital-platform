@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { apiFetch } from '@/lib/api';
 
 export default function ReportDownload({ clientId }) {
   const [downloading, setDownloading] = useState(false);
@@ -10,7 +11,7 @@ export default function ReportDownload({ clientId }) {
     setDownloading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/progress-features/reports/${clientId}`);
+      const res = await apiFetch(`/api/progress-features/reports/${clientId}`);
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || `Request failed (${res.status})`);

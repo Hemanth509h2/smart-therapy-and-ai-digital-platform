@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { apiFetch } from '@/lib/api';
 
 // Same glass-card styling convention used across STAAD (see the existing
 // Dashboard, Clients, and Progress pages) so this drops in visually
@@ -18,7 +19,7 @@ export default function MeasurementDashboard({ clientId }) {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetch(`/api/progress-features/measurement/${clientId}`)
+    apiFetch(`/api/progress-features/measurement/${clientId}`)
       .then(async (res) => {
         if (!res.ok) {
           const d = await res.json().catch(() => ({}));
