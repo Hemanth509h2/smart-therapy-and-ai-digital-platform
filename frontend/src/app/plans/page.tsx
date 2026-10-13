@@ -5,7 +5,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { usePracticeData, useTherapistGuard } from '@/hooks/usePracticeData';
 import { StaadShell } from '@/components/staad/Shell';
 import { TopBar } from '@/components/staad/TopBar';
-import { Badge, Btn, Chips, InlineError, Notch, Section, SkeletonCard, cx } from '@/components/staad/parts';
+import { Btn, Chips, InlineError, Notch, Section, SkeletonCard, cx } from '@/components/staad/parts';
 import { IconArrowRightXs, IconTick } from '@/components/staad/icons';
 import { DsDialog, toast } from '@/components/practice/ui';
 import { ALL_MODULE_IDS, MODULE_CATEGORIES, resolveAllowedModuleIds } from '@/lib/modules';

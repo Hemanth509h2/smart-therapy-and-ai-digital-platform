@@ -28,22 +28,7 @@ import { StartSessionDialog, AddClientDialog } from '@/components/practice/dialo
 import { useSessionActions } from '@/components/practice/useSessionActions';
 import SessionReportDrawer from '@/components/report/SessionReportDrawer';
 import { Sparkles } from 'lucide-react';
-import {
-  SESSION_KIND,
-  byStartAsc,
-  downloadFile,
-  fmtListDate,
-  fmtSessionNo,
-  fmtTime,
-  fullName,
-  hasDocs,
-  initials,
-  sessionDuration,
-  sessionNumbers,
-  sessionState,
-  toCsv,
-  type PracticeSession,
-} from '@/lib/practice';
+import { SESSION_KIND, downloadFile, fmtListDate, fmtSessionNo, fmtTime, fullName, hasDocs, initials, sessionDuration, sessionNumbers, sessionState, toCsv, type PracticeSession } from '@/lib/practice';
 
 type Tab = 'all' | 'completed' | 'upcoming' | 'notes-pending';
 const GRID = '1.9fr 1fr 1fr 1.1fr 150px';

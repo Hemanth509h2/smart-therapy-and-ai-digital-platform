@@ -6,25 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from '@/components/ThemeProvider';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
-import {
-  Home,
-  Users,
-  Calendar,
-  CalendarDays,
-  Puzzle,
-  User,
-  ClipboardList,
-  LifeBuoy,
-  Shield,
-  CreditCard,
-  Receipt,
-  Layers,
-  Moon,
-  Sun,
-  LogOut,
-  ChevronsLeft,
-  ChevronsRight,
-} from 'lucide-react';
+import { Home, Users, CalendarDays, Puzzle, User, ClipboardList, LifeBuoy, Shield, CreditCard, Receipt, Layers, Moon, Sun, LogOut, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { cx } from '@/components/practice/ui';
 import { initials as toInitials } from '@/lib/practice';
 

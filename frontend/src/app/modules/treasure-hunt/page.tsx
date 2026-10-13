@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Play, Sparkles, Volume2, VolumeX, Shield, User } from 'lucide-react';
+import { ArrowLeft, Shield, User } from 'lucide-react';
 import TreasureQuest from '@/components/modules/skill/TreasureQuest';
 import { useAuthStore } from '@/store/useAuthStore';
 

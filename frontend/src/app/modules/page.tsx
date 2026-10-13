@@ -21,7 +21,6 @@ import { IconArrowRightXs, IconModules, IconPlus } from '@/components/staad/icon
 import { toast } from '@/components/practice/ui';
 import { AddClientDialog, StartSessionDialog } from '@/components/practice/dialogs';
 import { MODULE_CATEGORIES, resolveAllowedModuleIds } from '@/lib/modules';
-import { type Tone } from '@/lib/practice';
 
 const CATEGORY_LABEL: Record<string, string> = {
   sld: 'SLD',
@@ -30,15 +29,6 @@ const CATEGORY_LABEL: Record<string, string> = {
   id: 'Intellectual Disability',
   general: 'General Therapy',
   skill: 'Skill Development',
-};
-
-const CATEGORY_TONE: Record<string, Tone> = {
-  sld: 'clay',
-  adhd: 'red',
-  'anxiety-dep': 'green',
-  id: 'blue',
-  general: 'amber',
-  skill: 'violet',
 };
 
 type Approach = 'CBT' | 'DBT';
@@ -99,7 +89,6 @@ const MODULES: ModuleCard[] = MODULE_CATEGORIES.flatMap((cat) =>
   }))
 );
 
-const CHIPS = ['All', 'CBT', 'DBT', 'Anxiety & Depression', 'ADHD', 'Intellectual Disability', 'General Therapy'];
 const FILTER_OPTIONS = ['All', 'Saved', 'CBT', 'DBT', ...MODULE_CATEGORIES.map((c) => CATEGORY_LABEL[c.id] ?? c.name)];
 
 export default function ModulesPage() {

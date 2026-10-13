@@ -9,7 +9,7 @@ import { usePracticeData } from '@/hooks/usePracticeData';
 import { StaadShell } from '@/components/staad/Shell';
 import { TopBar } from '@/components/staad/TopBar';
 import { Btn, InlineError, Section, SkeletonCard, cx } from '@/components/staad/parts';
-import { IconCheckSm, IconDownload, IconRowA, IconRowB, IconRowC } from '@/components/staad/icons';
+import { IconCheckSm, IconRowA, IconRowB, IconRowC } from '@/components/staad/icons';
 import { DsDialog, toast } from '@/components/practice/ui';
 import {
   DAY_NAMES,
