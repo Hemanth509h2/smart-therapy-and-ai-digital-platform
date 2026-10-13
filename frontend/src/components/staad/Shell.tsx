@@ -42,6 +42,7 @@ const THERAPIST_NAV: NavItem[] = [
 const CLIENT_NAV: NavItem[] = [
   { href: '/', label: 'Home', Icon: IconDashboard },
   { href: '/my-sessions', label: 'My Sessions', Icon: IconSessions },
+  { href: '/modules', label: 'Activities & Games', Icon: IconModules },
   { href: '/profile', label: 'Profile', Icon: IconProfile },
   { href: '/help', label: 'Help & Support', Icon: IconHelp },
 ];

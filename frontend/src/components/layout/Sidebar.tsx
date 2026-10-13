@@ -54,6 +54,7 @@ const therapistNav = [
 const clientNav = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/my-sessions', label: 'My Sessions', icon: Calendar },
+  { href: '/modules', label: 'Activities & Games', icon: Puzzle },
   { href: '/profile', label: 'Profile', icon: User },
   { href: '/help', label: 'Help & Support', icon: LifeBuoy },
 ];

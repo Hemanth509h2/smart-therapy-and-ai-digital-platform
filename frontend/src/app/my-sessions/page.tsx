@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { useRouter } from 'next/navigation';
-import { Play, ArrowRight, FileText, ChevronDown } from 'lucide-react';
+import Link from 'next/link';
+import { Play, ArrowRight, FileText, ChevronDown, Compass } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import SessionReportView from '@/components/report/SessionReportView';
 import { apiFetch } from '@/lib/api';
@@ -97,6 +98,47 @@ export default function MySessionsPage() {
           <p className="text-sm font-medium mt-1" style={{ color: 'var(--ink-muted)' }}>
             {sessions.length} session{sessions.length !== 1 ? 's' : ''} total
           </p>
+        </div>
+
+        {/* Featured 3D Game Quick Launch for Clients */}
+        <div
+          className={`${GLASS_CARD} p-5`}
+          style={{
+            background: 'linear-gradient(135deg, rgba(35, 52, 45, 0.95) 0%, rgba(21, 34, 28, 0.98) 100%)',
+            border: '1px solid rgba(84, 212, 138, 0.28)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+          }}
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div
+                className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl"
+                style={{ background: 'rgba(255,255,255,0.1)' }}
+              >
+                🧭
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#54d48a]/20 text-[#54d48a]">
+                    Interactive 3D Game
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-[#fbf4e8]">Treasure Hunt (3D)</h3>
+                <p className="text-xs text-[#d3e0d8] mt-0.5">
+                  Explore Grandmother’s 3D room, follow bilingual clues, and find the secret star chest!
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/modules/treasure-hunt"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white bg-[#4a7c6f] hover:bg-[#579b76] shadow-lg transition-all"
+              >
+                <Play size={14} fill="currentColor" />
+                <span>Play Game Now</span>
+              </Link>
+            </div>
+          </div>
         </div>
 
         {loading ? (

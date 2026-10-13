@@ -1,8 +1,10 @@
 'use client';
 
 import React, { Suspense, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { usePracticeData, useTherapistGuard } from '@/hooks/usePracticeData';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { usePracticeData } from '@/hooks/usePracticeData';
+import { useAuthStore } from '@/store/useAuthStore';
 import { StaadShell } from '@/components/staad/Shell';
 import { TopBar } from '@/components/staad/TopBar';
 import {
@@ -69,7 +71,8 @@ const META: Record<string, { blurb: string; focus: string; minutes: string; appr
   'story-choice-adventure': { blurb: 'Learn about consequences through interactive choices.', focus: 'Decision Making', minutes: '10–15' },
   'emotion-detective': { blurb: 'Work out how others feel in real-life situations.', focus: 'Empathy', minutes: '10–15' },
   'build-together': { blurb: 'Combine what you each know to build something.', focus: 'Collaboration', minutes: '10–15' },
-  'treasure-quest': { blurb: 'Follow a chain of clues by sharing information.', focus: 'Communication', minutes: '10–15' },
+  'treasure-quest': { blurb: 'Interactive 3D clue hunt — follow clues and explore Grandmother’s study.', focus: '3D Exploration & Communication', minutes: '10–15' },
+  'treasure-hunt': { blurb: '3D exploration game with riddles, clues, and hidden treasures.', focus: '3D Exploration', minutes: '10–15' },
 };
 
 interface ModuleCard {
@@ -112,9 +115,16 @@ export default function ModulesPage() {
 const SAVED_KEY = 'staad-saved-modules';
 
 function ModulesInner() {
-  useTherapistGuard();
+  const router = useRouter();
   const params = useSearchParams();
+  const { uid, role } = useAuthStore();
   const { profile, sessions, clients, loading, error, refresh } = usePracticeData();
+
+  useEffect(() => {
+    if (!uid) router.push('/auth');
+  }, [uid, router]);
+
+  const isTherapist = role === 'THERAPIST';
 
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
@@ -147,8 +157,11 @@ function ModulesInner() {
     if (q) setSearch(q);
   }, [params]);
 
-  // Per-therapist module access is real: locked modules cannot be launched.
-  const allowed = useMemo(() => new Set(resolveAllowedModuleIds(profile)), [profile]);
+  // Therapists follow per-therapist permissions; clients can freely practice activities
+  const allowed = useMemo(() => {
+    if (!isTherapist) return new Set(MODULES.map((m) => m.id));
+    return new Set(resolveAllowedModuleIds(profile));
+  }, [isTherapist, profile]);
 
   const q = search.trim().toLowerCase();
   const filtered = MODULES.filter((m) => {
@@ -180,14 +193,116 @@ function ModulesInner() {
 
       <div className="phead">
         <div>
-          <div className="eyebrow">Therapy toolkit</div>
-          <h1 className="phead__title">Modules</h1>
-          <p className="phead__lead">Activities you can run live with a client in the session room.</p>
+          <div className="eyebrow">{isTherapist ? 'Therapy toolkit' : 'Interactive Activities & Games'}</div>
+          <h1 className="phead__title">{isTherapist ? 'Modules' : 'Activities & Games'}</h1>
+          <p className="phead__lead">
+            {isTherapist
+              ? 'Activities you can run live with a client in the session room, or preview in 3D.'
+              : 'Interactive 3D games and exercises to build communication, focus, and life skills.'}
+          </p>
         </div>
-        <div className="phead__acts">
-          <Btn icon={<IconPlus />} variant="primary" onClick={() => setLaunch({ id: '', name: '' })}>
-            Start a Session
-          </Btn>
+        <div className="phead__acts" style={{ display: 'flex', gap: 10 }}>
+          <Link
+            href="/modules/treasure-hunt"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              background: '#4a7c6f',
+              color: '#ffffff',
+              padding: '9px 18px',
+              borderRadius: 999,
+              fontWeight: 800,
+              fontSize: 13.5,
+              textDecoration: 'none',
+              boxShadow: '0 4px 14px rgba(74, 124, 111, 0.35)',
+            }}
+          >
+            <span>🧭 Play 3D Treasure Hunt</span>
+          </Link>
+          {isTherapist && (
+            <Btn icon={<IconPlus />} variant="primary" onClick={() => setLaunch({ id: '', name: '' })}>
+              Start a Session
+            </Btn>
+          )}
+        </div>
+      </div>
+
+      {/* Featured 3D Game Spotlight Card */}
+      <div
+        style={{
+          margin: '0 0 24px',
+          background: 'linear-gradient(135deg, #23342d 0%, #15221c 100%)',
+          borderRadius: 20,
+          border: '1px solid rgba(255, 230, 190, 0.25)',
+          boxShadow: '0 12px 32px rgba(0,0,0,0.22)',
+          padding: '22px 28px',
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 20,
+          flexWrap: 'wrap',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ maxWidth: 580 }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'rgba(84, 212, 138, 0.16)',
+              color: '#54d48a',
+              border: '1px solid rgba(84, 212, 138, 0.35)',
+              borderRadius: 999,
+              padding: '3px 12px',
+              fontSize: 11.5,
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+              marginBottom: 10,
+            }}
+          >
+            <span>🧭</span>
+            <span>Featured 3D Game · Both Client & Therapist</span>
+          </div>
+          <h2 style={{ fontSize: 22, fontWeight: 900, color: '#fbf4e8', margin: '0 0 6px', letterSpacing: 0.2 }}>
+            Treasure Hunt (3D)
+          </h2>
+          <p style={{ fontSize: 13.5, color: 'rgba(251, 244, 232, 0.82)', lineHeight: 1.5, margin: 0 }}>
+            Explore Grandmother’s 3D study room, follow bilingual clues in English & Hindi, move your character to inspect secret books and mountain paintings, and cooperate to find the star chest!
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Link
+            href="/modules/treasure-hunt"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              background: '#579b76',
+              color: '#ffffff',
+              padding: '11px 22px',
+              borderRadius: 999,
+              fontWeight: 800,
+              fontSize: 14,
+              textDecoration: 'none',
+              boxShadow: '0 4px 16px rgba(87, 155, 118, 0.4)',
+            }}
+          >
+            <span>▶ Play 3D Game Now</span>
+          </Link>
+          {isTherapist && (
+            <Btn
+              variant="outline"
+              onClick={() => setLaunch({ id: 'treasure-hunt', name: 'Treasure Hunt' })}
+            >
+              Launch in Session
+            </Btn>
+          )}
         </div>
       </div>
 
@@ -230,23 +345,35 @@ function ModulesInner() {
       ) : (
         <div className="grid3">
           {filtered.map((m) => {
-            const locked = !allowed.has(m.id);
+            const is3DGame = m.id === 'treasure-quest' || m.id === 'treasure-hunt';
+            const locked = isTherapist ? !allowed.has(m.id) : false;
             const isSaved = saved.has(m.id);
             return (
               <article key={m.id} className={cx('card mod', locked && 'card--grey', isSaved && !locked && 'card--lime')}>
                 <Notch width={52}>
-                  <button
-                    type="button"
-                    className="nbtn arrow"
-                    aria-label={locked ? `${m.name} is not enabled for your account` : `Open ${m.name}`}
-                    onClick={() =>
-                      locked
-                        ? toast('That module is not enabled for your account yet.', 'error')
-                        : setLaunch({ id: m.id, name: m.name })
-                    }
-                  >
-                    <IconArrowRightXs />
-                  </button>
+                  {is3DGame ? (
+                    <Link
+                      href="/modules/treasure-hunt"
+                      className="nbtn arrow"
+                      aria-label={`Play ${m.name} in 3D`}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <IconArrowRightXs />
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      className="nbtn arrow"
+                      aria-label={locked ? `${m.name} is not enabled for your account` : `Open ${m.name}`}
+                      onClick={() =>
+                        locked
+                          ? toast('That module is not enabled for your account yet.', 'error')
+                          : setLaunch({ id: m.id, name: m.name })
+                      }
+                    >
+                      <IconArrowRightXs />
+                    </button>
+                  )}
                 </Notch>
 
                 <span className="mod__ic" aria-hidden>
@@ -263,8 +390,20 @@ function ModulesInner() {
                     <span>{m.category}</span>
                     <span>{m.minutes} min</span>
                   </div>
-                  <div className="mod__meta">
-                    {locked ? (
+                  <div className="mod__meta" style={{ gap: 8 }}>
+                    {is3DGame ? (
+                      <Link
+                        href="/modules/treasure-hunt"
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 800,
+                          color: '#4a7c6f',
+                          textDecoration: 'underline',
+                        }}
+                      >
+                        Play 3D
+                      </Link>
+                    ) : locked ? (
                       <Badge tone="gray">Locked</Badge>
                     ) : (
                       <span>{m.focus}</span>

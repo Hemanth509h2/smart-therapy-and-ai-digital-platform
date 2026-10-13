@@ -63,6 +63,7 @@ const moduleLoaders: Record<string, ModuleLoader> = {
   'emotion-detective': () => import('@/components/modules/skill/EmotionDetective').then(m => ({ default: m.default })),
   'build-together': () => import('@/components/modules/skill/BuildTogether').then(m => ({ default: m.default })),
   'treasure-quest': () => import('@/components/modules/skill/TreasureQuest').then(m => ({ default: m.default })),
+  'treasure-hunt': () => import('@/components/modules/skill/TreasureQuest').then(m => ({ default: m.default })),
 }
 
 // Cache for loaded modules
@@ -191,7 +192,8 @@ export const MODULE_METADATA: Record<string, {
   'story-choice-adventure': { title: 'Story Choice Adventure', subtitle: 'Consequential thinking · emotional intelligence', icon: '📖', label: 'Story', category: 'skill' },
   'emotion-detective': { title: 'Emotion Detective', subtitle: 'Emotion identification · perspective taking', icon: '🔍', label: 'Detective', category: 'skill' },
   'build-together': { title: 'Build Together', subtitle: 'Shared problem solving · communication', icon: '🌉', label: 'Build', category: 'skill' },
-  'treasure-quest': { title: 'Treasure Quest', subtitle: 'Sequential clue chain · shared discovery', icon: '🗺️', label: 'Quest', category: 'skill' },
+  'treasure-quest': { title: 'Treasure Hunt', subtitle: '3D Treasure Quest · Sequential clue chain · shared discovery', icon: '🗺️', label: 'Quest', category: 'skill' },
+  'treasure-hunt': { title: 'Treasure Hunt', subtitle: '3D Treasure Quest · Sequential clue chain · shared discovery', icon: '🗺️', label: 'Quest', category: 'skill' },
 }
 
 // Category display order and labels
@@ -210,6 +212,7 @@ export const SKILL_MODULE_IDS = new Set([
   'emotion-detective',
   'build-together',
   'treasure-quest',
+  'treasure-hunt',
 ])
 
 export function isSkillModule(moduleId: string): boolean {
