@@ -192,8 +192,8 @@ export const MODULE_METADATA: Record<string, {
   'story-choice-adventure': { title: 'Story Choice Adventure', subtitle: 'Consequential thinking · emotional intelligence', icon: '📖', label: 'Story', category: 'skill' },
   'emotion-detective': { title: 'Emotion Detective', subtitle: 'Emotion identification · perspective taking', icon: '🔍', label: 'Detective', category: 'skill' },
   'build-together': { title: 'Build Together', subtitle: 'Shared problem solving · communication', icon: '🌉', label: 'Build', category: 'skill' },
-  'treasure-quest': { title: 'Treasure Hunt', subtitle: '3D Treasure Quest · Sequential clue chain · shared discovery', icon: '🗺️', label: 'Quest', category: 'skill' },
-  'treasure-hunt': { title: 'Treasure Hunt', subtitle: '3D Treasure Quest · Sequential clue chain · shared discovery', icon: '🗺️', label: 'Quest', category: 'skill' },
+  'treasure-quest': { title: 'Treasure Hunt (3D)', subtitle: '3D Treasure Quest · Sequential clue chain · shared discovery', icon: '🧭', label: 'Quest', category: 'skill' },
+  'treasure-hunt': { title: 'Treasure Hunt (3D)', subtitle: '3D Treasure Quest · Sequential clue chain · shared discovery', icon: '🧭', label: 'Quest', category: 'skill' },
 }
 
 // Category display order and labels

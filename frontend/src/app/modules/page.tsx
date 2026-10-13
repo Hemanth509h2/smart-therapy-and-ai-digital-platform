@@ -71,8 +71,7 @@ const META: Record<string, { blurb: string; focus: string; minutes: string; appr
   'story-choice-adventure': { blurb: 'Learn about consequences through interactive choices.', focus: 'Decision Making', minutes: '10–15' },
   'emotion-detective': { blurb: 'Work out how others feel in real-life situations.', focus: 'Empathy', minutes: '10–15' },
   'build-together': { blurb: 'Combine what you each know to build something.', focus: 'Collaboration', minutes: '10–15' },
-  'treasure-quest': { blurb: 'Interactive 3D clue hunt — follow clues and explore Grandmother’s study.', focus: '3D Exploration & Communication', minutes: '10–15' },
-  'treasure-hunt': { blurb: '3D exploration game with riddles, clues, and hidden treasures.', focus: '3D Exploration', minutes: '10–15' },
+  'treasure-quest': { blurb: 'Interactive 3D clue hunt — follow clues and explore Grandmother’s study room to find the hidden chest.', focus: '3D Exploration & Communication', minutes: '10–15' },
 };
 
 interface ModuleCard {
@@ -201,106 +200,10 @@ function ModulesInner() {
               : 'Interactive 3D games and exercises to build communication, focus, and life skills.'}
           </p>
         </div>
-        <div className="phead__acts" style={{ display: 'flex', gap: 10 }}>
-          <Link
-            href="/modules/treasure-hunt"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              background: '#4a7c6f',
-              color: '#ffffff',
-              padding: '9px 18px',
-              borderRadius: 999,
-              fontWeight: 800,
-              fontSize: 13.5,
-              textDecoration: 'none',
-              boxShadow: '0 4px 14px rgba(74, 124, 111, 0.35)',
-            }}
-          >
-            <span>🧭 Play 3D Treasure Hunt</span>
-          </Link>
+        <div className="phead__acts">
           {isTherapist && (
             <Btn icon={<IconPlus />} variant="primary" onClick={() => setLaunch({ id: '', name: '' })}>
               Start a Session
-            </Btn>
-          )}
-        </div>
-      </div>
-
-      {/* Featured 3D Game Spotlight Card */}
-      <div
-        style={{
-          margin: '0 0 24px',
-          background: 'linear-gradient(135deg, #23342d 0%, #15221c 100%)',
-          borderRadius: 20,
-          border: '1px solid rgba(255, 230, 190, 0.25)',
-          boxShadow: '0 12px 32px rgba(0,0,0,0.22)',
-          padding: '22px 28px',
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 20,
-          flexWrap: 'wrap',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-      >
-        <div style={{ maxWidth: 580 }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              background: 'rgba(84, 212, 138, 0.16)',
-              color: '#54d48a',
-              border: '1px solid rgba(84, 212, 138, 0.35)',
-              borderRadius: 999,
-              padding: '3px 12px',
-              fontSize: 11.5,
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              letterSpacing: 0.5,
-              marginBottom: 10,
-            }}
-          >
-            <span>🧭</span>
-            <span>Featured 3D Game · Both Client & Therapist</span>
-          </div>
-          <h2 style={{ fontSize: 22, fontWeight: 900, color: '#fbf4e8', margin: '0 0 6px', letterSpacing: 0.2 }}>
-            Treasure Hunt (3D)
-          </h2>
-          <p style={{ fontSize: 13.5, color: 'rgba(251, 244, 232, 0.82)', lineHeight: 1.5, margin: 0 }}>
-            Explore Grandmother’s 3D study room, follow bilingual clues in English & Hindi, move your character to inspect secret books and mountain paintings, and cooperate to find the star chest!
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Link
-            href="/modules/treasure-hunt"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              background: '#579b76',
-              color: '#ffffff',
-              padding: '11px 22px',
-              borderRadius: 999,
-              fontWeight: 800,
-              fontSize: 14,
-              textDecoration: 'none',
-              boxShadow: '0 4px 16px rgba(87, 155, 118, 0.4)',
-            }}
-          >
-            <span>▶ Play 3D Game Now</span>
-          </Link>
-          {isTherapist && (
-            <Btn
-              variant="outline"
-              onClick={() => setLaunch({ id: 'treasure-hunt', name: 'Treasure Hunt' })}
-            >
-              Launch in Session
             </Btn>
           )}
         </div>
@@ -392,17 +295,34 @@ function ModulesInner() {
                   </div>
                   <div className="mod__meta" style={{ gap: 8 }}>
                     {is3DGame ? (
-                      <Link
-                        href="/modules/treasure-hunt"
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 800,
-                          color: '#4a7c6f',
-                          textDecoration: 'underline',
-                        }}
-                      >
-                        Play 3D
-                      </Link>
+                      <>
+                        <Link
+                          href="/modules/treasure-hunt"
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 800,
+                            color: '#4a7c6f',
+                            textDecoration: 'underline',
+                          }}
+                        >
+                          Play 3D
+                        </Link>
+                        {isTherapist && !locked && (
+                          <button
+                            type="button"
+                            className="as-button"
+                            onClick={() => setLaunch({ id: m.id, name: m.name })}
+                            style={{
+                              fontSize: 11.5,
+                              fontWeight: 700,
+                              color: '#2d6a4f',
+                              textDecoration: 'underline',
+                            }}
+                          >
+                            Launch
+                          </button>
+                        )}
+                      </>
                     ) : locked ? (
                       <Badge tone="gray">Locked</Badge>
                     ) : (
