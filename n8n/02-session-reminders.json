@@ -1,0 +1,212 @@
+{
+  "name": "STAAD - Session reminders (every 15 min)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "2b63da94-edf4-478d-9d8e-eff3477fdfef",
+      "name": "Every 15 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://YOUR-BACKEND-URL/api/automation/reminders",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fromMinutes",
+              "value": "60"
+            },
+            {
+              "name": "toMinutes",
+              "value": "75"
+            }
+          ]
+        }
+      },
+      "id": "e598751d-cd10-4f70-833a-7cc669a3112b",
+      "name": "Sessions starting in 1 hour",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        -120
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "STAAD Automation API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://YOUR-BACKEND-URL/api/automation/reminders",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fromMinutes",
+              "value": "1440"
+            },
+            {
+              "name": "toMinutes",
+              "value": "1455"
+            }
+          ]
+        }
+      },
+      "id": "867209e0-8b8c-4b67-9df7-ef4a0d59cc88",
+      "name": "Sessions starting in 24 hours",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        120
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "STAAD Automation API Key"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "e086031d-1f6d-45cf-a4ab-2afefe87b5d3",
+      "name": "Combine",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "sessions",
+        "options": {}
+      },
+      "id": "dfb55846-b273-4877-b23e-4c8c33fcc524",
+      "name": "One item per session",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "YOUR_WHATSAPP_PHONE_NUMBER_ID",
+        "recipientPhoneNumber": "={{ $json.client.phoneNumber.replace('+', '') }}",
+        "textBody": "={{ $json.message }}",
+        "additionalFields": {}
+      },
+      "id": "3eebe6fb-59c9-4d5d-9d0e-0c8250e9efab",
+      "name": "Send reminder to client",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        0
+      ],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "",
+          "name": "WhatsApp account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 15 minutes": {
+      "main": [
+        [
+          {
+            "node": "Sessions starting in 1 hour",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sessions starting in 24 hours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sessions starting in 1 hour": {
+      "main": [
+        [
+          {
+            "node": "Combine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sessions starting in 24 hours": {
+      "main": [
+        [
+          {
+            "node": "Combine",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combine": {
+      "main": [
+        [
+          {
+            "node": "One item per session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One item per session": {
+      "main": [
+        [
+          {
+            "node": "Send reminder to client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  },
+  "pinData": {},
+  "tags": []
+}
