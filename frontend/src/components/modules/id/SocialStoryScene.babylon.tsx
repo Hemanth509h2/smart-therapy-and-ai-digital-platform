@@ -317,6 +317,12 @@ export default function SocialStoryScene(props: SocialStoryScene3DProps) {
       d.position.set(-2.5 + (((i * 37) % 11) / 8 - 0.7), 2, -0.6 + (((i * 53) % 7) / 8 - 0.4))
       drops.push(d)
     }
+    // Fair weather: a sun and a cloud (the scenery file has none, so the rain can replace them).
+    const fair = new TransformNode('fair', scene)
+    add(MeshBuilder.CreateSphere('sun', { diameter: 1.8, segments: 20 }, scene), fair, [-6, 6.4, -12], pbr(scene, '#ffe27a', 0.5, 1.2))
+    for (const [x, y, r] of [[0, 0, 0.6], [0.6, -0.1, 0.45], [-0.6, -0.1, 0.45], [0.25, 0.3, 0.42]] as number[][]) {
+      add(MeshBuilder.CreateSphere('fairc', { diameter: r * 2, segments: 16 }, scene), fair, [2 + x * 1.5, 6.2 + y * 1.5, -12], pbr(scene, '#ffffff', 0.9, 0.3)).scaling.setAll(1.5)
+    }
     const rainbow = new TransformNode('rainbow', scene)
     ;['#ef6b6b', '#f4a64a', '#f6d65a', '#7cc77a', '#5fa8e0', '#9a7fe0'].forEach((hex, i) => {
       const arc = Array.from({ length: 33 }, (_, k) => { const a = (k / 32) * Math.PI; const R = (1.6 - i * 0.14) * 2.4; return new Vector3(Math.cos(a) * R, Math.sin(a) * R, 0) })
@@ -468,6 +474,7 @@ export default function SocialStoryScene(props: SocialStoryScene3DProps) {
       const sad = p.storyId === 'handling-disappointment' && acting && (action === 's7p2' || action === 's7p3' || action === 's7p4')
       const hope = p.storyId === 'handling-disappointment' && ((acting && action === 's7p5') || p.mood === 'cheer')
       rain.setEnabled(sad)
+      fair.setEnabled(p.storyId === 'handling-disappointment' && !sad)
       rainbow.setEnabled(hope)
       if (sad) drops.forEach((d, i) => { d.position.y = 3.7 - ((t * 2.2 + i * 0.37) % 1) * 3.6 })
 

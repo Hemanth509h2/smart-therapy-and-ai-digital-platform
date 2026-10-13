@@ -1576,8 +1576,10 @@ function Classroom() {
 }
 
 function Garden({ action, mood }: { action: string | null; mood: KidMood }) {
-  const sad = action === 's7p2' || action === 's7p3' || action === 's7p4'
-  const hopeful = action === 's7p5' || mood === 'cheer'
+  // 'export-clear' is the scenery-only variant exported for the Babylon renderer, which draws the weather itself.
+  const clear = action === 'export-clear'
+  const sad = !clear && (action === 's7p2' || action === 's7p3' || action === 's7p4')
+  const hopeful = !clear && (action === 's7p5' || mood === 'cheer')
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, -3]}><planeGeometry args={[60, 30]} /><Mat color="#a9cf8c" rough={0.95} /></mesh>
@@ -1609,8 +1611,8 @@ function Garden({ action, mood }: { action: string | null; mood: KidMood }) {
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[3.0, 0.02, -2.0]}><planeGeometry args={[2.2, 1.6]} /><Mat color="#e86a6a" /></mesh>
       <Box size={[0.6, 0.35, 0.4]} pos={[3.0, 0.2, -2.0]} color="#b98a5a" r={0.05} />
       {/* the weather follows how she feels */}
-      {!sad && <mesh position={[-6, 6.4, -12]}><sphereGeometry args={[0.9, 20, 16]} /><meshStandardMaterial color="#ffe27a" emissive="#ffd34d" emissiveIntensity={0.9} /></mesh>}
-      {!sad && <Cloud pos={[2, 6.2, -12]} s={1.5} />}
+      {!sad && !clear && <mesh position={[-6, 6.4, -12]}><sphereGeometry args={[0.9, 20, 16]} /><meshStandardMaterial color="#ffe27a" emissive="#ffd34d" emissiveIntensity={0.9} /></mesh>}
+      {!sad && !clear && <Cloud pos={[2, 6.2, -12]} s={1.5} />}
       {sad && (
         <group>
           <group position={[-2.5, 4.2, -0.6]} scale={1.5}>
