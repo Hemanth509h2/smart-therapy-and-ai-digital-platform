@@ -1,7 +1,6 @@
 'use client';
 
 import React, { Suspense, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { usePracticeData } from '@/hooks/usePracticeData';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -248,22 +247,11 @@ function ModulesInner() {
       ) : (
         <div className="grid3">
           {filtered.map((m) => {
-            const is3DGame = m.id === 'treasure-quest' || m.id === 'treasure-hunt';
             const locked = isTherapist ? !allowed.has(m.id) : false;
             const isSaved = saved.has(m.id);
             return (
               <article key={m.id} className={cx('card mod', locked && 'card--grey', isSaved && !locked && 'card--lime')}>
                 <Notch width={52}>
-                  {is3DGame ? (
-                    <Link
-                      href="/modules/treasure-hunt"
-                      className="nbtn arrow"
-                      aria-label={`Play ${m.name} in 3D`}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <IconArrowRightXs />
-                    </Link>
-                  ) : (
                     <button
                       type="button"
                       className="nbtn arrow"
@@ -276,7 +264,6 @@ function ModulesInner() {
                     >
                       <IconArrowRightXs />
                     </button>
-                  )}
                 </Notch>
 
                 <span className="mod__ic" aria-hidden>
@@ -294,36 +281,7 @@ function ModulesInner() {
                     <span>{m.minutes} min</span>
                   </div>
                   <div className="mod__meta" style={{ gap: 8 }}>
-                    {is3DGame ? (
-                      <>
-                        <Link
-                          href="/modules/treasure-hunt"
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 800,
-                            color: '#4a7c6f',
-                            textDecoration: 'underline',
-                          }}
-                        >
-                          Play 3D
-                        </Link>
-                        {isTherapist && !locked && (
-                          <button
-                            type="button"
-                            className="as-button"
-                            onClick={() => setLaunch({ id: m.id, name: m.name })}
-                            style={{
-                              fontSize: 11.5,
-                              fontWeight: 700,
-                              color: '#2d6a4f',
-                              textDecoration: 'underline',
-                            }}
-                          >
-                            Launch
-                          </button>
-                        )}
-                      </>
-                    ) : locked ? (
+                    {locked ? (
                       <Badge tone="gray">Locked</Badge>
                     ) : (
                       <span>{m.focus}</span>

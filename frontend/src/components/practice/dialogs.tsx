@@ -27,6 +27,7 @@ import {
   type PracticeSession,
 } from '@/lib/practice';
 import { apiFetch } from '@/lib/api';
+import { MODULE_CATEGORIES, resolveAllowedModuleIds } from '@/lib/modules';
 
 const DURATIONS = [30, 45, 50, 60, 80];
 
@@ -216,10 +217,14 @@ export function StartSessionDialog({
   const [patientLink, setPatientLink] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [pickedModule, setPickedModule] = useState('');
+
+  const allowedModules = useMemo(() => new Set(resolveAllowedModuleIds(profile)), [profile]);
 
   useEffect(() => {
     if (!open) return;
     setClientId(defaultClientId ?? clients[0]?.id ?? '');
+    setPickedModule(moduleId ?? '');
     setError('');
     setStarting(false);
     setPatientLink(null);
@@ -256,7 +261,7 @@ export function StartSessionDialog({
   };
 
   const joinVideo = () => {
-    if (sessionId) router.push(sessionRoomUrl(sessionId, moduleId));
+    if (sessionId) router.push(sessionRoomUrl(sessionId, pickedModule || undefined));
   };
 
   const copyLink = async () => {
@@ -331,6 +336,25 @@ export function StartSessionDialog({
               ))}
             </select>
           </Field>
+          {!moduleName && (
+            <Field label="Module (optional)" htmlFor="start-module">
+              <select id="start-module" className="ds-input" value={pickedModule} onChange={(e) => setPickedModule(e.target.value)}>
+                <option value="">No module — start with video only</option>
+                {MODULE_CATEGORIES.map((c) => {
+                  const mods = c.modules.filter((m) => allowedModules.has(m.id));
+                  return mods.length > 0 ? (
+                    <optgroup key={c.id} label={c.name}>
+                      {mods.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.emoji} {m.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null;
+                })}
+              </select>
+            </Field>
+          )}
           {existing && (
             <p className="ds-muted text-[12.5px]">
               {existing.status === 'ACTIVE' ? 'This client already has a live session' : `This client has a session at ${fmtDayTime(existing.scheduledAt)}`}{' '}
