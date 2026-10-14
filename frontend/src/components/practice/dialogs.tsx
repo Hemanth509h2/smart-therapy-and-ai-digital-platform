@@ -379,7 +379,16 @@ export function StartSessionDialog({
               </select>
             </Field>
           )}
-          {clientSessions.length > 0 && (
+          {clientSessions.length === 0 ? (
+            <Field label="Scheduled sessions">
+              <p
+                className="rounded-xl px-3 py-2.5 text-[13px]"
+                style={{ background: 'var(--ds-surface-2)', border: '1px solid var(--ds-border)', color: 'var(--ds-muted)' }}
+              >
+                No upcoming sessions scheduled with this client — a new session will start now.
+              </p>
+            </Field>
+          ) : (
             <Field label="Scheduled sessions">
               <div className="space-y-2" role="radiogroup">
                 {[...clientSessions.map((s) => ({ id: s.id, session: s })), { id: 'new', session: undefined }].map(({ id, session }) => {
