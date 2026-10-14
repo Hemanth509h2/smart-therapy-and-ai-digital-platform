@@ -525,3 +525,26 @@ select.ds-input {
   .hover-lift:hover,
   .stat-hover:hover { transform: none; }
 }
+/* Site-wide button loading state (set by lib/buttonBusy.ts while a request
+   started by the click is in flight). Buttons that already draw their own
+   spinner keep theirs. */
+[data-busy] {
+  pointer-events: none;
+  cursor: progress;
+}
+[data-busy]:not(:has(.animate-spin))::before {
+  content: '';
+  display: inline-block;
+  flex: none;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.45em;
+  vertical-align: -0.15em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: btnBusySpin 0.7s linear infinite;
+}
+@keyframes btnBusySpin {
+  to { transform: rotate(360deg); }
+}
