@@ -65,7 +65,7 @@ Return this exact JSON structure:
   "emotions": ["string"],
   "summary": "string (max 2 sentences)",
   "steps": ["string", "string"],
-  "module": "string (one of: word-building, bubble-splash, whack-a-mole-math, pixel-art-coding, n-back-challenge, virtual-maze, simon-says, grounding-game, emotional-charades, box-popping, worry-box, drag-drop-sorting, social-story, virtual-shop)",
+  "module": "string (one of: word-building, bubble-splash, whack-a-mole-math, pixel-art-coding, n-back-challenge, virtual-maze, simon-says, grounding-game, emotional-charades, box-popping, worry-vault, drag-drop-sorting, social-story, virtual-shop)",
   "riskFlag": false
 }`
 

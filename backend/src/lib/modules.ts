@@ -64,7 +64,6 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
       { id: '5-4-3-2-1-grounding', name: '5-4-3-2-1 Grounding', emoji: '🌱', desc: 'Sensory anchoring · anxiety reduction' },
       { id: 'emotional-charades', name: 'Emotional Charades', emoji: '🎭', desc: 'Emotion identification · social learning' },
       { id: 'virtual-box-popping', name: 'Virtual Box Popping', emoji: '📦', desc: 'Tension release · cognitive defusion' },
-      { id: 'worry-box', name: 'Worry Box', emoji: '🗃️', desc: 'Worry containment · externalisation' },
     ],
   },
   {
@@ -146,6 +145,7 @@ const RETIRED_MODULE_NAMES: Record<string, string> = {
   // Removed — testers did not understand either activity.
   'urge-surfing': 'Urge Surfing',
   'safe-space-builder': 'Safe Space Builder',
+  'worry-box': 'Worry Box',
 }
 
 export const moduleName = (id: string): string =>
