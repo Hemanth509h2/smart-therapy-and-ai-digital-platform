@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, Clock, Eye, Gift, Mail, Sparkles, UserX, UserCheck, Users } from 'lucide-react';
+import { Activity, Clock, Eye, Gift, Mail, Sparkles, Trash2, UserX, UserCheck, Users } from 'lucide-react';
 import {
   AdminPage,
   Badge,
@@ -33,6 +33,7 @@ import { ChartCard } from '@/components/admin/charts';
 import { adminFetch, fmtDate, fmtDateTime, fmtMinutes, num, timeAgo } from '@/lib/adminApi';
 import { MODULE_CATEGORIES, moduleName } from '@/lib/modules';
 import { toast } from '@/components/practice/ui';
+import { RemoveProfessionalDialog } from '@/components/admin/RemoveProfessionalDialog';
 
 interface Detail {
   therapist: {
@@ -124,6 +125,8 @@ export default function TherapistDetailPage() {
   const [tab, setTab] = useState<Tab>('overview');
   const [emailOpen, setEmailOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const router = useRouter();
 
   const t = data?.therapist;
   const suspended = t?.status === 'SUSPENDED';
@@ -167,6 +170,9 @@ export default function TherapistDetailPage() {
               >
                 {suspended ? 'Reactivate' : 'Suspend'}
               </Btn>
+            )}
+            {can('admins.manage') && (
+              <Btn variant="danger" icon={<Trash2 className="h-4 w-4" />} onClick={() => setRemoveOpen(true)}>Remove</Btn>
             )}
           </>
         )
@@ -213,6 +219,11 @@ export default function TherapistDetailPage() {
             danger={!suspended}
             reasonLabel={suspended ? undefined : 'Reason (shown in the audit log)'}
             onConfirm={setStatus}
+          />
+          <RemoveProfessionalDialog
+            target={removeOpen ? { userId: t.userId, name: t.name, email: t.email, clients: data.clients.length } : null}
+            onClose={() => setRemoveOpen(false)}
+            onRemoved={() => router.push('/admin/professionals')}
           />
         </>
       ) : !loading && !error ? (

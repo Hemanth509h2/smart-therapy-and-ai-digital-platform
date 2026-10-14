@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, Ban, CreditCard, Download, RotateCcw, SlidersHorizontal, Users } from 'lucide-react';
+import { Activity, Ban, CreditCard, Download, RotateCcw, SlidersHorizontal, Trash2, Users } from 'lucide-react';
 import {
   AdminPage,
   Badge,
@@ -26,6 +26,7 @@ import {
 import { adminFetch, downloadCsv, fetchAllPages, fmtDate, num, timeAgo } from '@/lib/adminApi';
 import { toast } from '@/components/practice/ui';
 import { MODULE_CATEGORIES, ALL_MODULE_IDS } from '@/lib/modules';
+import { RemoveProfessionalDialog } from '@/components/admin/RemoveProfessionalDialog';
 
 interface Row {
   id: string;
@@ -68,6 +69,7 @@ export default function AdminProfessionalsPage() {
   const router = useRouter();
   const { can } = useAdmin();
   const canWrite = can('people.write');
+  const canRemove = can('admins.manage'); // permanent removal: super admins only
   const list = useListState({ sort: 'createdAt', dir: 'desc', filters: { status: '', plan: '', from: '', to: '' } });
   const { data, loading, error, reload } = useAdminQuery<ListResponse>(`/api/admin/professionals?${list.query}`);
   const rows = data?.professionals ?? [];
@@ -89,6 +91,8 @@ export default function AdminProfessionalsPage() {
 
   // Suspend / reactivate
   const [statusTarget, setStatusTarget] = useState<Row | null>(null);
+  // Permanent removal
+  const [removeTarget, setRemoveTarget] = useState<Row | null>(null);
 
   const toggle = (set: Set<string>, id: string) => {
     const next = new Set(set);
@@ -266,6 +270,9 @@ export default function AdminProfessionalsPage() {
                 ) : (
                   <Btn size="sm" variant="danger" icon={<Ban className="h-3.5 w-3.5" />} onClick={() => setStatusTarget(r)}>Suspend</Btn>
                 )}
+                {canRemove && (
+                  <Btn size="sm" variant="danger" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setRemoveTarget(r)} title="Remove permanently">Remove</Btn>
+                )}
               </div>
             ),
           } as Column<Row>,
@@ -419,6 +426,15 @@ export default function AdminProfessionalsPage() {
         danger={suspending}
         reasonLabel={suspending ? 'Reason (kept in the audit log)' : undefined}
         onConfirm={changeStatus}
+      />
+
+      <RemoveProfessionalDialog
+        target={removeTarget}
+        onClose={() => setRemoveTarget(null)}
+        onRemoved={() => {
+          setSelected((s) => { const next = new Set(s); if (removeTarget) next.delete(removeTarget.id); return next; });
+          reload();
+        }}
       />
     </AdminPage>
   );
