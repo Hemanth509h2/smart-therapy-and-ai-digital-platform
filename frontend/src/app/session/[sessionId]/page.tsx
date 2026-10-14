@@ -27,7 +27,6 @@ import { loadModuleSettings } from '@/hooks/useModuleSettings';
 import { RC } from '@/components/session/roomTheme';
 import type { SidebarPanel } from '@/components/session/sessionPanels';
 import CaptionOverlay from '@/components/session/CaptionOverlay';
-import TranslationControl from '@/components/session/TranslationControl';
 import TranslationSync from '@/components/session/TranslationSync';
 import { useTranslationSettings, pairForRole, writeTranslationSettings } from '@/lib/translation';
 import SessionTopBar from '@/components/session/SessionTopBar';
@@ -1038,32 +1037,6 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
             startedAt={startTime.current}
             sessionId={sessionId}
             onlineCount={onlineCount}
-            transcriptLine={
-              isTherapist ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  {transcriptionEnabled && transcription.isRecording && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: RC.greenDark,
-                      }}
-                    >
-                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: RC.green, animation: 'pulse 1.4s ease infinite' }} />
-                      {`${transcription.chunkCount} lines`}
-                    </div>
-                  )}
-                  {/* Therapist-only: turns captions on and sets who speaks what. */}
-                  <TranslationControl
-                    settings={translationSettings}
-                    onChange={(patch) => writeTranslationSettings(sessionId, patch)}
-                  />
-                </div>
-              ) : null
-            }
             // Timer action handlers
             onToggleParticipants={isTherapist ? toggleParticipants : toggleParticipantsClient}
             showParticipants={isTherapist ? showParticipants : showParticipantsClient}
@@ -1338,6 +1311,8 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
           <CaptionsPopup
             sessionId={sessionId}
             live={transcription.isRecording || translationSettings.enabled}
+            translation={translationSettings}
+            onTranslationChange={(patch) => writeTranslationSettings(sessionId, patch)}
             onClose={() => setShowCaptionsPopup(false)}
           />
         )}

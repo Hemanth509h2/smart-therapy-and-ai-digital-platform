@@ -7,10 +7,14 @@ import { Captions, Copy, Download, GripHorizontal, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { GLASS } from './roomTheme'
 import { useCaptionLog, type StoredCaption } from '@/lib/captionLog'
+import TranslationControl from './TranslationControl'
+import type { TranslationSettings } from '@/lib/translation'
 
 interface CaptionsPopupProps {
   sessionId: string
   live: boolean
+  translation: TranslationSettings
+  onTranslationChange: (patch: Partial<TranslationSettings>) => void
   onClose: () => void
   initialPosition?: { x: number; y: number }
 }
@@ -25,6 +29,8 @@ const asText = (captions: StoredCaption[]) =>
 export default function CaptionsPopup({
   sessionId,
   live,
+  translation,
+  onTranslationChange,
   onClose,
   initialPosition = { x: 460, y: 160 },
 }: CaptionsPopupProps) {
@@ -35,9 +41,9 @@ export default function CaptionsPopup({
   const [position, setPosition] = useState(initialPosition)
   const [isDragging, setIsDragging] = useState(false)
   const dragOffset = useRef({ x: 0, y: 0 })
-  const [size, setSize] = useState({ width: 380, height: 440 })
+  const [size, setSize] = useState({ width: 380, height: 520 })
   const [isResizing, setIsResizing] = useState(false)
-  const resizeStart = useRef({ x: 0, y: 0, w: 380, h: 440 })
+  const resizeStart = useRef({ x: 0, y: 0, w: 380, h: 520 })
 
   useEffect(() => {
     const handleMove = (e: MouseEvent) => {
@@ -67,7 +73,7 @@ export default function CaptionsPopup({
 
   const handleDragStart = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
-    if (target.closest('button') || target.closest('[data-resize-handle]') || target.closest('[data-scroll]')) return
+    if (target.closest('button, select, input, label') || target.closest('[data-resize-handle]') || target.closest('[data-scroll]')) return
     setIsDragging(true)
     dragOffset.current = { x: e.clientX - position.x, y: e.clientY - position.y }
   }
@@ -193,6 +199,11 @@ export default function CaptionsPopup({
             <X size={14} />
           </button>
         </div>
+      </div>
+
+      {/* Translation settings (moved here from the top bar) */}
+      <div style={{ padding: '12px 14px 0' }}>
+        <TranslationControl settings={translation} onChange={onTranslationChange} />
       </div>
 
       {/* Caption list */}
