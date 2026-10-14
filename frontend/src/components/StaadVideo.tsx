@@ -6,7 +6,7 @@ import {
 import { apiFetch } from '@/lib/api';
 import '@livekit/components-styles'
 import { Room, RoomEvent, Track, VideoPresets, type LocalTrackPublication, type RoomOptions } from 'livekit-client'
-import { useEffect, useState, useMemo, useCallback, createContext, useContext } from 'react'
+import { useEffect, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react'
 
 // Video quality policy (see Smart_Therapy_Video_Quality_Report):
 //  - Capture and publish at most 720p / 30fps. A 1080p camera is capped to 720p;
@@ -101,19 +101,23 @@ export default function StaadVideo({
     }
   }, [room])
 
+  // Languages are signed into the token as participant attributes, which is
+  // how the translation agent learns who speaks and reads what. They are read
+  // from a ref at fetch time and are NOT effect dependencies: a new token
+  // remounts the whole call. Changes mid-call are pushed to the room by the
+  // backend instead (POST /api/sessions/[id]/translation).
+  const langs = useRef({ sourceLang, targetLang })
+  langs.current = { sourceLang, targetLang }
+
   useEffect(() => {
     if (!sessionId || !userName) return
-    // Languages are signed into the token as participant attributes, which is
-    // how the translation agent learns who speaks and reads what. Changing them
-    // mid-session therefore requires a reconnect — the effect re-runs and a
-    // fresh token is minted.
-    const params = new URLSearchParams({ room: sessionId, name: userName, role })
-    if (sourceLang) params.set('sourceLang', sourceLang)
-    if (targetLang) params.set('targetLang', targetLang)
 
     let cancelled = false
     let retry: ReturnType<typeof setTimeout> | undefined
     const fetchToken = () => {
+      const params = new URLSearchParams({ room: sessionId, name: userName, role })
+      if (langs.current.sourceLang) params.set('sourceLang', langs.current.sourceLang)
+      if (langs.current.targetLang) params.set('targetLang', langs.current.targetLang)
       apiFetch(`/api/livekit-token?${params.toString()}`)
         .then(r => r.json())
         .then(d => {
@@ -134,7 +138,7 @@ export default function StaadVideo({
       cancelled = true
       clearTimeout(retry)
     }
-  }, [sessionId, userName, role, sourceLang, targetLang])
+  }, [sessionId, userName, role])
 
   const disconnect = useCallback(() => {
     room.disconnect()

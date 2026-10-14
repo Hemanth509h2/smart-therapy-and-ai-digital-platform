@@ -28,6 +28,7 @@ import { RC } from '@/components/session/roomTheme';
 import type { SidebarPanel } from '@/components/session/sessionPanels';
 import CaptionOverlay from '@/components/session/CaptionOverlay';
 import TranslationControl from '@/components/session/TranslationControl';
+import TranslationSync from '@/components/session/TranslationSync';
 import { useTranslationSettings, pairForRole, writeTranslationSettings } from '@/lib/translation';
 import SessionTopBar from '@/components/session/SessionTopBar';
 import SessionBottomBar from '@/components/session/SessionBottomBar';
@@ -973,6 +974,8 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
           translation agent is on. Previously gated on the translation toggle
           alone (default off), which hid every Sarvam caption. */}
       <CaptionOverlay enabled={transcriptionEnabled || translationSettings.enabled} />
+      {/* Applies caption-language changes to the room without reconnecting. */}
+      {isTherapist && <TranslationSync sessionId={sessionId} settings={translationSettings} />}
       {/* Runs the Sarvam pipeline inside the room provider so it can access the
           LiveKit room; reports recording state up to this page for the chip. */}
       <TranscriptionBridge
@@ -1029,7 +1032,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
             transcriptLine={
               isTherapist ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  {transcriptionEnabled && (
+                  {transcriptionEnabled && transcription.isRecording && (
                     <div
                       style={{
                         display: 'flex',
@@ -1037,11 +1040,11 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                         gap: 6,
                         fontSize: 12,
                         fontWeight: 600,
-                        color: transcription.isRecording ? RC.greenDark : RC.inkMuted,
+                        color: RC.greenDark,
                       }}
                     >
-                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: transcription.isRecording ? RC.green : RC.border, animation: transcription.isRecording ? 'pulse 1.4s ease infinite' : 'none' }} />
-                      {transcription.isRecording ? `${transcription.chunkCount} lines` : 'transcript off'}
+                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: RC.green, animation: 'pulse 1.4s ease infinite' }} />
+                      {`${transcription.chunkCount} lines`}
                     </div>
                   )}
                   {/* Therapist-only: turns captions on and sets who speaks what. */}

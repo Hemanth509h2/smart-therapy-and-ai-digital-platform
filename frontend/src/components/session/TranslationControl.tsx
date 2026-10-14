@@ -6,9 +6,8 @@
 // participant in the language they speak and captions them in the language the
 // other person reads.
 //
-// Changing a language re-mints the access token (the languages are signed into
-// it as participant attributes), which reconnects the room — so the control
-// warns before it does that mid-session.
+// Changes apply live: the backend updates the participants' attributes in the
+// room (see TranslationSync), so the call is not reconnected.
 
 import { useState } from 'react'
 import { Languages, ChevronDown, AlertTriangle } from 'lucide-react'
@@ -126,8 +125,7 @@ export default function TranslationControl({
           </div>
 
           <p style={{ margin: 0, fontSize: 11, lineHeight: 1.5, color: RC.inkMuted }}>
-            Each of you reads captions in your own language. Changing a language
-            reconnects the call.
+            Each of you reads captions in your own language.
           </p>
 
           {unsupportedSpeakers.length > 0 && (
