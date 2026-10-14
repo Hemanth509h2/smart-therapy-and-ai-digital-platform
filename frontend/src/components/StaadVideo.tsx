@@ -65,6 +65,8 @@ interface StaadVideoProps {
   sourceLang?: string
   /** Language this participant READS — the language their captions arrive in. */
   targetLang?: string
+  /** Shown to a client while the therapist hasn't joined yet. */
+  waitingScreen?: React.ReactNode
   children: React.ReactNode
 }
 
@@ -83,6 +85,7 @@ export default function StaadVideo({
   role,
   sourceLang,
   targetLang,
+  waitingScreen,
   children,
 }: StaadVideoProps) {
   const [token, setToken] = useState<string>('')
@@ -113,30 +116,62 @@ export default function StaadVideo({
     if (!sessionId || !userName) return
 
     let cancelled = false
+    let done = false
+    let polling = false
+    let isWaiting = false
     let retry: ReturnType<typeof setTimeout> | undefined
+    const schedule = (ms: number) => {
+      clearTimeout(retry)
+      retry = setTimeout(fetchToken, ms)
+    }
     const fetchToken = () => {
+      // One request at a time; a tab-visible wake-up may land mid-request.
+      if (cancelled || done || polling) return
+      polling = true
+      clearTimeout(retry)
       const params = new URLSearchParams({ room: sessionId, name: userName, role })
       if (langs.current.sourceLang) params.set('sourceLang', langs.current.sourceLang)
       if (langs.current.targetLang) params.set('targetLang', langs.current.targetLang)
-      apiFetch(`/api/livekit-token?${params.toString()}`)
-        .then(r => r.json())
+      // A request that never settles (auth token refresh or the LiveKit lookup
+      // hanging on a slow network) would otherwise end the polling for good and
+      // strand the client in the waiting room.
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 10_000))
+      Promise.race([apiFetch(`/api/livekit-token?${params.toString()}`).then(r => r.json()), timeout])
         .then(d => {
           if (cancelled) return
           if (d.waiting) {
             // Therapist hasn't joined yet — ask again shortly.
+            isWaiting = true
             setWaiting(true)
-            retry = setTimeout(fetchToken, 3000)
+            schedule(3000)
           } else if (d.token) {
+            done = true
             setWaiting(false)
             setToken(d.token)
           } else setError('Could not get video token')
         })
-        .catch(() => { if (!cancelled) setError('Video connection failed') })
+        .catch(() => {
+          if (cancelled) return
+          // While waiting, a failed poll is just retried.
+          if (isWaiting) schedule(3000)
+          else setError('Video connection failed')
+        })
+        .finally(() => { polling = false })
     }
+    // Browsers throttle timers in background tabs (down to once a minute), so
+    // check right away when the client comes back to the tab.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && isWaiting) fetchToken()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
     fetchToken()
     return () => {
       cancelled = true
       clearTimeout(retry)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
     }
   }, [sessionId, userName, role])
 
@@ -152,6 +187,8 @@ export default function StaadVideo({
       {error}
     </div>
   )
+
+  if (!token && waiting && waitingScreen) return <>{waitingScreen}</>
 
   if (!token && waiting) return (
     <div className="h-full flex flex-col items-center justify-center gap-2" style={{ color: 'var(--ink-muted)', fontSize: 13 }}>
