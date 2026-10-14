@@ -16,20 +16,7 @@ import {
 } from '@/components/staad/icons';
 import { AddClientDialog, BookSessionDialog } from '@/components/practice/dialogs';
 import { useSessionActions } from '@/components/practice/useSessionActions';
-import {
-  DAY_NAMES,
-  addDays,
-  describeAvailability,
-  fmtTime,
-  fullName,
-  isSameDay,
-  loadAvailability,
-  sessionDuration,
-  sessionState,
-  startOfDay,
-  startOfWeek,
-  type PracticeSession,
-} from '@/lib/practice';
+import { DAY_NAMES, addDays, describeAvailability, fmtTime, fullName, isSameDay, loadAvailability, sessionDuration, sessionState, startOfDay, startOfWeek } from '@/lib/practice';
 
 /** Two-hour buckets, the same rhythm the artboard's week grid uses. */
 const BUCKET_HOURS = 2;

@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { requireAuth } from '@/lib/apiAuth'
 import { prisma } from '@/lib/db'
 import { sendWhatsAppInvite } from '@/lib/whatsapp-bot'
+import { errorResponse, logError } from '@/lib/apiError'
 
 export const dynamic = 'force-dynamic'
 
@@ -105,10 +106,10 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'WhatsApp send failed'
     const isAuthError = message.includes('Firebase ID token') || message.includes('auth/')
-    console.error('[whatsapp/invite]', message)
-    return NextResponse.json(
-      { error: isAuthError ? 'Invalid authentication token' : message },
-      { status: isAuthError ? 401 : 500 }
-    )
+    if (isAuthError) {
+      logError('whatsapp/invite', error)
+      return NextResponse.json({ error: 'Invalid authentication token' }, { status: 401 })
+    }
+    return errorResponse(error, 'whatsapp/invite', 'WhatsApp send failed')
   }
 }

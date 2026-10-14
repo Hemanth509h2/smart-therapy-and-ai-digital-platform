@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules';
 import { daysAgo } from '@/lib/adminList';
 import { resolveCurrent, serializeSubscription } from '@/lib/subscriptions';
+import { errorResponse } from '@/lib/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -233,7 +234,6 @@ export async function GET(request: Request, { params }: { params: { id: string }
       })),
     });
   } catch (error: any) {
-    console.error('Admin therapist detail error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin therapist detail error');
   }
 }

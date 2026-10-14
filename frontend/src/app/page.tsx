@@ -18,20 +18,7 @@ import {
   StaadMenu,
   cx,
 } from '@/components/staad/parts';
-import {
-  IconArrowRightXs,
-  IconCalendarPlus,
-  IconModules,
-  IconNoteAdd,
-  IconPlus,
-  IconSchTile,
-  IconStatA,
-  IconStatB,
-  IconStatE,
-  IconStatF,
-  IconTrendUp,
-  IconUserPlus,
-} from '@/components/staad/icons';
+import { IconArrowRightXs, IconCalendarPlus, IconModules, IconPlus, IconSchTile, IconStatA, IconStatB, IconStatE, IconStatF, IconTrendUp, IconUserPlus } from '@/components/staad/icons';
 import { AddClientDialog, BookSessionDialog, StartSessionDialog } from '@/components/practice/dialogs';
 import { useSessionActions } from '@/components/practice/useSessionActions';
 import {

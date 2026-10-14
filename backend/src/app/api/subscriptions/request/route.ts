@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules';
+import { errorResponse } from '@/lib/apiError';
 
 // The caller must own the therapist profile or be an ADMIN.
 async function mayAccessTherapist(uid: string, therapistId: string) {
@@ -79,7 +80,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, request: created });
   } catch (error: any) {
-    console.error('Subscription request POST error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Subscription request POST error');
   }
 }

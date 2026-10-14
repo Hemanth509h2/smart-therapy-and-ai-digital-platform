@@ -5,6 +5,7 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signInWithPopup, 
+  signOut,
   GoogleAuthProvider 
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -21,16 +22,14 @@ function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'THERAPIST' | 'CLIENT'>('THERAPIST');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get('invite');
+  const clientsRemoved = searchParams.get('clients') === 'removed';
   const { uid, setRoleAndProfile } = useAuthStore();
   const redirecting = useRef(false);
-
-  const [inviteInfo, setInviteInfo] = useState<{ firstName: string; therapistName: string; status: string } | null>(null);
 
   // Single place that routes a signed-in user (email, Google, signup, or
   // arriving here already signed in). The role is loaded BEFORE navigating:
@@ -55,15 +54,19 @@ function AuthForm() {
       try {
         const res = await apiFetch('/api/users/profile');
         if (res.status === 404) {
-          router.replace(onboardingUrl(role));
+          router.replace('/onboarding');
           return;
         }
         const user = res.ok ? (await res.json()).user : null;
+        if (user?.role === 'CLIENT') {
+          // Patients no longer have accounts: they join through the link their therapist sends.
+          await signOut(auth);
+          redirecting.current = false;
+          setError('Client accounts are no longer supported. Please use the session link your therapist sent you.');
+          return;
+        }
         if (user) {
-          const profile =
-            user.role === 'THERAPIST' ? user.therapist
-            : user.role === 'ADMIN' ? user.admin
-            : user.client;
+          const profile = user.role === 'THERAPIST' ? user.therapist : user.admin;
           setRoleAndProfile(user.role, profile);
         }
         router.replace(user?.role === 'ADMIN' ? '/admin' : '/');
@@ -74,27 +77,10 @@ function AuthForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
 
-  // When arriving via an invite link, switch to signup as a CLIENT and load the invite.
+  // Patients don't sign up any more: an old invite link goes to the guest join page.
   useEffect(() => {
-    if (!inviteToken) return;
-    setIsLogin(false);
-    setRole('CLIENT');
-    apiFetch(`/api/invites/${inviteToken}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.invite) {
-          setInviteInfo({
-            firstName: data.invite.firstName,
-            therapistName: data.invite.therapistName,
-            status: data.invite.status,
-          });
-        }
-      })
-      .catch(() => {});
-  }, [inviteToken]);
-
-  const onboardingUrl = (r: 'THERAPIST' | 'CLIENT') =>
-    `/onboarding?role=${r}${inviteToken ? `&invite=${inviteToken}` : ''}`;
+    if (inviteToken) router.replace(`/join/${encodeURIComponent(inviteToken)}`);
+  }, [inviteToken, router]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -210,11 +196,9 @@ function AuthForm() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {inviteInfo && (
+          {clientsRemoved && (
             <div className="rounded-xl p-3 text-sm font-medium" style={{ background: 'var(--c-accent-bg)', color: 'var(--c-accent)', border: '1px solid var(--glass-border)' }}>
-              {inviteInfo.status === 'CLAIMED'
-                ? 'This invite has already been used. Please log in instead.'
-                : <>You've been invited by <strong>{inviteInfo.therapistName}</strong>. Create your account to join your session.</>}
+              Client accounts are no longer supported. Please use the session link your therapist sent you.
             </div>
           )}
           <form onSubmit={handleAuth} className="space-y-4">
@@ -244,38 +228,6 @@ function AuthForm() {
               />
             </div>
             
-            {!isLogin && !inviteToken && (
-              <div className="space-y-2">
-                <Label className="font-medium text-sm" style={{ color: 'var(--ink-muted)' }}>I am a...</Label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setRole('THERAPIST')}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
-                      role === 'THERAPIST'
-                        ? 'text-white shadow-sm'
-                        : 'text-[var(--ink-muted)] border-[var(--glass-border)] hover:border-[var(--sage)]/40'
-                    }`}
-                    style={role === 'THERAPIST' ? { background: 'var(--sage)', borderColor: 'var(--sage)' } : { background: 'var(--glass-bg)' }}
-                  >
-                    Therapist
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole('CLIENT')}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
-                      role === 'CLIENT'
-                        ? 'text-white shadow-sm'
-                        : 'text-[var(--ink-muted)] border-[var(--glass-border)] hover:border-[var(--sage)]/40'
-                    }`}
-                    style={role === 'CLIENT' ? { background: 'var(--sage)', borderColor: 'var(--sage)' } : { background: 'var(--glass-bg)' }}
-                  >
-                    Client / Student
-                  </button>
-                </div>
-              </div>
-            )}
-
             {error && (
               <p className="text-sm text-red-600 font-medium text-center">{error}</p>
             )}

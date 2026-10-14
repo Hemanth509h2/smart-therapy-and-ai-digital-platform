@@ -10,6 +10,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { generateClientReportPdf } from './reportService.js';
+import { errorResponse } from '@/lib/apiError';
 
 export async function GET(request, { params }) {
   try {
@@ -28,8 +29,6 @@ export async function GET(request, { params }) {
       },
     });
   } catch (error) {
-    console.error('reportController GET error:', error);
-    const status = error.message === 'Client not found' ? 404 : 500;
-    return NextResponse.json({ error: error.message }, { status });
+    return errorResponse(error, 'reportController GET');
   }
 }

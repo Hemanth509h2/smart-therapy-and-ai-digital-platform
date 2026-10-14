@@ -41,13 +41,6 @@ const THERAPIST_NAV: NavItem[] = [
   { href: '/help', label: 'Help & Support', Icon: IconHelp },
 ];
 
-const CLIENT_NAV: NavItem[] = [
-  { href: '/', label: 'Home', Icon: IconDashboard },
-  { href: '/my-sessions', label: 'My Sessions', Icon: IconSessions },
-  { href: '/profile', label: 'Profile', Icon: IconProfile },
-  { href: '/help', label: 'Help & Support', Icon: IconHelp },
-];
-
 const COLLAPSE_KEY = 'staad-sidebar-collapsed';
 
 /** The design collapses the rail on its own below this width. */
@@ -98,7 +91,7 @@ export function StaadShell({ children, className }: { children: React.ReactNode;
     });
 
   const isAdmin = role === 'ADMIN';
-  const nav = isAdmin ? adminNav(profile) : role === 'CLIENT' ? CLIENT_NAV : THERAPIST_NAV;
+  const nav = isAdmin ? adminNav(profile) : THERAPIST_NAV;
   const home = isAdmin ? '/admin' : '/';
   // Home routes match exactly; everything else also owns its sub-routes.
   const isActive = (href: string) =>

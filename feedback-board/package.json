@@ -1,0 +1,26 @@
+{
+  "name": "feedback-board",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3100",
+    "build": "next build",
+    "start": "next start -p 3100",
+    "db:init": "node scripts/init-db.mjs"
+  },
+  "dependencies": {
+    "next": "^16.4.0",
+    "pg": "^8.13.0",
+    "qrcode": "^1.5.4",
+    "react": "^19",
+    "react-dom": "^19"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/pg": "^8.11.10",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
+  }
+}

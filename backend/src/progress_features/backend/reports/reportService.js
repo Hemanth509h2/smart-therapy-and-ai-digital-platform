@@ -6,11 +6,12 @@
 
 import { jsPDF } from 'jspdf';
 import { getClientMetrics } from '../measurement/measurementService.js';
+import { PublicError } from '@/lib/apiError';
 
 export async function generateClientReportPdf(prisma, clientId) {
   const client = await prisma.profileClient.findUnique({ where: { id: clientId } });
   if (!client) {
-    throw new Error('Client not found');
+    throw new PublicError('Client not found', 404);
   }
 
   const metrics = await getClientMetrics(prisma, clientId);

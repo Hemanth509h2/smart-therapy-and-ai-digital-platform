@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { requireTherapist } from '@/lib/progressAuth';
+import { errorResponse } from '@/lib/apiError';
 
 // Session notes belong to the session's therapist; admins may read them too.
 async function mayAccessSession(uid: string, sessionId: string) {
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ notes });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'notes GET');
   }
 }
 
@@ -77,6 +78,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ note });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'notes POST');
   }
 }

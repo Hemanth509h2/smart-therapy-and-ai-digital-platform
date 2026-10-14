@@ -4,8 +4,7 @@ import type { TrackReference } from '@livekit/components-react'
 import { Track } from 'livekit-client'
 import ConnectionQualityBadge from '@/components/session/ConnectionQualityBadge'
 import VideoStatsBadge from '@/components/session/VideoStatsBadge'
-import { useState, useMemo } from 'react'
-import { aspectRatioCss } from '@/lib/video-frame'
+import { useState } from 'react';
 import { useVideoFrameStyle } from '@/hooks/useVideoTrackDimensions'
 
 interface RemoteVideoAreaProps {
@@ -27,13 +26,6 @@ export default function RemoteVideoArea({ participantName = 'Participant' }: Rem
   const videoStyle = useVideoFrameStyle(subscribedRemote, 16 / 9)
 
   // Fallback style for when track isn't ready yet
-  const fallbackStyle = useMemo<React.CSSProperties>(() => ({
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain',
-    aspectRatio: aspectRatioCss(16, 9),
-  }), [])
-
   if (subscribedRemote) {
     return (
       <div

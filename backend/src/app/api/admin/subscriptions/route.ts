@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
 import { listParams } from '@/lib/adminList';
 import { daysUntil, resolveCurrent, serializeSubscription, subscriptionState } from '@/lib/subscriptions';
+import { errorResponse } from '@/lib/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,7 +113,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ professionals, total, requests: pending });
   } catch (error: any) {
-    console.error('Admin subscriptions GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin subscriptions GET error');
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { sendSessionBookedWhatsApp } from '@/lib/session-whatsapp';
+import { errorResponse } from '@/lib/apiError';
 
 // The caller must own the referenced therapist/client profile or be an ADMIN.
 async function mayAccess(uid: string, ref: { therapistId?: string | null; clientId?: string | null }) {
@@ -28,11 +29,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const therapistId = searchParams.get('therapistId');
     const clientId = searchParams.get('clientId');
-    if ((therapistId || clientId) && !(await mayAccess(auth.uid, { therapistId, clientId }))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
 
     if (therapistId) {
+      const owner = await prisma.profileTherapist.findUnique({ where: { id: therapistId }, select: { userId: true } });
+      if (!owner || owner.userId !== auth.uid) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
       // Note count + report presence let the UI flag completed sessions whose
       // documentation is still outstanding ("Notes pending").
       const sessions = await prisma.session.findMany({
@@ -48,6 +50,13 @@ export async function GET(request: Request) {
     }
 
     if (clientId) {
+      const client = await prisma.profileClient.findUnique({
+        where: { id: clientId },
+        select: { userId: true, therapist: { select: { userId: true } } },
+      });
+      if (!client || (client.userId !== auth.uid && client.therapist?.userId !== auth.uid)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
       const sessions = await prisma.session.findMany({
         where: { clientId },
         include: {
@@ -60,8 +69,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ error: 'Missing filter parameter' }, { status: 400 });
   } catch (error: any) {
-    console.error('Sessions GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Sessions GET error');
   }
 }
 
@@ -107,7 +115,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ session });
   } catch (error: any) {
-    console.error('Session creation error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Session creation error');
   }
 }

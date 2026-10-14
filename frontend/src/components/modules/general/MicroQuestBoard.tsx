@@ -30,9 +30,7 @@ interface Quest {
 
 /* ---------------------------------------------------------------------------
    Palette. This module renders on ModuleStage's WHITE canvas, so every colour
-   below is stated literally and chosen for dark-on-light contrast. The shared
-   `--ink-*` CSS vars are authored for the dark sidebar panel and are NOT used
-   here. White text appears on exactly one surface: the solid green button.
+   below is stated literally and chosen for dark-on-light contrast.
 --------------------------------------------------------------------------- */
 const INK = '#16233A'        // headings
 const INK_BODY = '#1E293B'   // quest copy
@@ -52,8 +50,6 @@ interface EffortSpec {
   Icon: typeof Leaf
 }
 
-/* Difficulty language. The accents are the saturated trio the design calls
-   for — each sits on its own pale tint, never white-on-light. */
 const EFFORTS: Effort[] = ['Easy', 'Medium', 'Hard']
 const EFFORT_SPEC: Record<Effort, EffortSpec> = {
   Easy: {
@@ -70,9 +66,6 @@ const EFFORT_SPEC: Record<Effort, EffortSpec> = {
   },
 }
 
-/* Each quest gets a pastel badge from this pool, picked deterministically from
-   its id. Purely decorative — the difficulty is carried by the coloured label
-   under the quest text, never by the badge alone. */
 const BADGES: { tint: string; accent: string; Icon: typeof Target }[] = [
   { tint: '#ECFDF5', accent: '#059669', Icon: Target },
   { tint: '#EFF6FF', accent: '#2563EB', Icon: GlassWater },
@@ -89,9 +82,10 @@ const badgeFor = (id: string) => {
   return BADGES[sum % BADGES.length]
 }
 
-export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQuestBoardProps) {
+export default function MicroQuestBoard({ sessionId, role }: MicroQuestBoardProps) {
   const isT = role === 'therapist'
-  const canInteract = isT || !isLocked
+  // Client is strictly view-only in Micro Quest Board and cannot select anything
+  const canInteract = isT
 
   const [clientId, setClientId] = useState<string | null>(null)
   const [quests, setQuests] = useState<Quest[]>([])
@@ -101,10 +95,6 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
   const [reviewMode, setReviewMode] = useState(false)
   const [celebrate, setCelebrate] = useState<string | null>(null)
 
-  /* Purely local view state — nothing below is persisted and no new Firestore
-     field is introduced. `composerOpen` follows the disclosure convention the
-     sibling modules use: the mockup shows the button alone, so the text field
-     stays folded away until the therapist asks for it. */
   const [composerOpen, setComposerOpen] = useState(false)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
@@ -116,13 +106,9 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
   const touchMoved = useRef(false)
   const touchStart = useRef({ x: 0, y: 0 })
 
-  /* The live board rides on liveSessions/{id}.moduleState.mqQuests — the one
-     document both participants are always entitled to write. It used to live
-     only on patients/{clientUid}, which the session rules refuse unless the
-     therapist's role claim has landed; that write failed into a bare catch,
-     the board snapped back on the next snapshot, and nothing ever "stuck".
-     The patient record is still written as a best-effort long-term copy and
-     seeds the board when a session opens it for the first time. */
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const noteTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
   const seededRef = useRef(false)
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'liveSessions', sessionId), (snap) => {
@@ -131,17 +117,37 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
       const parts = data.participants || {}
       const client = Object.values(parts).find((p: any) => p?.role === 'client') as any
       if (client?.uid) setClientId(client.uid)
-      const live = data.moduleState?.mqQuests
+      const st = data.moduleState || {}
+      const live = st.mqQuests
       if (Array.isArray(live)) {
         seededRef.current = true
         setQuests(live)
       }
-    })
-    return () => unsub()
-  }, [sessionId])
 
-  // One-time seed from the client's saved quests, therapist side only so the
-  // two browsers can't race to write it.
+      // Sync therapist's live typing and controls to client
+      if (!isT) {
+        if (typeof st.mqDraftQuest === 'string') {
+          setQuestText(st.mqDraftQuest)
+        }
+        if (typeof st.mqComposerOpen === 'boolean') {
+          setComposerOpen(st.mqComposerOpen)
+        }
+        if (typeof st.mqEffort === 'string' && (EFFORTS as string[]).includes(st.mqEffort)) {
+          setEffort(st.mqEffort as Effort)
+        }
+        if (typeof st.mqReviewMode === 'boolean') {
+          setReviewMode(st.mqReviewMode)
+        }
+      }
+    })
+    return () => {
+      unsub()
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+      if (noteTimeoutRef.current) clearTimeout(noteTimeoutRef.current)
+    }
+  }, [sessionId, isT])
+
+  // One-time seed from client's saved quests (therapist side only)
   useEffect(() => {
     if (!isT || !clientId || seededRef.current) return
     let cancelled = false
@@ -170,11 +176,83 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
     }
   }, [sessionId, clientId])
 
+  // Live typing sync for therapist
+  const handleQuestTextChange = useCallback((text: string) => {
+    setQuestText(text)
+    if (!isT) return
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+    typingTimeoutRef.current = setTimeout(() => {
+      writeModuleState(
+        sessionId,
+        { 'moduleState.mqDraftQuest': text },
+        { label: 'MicroQuestBoard' }
+      )
+    }, 80)
+  }, [isT, sessionId])
+
+  const toggleComposer = useCallback(() => {
+    if (!isT) return
+    setComposerOpen(o => {
+      const next = !o
+      writeModuleState(
+        sessionId,
+        {
+          'moduleState.mqComposerOpen': next,
+          'moduleState.mqDraftQuest': next ? questText : '',
+        },
+        { label: 'MicroQuestBoard' }
+      )
+      return next
+    })
+  }, [isT, questText, sessionId])
+
+  const changeEffort = useCallback((newEffort: Effort) => {
+    if (!isT) return
+    setEffort(newEffort)
+    writeModuleState(
+      sessionId,
+      { 'moduleState.mqEffort': newEffort },
+      { label: 'MicroQuestBoard' }
+    )
+  }, [isT, sessionId])
+
+  const toggleReviewMode = useCallback(() => {
+    if (!isT) return
+    setReviewMode(r => {
+      const next = !r
+      writeModuleState(
+        sessionId,
+        { 'moduleState.mqReviewMode': next },
+        { label: 'MicroQuestBoard' }
+      )
+      return next
+    })
+  }, [isT, sessionId])
+
   const addQuest = useCallback(() => {
     if (!isT || !questText.trim()) return
-    const q: Quest = { id: `q${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, text: questText.trim(), effort, completed: false, completedAt: null, therapistNote: '' }
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+    const q: Quest = {
+      id: `q${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      text: questText.trim(),
+      effort,
+      completed: false,
+      completedAt: null,
+      therapistNote: '',
+    }
     const next = [...quests, q]
-    setQuests(next); persist(next); setQuestText('')
+    setQuests(next)
+    setQuestText('')
+    setComposerOpen(false)
+    persist(next)
+    writeModuleState(
+      sessionId,
+      {
+        'moduleState.mqDraftQuest': '',
+        'moduleState.mqComposerOpen': false,
+      },
+      { label: 'MicroQuestBoard' }
+    )
     logModuleEvent(sessionId, {
       module: 'micro-quest-board',
       type: 'quest_assigned',
@@ -185,16 +263,19 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
   const removeQuest = useCallback((id: string) => {
     if (!isT) return
     const next = quests.filter(q => q.id !== id)
-    setQuests(next); persist(next)
+    setQuests(next)
+    persist(next)
   }, [isT, quests, persist])
 
   const toggleComplete = useCallback((id: string) => {
     if (!canInteract) return
     const next = quests.map(q => q.id === id ? { ...q, completed: !q.completed, completedAt: !q.completed ? Date.now() : null } : q)
-    setQuests(next); persist(next)
+    setQuests(next)
+    persist(next)
     const q = quests.find(x => x.id === id)
     if (q && !q.completed) {
-      setCelebrate(id); setTimeout(() => setCelebrate(null), 1200)
+      setCelebrate(id)
+      setTimeout(() => setCelebrate(null), 1200)
       logModuleEvent(sessionId, {
         module: 'micro-quest-board',
         type: 'quest_completed',
@@ -207,26 +288,24 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
     if (!isT) return
     const next = quests.map(q => q.id === id ? { ...q, therapistNote: note } : q)
     setQuests(next)
-  }, [isT, quests])
+    if (noteTimeoutRef.current) clearTimeout(noteTimeoutRef.current)
+    noteTimeoutRef.current = setTimeout(() => {
+      persist(next)
+    }, 120)
+  }, [isT, quests, persist])
 
-  /* Dropping a quest onto a difficulty zone re-labels it. This writes the same
-     `effort` value the composer has always written, through the same `persist`
-     path — no new field, no new document. */
   const assignEffort = useCallback((id: string, next: Effort) => {
     if (!canInteract) return
     const q = quests.find(x => x.id === id)
     if (!q || q.effort === next) return
     const updated = quests.map(x => x.id === id ? { ...x, effort: next } : x)
-    setQuests(updated); persist(updated)
+    setQuests(updated)
+    persist(updated)
   }, [canInteract, quests, persist])
 
-  /* ---- Touch drag. Mouse drag rides on the HTML5 handlers below; touch has to
-          be hand-rolled. A finger that never travels 8px is a TAP, so we never
-          preventDefault on touchstart and never swallow the synthetic click —
-          tapping a quest card still toggles it. ---- */
   useEffect(() => {
     const el = rootRef.current
-    if (!el) return
+    if (!el || !canInteract) return
     const zoneAt = (x: number, y: number) =>
       document.elementFromPoint(x, y)?.closest('[data-effort-zone]')?.getAttribute('data-effort-zone') as Effort | undefined
 
@@ -251,7 +330,9 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
       }
       touchId.current = null
       touchMoved.current = false
-      setDragId(null); setDragOver(null); setGhost(null)
+      setDragId(null)
+      setDragOver(null)
+      setGhost(null)
     }
 
     el.addEventListener('touchmove', onMove, { passive: false })
@@ -262,7 +343,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
       el.removeEventListener('touchend', onEnd)
       el.removeEventListener('touchcancel', onEnd)
     }
-  }, [assignEffort])
+  }, [canInteract, assignEffort])
 
   const onTouchStart = (id: string) => (e: React.TouchEvent) => {
     if (!canInteract) return
@@ -272,10 +353,6 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
     touchMoved.current = false
   }
 
-  /* Quests still open per difficulty. Derived straight from `quests`, so it
-     re-counts on every add, delete, completion and drag-to-re-label without any
-     bookkeeping of its own. Completed quests are excluded: they are no longer
-     available to pick up. */
   const availableByEffort = useMemo(() => {
     const acc: Record<Effort, number> = { Easy: 0, Medium: 0, Hard: 0 }
     for (const q of quests) if (!q.completed) acc[q.effort] += 1
@@ -286,18 +363,20 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
   const momentum = quests.length ? Math.round((completedCount / quests.length) * 100) : 0
   const dragQuest = dragId ? quests.find(q => q.id === dragId) : undefined
 
-  const submitQuest = () => { if (!questText.trim()) return; addQuest(); setComposerOpen(false) }
+  const submitQuest = () => {
+    if (!questText.trim()) return
+    addQuest()
+  }
 
   return (
-    /* Root fills the stage and never scrolls itself: ModuleStage's body is
-       overflow:hidden and hands every module a `height:100%` box. Only the
-       "Your quests" grid scrolls, inside its own region. */
     <div
       ref={rootRef}
       style={{
         height: '100%', minHeight: 0, maxWidth: '100%',
         display: 'flex', flexDirection: 'column', gap: 14,
         position: 'relative', fontFamily: '"DM Sans", sans-serif', color: INK,
+        userSelect: isT ? 'auto' : 'none',
+        WebkitUserSelect: isT ? 'auto' : 'none',
       }}
     >
       <style>{`
@@ -317,6 +396,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
           width: 300, flexShrink: 0,
           background: '#ffffff', border: `1px solid ${LINE}`, borderRadius: 18,
           boxShadow: '0 2px 10px rgba(20,30,45,0.05)', overflow: 'hidden',
+          userSelect: 'none',
         }}>
           <div style={{ padding: '14px 16px 15px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
             <span style={badgeSquare('#F0FDF4', '#D5EFDF')}>
@@ -325,8 +405,6 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={rowTitle}>Momentum</div>
               <div style={rowSub}>Keep the streak going!</div>
-              {/* The meter this module has always shown, now a hairline under
-                  its own row rather than a separate block. */}
               <div style={{ marginTop: 9, height: 6, borderRadius: 4, background: '#EDF1F4', overflow: 'hidden' }}>
                 <div style={{
                   height: '100%', width: `${momentum}%`, borderRadius: 4,
@@ -369,15 +447,16 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
               background: '#EEF4FF', border: '1px solid #DBE6FB',
               color: '#2563EB', fontSize: 16.5, fontWeight: 800,
               fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+              userSelect: 'none',
             }}>
               {completedCount}/{quests.length}
             </span>
           </div>
 
-          {isT && (
+          {isT ? (
             <>
               <button
-                onClick={() => setComposerOpen(o => !o)}
+                onClick={toggleComposer}
                 style={{
                   width: '100%', padding: '13px 16px', borderRadius: 12, border: 'none',
                   background: GREEN_SOLID, color: '#ffffff',
@@ -387,7 +466,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
                 }}
               >
                 <Plus size={18} strokeWidth={2.8} color="#ffffff" />
-                Add quest
+                {composerOpen ? 'Close composer' : 'Add quest'}
               </button>
 
               {composerOpen && (
@@ -397,7 +476,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
                     autoFocus
                     className="mq-input"
                     value={questText}
-                    onChange={e => setQuestText(e.target.value)}
+                    onChange={e => handleQuestTextChange(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && submitQuest()}
                     placeholder={`New ${effort.toLowerCase()} quest / micro-task`}
                     style={inputStyle}
@@ -406,6 +485,32 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
                 </div>
               )}
             </>
+          ) : (
+            /* Client sees live typing what the therapist is writing */
+            composerOpen && (
+              <div style={{
+                display: 'flex', flexDirection: 'column', gap: 6,
+                padding: '12px 14px', borderRadius: 14,
+                background: '#F0FDF4', border: '1.5px solid #CFEEDA',
+                boxShadow: '0 2px 8px rgba(31,122,68,0.06)',
+                userSelect: 'none',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 700, color: GREEN_SOLID }}>
+                  <Sparkles size={15} color={GREEN_ACCENT} />
+                  Therapist is creating a {effort} quest:
+                </div>
+                <div style={{
+                  padding: '9px 12px', borderRadius: 10,
+                  background: '#ffffff', border: `1px solid ${LINE}`,
+                  fontSize: 16.5, fontWeight: 600, color: questText ? INK_BODY : INK_FAINT,
+                  fontStyle: questText ? 'normal' : 'italic',
+                  minHeight: 42, display: 'flex', alignItems: 'center',
+                  wordBreak: 'break-word', userSelect: 'none',
+                }}>
+                  {questText ? questText : 'Therapist is typing…'}
+                </div>
+              </div>
+            )
           )}
 
           <div style={{ display: 'flex', gap: 14 }}>
@@ -413,7 +518,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
               const spec = EFFORT_SPEC[key]
               const count = availableByEffort[key]
               const over = dragOver === key
-              const selected = isT && effort === key && !dragOver
+              const selected = effort === key && !dragOver
               const active = over || selected
               const Icon = spec.Icon
               return (
@@ -422,12 +527,12 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
                   data-effort-zone={key}
                   role={isT ? 'button' : undefined}
                   tabIndex={isT ? 0 : undefined}
-                  onClick={() => { if (isT) setEffort(key) }}
-                  onKeyDown={e => { if (isT && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setEffort(key) } }}
-                  onDragOver={e => { e.preventDefault(); setDragOver(key) }}
-                  onDragLeave={() => setDragOver(prev => (prev === key ? null : prev))}
-                  onDrop={() => { if (dragId) assignEffort(dragId, key); setDragId(null); setDragOver(null) }}
-                  title={isT ? `New quests default to ${key} — or drop a quest here to re-label it` : `Drop a quest here to make it ${key}`}
+                  onClick={() => { if (isT) changeEffort(key) }}
+                  onKeyDown={e => { if (isT && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); changeEffort(key) } }}
+                  onDragOver={e => { if (isT) { e.preventDefault(); setDragOver(key) } }}
+                  onDragLeave={() => { if (isT) setDragOver(prev => (prev === key ? null : prev)) }}
+                  onDrop={() => { if (isT && dragId) assignEffort(dragId, key); setDragId(null); setDragOver(null) }}
+                  title={isT ? `New quests default to ${key} — or drop a quest here to re-label it` : undefined}
                   style={{
                     position: 'relative', flex: 1, minWidth: 0,
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
@@ -437,6 +542,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
                     boxShadow: active ? `0 0 0 3px ${spec.ring}` : '0 2px 10px rgba(20,30,45,0.03)',
                     cursor: isT ? 'pointer' : 'default',
                     transition: 'border-color .15s, box-shadow .15s',
+                    userSelect: 'none',
                   }}
                 >
                   {count > 0 && (
@@ -462,8 +568,6 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
                   <div style={{ fontSize: 15.5, fontWeight: 500, color: INK_MUTED, textAlign: 'center' }}>
                     {spec.sub}
                   </div>
-                  {/* The corner badge is a bare number with nothing saying what
-                      it counts, so the same figure is spelled out here. */}
                   <div style={{
                     fontSize: 15, fontWeight: 700, color: spec.accent, textAlign: 'center',
                     fontVariantNumeric: 'tabular-nums',
@@ -484,7 +588,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
                       fontSize: 15.5, fontWeight: over ? 700 : 500,
                       color: over ? spec.accent : INK_MUTED, textAlign: 'center',
                     }}>
-                      {over ? `Drop to make it ${key}` : 'Drag & drop quests here'}
+                      {isT ? (over ? `Drop to make it ${key}` : 'Drag & drop quests here') : `${key} zone`}
                     </span>
                   </div>
                 </div>
@@ -501,7 +605,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
           <span style={sectionTitle}>Your quests</span>
           <span style={{ flex: 1, height: 1, background: LINE }} />
           {isT && (
-            <button onClick={() => setReviewMode(r => !r)} style={{
+            <button onClick={toggleReviewMode} style={{
               ...ghostBtn,
               borderColor: reviewMode ? GREEN_ACCENT : LINE,
               color: reviewMode ? GREEN_SOLID : INK_MUTED,
@@ -535,7 +639,7 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
               <div
                 key={q.id}
                 draggable={canInteract}
-                onDragStart={() => setDragId(q.id)}
+                onDragStart={() => { if (canInteract) setDragId(q.id) }}
                 onDragEnd={() => { setDragId(null); setDragOver(null) }}
                 onTouchStart={onTouchStart(q.id)}
                 onClick={() => { if (canInteract) toggleComplete(q.id) }}
@@ -548,7 +652,9 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
                   boxShadow: dragging ? '0 8px 20px rgba(31,122,68,0.16)' : '0 2px 8px rgba(20,30,45,0.05)',
                   cursor: canInteract ? 'grab' : 'default',
                   opacity: dragging ? 0.55 : 1,
-                  userSelect: 'none', touchAction: canInteract ? 'none' : 'auto',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  touchAction: canInteract ? 'none' : 'auto',
                   animation: celebrate === q.id ? 'mq-pop 1.2s ease' : 'none',
                   transition: 'border-color .15s, box-shadow .15s',
                 }}
@@ -578,62 +684,72 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
                     </div>
                   </div>
 
-                  <button
-                    onClick={e => { e.stopPropagation(); setMenuId(open ? null : q.id) }}
-                    aria-label="Quest actions"
-                    aria-expanded={open}
-                    style={{
-                      width: 26, height: 26, flexShrink: 0, borderRadius: 8, padding: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: open ? '#F1F5F9' : 'transparent',
-                      border: `1px solid ${open ? LINE : 'transparent'}`,
-                      color: INK_FAINT, cursor: 'pointer',
-                    }}
-                  >
-                    <EllipsisVertical size={16} color={INK_FAINT} strokeWidth={2.2} />
-                  </button>
+                  {isT && (
+                    <button
+                      onClick={e => { e.stopPropagation(); setMenuId(open ? null : q.id) }}
+                      aria-label="Quest actions"
+                      aria-expanded={open}
+                      style={{
+                        width: 26, height: 26, flexShrink: 0, borderRadius: 8, padding: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: open ? '#F1F5F9' : 'transparent',
+                        border: `1px solid ${open ? LINE : 'transparent'}`,
+                        color: INK_FAINT, cursor: 'pointer',
+                      }}
+                    >
+                      <EllipsisVertical size={16} color={INK_FAINT} strokeWidth={2.2} />
+                    </button>
+                  )}
                 </div>
 
-                {open && (
+                {isT && open && (
                   <div
                     onClick={e => e.stopPropagation()}
                     style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingTop: 9, borderTop: `1px solid ${LINE}` }}
                   >
                     <button
                       onClick={() => { toggleComplete(q.id); setMenuId(null) }}
-                      disabled={!canInteract}
                       style={{
                         ...menuBtn,
                         borderColor: '#CFEEDA', color: GREEN_SOLID,
-                        cursor: canInteract ? 'pointer' : 'default',
-                        opacity: canInteract ? 1 : 0.5,
+                        cursor: 'pointer',
                       }}
                     >
                       <Check size={13} color={GREEN_SOLID} strokeWidth={2.6} />
                       {q.completed ? 'Mark not done' : 'Mark complete'}
                     </button>
-                    {isT && (
-                      <button
-                        onClick={() => { removeQuest(q.id); setMenuId(null) }}
-                        style={{ ...menuBtn, borderColor: '#F5D6D6', color: '#B91C1C' }}
-                      >
-                        <Trash2 size={13} color="#B91C1C" strokeWidth={2.3} />
-                        Remove
-                      </button>
-                    )}
+                    <button
+                      onClick={() => { removeQuest(q.id); setMenuId(null) }}
+                      style={{ ...menuBtn, borderColor: '#F5D6D6', color: '#B91C1C' }}
+                    >
+                      <Trash2 size={13} color="#B91C1C" strokeWidth={2.3} />
+                      Remove
+                    </button>
                   </div>
                 )}
 
-                {isT && reviewMode && q.completed && (
-                  <input
-                    onClick={e => e.stopPropagation()}
-                    className="mq-input"
-                    placeholder="Which felt hardest and why?"
-                    value={q.therapistNote}
-                    onChange={e => setNote(q.id, e.target.value)}
-                    onBlur={() => persist(quests)}
-                    style={{ ...inputStyle, fontSize: 15.5, padding: '8px 10px' }}
-                  />
+                {reviewMode && q.completed && (
+                  isT ? (
+                    <input
+                      onClick={e => e.stopPropagation()}
+                      className="mq-input"
+                      placeholder="Which felt hardest and why?"
+                      value={q.therapistNote}
+                      onChange={e => setNote(q.id, e.target.value)}
+                      onBlur={() => persist(quests)}
+                      style={{ ...inputStyle, fontSize: 15.5, padding: '8px 10px' }}
+                    />
+                  ) : (
+                    <div style={{
+                      padding: '8px 10px', borderRadius: 8,
+                      background: '#F8FAFC', border: `1px solid ${LINE}`,
+                      fontSize: 15.5, color: q.therapistNote ? INK_BODY : INK_FAINT,
+                      fontStyle: q.therapistNote ? 'normal' : 'italic',
+                      userSelect: 'none',
+                    }}>
+                      {q.therapistNote ? q.therapistNote : 'Therapist is adding reflection notes…'}
+                    </div>
+                  )
                 )}
               </div>
             )
@@ -641,8 +757,8 @@ export default function MicroQuestBoard({ sessionId, role, isLocked }: MicroQues
         </div>
       </div>
 
-      {/* Finger-follow ghost for the touch drag path. */}
-      {ghost && dragQuest && (
+      {/* Finger-follow ghost for the touch drag path (therapist only) */}
+      {isT && ghost && dragQuest && (
         <div aria-hidden style={{
           position: 'fixed', left: ghost.x, top: ghost.y, transform: 'translate(-50%, -50%)',
           zIndex: 60, pointerEvents: 'none',

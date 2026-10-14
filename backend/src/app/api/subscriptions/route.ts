@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { resolveCurrent, serializeSubscription } from '@/lib/subscriptions';
+import { errorResponse } from '@/lib/apiError';
 
 // The caller must own the therapist profile or be an ADMIN.
 async function mayAccessTherapist(uid: string, therapistId: string) {
@@ -61,7 +62,6 @@ export async function GET(request: Request) {
       history: subs.map((s) => serializeSubscription({ ...s })),
     });
   } catch (error: any) {
-    console.error('Subscriptions GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Subscriptions GET error');
   }
 }

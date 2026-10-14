@@ -4,7 +4,7 @@ import { Track } from 'livekit-client'
 import { useState, type CSSProperties, useMemo } from 'react'
 import { useAuthStore } from '@/store/useAuthStore'
 import ConnectionQualityBadge from '@/components/session/ConnectionQualityBadge'
-import { viewportFrameCss, TILE_ASPECT, aspectRatioCss } from '@/lib/video-frame'
+import { viewportFrameCss } from '@/lib/video-frame';
 import { useVideoTrackDimensions } from '@/hooks/useVideoTrackDimensions'
 
 export default function LocalVideoPip({

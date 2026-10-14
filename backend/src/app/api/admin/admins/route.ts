@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { requireAdmin, requireRecentLogin } from '@/lib/apiAuth';
 import { audit } from '@/lib/audit';
 import { adminAuth } from '@/lib/firebaseAdmin';
+import { errorResponse } from '@/lib/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,8 +53,7 @@ export async function GET(request: Request) {
       })),
     });
   } catch (error: any) {
-    console.error('Admins GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admins GET error');
   }
 }
 
@@ -148,8 +148,7 @@ export async function POST(request: Request) {
       admin: { id: profile.id, userId: uid, email, adminRole: profile.adminRole },
     });
   } catch (error: any) {
-    console.error('Admins POST error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admins POST error');
   }
 }
 

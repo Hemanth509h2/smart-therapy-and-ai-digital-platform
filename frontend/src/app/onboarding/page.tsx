@@ -14,42 +14,20 @@ function OnboardingForm() {
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get('invite');
   const router = useRouter();
-  const [role, setRole] = useState<'THERAPIST' | 'CLIENT'>('THERAPIST');
 
   // Therapist profile fields
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [specialtyInput, setSpecialtyInput] = useState('');
-
-  // Client profile fields
-  const [dob, setDob] = useState('');
-  const [diagnosisInput, setDiagnosisInput] = useState('');
+  const [phone, setPhone] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Patients don't have accounts any more: an old invite link goes to the guest join page.
   useEffect(() => {
-    const param = searchParams.get('role') as 'THERAPIST' | 'CLIENT' | null;
-    if (param === 'THERAPIST' || param === 'CLIENT') {
-      setRole(param);
-    }
-  }, [searchParams]);
-
-  // Invite flow: lock role to CLIENT and prefill name + diagnosis from the invite.
-  useEffect(() => {
-    if (!inviteToken) return;
-    setRole('CLIENT');
-    apiFetch(`/api/invites/${inviteToken}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.invite) {
-          setFirstName(data.invite.firstName || '');
-          setLastName(data.invite.lastName || '');
-          setDiagnosisInput((data.invite.diagnosis || []).join(', '));
-        }
-      })
-      .catch(() => {});
-  }, [inviteToken]);
+    if (inviteToken) router.replace(`/join/${encodeURIComponent(inviteToken)}`);
+  }, [inviteToken, router]);
 
   useEffect(() => {
     if (!uid) {
@@ -63,7 +41,6 @@ function OnboardingForm() {
     setLoading(true);
 
     const specialty = specialtyInput.split(',').map(s => s.trim()).filter(s => s.length > 0);
-    const diagnosis = diagnosisInput.split(',').map(d => d.trim()).filter(d => d.length > 0);
 
     try {
       const response = await apiFetch('/api/users/profile', {
@@ -72,13 +49,11 @@ function OnboardingForm() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          role,
+          role: 'THERAPIST',
           firstName,
           lastName,
           specialty,
-          dateOfBirth: dob || undefined,
-          diagnosis,
-          inviteToken: inviteToken || undefined,
+          phoneNumber: phone,
         }),
       });
 
@@ -88,7 +63,7 @@ function OnboardingForm() {
       }
 
       const data = await response.json();
-      setRoleAndProfile(role, data.profile);
+      setRoleAndProfile('THERAPIST', data.profile);
       router.push('/');
     } catch (err: any) {
       setError(err.message || 'Onboarding registration failed');
@@ -103,47 +78,11 @@ function OnboardingForm() {
         <CardHeader className="text-center pb-4">
           <CardTitle className="text-3xl font-bold" style={{ color: 'var(--ink)' }}>Complete Your Profile</CardTitle>
           <CardDescription className="font-medium" style={{ color: 'var(--ink-muted)' }}>
-            Setup your role and profile to start therapy sessions
+            Set up your therapist profile to start running sessions
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {inviteToken ? (
-              <div className="rounded-xl p-3 text-sm font-medium" style={{ background: 'var(--c-accent-bg)', color: 'var(--c-accent)', border: '1px solid var(--glass-border)' }}>
-                Joining as a patient — your name and diagnosis were set by your therapist. Just add your date of birth below.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Label className="font-medium" style={{ color: 'var(--ink-muted)' }}>Select Your Account Type</Label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setRole('THERAPIST')}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
-                      role === 'THERAPIST'
-                        ? 'text-white shadow-sm'
-                        : 'text-[var(--ink-muted)] border-[var(--glass-border)] hover:border-[var(--sage)]/40'
-                    }`}
-                    style={role === 'THERAPIST' ? { background: 'var(--sage)', borderColor: 'var(--sage)' } : { background: 'var(--glass-bg)' }}
-                  >
-                    Therapist
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole('CLIENT')}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
-                      role === 'CLIENT'
-                        ? 'text-white shadow-sm'
-                        : 'text-[var(--ink-muted)] border-[var(--glass-border)] hover:border-[var(--sage)]/40'
-                    }`}
-                    style={role === 'CLIENT' ? { background: 'var(--sage)', borderColor: 'var(--sage)' } : { background: 'var(--glass-bg)' }}
-                  >
-                    Client / Student
-                  </button>
-                </div>
-              </div>
-            )}
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label htmlFor="firstName" className="font-medium" style={{ color: 'var(--ink-muted)' }}>First Name</Label>
@@ -152,10 +91,9 @@ function OnboardingForm() {
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   required
-                  readOnly={!!inviteToken}
                   placeholder="John"
                   className="rounded-xl border"
-                  style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)', opacity: inviteToken ? 0.7 : 1 }}
+                  style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)' }}
                 />
               </div>
               <div className="space-y-1">
@@ -164,16 +102,28 @@ function OnboardingForm() {
                   id="lastName"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  readOnly={!!inviteToken}
                   placeholder="Doe"
                   className="rounded-xl border"
-                  style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)', opacity: inviteToken ? 0.7 : 1 }}
+                  style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)' }}
                 />
               </div>
             </div>
 
-            {role === 'THERAPIST' ? (
-              <div className="space-y-1 animate-fadeIn">
+            <div className="space-y-4 animate-fadeIn">
+              <div className="space-y-1">
+                <Label htmlFor="phone" className="font-medium" style={{ color: 'var(--ink-muted)' }}>WhatsApp Phone Number</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  required
+                  className="rounded-xl border"
+                  style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)' }}
+                />
+              </div>
+              <div className="space-y-1">
                 <Label htmlFor="specialty" className="font-medium" style={{ color: 'var(--ink-muted)' }}>Specialties (comma-separated)</Label>
                 <Input 
                   id="specialty" 
@@ -184,34 +134,7 @@ function OnboardingForm() {
                   style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)' }}
                 />
               </div>
-            ) : (
-              <div className="space-y-4 animate-fadeIn">
-                <div className="space-y-1">
-                  <Label htmlFor="dob" className="font-medium" style={{ color: 'var(--ink-muted)' }}>Date of Birth</Label>
-                  <Input 
-                    id="dob" 
-                    type="date" 
-                    value={dob} 
-                    onChange={(e) => setDob(e.target.value)} 
-                    required
-                    className="rounded-xl border"
-                    style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)' }}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="diagnosis" className="font-medium" style={{ color: 'var(--ink-muted)' }}>Diagnosis / Learning Needs (comma-separated)</Label>
-                  <Input
-                    id="diagnosis"
-                    value={diagnosisInput}
-                    onChange={(e) => setDiagnosisInput(e.target.value)}
-                    readOnly={!!inviteToken}
-                    placeholder="ADHD, Anxiety, Dyslexia"
-                    className="rounded-xl border"
-                    style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)', opacity: inviteToken ? 0.7 : 1 }}
-                  />
-                </div>
               </div>
-            )}
 
             {error && (
               <p className="text-sm text-red-600 font-medium text-center">{error}</p>

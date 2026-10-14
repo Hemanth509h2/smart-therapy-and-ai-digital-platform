@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { getOrCreateGuestInvite, sendSessionLinkWhatsApp } from '@/lib/session-whatsapp';
+import { errorResponse } from '@/lib/apiError';
 
 // POST /api/sessions/[sessionId]/guest-link — create (or reuse) a patient
 // join link for an already-created session ("Start a new session"). The
@@ -29,7 +30,6 @@ export async function POST(request: Request, { params }: { params: { sessionId: 
 
     return NextResponse.json({ token: invite.token });
   } catch (error: any) {
-    console.error('Guest link error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Guest link error');
   }
 }

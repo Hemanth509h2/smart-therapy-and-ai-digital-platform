@@ -111,7 +111,7 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
       { id: 'story-choice-adventure', name: 'Story Choice Adventure', emoji: '📖', desc: 'Learn consequences through interactive choices' },
       { id: 'emotion-detective', name: 'Emotion Detective', emoji: '🔍', desc: 'Identify how others feel in real-life situations' },
       { id: 'build-together', name: 'Build Together', emoji: '🌉', desc: 'Combine what you know to build something together' },
-      { id: 'treasure-quest', name: 'Treasure Quest', emoji: '🗺️', desc: 'Follow a chain of clues by sharing what you each know' },
+      { id: 'treasure-quest', name: 'Treasure Hunt (3D)', emoji: '🧭', desc: '3D exploration game with riddles, clues, and hidden treasures' },
     ],
   },
 ]
@@ -146,6 +146,7 @@ const RETIRED_MODULE_NAMES: Record<string, string> = {
   // Removed — testers did not understand either activity.
   'urge-surfing': 'Urge Surfing',
   'safe-space-builder': 'Safe Space Builder',
+  'treasure-hunt': 'Treasure Hunt (3D)',
 }
 
 export const moduleName = (id: string): string =>

@@ -6,10 +6,7 @@ import { useSessionStore } from '@/store/useSessionStore';
 import { useRouter } from 'next/navigation';
 import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import {
-  Mic, MicOff, Camera, CameraOff, PhoneOff, Settings, Smile,
-  Maximize2, Minimize2, Users, X, GripHorizontal,
-} from 'lucide-react';
+import { Mic, MicOff, Camera, CameraOff, PhoneOff, Settings, Smile, X, GripHorizontal } from 'lucide-react';
 import AIConsentBanner from '@/components/session/AIConsentBanner';
 import { AIErrorBoundary } from '@/components/session/AIErrorBoundary';
 import { useSessionTranscription } from '@/hooks/useSessionTranscription';
@@ -27,7 +24,7 @@ import SkillDevLayout from '@/components/session/SkillDevLayout';
 import ReactionOverlay from '@/components/ReactionOverlay';
 import { resolveAllowedModuleIds, isSkillModule, moduleName as moduleDisplayName } from '@/lib/modules';
 import { loadModuleSettings } from '@/hooks/useModuleSettings';
-import { RC, SIDEBAR_WIDTH } from '@/components/session/roomTheme';
+import { RC } from '@/components/session/roomTheme';
 import type { SidebarPanel } from '@/components/session/sessionPanels';
 import CaptionOverlay from '@/components/session/CaptionOverlay';
 import TranslationControl from '@/components/session/TranslationControl';
@@ -667,14 +664,6 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       console.error('Consent write failed:', e);
     }
     setShowConsentBanner(false);
-  };
-
-  const handleCopySessionId = async () => {
-    try {
-      await navigator.clipboard.writeText(sessionId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {}
   };
 
   const handleLeaveSession = () => {

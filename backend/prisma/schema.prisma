@@ -95,6 +95,7 @@ model ProfileTherapist {
   qualification     String?
   experience        String?
   bio               String?
+  phoneNumber       String?  @unique // E.164 format; used for WhatsApp notifications
   // Per-therapist module/tool access. When allModulesAllowed is true the
   // therapist may launch any module; otherwise only those listed in moduleAccess.
   allModulesAllowed Boolean  @default(true)
@@ -114,6 +115,7 @@ model ProfileTherapist {
   progressMetrics ProgressMetric[]
   progressReports ProgressReport[]
   progressNotes   ProgressNote[]
+  whatsAppMessages WhatsAppMessage[]
 }
 
 model ProfileClient {
@@ -169,6 +171,9 @@ model Booking {
   status      String           @default("pending") // pending, confirmed, cancelled
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
+
+  @@index([therapistId, dateTime])
+  @@index([clientId, dateTime])
 }
 
 model Session {
@@ -188,6 +193,9 @@ model Session {
   notes            TherapistNote[]
   report           SessionReport?
   whatsAppMessages WhatsAppMessage[]
+
+  @@index([therapistId, scheduledAt])
+  @@index([clientId, scheduledAt])
 }
 
 // End-of-session AI clinical report. One per session. Generated from the full
@@ -240,6 +248,7 @@ model WhatsAppMessage {
   inviteId          String?
   sessionId         String?
   clientId          String?
+  therapistId       String?
   phoneNumber       String
   generatedLink     String
   messageType       WhatsAppMessageType   @default(CLIENT_INVITE)
@@ -259,6 +268,7 @@ model WhatsAppMessage {
   invite            Invite?               @relation(fields: [inviteId], references: [id], onDelete: Cascade)
   session           Session?              @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   client            ProfileClient?        @relation(fields: [clientId], references: [id])
+  therapist         ProfileTherapist?     @relation(fields: [therapistId], references: [id], onDelete: Cascade)
 
   // Nullable columns don't collide under Postgres uniqueness (NULL != NULL),
   // so CLIENT_INVITE rows (inviteId set, sessionId null) and
@@ -267,6 +277,7 @@ model WhatsAppMessage {
   @@unique([inviteId, messageType])
   @@unique([sessionId, messageType])
   @@index([clientId])
+  @@index([therapistId])
   @@index([status, nextAttemptAt])
 }
 

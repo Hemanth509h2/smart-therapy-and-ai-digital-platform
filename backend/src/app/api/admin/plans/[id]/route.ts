@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { requireAdmin, requireRecentLogin } from '@/lib/apiAuth';
 import { audit } from '@/lib/audit';
 import { parseFeatures, parsePlanLimits } from '@/lib/subscriptions';
+import { errorResponse } from '@/lib/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,8 +55,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (error.code === 'P2025') {
       return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
     }
-    console.error('Admin plan PATCH error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin plan PATCH error');
   }
 }
 
@@ -96,7 +96,6 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     if (error.code === 'P2025') {
       return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
     }
-    console.error('Admin plan DELETE error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin plan DELETE error');
   }
 }

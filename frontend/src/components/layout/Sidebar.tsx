@@ -6,22 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from '@/components/ThemeProvider';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
-import {
-  Home,
-  Users,
-  Calendar,
-  CalendarDays,
-  Puzzle,
-  User,
-  ClipboardList,
-  LifeBuoy,
-  CreditCard,
-  Moon,
-  Sun,
-  LogOut,
-  ChevronsLeft,
-  ChevronsRight,
-} from 'lucide-react';
+import { Home, Users, CalendarDays, Puzzle, User, ClipboardList, LifeBuoy, CreditCard, Moon, Sun, LogOut, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { cx } from '@/components/practice/ui';
 import { initials as toInitials } from '@/lib/practice';
 import { adminNavFor } from '@/lib/adminNav';
@@ -49,13 +34,6 @@ const therapistNav = [
   { href: '/help', label: 'Help & Support', icon: LifeBuoy },
 ];
 
-const clientNav = [
-  { href: '/', label: 'Home', icon: Home },
-  { href: '/my-sessions', label: 'My Sessions', icon: Calendar },
-  { href: '/profile', label: 'Profile', icon: User },
-  { href: '/help', label: 'Help & Support', icon: LifeBuoy },
-];
-
 
 export default function Sidebar({
   role,
@@ -69,12 +47,7 @@ export default function Sidebar({
   const router = useRouter();
   const { theme, toggle: toggleTheme } = useTheme();
 
-  const navItems =
-    role === 'ADMIN'
-      ? adminNavFor(profile)
-      : role === 'THERAPIST'
-        ? therapistNav
-        : clientNav;
+  const navItems = role === 'ADMIN' ? adminNavFor(profile) : therapistNav;
   const roleLabel = role === 'ADMIN' ? 'Admin' : role === 'THERAPIST' ? 'Therapist' : 'Client';
 
   // '/' and '/admin' only match exactly; everything else also owns its sub-routes

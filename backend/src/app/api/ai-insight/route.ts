@@ -1,19 +1,25 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { requireTherapist } from '@/lib/progressAuth'
 import { runAnalysis } from '@/lib/rag/analysis'
 import { checkAIConsent, getSessionTranscript, appendCopilotEvent } from '@/lib/rag/transcript-store'
 import type { ClientProfile } from '@/lib/rag/retrieval'
 import type { AIInsight } from '@/lib/rag/types'
 import { getSetting } from '@/lib/settings'
+import { errorResponse, logError } from '@/lib/apiError'
 
 export async function POST(request: Request) {
   try {
+    // Authenticate before any consent/transcript/notes read, LLM call or write.
+    const auth = await requireTherapist(request)
+    if (!auth.ok) return auth.response
+
     if (!(await getSetting('features.aiInsights'))) {
       return NextResponse.json({ error: 'AI insights are turned off by an admin.' }, { status: 503 })
     }
 
     const body = await request.json()
-    const { sessionId, therapistId, clientProfile, transcriptWindowMinutes } = body
+    const { sessionId, therapistId: bodyTherapistId, clientProfile, transcriptWindowMinutes } = body
 
     if (!sessionId || typeof sessionId !== 'string') {
       return NextResponse.json(
@@ -22,7 +28,7 @@ export async function POST(request: Request) {
       )
     }
 
-    if (!therapistId || typeof therapistId !== 'string') {
+    if (!bodyTherapistId || typeof bodyTherapistId !== 'string') {
       return NextResponse.json(
         { error: 'therapistId is required and must be a string' },
         { status: 400 }
@@ -36,8 +42,36 @@ export async function POST(request: Request) {
       )
     }
 
+    // Kept as a required field for the existing request contract, but never
+    // used: the client is taken from the verified session row below.
+    if (!String(clientProfile.clientId ?? '')) {
+      return NextResponse.json(
+        { error: 'clientProfile.clientId is required' },
+        { status: 400 }
+      )
+    }
+
+    // The body's therapistId must be the caller's own uid; from here on only the
+    // verified uid is used (study material, previous notes, usage logging).
+    if (bodyTherapistId !== auth.uid) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    const therapistId = auth.uid
+
+    // Ownership check before consent, transcript, notes, LLM calls or writes.
+    // Non-owned and non-existent sessions get the same 404.
+    const session = await prisma.session.findFirst({
+      where: { id: sessionId, therapistId: auth.therapist.id },
+      select: { id: true, clientId: true },
+    })
+    if (!session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+    }
+
+    // name/age/conditions are the owning therapist's descriptive input for the
+    // prompt only — not identity. clientId and therapistId are verified values.
     const profile: ClientProfile = {
-      clientId: String(clientProfile.clientId ?? ''),
+      clientId: session.clientId,
       name: String(clientProfile.name ?? 'Unknown'),
       age: Number(clientProfile.age ?? 0),
       conditions: Array.isArray(clientProfile.conditions)
@@ -45,13 +79,6 @@ export async function POST(request: Request) {
         : [],
       sessionNumber: Number(clientProfile.sessionNumber ?? 1),
       therapistId,
-    }
-
-    if (!profile.clientId) {
-      return NextResponse.json(
-        { error: 'clientProfile.clientId is required' },
-        { status: 400 }
-      )
     }
 
     // Dev test mode bypasses the both-consent gate so the copilot can be verified
@@ -134,7 +161,7 @@ export async function POST(request: Request) {
         await prisma.usageEvent.create({ data: { therapistId: t.id, sessionId, type: 'AI_ANALYSIS' } })
       }
     } catch (e) {
-      console.error('Failed to log AI usage event:', e)
+      logError('ai-insight usage event', e)
     }
 
     // Persist risk flags for the admin Sessions monitor. The copilot re-runs
@@ -159,10 +186,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ insight })
   } catch (error: any) {
-    console.error('AI insight generation error:', error)
-    return NextResponse.json(
-      { error: error.message ?? 'Internal server error' },
-      { status: 500 }
-    )
+    return errorResponse(error, 'ai-insight')
   }
 }

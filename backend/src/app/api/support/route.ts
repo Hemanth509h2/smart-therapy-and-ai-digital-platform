@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
 import { getSetting } from '@/lib/settings';
+import { errorResponse } from '@/lib/apiError';
 
 const CATEGORIES = ['Technical Issue', 'Billing', 'Account', 'Feedback', 'Other'];
 
@@ -124,10 +125,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, ref, emailed: true });
   } catch (error: any) {
-    console.error('Support ticket error:', error);
-    return NextResponse.json(
-      { error: error?.message || 'Failed to send ticket' },
-      { status: 500 }
-    );
+    return errorResponse(error, 'Support ticket error', 'Failed to send ticket');
   }
 }

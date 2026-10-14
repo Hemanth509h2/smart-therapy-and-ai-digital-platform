@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
-import { normalizeWhatsAppNumber } from '@/lib/whatsapp-cloud-api';
+import { normalizePhoneNumber } from '@/lib/phone';
+import { errorResponse } from '@/lib/apiError';
 
 // The caller must own the therapist profile or be an ADMIN.
 async function mayAccessTherapist(uid: string, therapistId: string) {
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
 
     const normalizedPhoneNumber =
       typeof phoneNumber === 'string' && phoneNumber.trim()
-        ? normalizeWhatsAppNumber(phoneNumber)
+        ? normalizePhoneNumber(phoneNumber)
         : null;
 
     const invite = await prisma.invite.create({
@@ -55,8 +56,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ token: invite.token, invite });
   } catch (error: any) {
-    console.error('Invite creation error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Invite creation error');
   }
 }
 
@@ -82,6 +82,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ invites });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'invites GET');
   }
 }

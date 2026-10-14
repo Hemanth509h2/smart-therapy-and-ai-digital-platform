@@ -8,6 +8,7 @@ import { sendSessionScheduledMessage, sendWhatsAppInvite } from '@/lib/whatsapp-
 // WhatsApp rules for sessions:
 //   - booking a session      -> date/time confirmation, NO link
 //   - starting a session     -> the patient join link, sent once per session
+//                               (webhook first, WhatsApp Cloud API on failure)
 
 /** Get (or create) the patient join invite for a session. The invite is
  *  CLAIMED with claimedClientId = session.clientId, so opening the link lands
@@ -40,6 +41,39 @@ export async function getOrCreateGuestInvite(session: Session) {
   });
 }
 
+interface LinkWebhookPayload {
+  event: 'session.link.generated';
+  sessionId: string;
+  phoneNumber: string;
+  patientName: string;
+  therapistName: string;
+  link: string;
+}
+
+/** Step 1 of the link flow: POST the freshly generated link to the configured
+ *  webhook. Throws on a network error, timeout or non-2xx so the caller can
+ *  fall back to the official WhatsApp Cloud API. */
+async function postLinkWebhook(payload: LinkWebhookPayload): Promise<{ id?: string }> {
+  const url = process.env.WHATSAPP_LINK_WEBHOOK_URL;
+  if (!url) throw new Error('WHATSAPP_LINK_WEBHOOK_URL not set');
+
+  const secret = process.env.WHATSAPP_LINK_WEBHOOK_SECRET;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(secret ? { Authorization: `Bearer ${secret}` } : {}),
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(10_000),
+    cache: 'no-store',
+  });
+  if (!response.ok) throw new Error(`Link webhook responded ${response.status}`);
+
+  const body = (await response.json().catch(() => ({}))) as { id?: unknown };
+  return { id: typeof body.id === 'string' ? body.id : undefined };
+}
+
 type MessageType = 'SESSION_SCHEDULED' | 'SESSION_STARTED';
 
 export const WHATSAPP_OFF = 'WhatsApp messaging is turned off by an admin.';
@@ -52,7 +86,7 @@ async function deliver(
   phoneNumber: string,
   messageType: MessageType,
   generatedLink: string,
-  send: () => Promise<{ id: string }>
+  send: () => Promise<{ id?: string }>
 ) {
   const now = new Date();
   try {
@@ -149,14 +183,31 @@ export async function sendSessionLinkWhatsApp(sessionId: string, request: Reques
   const invite = await getOrCreateGuestInvite(session);
   const link = `${appUrl(request)}/join/${invite.token}`;
 
-  await deliver(session.id, session.clientId, phone, 'SESSION_STARTED', link, () =>
-    sendWhatsAppInvite({
+  const therapistName = `${session.therapist.firstName} ${session.therapist.lastName}`.trim();
+
+  await deliver(session.id, session.clientId, phone, 'SESSION_STARTED', link, async () => {
+    // Webhook first; only if it fails do we send via the WhatsApp Cloud API.
+    if (process.env.WHATSAPP_LINK_WEBHOOK_URL) {
+      try {
+        return await postLinkWebhook({
+          event: 'session.link.generated',
+          sessionId: session.id,
+          phoneNumber: phone,
+          patientName: session.client.firstName,
+          therapistName,
+          link,
+        });
+      } catch (error: any) {
+        console.error('Link webhook failed, falling back to WhatsApp Cloud API:', error?.message || error);
+      }
+    }
+    return sendWhatsAppInvite({
       to: phone,
       patientName: session.client.firstName,
       inviteLink: link,
-      therapistName: `${session.therapist.firstName} ${session.therapist.lastName}`.trim(),
-    })
-  );
+      therapistName,
+    });
+  });
 }
 
 /** Admin retry of one logged message (any type), re-using its stored link.

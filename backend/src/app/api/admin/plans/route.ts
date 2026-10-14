@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
 import { audit } from '@/lib/audit';
 import { parseFeatures, parsePlanLimits } from '@/lib/subscriptions';
+import { errorResponse } from '@/lib/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,8 +37,7 @@ export async function GET(request: Request) {
       })),
     });
   } catch (error: any) {
-    console.error('Admin plans GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin plans GET error');
   }
 }
 
@@ -85,7 +85,6 @@ export async function POST(request: Request) {
     if (error.code === 'P2002') {
       return NextResponse.json({ error: 'A plan with that name already exists.' }, { status: 409 });
     }
-    console.error('Admin plans POST error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin plans POST error');
   }
 }
