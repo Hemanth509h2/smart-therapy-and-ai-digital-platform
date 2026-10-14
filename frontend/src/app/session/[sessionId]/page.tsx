@@ -34,6 +34,7 @@ import SessionTopBar from '@/components/session/SessionTopBar';
 import SessionBottomBar from '@/components/session/SessionBottomBar';
 import AIAssistantPopup from '@/components/session/AIAssistantPopup';
 import AINotesPopup from '@/components/session/AINotesPopup';
+import CaptionsPopup from '@/components/session/CaptionsPopup';
 import TherapyModulesPanel from '@/components/session/TherapyModulesPanel';
 import { ShareWhiteboardModal } from '@/components/session/WhiteboardStage';
 import StaadWhiteboard from '@/components/session/StaadWhiteboard';
@@ -130,6 +131,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   // AI Assistant & AI Notes are now floating popups instead of sidebar panels
   const [showAssistantPopup, setShowAssistantPopup] = useState(false);
   const [showNotesPopup, setShowNotesPopup] = useState(false);
+  const [showCaptionsPopup, setShowCaptionsPopup] = useState(false);
   const [screenSharing, setScreenSharing] = useState(false);
   const [shareWhiteboardAsk, setShareWhiteboardAsk] = useState(false);
   const whiteboardPromptedRef = useRef(false);
@@ -1294,6 +1296,8 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                 onToggleScreenShare={() => setScreenSharing((s) => !s)}
                 showBackToVideo={whiteboardMode || moduleMode}
                 onBackToVideo={() => (whiteboardMode ? closeWhiteboard() : handleModuleClose())}
+                captionsOpen={showCaptionsPopup}
+                onToggleCaptions={() => setShowCaptionsPopup((open) => !open)}
               />
             )}
           </div>
@@ -1323,6 +1327,15 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
             insight={aiInsight}
             initialPosition={{ x: 820, y: 140 }}
             onClose={() => setShowNotesPopup(false)}
+          />
+        )}
+
+        {/* Captions Popup — every caption stored for this session */}
+        {isTherapist && showCaptionsPopup && (
+          <CaptionsPopup
+            sessionId={sessionId}
+            live={transcription.isRecording || translationSettings.enabled}
+            onClose={() => setShowCaptionsPopup(false)}
           />
         )}
 

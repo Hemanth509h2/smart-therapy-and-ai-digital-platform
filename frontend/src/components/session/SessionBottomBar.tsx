@@ -3,7 +3,7 @@ import { useLocalParticipant } from '@livekit/components-react'
 import {
   Mic, MicOff, Camera, CameraOff, PhoneOff, ChevronUp,
   MonitorUp, NotebookPen, PenTool, Blocks, Settings,
-  Smile, Lock, LockOpen, Sparkles, Video,
+  Smile, Lock, LockOpen, Sparkles, Video, Captions,
 } from 'lucide-react'
 import { RC } from './roomTheme'
 import type { SidebarPanel } from './sessionPanels'
@@ -31,6 +31,8 @@ export default function SessionBottomBar({
   onToggleScreenShare,
   showBackToVideo,
   onBackToVideo,
+  captionsOpen = false,
+  onToggleCaptions,
 }: {
   activePanel: SidebarPanel
   onSelectPanel: (panel: Exclude<SidebarPanel, null>) => void
@@ -45,6 +47,8 @@ export default function SessionBottomBar({
   onToggleScreenShare: () => void
   showBackToVideo?: boolean
   onBackToVideo?: () => void
+  captionsOpen?: boolean
+  onToggleCaptions?: () => void
 }) {
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant()
 
@@ -157,6 +161,12 @@ export default function SessionBottomBar({
         <button onClick={() => onSelectPanel('notes')} style={item(activePanel === 'notes')}>
           <NotebookPen size={17} /> AI Notes
         </button>
+
+        {onToggleCaptions && (
+          <button onClick={onToggleCaptions} title="Session captions" style={item(captionsOpen)}>
+            <Captions size={17} /> Captions
+          </button>
+        )}
 
         <button onClick={() => onSelectPanel('whiteboard')} style={item(activePanel === 'whiteboard')}>
           <PenTool size={17} /> Whiteboard
