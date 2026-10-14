@@ -973,7 +973,11 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       {/* Shown whenever transcription is consent-enabled (Sarvam captions) or the
           translation agent is on. Previously gated on the translation toggle
           alone (default off), which hid every Sarvam caption. */}
-      <CaptionOverlay enabled={transcriptionEnabled || translationSettings.enabled} />
+      <CaptionOverlay
+        enabled={transcriptionEnabled || translationSettings.enabled}
+        sessionId={sessionId}
+        store={isTherapist}
+      />
       {/* Applies caption-language changes to the room without reconnecting. */}
       {isTherapist && <TranslationSync sessionId={sessionId} settings={translationSettings} />}
       {/* Runs the Sarvam pipeline inside the room provider so it can access the

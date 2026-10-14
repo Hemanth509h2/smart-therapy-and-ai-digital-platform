@@ -19,6 +19,7 @@ import { useSessionRoom } from '@/components/StaadVideo'
 import { RC } from '@/components/session/roomTheme'
 import { languageLabel } from '@/lib/translationLanguages'
 import { shouldShowCaption } from '@/lib/stt/sarvam'
+import { saveCaption } from '@/lib/captionLog'
 
 const TRANSCRIPTION_TOPIC = 'lk.transcription'
 /** Captions older than this fade out, so stale text does not linger on screen. */
@@ -40,7 +41,16 @@ interface CaptionPayload {
   attributes: Record<string, string>
 }
 
-export default function CaptionOverlay({ enabled }: { enabled: boolean }) {
+export default function CaptionOverlay({
+  enabled,
+  sessionId,
+  store = false,
+}: {
+  enabled: boolean
+  sessionId?: string
+  /** Also append each caption to the session record (therapist browser only). */
+  store?: boolean
+}) {
   const { room } = useSessionRoom()
   const [captions, setCaptions] = useState<Caption[]>([])
   const [showOriginal, setShowOriginal] = useState(false)
@@ -48,6 +58,8 @@ export default function CaptionOverlay({ enabled }: { enabled: boolean }) {
   // torn down every time this flag flips.
   const enabledRef = useRef(enabled)
   enabledRef.current = enabled
+  const storeRef = useRef({ store, sessionId })
+  storeRef.current = { store, sessionId }
 
   const addCaption = (payload: CaptionPayload) => {
     const text = payload.text.trim()
@@ -62,6 +74,16 @@ export default function CaptionOverlay({ enabled }: { enabled: boolean }) {
       sourceLang: attrs['staad.source_language'] || '',
       targetLang: attrs['staad.target_language'] || '',
       at: Date.now(),
+    }
+
+    if (storeRef.current.store && storeRef.current.sessionId) {
+      saveCaption(storeRef.current.sessionId, {
+        id: caption.segmentId,
+        speaker: caption.speaker,
+        text: caption.text,
+        original: caption.original,
+        at: caption.at,
+      })
     }
 
     setCaptions((prev) => {
