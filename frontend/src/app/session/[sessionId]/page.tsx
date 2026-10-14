@@ -52,9 +52,6 @@ interface SessionState {
 /* The room colour palette now lives in components/session/roomTheme.ts (same
    values) so the top bar, bottom bar and the swappable panels share one source. */
 
-// How long the client sees the session-ended details before the window closes.
-const CLIENT_CLOSE_SECONDS = 10;
-
 // Thin wrapper so the transcription hook runs INSIDE <StaadVideo>'s room
 // context (it reads the LiveKit room via useSessionRoom). Renders nothing;
 // it just relays the recording state up to the page for the status chip.
@@ -887,27 +884,17 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       .catch(() => {});
   }, [sessionEnded, sessionId]);
 
-  // For client: show the session details, then close the window after a
-  // countdown. For therapist: the session-ended screen stays up until "Done".
-  // Must sit above the early returns — hooks can't be called conditionally.
-  const [closeIn, setCloseIn] = useState(CLIENT_CLOSE_SECONDS);
+  // When the therapist ends the call the client's window closes straight away.
+  // Browsers only let script close a tab that script opened, and clients
+  // usually arrive from a WhatsApp link, so if the tab is still here a moment
+  // later it is replaced (no Back into the room) with a plain "session ended"
+  // page. Must sit above the early returns — hooks can't be called conditionally.
   useEffect(() => {
     if (!sessionEnded || isTherapist) return;
-    const interval = setInterval(() => setCloseIn((s) => Math.max(0, s - 1)), 1000);
-    const timer = setTimeout(() => {
-      window.close();
-      // Fallback if window.close() doesn't work (not opened by JS)
-      if (auth.currentUser?.uid?.startsWith('guest:')) {
-        auth.signOut().catch(() => {});
-        window.location.href = '/auth';
-      } else {
-        window.location.href = '/';
-      }
-    }, CLIENT_CLOSE_SECONDS * 1000);
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timer);
-    };
+    if (auth.currentUser?.uid?.startsWith('guest:')) auth.signOut().catch(() => {});
+    window.close();
+    const fallback = setTimeout(() => window.location.replace('/session-ended'), 300);
+    return () => clearTimeout(fallback);
   }, [sessionEnded, isTherapist]);
 
   if (loading) {
@@ -958,11 +945,6 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
           >
             {isTherapist ? 'Done' : 'Close'}
           </button>
-          {!isTherapist && (
-            <p className="mt-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
-              This window will close in {closeIn}s
-            </p>
-          )}
         </div>
       </div>
     );
