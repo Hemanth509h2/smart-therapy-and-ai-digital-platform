@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { timeAgo } from "@/lib/client";
 import { category } from "@/lib/ui";
+import type { QuickResult } from "@/lib/survey";
 
 type Post = { id: string; category: string; body: string; vote_count: number; comment_count: number; created_at: string };
 
@@ -12,6 +13,8 @@ export default function Present() {
   const [svg, setSvg] = useState("");
   const [latest, setLatest] = useState<Post[]>([]);
   const [total, setTotal] = useState<number | null>(null);
+  const [quicks, setQuicks] = useState<QuickResult[]>([]);
+  const [qi, setQi] = useState(0);
 
   useEffect(() => {
     const target = process.env.NEXT_PUBLIC_PUBLIC_URL || window.location.origin;
@@ -28,12 +31,22 @@ export default function Present() {
         if (!alive) return;
         setLatest((r.items ?? []).slice(0, 2));
         setTotal(r.total ?? 0);
+        const qr = await fetch("/api/quick", { cache: "no-store" }).then((x) => x.json());
+        setQuicks(Array.isArray(qr?.questions) ? qr.questions : []);
       } catch {}
     };
     poll();
     const t = setInterval(poll, 10_000);
     return () => { alive = false; clearInterval(t); };
   }, []);
+
+  // rotate through the quick questions every 8 seconds
+  useEffect(() => {
+    if (quicks.length < 2) return;
+    const t = setInterval(() => setQi((x) => x + 1), 8000);
+    return () => clearInterval(t);
+  }, [quicks.length]);
+  const quick = quicks.length ? quicks[qi % quicks.length] : null;
 
   return (
     <div className="present">
@@ -50,8 +63,21 @@ export default function Present() {
       </div>
       <div className="present-right">
         <div className="qr" dangerouslySetInnerHTML={{ __html: svg }} aria-label={`QR code for ${url}`} />
+        {quick && (
+          <div className="p-quick">
+            <div className="p-quick-head" key={quick.id}><span>{quick.question}</span><small>{quicks.length > 1 ? `${(qi % quicks.length) + 1}/${quicks.length} · ` : ""}{quick.total} {quick.total === 1 ? "answer" : "answers"}</small></div>
+            {quick.options.map((o) => {
+              const pct = quick.total ? Math.round(((quick.counts[o] ?? 0) / quick.total) * 100) : 0;
+              return (
+                <div className="p-quick-row" key={o}>
+                  <span>{o}</span><span className="p-quick-track"><i style={{ width: `${pct}%` }} /></span><b>{pct}%</b>
+                </div>
+              );
+            })}
+          </div>
+        )}
         <div className="ticker" aria-live="polite">
-          {latest.map((p) => (
+          {latest.slice(0, quick ? 1 : 2).map((p) => (
             <div className="ticker-item" key={p.id}>
               <small><i style={{ background: category(p.category).color }} />{category(p.category).label} · {timeAgo(p.created_at)}</small>
               <p>{p.body}</p>

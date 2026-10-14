@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Menu, { MenuItem } from "@/components/Menu";
+import QuickQuestion from "@/components/QuickQuestion";
 import WaBar, { ReplyTarget, SimilarItem } from "@/components/WaBar";
 import {
   BackIcon, ChevronDown, ChevronUp, CloseIcon, FlagIcon, LikeFilledIcon, LikeIcon, LinkIcon, Logo,
@@ -8,7 +9,8 @@ import {
 } from "@/components/icons";
 import { avatarColor, handle, initial } from "@/lib/anon";
 import { api, deviceToken, forgetOwn, newAuthorToken, ownTokens, rememberOwn, saveVoted, timeAgo, votedSet } from "@/lib/client";
-import { CATEGORIES, category, compact, openPrivacy, openReport, toast } from "@/lib/ui";
+import { CATEGORIES, category, compact, openPrivacy, openReport, openSurvey, toast } from "@/lib/ui";
+import { surveyDone } from "@/components/Survey";
 
 type Post = { id: string; category: string; body: string; vote_count: number; comment_count: number; created_at: string };
 type Reply = { id: string; parent_id: string | null; body: string | null; removed: boolean; is_op: boolean; vote_count: number; created_at: string };
@@ -42,6 +44,14 @@ export default function Board() {
   const [flash, setFlash] = useState<string | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
+  const [surveyed, setSurveyed] = useState(false);
+
+  useEffect(() => {
+    setSurveyed(surveyDone());
+    const on = () => setSurveyed(true);
+    window.addEventListener("fb:survey-done", on);
+    return () => window.removeEventListener("fb:survey-done", on);
+  }, []);
 
   // Optional deep links: /?c=<category>&sort=new
   useEffect(() => {
@@ -217,8 +227,14 @@ export default function Board() {
           </p>
           <div className="mh-row">
             <button className="mh-cta" onClick={() => { setReplyTo(null); setFocusKey((k) => k + 1); }}>Write a note</button>
-            <button className="mh-link" onClick={openPrivacy}>How we keep it anonymous</button>
+            {surveyed ? (
+              <span className="mh-done">Survey done · thanks</span>
+            ) : (
+              <button className="mh-cta secondary" onClick={openSurvey}>Take the 2-min survey</button>
+            )}
           </div>
+          <button className="mh-link" onClick={openPrivacy}>How we keep it anonymous</button>
+          <QuickQuestion />
         </section>
 
         <div className="sec-head">

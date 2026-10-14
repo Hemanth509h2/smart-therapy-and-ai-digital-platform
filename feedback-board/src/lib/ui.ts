@@ -13,6 +13,10 @@ export function openPrivacy() {
   window.dispatchEvent(new CustomEvent("fb:privacy"));
 }
 
+export function openSurvey() {
+  window.dispatchEvent(new CustomEvent("fb:survey"));
+}
+
 export const CATEGORIES = [
   { key: "idea", label: "Idea", plural: "Ideas", color: "#b07b4f", emoji: "💡" },
   { key: "issue", label: "Issue", plural: "Issues", color: "#c8473a", emoji: "🐞" },

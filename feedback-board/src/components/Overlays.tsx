@@ -4,6 +4,7 @@ import { api, deviceToken } from "@/lib/client";
 import { toast } from "@/lib/ui";
 import { CloseIcon } from "./icons";
 import Captcha from "./Captcha";
+import Survey from "./Survey";
 
 /** Toasts, report dialog, create-post dialog and the shared CAPTCHA widget - mounted once in the layout. */
 export default function Overlays() {
@@ -12,6 +13,7 @@ export default function Overlays() {
       <Toaster />
       <ReportDialog />
       <PrivacyDialog />
+      <Survey />
       <div className="captcha-slot"><Captcha /></div>
     </>
   );
