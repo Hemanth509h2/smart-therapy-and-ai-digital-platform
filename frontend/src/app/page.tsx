@@ -88,7 +88,9 @@ export default function DashboardPage() {
     const featured =
       today.find((s) => sessionState(s, now, sessionDuration(s, bookings)) === 'live') ??
       today.filter((s) => sessionState(s, now, sessionDuration(s, bookings)) === 'upcoming').sort(byStartAsc)[0] ??
-      [...today].sort(byStartAsc)[0];
+      // A finished session has nothing left to do here; its notes are under
+      // Pending Notes / the client's page.
+      today.filter((s) => s.status !== 'COMPLETED').sort(byStartAsc)[0];
 
     const focus = clients
       .map((c) => ({ c, f: clientFocus(c, sessions, bookings, now) }))
@@ -271,8 +273,12 @@ export default function DashboardPage() {
               ) : (
                 <EmptyCard
                   mark={<IconSchTile />}
-                  title="No sessions today"
-                  body="When you book an appointment for today it will appear here."
+                  title={live.today.length ? 'All done for today' : 'No sessions today'}
+                  body={
+                    live.today.length
+                      ? "Today's sessions are complete. New appointments for today will appear here."
+                      : 'When you book an appointment for today it will appear here.'
+                  }
                   notch={<NotchLink href="/schedule" label="Book appointment" />}
                   action={
                     <Btn icon={<IconCalendarPlus />} variant="primary" onClick={() => openBook()}>
