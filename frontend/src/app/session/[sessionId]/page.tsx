@@ -34,6 +34,7 @@ import SessionBottomBar from '@/components/session/SessionBottomBar';
 import AIAssistantPopup from '@/components/session/AIAssistantPopup';
 import AINotesPopup from '@/components/session/AINotesPopup';
 import CaptionsPopup from '@/components/session/CaptionsPopup';
+import WaitingLobby from '@/components/session/WaitingLobby';
 import TherapyModulesPanel from '@/components/session/TherapyModulesPanel';
 import { ShareWhiteboardModal } from '@/components/session/WhiteboardStage';
 import StaadWhiteboard from '@/components/session/StaadWhiteboard';
@@ -964,6 +965,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       // transcribing on a GPU for output nobody is showing.
       sourceLang={translationSettings.enabled ? translationPair.source : undefined}
       targetLang={translationSettings.enabled ? translationPair.target : undefined}
+      waitingScreen={<WaitingLobby therapistName={participantName} selfName={displayName} />}
     >
       {/* Renders translated captions published by the translation agent on the
           lk.transcription topic. Inside the room provider, like the bridges. */}
