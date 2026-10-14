@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { Blocks, Search, X } from 'lucide-react'
 import { MODULE_CATEGORIES, type ModuleItem } from '@/lib/modules'
 import { RC } from './roomTheme'
+import { useModuleSettings } from '@/hooks/useModuleSettings'
 
 // The picker uses the same registry, permission filter, and launch callback as
 // the previous selector. It is shown as an overlay above the call instead of in
@@ -27,17 +28,19 @@ export default function TherapyModulesPanel({
   const selectedId = clickedId ?? activeModuleId
 
   const allowSet = allowedModuleIds == null ? null : new Set(allowedModuleIds)
+  // Modules an admin switched off globally are hidden; featured ones are badged.
+  const { disabled, featured } = useModuleSettings()
 
   const categories = useMemo(
     () =>
-      (allowSet
-        ? MODULE_CATEGORIES.map((c) => ({ ...c, modules: c.modules.filter((m) => allowSet.has(m.id)) }))
-        : MODULE_CATEGORIES
-      ).filter((c) => c.modules.length > 0),
+      MODULE_CATEGORIES.map((c) => ({
+        ...c,
+        modules: c.modules.filter((m) => (!allowSet || allowSet.has(m.id)) && !disabled.has(m.id)),
+      })).filter((c) => c.modules.length > 0),
     // allowedModuleIds is a stable-enough array from the profile; keying on its
     // joined form avoids re-filtering on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allowedModuleIds?.join(',')]
+    [allowedModuleIds?.join(','), disabled]
   )
 
   const rows = useMemo(() => {
@@ -117,6 +120,9 @@ export default function TherapyModulesPanel({
               >
                 <span aria-hidden="true" style={{ width: 43, height: 43, borderRadius: 12, display: 'grid', placeItems: 'center', fontSize: 23, background: iconBg, border: `1px solid ${iconBorder}` }}>{mod.emoji}</span>
                 <span style={{ fontSize: 12, lineHeight: 1.25, fontWeight: 700, textAlign: 'center' }}>{mod.name}</span>
+                {featured.has(mod.id) && (
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: RC.tileActive, color: RC.greenDark, border: `1px solid ${RC.border}` }}>Featured</span>
+                )}
               </button>
             )
           })}

@@ -1,4 +1,4 @@
-import { AccessToken } from 'livekit-server-sdk'
+import { AccessToken, RoomServiceClient } from 'livekit-server-sdk'
 import { NextRequest, NextResponse } from 'next/server'
 import { isTranslationLanguage } from '@/lib/translationLanguages'
 
@@ -49,6 +49,14 @@ export async function GET(req: NextRequest) {
   if (isTranslationLanguage(sourceLang)) attributes.source_lang = sourceLang
   if (isTranslationLanguage(targetLang)) attributes.target_lang = targetLang
 
+  // Waiting room: a client is not let into the call until the therapist is
+  // actually connected to the LiveKit room. Checked against LiveKit itself
+  // rather than Firestore presence, which goes stale when a tab is closed.
+  // The client's browser polls this endpoint while it gets `waiting: true`.
+  if (claimedRole === 'client' && !(await therapistInRoom(roomName))) {
+    return NextResponse.json({ waiting: true }, { status: 409 })
+  }
+
   const at = new AccessToken(
     process.env.LIVEKIT_API_KEY!,
     process.env.LIVEKIT_API_SECRET!,
@@ -71,4 +79,33 @@ export async function GET(req: NextRequest) {
   })
 
   return NextResponse.json({ token: await at.toJwt() })
+}
+
+async function therapistInRoom(roomName: string): Promise<boolean> {
+  const url = process.env.LIVEKIT_URL || process.env.NEXT_PUBLIC_LIVEKIT_URL
+  if (!url) {
+    // Without a server URL we cannot look; let the client in rather than
+    // locking every call. Set LIVEKIT_URL on the backend to enable the gate.
+    console.warn('[livekit-token] LIVEKIT_URL not set — waiting room disabled')
+    return true
+  }
+  const svc = new RoomServiceClient(
+    url.replace(/^wss:/i, 'https:').replace(/^ws:/i, 'http:'),
+    process.env.LIVEKIT_API_KEY!,
+    process.env.LIVEKIT_API_SECRET!,
+  )
+  try {
+    const people = await svc.listParticipants(roomName)
+    return people.some((p) => {
+      if (p.attributes?.role === 'therapist') return true
+      try {
+        return JSON.parse(p.metadata || '{}').role === 'therapist'
+      } catch {
+        return false
+      }
+    })
+  } catch {
+    // The room does not exist until someone joins it — so no therapist yet.
+    return false
+  }
 }

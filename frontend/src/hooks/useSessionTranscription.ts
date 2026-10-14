@@ -6,6 +6,13 @@ import { db } from '@/lib/firebase'
 import { useSessionRoom } from '@/components/StaadVideo'
 import type { TranscriptChunk } from '@/lib/rag/types'
 import { apiFetch } from '@/lib/api';
+import {
+  STT_SAMPLE_RATE,
+  STT_STREAM_PARAMS,
+  buildAudioMessage,
+  buildCaptionAttributes,
+  parseSarvamMessage,
+} from '@/lib/stt/sarvam'
 
 const TRANSCRIPTION_TOPIC = 'lk.transcription'
 
@@ -29,6 +36,9 @@ interface Pipe {
   ctx: AudioContext
   source: MediaStreamAudioSourceNode
   processor: ScriptProcessorNode
+  track: MediaStreamTrack
+  speaker: TranscriptChunk['speaker']
+  closing: boolean
 }
 
 const STT_RELAY_URL = process.env.NEXT_PUBLIC_STT_RELAY_URL
@@ -43,10 +53,7 @@ function buildProxyUrl(sessionId: string, speaker: string, token: string): strin
   // Ensure wss:// or ws://
   url.protocol = url.protocol.replace('http', 'ws')
   
-  url.searchParams.set('model', 'saaras:v3')
-  url.searchParams.set('mode', 'translate')
-  url.searchParams.set('high_vad_sensitivity', 'true')
-  url.searchParams.set('vad_signals', 'true')
+  for (const [k, v] of Object.entries(STT_STREAM_PARAMS)) url.searchParams.set(k, v)
   url.searchParams.set('sid', sessionId)
   url.searchParams.set('speaker', speaker)
   if (token) url.searchParams.set('token', token)
@@ -54,35 +61,7 @@ function buildProxyUrl(sessionId: string, speaker: string, token: string): strin
   return url.toString()
 }
 
-// Sarvam streaming audio chunks are base64-encoded PCM (s16le) wrapped in JSON.
-function pcmToBase64(int16: Int16Array): string {
-  const bytes = new Uint8Array(int16.buffer)
-  let binary = ''
-  const block = 0x8000
-  for (let i = 0; i < bytes.length; i += block) {
-    binary += String.fromCharCode.apply(
-      null,
-      bytes.subarray(i, i + block) as unknown as number[]
-    )
-  }
-  return btoa(binary)
-}
-
-function captionAttributes(
-  speaker: TranscriptChunk['speaker'],
-  original: string,
-): Record<string, string> {
-  return {
-    'lk.segment_id': `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    'lk.transcription_final': 'true',
-    'staad.kind': 'translation',
-    'staad.speaker_identity': speaker,
-    'staad.source_language': speaker,
-    'staad.target_language': 'en',
-    'staad.original_text': original,
-    'staad.source': 'sarvam-browser',
-  }
-}
+const MAX_RETRIES = 3
 
 export function useSessionTranscription({
   sessionId,
@@ -93,6 +72,9 @@ export function useSessionTranscription({
   const pipesRef = useRef<Map<string, Pipe>>(new Map())
   const startTimeRef = useRef<number>(0)
   const startedRef = useRef(false)
+  const pendingRef = useRef<Set<string>>(new Set())
+  const retriesRef = useRef<Map<string, number>>(new Map())
+  const startPipeRef = useRef<((key: string, track: MediaStreamTrack, speaker: TranscriptChunk['speaker']) => Promise<void>) | null>(null)
   const [state, setState] = useState<TranscriptionState>({
     isRecording: false,
     error: null,
@@ -130,11 +112,11 @@ export function useSessionTranscription({
   )
 
   const publishCaption = useCallback(
-    async (text: string, speaker: TranscriptChunk['speaker']) => {
+    async (text: string, speaker: TranscriptChunk['speaker'], segmentId: string) => {
       const clean = text.trim()
       if (!clean || !room) return
 
-      const attributes = captionAttributes(speaker, clean)
+      const attributes = buildCaptionAttributes(speaker, clean, segmentId)
 
       // Text streams are not looped back to the sender in every LiveKit client
       // path, so update this browser directly and also publish for the peer.
@@ -157,10 +139,17 @@ export function useSessionTranscription({
   )
 
   const stopPipe = useCallback((key: string) => {
+    pendingRef.current.delete(key)
     const pipe = pipesRef.current.get(key)
     if (!pipe) return
+    pipe.closing = true
+    pipe.processor.onaudioprocess = null
+    pipe.ws.onopen = pipe.ws.onmessage = pipe.ws.onerror = pipe.ws.onclose = null
+    pipe.track.onended = null
     try { pipe.processor.disconnect() } catch {}
     try { pipe.source.disconnect() } catch {}
+    // Closing the context does NOT stop the MediaStreamTrack, which stays
+    // owned by LiveKit and keeps feeding the call.
     try { pipe.ctx.close() } catch {}
     try { pipe.ws.close() } catch {}
     pipesRef.current.delete(key)
@@ -169,51 +158,56 @@ export function useSessionTranscription({
   // Open a Sarvam socket + audio graph for one participant track.
   const startPipe = useCallback(
     async (key: string, track: MediaStreamTrack, speaker: TranscriptChunk['speaker']) => {
-      if (pipesRef.current.has(key)) return
+      // Reserve the key synchronously: the token fetch below is async, so
+      // checking only pipesRef would let two callers race into duplicate pipes.
+      if (pipesRef.current.has(key) || pendingRef.current.has(key)) return
+      pendingRef.current.add(key)
 
+      // The proxy verifies this token when STT_TOKEN_SECRET is set on the server.
+      // Dev without a secret may proceed tokenless; production may not.
       let token = ''
-      if (STT_RELAY_URL) try {
+      try {
         const { auth } = await import('@/lib/firebase')
+        // After a refresh Firebase restores the login asynchronously; asking
+        // for the token before that returns nothing and the request fails.
+        await auth.authStateReady?.()
         const idToken = await auth.currentUser?.getIdToken()
         const res = await apiFetch(`/api/stt-token?sessionId=${sessionId}`, {
-          headers: { Authorization: `Bearer ${idToken}` }
+          headers: { Authorization: `Bearer ${idToken}` },
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Failed to get STT token')
         token = data.token
       } catch (err) {
-        console.error('[Transcription] Failed to get token:', err)
-        setState((s) => ({ ...s, error: 'Transcription auth error' }))
+        if (process.env.NODE_ENV === 'production' || STT_RELAY_URL) {
+          console.error('[Transcription] Failed to get token:', err)
+          pendingRef.current.delete(key)
+          setState((s) => ({ ...s, error: 'Transcription auth error' }))
+          return
+        }
+        console.warn('[Transcription] No STT token (dev): continuing without one')
+      }
+      // Stopped (or track ended) while the token was being fetched.
+      if (!pendingRef.current.has(key) || track.readyState === 'ended') {
+        pendingRef.current.delete(key)
         return
       }
+      pendingRef.current.delete(key)
 
-      // Connect to our proxy (translate mode → English out, multilingual in).
       const ws = new WebSocket(buildProxyUrl(sessionId, speaker, token))
-
-      const ctx = new AudioContext({ sampleRate: 16000 })
+      const ctx = new AudioContext({ sampleRate: STT_SAMPLE_RATE })
       const source = ctx.createMediaStreamSource(new MediaStream([track]))
       const processor = ctx.createScriptProcessor(4096, 1, 1)
+      const pipe: Pipe = { ws, ctx, source, processor, track, speaker, closing: false }
 
       processor.onaudioprocess = (e) => {
         if (ws.readyState !== WebSocket.OPEN) return
-        const float32 = e.inputBuffer.getChannelData(0)
-        const int16 = new Int16Array(float32.length)
-        for (let i = 0; i < float32.length; i++) {
-          const s = Math.max(-1, Math.min(1, float32[i]))
-          int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff
-        }
-        ws.send(
-          JSON.stringify({
-            audio: {
-              data: pcmToBase64(int16),
-              sample_rate: '16000',
-              encoding: 'audio/wav',
-            },
-          })
-        )
+        ws.send(buildAudioMessage(e.inputBuffer.getChannelData(0)))
       }
 
       ws.onopen = () => {
+        retriesRef.current.delete(key)
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {})
         source.connect(processor)
         processor.connect(ctx.destination)
         setState((s) => ({ ...s, isRecording: true, error: null }))
@@ -221,32 +215,57 @@ export function useSessionTranscription({
       }
 
       ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data)
-          if (msg.type !== 'data') return
-          const text: string = msg.data?.transcript || msg.data?.translation || ''
-          if (text.trim()) {
-            console.log(`[Transcription] Caption received (${speaker})`)
-            writeChunk(text, speaker)
-            publishCaption(text, speaker)
-          }
-        } catch (e) {
-          console.warn('[Transcription] Parse error:', e)
+        const msg = parseSarvamMessage(event.data)
+        if (msg.kind === 'error') {
+          console.warn(`[Transcription] Service error (${speaker}):`, msg.code ?? '')
+          setState((s) => ({ ...s, error: 'Transcription service error' }))
+          return
         }
+        if (msg.kind !== 'transcript') return
+        // Fresh segment id per message. Sarvam's request_id is not documented as
+        // unique per utterance, so it must not drive dedupe or the overlay's
+        // replace-by-segment-id (that dropped every caption after the first).
+        const segmentId = `${speaker}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+        console.log(`[Transcription] Caption received (${speaker}, ${msg.text.length} chars)`)
+        // Caption first: a Firestore failure must never suppress the UI.
+        publishCaption(msg.text, speaker, segmentId)
+        writeChunk(msg.text, speaker)
       }
 
       ws.onerror = () => {
         setState((s) => ({ ...s, error: 'Transcription connection error' }))
       }
 
-      ws.onclose = () => {
-        console.log(`[Transcription] Pipe closed (${speaker})`)
+      ws.onclose = (ev) => {
+        if (pipe.closing) return
+        console.log(`[Transcription] Pipe closed (${speaker}) code=${ev.code}`)
+        stopPipe(key)
+        if (pipesRef.current.size === 0) setState((s) => ({ ...s, isRecording: false }))
+        // Auth/config failures will not fix themselves; transient ones get a bounded retry.
+        const reason = ev.reason || ''
+        if (/not configured|auth/i.test(reason)) {
+          setState((s) => ({ ...s, error: reason }))
+          return
+        }
+        const attempt = (retriesRef.current.get(key) ?? 0) + 1
+        if (!startedRef.current || attempt > MAX_RETRIES || track.readyState === 'ended') {
+          setState((s) => ({ ...s, error: 'Transcription disconnected' }))
+          return
+        }
+        retriesRef.current.set(key, attempt)
+        setTimeout(() => {
+          if (startedRef.current && !pipesRef.current.has(key)) startPipeRef.current?.(key, track, speaker)
+        }, 1000 * 2 ** (attempt - 1))
       }
 
-      pipesRef.current.set(key, { ws, ctx, source, processor })
+      // Track ended (e.g. mic unpublished): tear the pipe down without touching the track.
+      track.onended = () => stopPipe(key)
+
+      pipesRef.current.set(key, pipe)
     },
-    [writeChunk, publishCaption, sessionId]
+    [writeChunk, publishCaption, sessionId, stopPipe]
   )
+  startPipeRef.current = startPipe
 
   const addRemoteMic = useCallback(
     (participant: RemoteParticipant) => {
@@ -267,10 +286,13 @@ export function useSessionTranscription({
       .getTrackPublication(Track.Source.Microphone)
       ?.track?.mediaStreamTrack
     if (track) startPipe('local', track, 'therapist')
+    else console.log('[Transcription] Started; waiting for the local microphone track to publish')
   }, [room, startPipe])
 
   const stopTranscription = useCallback(() => {
     for (const key of Array.from(pipesRef.current.keys())) stopPipe(key)
+    pendingRef.current.clear()
+    retriesRef.current.clear()
     startedRef.current = false
     setState((s) => ({ ...s, isRecording: false }))
     console.log('[Transcription] Stopped')
@@ -320,8 +342,12 @@ export function useSessionTranscription({
   }, [shouldRun, room, addLocalMic, addRemoteMic, stopPipe])
 
   useEffect(() => {
-    if (!shouldRun || !room) return
-    if (room.state !== 'connected') return
+    if (!shouldRun || !room || room.state !== 'connected') {
+      console.log(
+        `[Transcription] Not starting: consentEnabled=${enabled} role=${userRole} room=${room ? room.state : 'none'}`
+      )
+      return
+    }
     startTranscription()
     return () => { stopTranscription() }
   }, [shouldRun, room?.state, startTranscription, stopTranscription])

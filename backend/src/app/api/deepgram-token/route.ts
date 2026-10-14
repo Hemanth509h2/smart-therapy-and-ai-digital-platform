@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@deepgram/sdk'
+import { getSetting } from '@/lib/settings'
 
 const deepgram = createClient(process.env.DEEPGRAM_API_KEY!)
 
@@ -10,6 +11,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
+      )
+    }
+
+    if (!(await getSetting('features.transcription'))) {
+      return NextResponse.json(
+        { error: 'Transcription is turned off by an admin.' },
+        { status: 503 }
       )
     }
 

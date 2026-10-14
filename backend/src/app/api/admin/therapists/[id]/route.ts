@@ -2,30 +2,50 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules';
+import { daysAgo } from '@/lib/adminList';
+import { resolveCurrent, serializeSubscription } from '@/lib/subscriptions';
+import { errorResponse } from '@/lib/apiError';
+
+export const dynamic = 'force-dynamic';
+
+const USAGE_TYPES = ['AI_ANALYSIS', 'TRANSCRIPTION', 'MODULE_LAUNCH'] as const;
+const USAGE_DAYS = 90;
+
+// Client PHI stays hidden here: names are reduced to initials and clinical
+// fields are left out. The full record comes from ./phi (audited).
+const initial = (s: string | null | undefined) => (s?.trim() ? `${s.trim()[0].toUpperCase()}.` : '');
+const maskName = (first: string, last: string) => [initial(first), initial(last)].filter(Boolean).join(' ') || '—';
 
 // GET /api/admin/therapists/[id]
-// Full detail view for one therapist: profile info, every client they've
-// seen, every session (with client name/status/duration), invite history,
-// and the same usage/AI stats shown on the overview table.
+// Full detail view for one therapist: profile + account status, clients and
+// sessions (client names masked), invite history, subscription history and
+// pending request, usage stats and a 90-day daily usage series per type.
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireAdmin(request, 'people.read');
     if (!auth.ok) return auth.response;
     const { id } = params;
 
     const therapist = await prisma.profileTherapist.findUnique({
       where: { id },
-      include: { user: { select: { email: true, createdAt: true } } },
+      include: {
+        user: {
+          select: { email: true, createdAt: true, status: true, suspendedAt: true, suspendReason: true, lastSeenAt: true },
+        },
+      },
     });
 
     if (!therapist) {
       return NextResponse.json({ error: 'Therapist not found' }, { status: 404 });
     }
 
-    const [sessions, invites, docCount, usage, moduleUsage] = await Promise.all([
+    const since = daysAgo(USAGE_DAYS - 1);
+    since.setHours(0, 0, 0, 0);
+
+    const [sessions, invites, docCount, usage, moduleUsage, subscriptions, pendingRequest, recentUsage] = await Promise.all([
       prisma.session.findMany({
         where: { therapistId: id },
-        include: { client: { select: { id: true, firstName: true, lastName: true, diagnosis: true } } },
+        include: { client: { select: { id: true, firstName: true, lastName: true } } },
         orderBy: { scheduledAt: 'desc' },
       }),
       prisma.invite.findMany({
@@ -39,13 +59,65 @@ export async function GET(request: Request, { params }: { params: { id: string }
         where: { therapistId: id, type: 'MODULE_LAUNCH' },
         _sum: { count: true },
       }),
+      prisma.subscription.findMany({
+        where: { therapistId: id },
+        include: { plan: true },
+        orderBy: { startedAt: 'desc' },
+      }),
+      prisma.subscriptionRequest.findFirst({
+        where: { therapistId: id, status: 'PENDING' },
+        include: { plan: { select: { id: true, name: true, toolQuota: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.usageEvent.findMany({
+        where: { therapistId: id, type: { in: [...USAGE_TYPES] }, createdAt: { gte: since } },
+        select: { type: true, count: true, createdAt: true },
+      }),
     ]);
 
-    const clientMap = new Map<string, { id: string; firstName: string; lastName: string; diagnosis: string[] }>();
+    // Clients seen in sessions plus clients the therapist added directly.
+    const linked = await prisma.profileClient.findMany({
+      where: { therapistId: id },
+      select: { id: true, firstName: true, lastName: true },
+    });
+    const clientMap = new Map<string, { id: string; firstName: string; lastName: string }>();
     for (const s of sessions) {
       if (s.client && !clientMap.has(s.client.id)) clientMap.set(s.client.id, s.client);
     }
-    const clients = Array.from(clientMap.values());
+    for (const c of linked) if (!clientMap.has(c.id)) clientMap.set(c.id, c);
+    const sessionCounts = new Map<string, { count: number; last: Date | null }>();
+    for (const s of sessions) {
+      const e = sessionCounts.get(s.clientId) ?? { count: 0, last: null };
+      e.count++;
+      if (!e.last || s.scheduledAt > e.last) e.last = s.scheduledAt;
+      sessionCounts.set(s.clientId, e);
+    }
+    const clients = Array.from(clientMap.values()).map((c) => ({
+      id: c.id,
+      name: maskName(c.firstName, c.lastName),
+      firstName: initial(c.firstName),
+      lastName: initial(c.lastName),
+      masked: true,
+      sessions: sessionCounts.get(c.id)?.count ?? 0,
+      lastSession: sessionCounts.get(c.id)?.last ?? null,
+    }));
+
+    // Daily usage buckets (local days), oldest first, zero-filled.
+    const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const days: string[] = [];
+    for (let i = 0; i < USAGE_DAYS; i++) {
+      const d = new Date(since);
+      d.setDate(since.getDate() + i);
+      days.push(dayKey(d));
+    }
+    const usageDaily: Record<string, { date: string; count: number }[]> = {};
+    for (const type of USAGE_TYPES) {
+      const byDay = new Map<string, number>();
+      for (const e of recentUsage) {
+        if (e.type === type) byDay.set(dayKey(e.createdAt), (byDay.get(dayKey(e.createdAt)) ?? 0) + e.count);
+      }
+      usageDaily[type] = days.map((date) => ({ date, count: byDay.get(date) ?? 0 }));
+    }
 
     const total = sessions.length;
     const active = sessions.filter((s) => s.status === 'ACTIVE').length;
@@ -80,6 +152,10 @@ export async function GET(request: Request, { params }: { params: { id: string }
         experience: therapist.experience,
         bio: therapist.bio,
         joinedAt: therapist.user?.createdAt ?? therapist.createdAt,
+        status: therapist.user?.status ?? 'ACTIVE',
+        suspendedAt: therapist.user?.suspendedAt ?? null,
+        suspendReason: therapist.user?.suspendReason ?? null,
+        lastSeenAt: therapist.user?.lastSeenAt ?? null,
         access: {
           allModulesAllowed: therapist.allModulesAllowed,
           moduleAccess: therapist.moduleAccess,
@@ -102,6 +178,35 @@ export async function GET(request: Request, { params }: { params: { id: string }
         lastActive,
       },
       clients,
+      billing: {
+        current: serializeSubscription(resolveCurrent(subscriptions)),
+        history: subscriptions.map((s) => ({
+          id: s.id,
+          planId: s.planId,
+          planName: s.plan.name,
+          toolQuota: s.plan.toolQuota,
+          status: s.status,
+          months: s.months,
+          startedAt: s.startedAt,
+          currentPeriodEnd: s.currentPeriodEnd,
+          renewedAt: s.renewedAt,
+          renewalCount: s.renewalCount,
+          moduleAccess: s.moduleAccess,
+        })),
+        pendingRequest: pendingRequest
+          ? {
+              id: pendingRequest.id,
+              planId: pendingRequest.planId,
+              planName: pendingRequest.plan.name,
+              toolQuota: pendingRequest.plan.toolQuota,
+              months: pendingRequest.months,
+              modules: pendingRequest.modules,
+              note: pendingRequest.note,
+              createdAt: pendingRequest.createdAt,
+            }
+          : null,
+      },
+      usageDaily,
       sessions: sessions.map((s) => ({
         id: s.id,
         status: s.status,
@@ -110,18 +215,25 @@ export async function GET(request: Request, { params }: { params: { id: string }
         endedAt: s.endedAt,
         durationMinutes:
           s.startedAt && s.endedAt ? Math.round((s.endedAt.getTime() - s.startedAt.getTime()) / 60000) : null,
-        client: s.client ? { id: s.client.id, firstName: s.client.firstName, lastName: s.client.lastName } : null,
+        client: s.client
+          ? {
+              id: s.client.id,
+              name: maskName(s.client.firstName, s.client.lastName),
+              firstName: initial(s.client.firstName),
+              lastName: initial(s.client.lastName),
+            }
+          : null,
       })),
       invites: invites.map((i) => ({
         id: i.id,
-        firstName: i.firstName,
-        lastName: i.lastName,
+        name: maskName(i.firstName, i.lastName),
+        firstName: initial(i.firstName),
+        lastName: initial(i.lastName),
         status: i.status,
         createdAt: i.createdAt,
       })),
     });
   } catch (error: any) {
-    console.error('Admin therapist detail error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin therapist detail error');
   }
 }

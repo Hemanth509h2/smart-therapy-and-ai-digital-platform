@@ -6,10 +6,7 @@ import { useSessionStore } from '@/store/useSessionStore';
 import { useRouter } from 'next/navigation';
 import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import {
-  Mic, MicOff, Camera, CameraOff, PhoneOff, Settings, Smile,
-  Maximize2, Minimize2, Users, X, GripHorizontal,
-} from 'lucide-react';
+import { Mic, MicOff, Camera, CameraOff, PhoneOff, Settings, Smile, X, GripHorizontal } from 'lucide-react';
 import AIConsentBanner from '@/components/session/AIConsentBanner';
 import { AIErrorBoundary } from '@/components/session/AIErrorBoundary';
 import { useSessionTranscription } from '@/hooks/useSessionTranscription';
@@ -26,10 +23,12 @@ import { SkillModuleView } from '@/components/GlassModulePanel';
 import SkillDevLayout from '@/components/session/SkillDevLayout';
 import ReactionOverlay from '@/components/ReactionOverlay';
 import { resolveAllowedModuleIds, isSkillModule, moduleName as moduleDisplayName } from '@/lib/modules';
-import { RC, SIDEBAR_WIDTH } from '@/components/session/roomTheme';
+import { loadModuleSettings } from '@/hooks/useModuleSettings';
+import { RC } from '@/components/session/roomTheme';
 import type { SidebarPanel } from '@/components/session/sessionPanels';
 import CaptionOverlay from '@/components/session/CaptionOverlay';
 import TranslationControl from '@/components/session/TranslationControl';
+import TranslationSync from '@/components/session/TranslationSync';
 import { useTranslationSettings, pairForRole, writeTranslationSettings } from '@/lib/translation';
 import SessionTopBar from '@/components/session/SessionTopBar';
 import SessionBottomBar from '@/components/session/SessionBottomBar';
@@ -47,7 +46,7 @@ interface SessionState {
   sessionId: string;
   activeModuleId: string | null;
   status?: string;
-  participants: Record<string, { uid: string; name: string; role: string; isOnline: boolean }>;
+  participants: Record<string, { uid: string; name: string; role: string; isOnline: boolean; lastSeen?: string }>;
   timestamps: { createdAt: string; updatedAt: string };
 }
 
@@ -544,7 +543,11 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       showToast('That module is not included in your plan');
       return;
     }
-    handleModuleLaunch(requested, moduleDisplayName(requested));
+    // Modules an admin switched off globally can't be launched by link either.
+    loadModuleSettings().then(({ disabled }) => {
+      if (disabled.has(requested)) showToast('That module is currently unavailable');
+      else handleModuleLaunch(requested, moduleDisplayName(requested));
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isTherapist, sessionState, profile]);
 
@@ -569,6 +572,12 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
         const data = snap.data();
         const aiConsent = data?.aiConsent ?? {};
         setConsentStatus(aiConsent);
+        // Diagnostic (booleans only): a pending local write that later flips back
+        // to false means the server rejected/rolled back the consent write.
+        console.log(
+          `[Consent] therapist=${aiConsent.therapist ?? 'unset'} client=${aiConsent.client ?? 'unset'} ` +
+          `pendingWrite=${snap.metadata.hasPendingWrites} fromCache=${snap.metadata.fromCache}`
+        );
 
         const myKey = isTherapist ? 'therapist' : 'client';
         if (aiConsent[myKey] != null) {
@@ -671,14 +680,6 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     setShowConsentBanner(false);
   };
 
-  const handleCopySessionId = async () => {
-    try {
-      await navigator.clipboard.writeText(sessionId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {}
-  };
-
   const handleLeaveSession = () => {
     // Leave FIRST, clean up in the background. Every call below is
     // fire-and-forget: on slow/offline networks awaiting them can hang for a
@@ -746,6 +747,19 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   const clientName = clientParticipant?.name || 'Client';
 
   const participantName = isTherapist ? clientName : (Object.values(participants).find((p) => p.role === 'therapist')?.name || 'Therapist');
+  // The participants popup shows exactly two tiles: you, and the person on the
+  // other side of the call. `participants` keeps every uid that ever joined (a
+  // guest rejoining gets a new uid, and a closed tab never flips isOnline back
+  // to false), so listing it raw showed the same remote video several times.
+  // Keep only the most recently joined online participant of the other role.
+  const popupParticipants = (() => {
+    const all = Object.values(participants);
+    const self = all.find((p) => p.uid === uid);
+    const peer = all
+      .filter((p) => p.uid !== uid && p.isOnline && p.role !== (isTherapist ? 'therapist' : 'client'))
+      .sort((a, b) => (b.lastSeen ?? '').localeCompare(a.lastSeen ?? ''))[0];
+    return [self, peer].filter((p): p is NonNullable<typeof p> => !!p);
+  })();
   const minutes = Math.floor(elapsed / 60);
   const seconds = elapsed % 60;
   const timerStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
@@ -977,7 +991,12 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     >
       {/* Renders translated captions published by the translation agent on the
           lk.transcription topic. Inside the room provider, like the bridges. */}
-      <CaptionOverlay enabled={translationSettings.enabled} />
+      {/* Shown whenever transcription is consent-enabled (Sarvam captions) or the
+          translation agent is on. Previously gated on the translation toggle
+          alone (default off), which hid every Sarvam caption. */}
+      <CaptionOverlay enabled={transcriptionEnabled || translationSettings.enabled} />
+      {/* Applies caption-language changes to the room without reconnecting. */}
+      {isTherapist && <TranslationSync sessionId={sessionId} settings={translationSettings} />}
       {/* Runs the Sarvam pipeline inside the room provider so it can access the
           LiveKit room; reports recording state up to this page for the chip. */}
       <TranscriptionBridge
@@ -1034,7 +1053,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
             transcriptLine={
               isTherapist ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  {transcriptionEnabled && (
+                  {transcriptionEnabled && transcription.isRecording && (
                     <div
                       style={{
                         display: 'flex',
@@ -1042,11 +1061,11 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                         gap: 6,
                         fontSize: 12,
                         fontWeight: 600,
-                        color: transcription.isRecording ? RC.greenDark : RC.inkMuted,
+                        color: RC.greenDark,
                       }}
                     >
-                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: transcription.isRecording ? RC.green : RC.border, animation: transcription.isRecording ? 'pulse 1.4s ease infinite' : 'none' }} />
-                      {transcription.isRecording ? `${transcription.chunkCount} lines` : 'transcript off'}
+                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: RC.green, animation: 'pulse 1.4s ease infinite' }} />
+                      {`${transcription.chunkCount} lines`}
                     </div>
                   )}
                   {/* Therapist-only: turns captions on and sets who speaks what. */}
@@ -1094,7 +1113,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                   </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflowY: 'auto' }}>
-                  {Object.values(participants).map((p) =>
+                  {popupParticipants.map((p) =>
                     p.uid === uid ? (
                       // Doctor: resizing only grows/shrinks the CLIENT's tile; the
                       // doctor's own self-view stays at the default small size.
@@ -1157,7 +1176,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                   </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflowY: 'auto' }}>
-                  {Object.values(participants).map((p) =>
+                  {popupParticipants.map((p) =>
                     p.uid === uid ? (
                       // Client: own video stays fixed; doctor's video is resizable.
                       <LocalVideoPip

@@ -32,7 +32,7 @@ import { AddClientDialog, StartSessionDialog } from '@/components/practice/dialo
 import { useSessionActions } from '@/components/practice/useSessionActions';
 import { toast } from '@/components/practice/ui';
 import SessionReportDrawer from '@/components/report/SessionReportDrawer';
-import { apiFetch } from '@/lib/api';
+import { apiFetchCached } from '@/lib/api';
 import { Sparkles } from 'lucide-react';
 import { MODULE_CATEGORIES, type ModuleItem } from '@/lib/modules';
 import {
@@ -168,7 +168,7 @@ export default function ClientProfilePage() {
       fetchClientMetrics(clientId),
       fetchClientNotes(clientId),
       fetchClientReports(clientId),
-      apiFetch(`/api/notes?clientId=${encodeURIComponent(clientId)}`).then((res) => (res.ok ? res.json() : { notes: [] })),
+      apiFetchCached(`/api/notes?clientId=${encodeURIComponent(clientId)}`).then((res) => (res.ok ? res.json() : { notes: [] })),
     ])
       .then(([m, n, r, sn]) => {
         if (cancelled) return;

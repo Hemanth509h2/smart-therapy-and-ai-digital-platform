@@ -132,6 +132,60 @@ export function serializeSubscription(s: SubscriptionWithPlan | null) {
   };
 }
 
+// ─── Expiry + access helpers (admin subscriptions page, daily cron) ─────────
+
+// Tool access with no current term: the ProfileTherapist column defaults
+// (every tool allowed, no explicit list).
+export const FREE_TIER_ACCESS = { allModulesAllowed: true, moduleAccess: [] as string[] };
+
+// Tool access granted by a term: unlimited plans allow everything.
+export function termAccess(toolQuota: number | null, moduleAccess: string[]) {
+  return toolQuota == null
+    ? { allModulesAllowed: true, moduleAccess: [] as string[] }
+    : { allModulesAllowed: false, moduleAccess };
+}
+
+// Calendar-day maths in India time (users are in IST; servers run in UTC).
+const IST_OFFSET_MS = 330 * 60 * 1000;
+const DAY_MS = 864e5;
+const istDay = (d: Date) => Math.floor((d.getTime() + IST_OFFSET_MS) / DAY_MS);
+
+// Whole calendar days from `now` until `end` (0 = ends today, negative = past).
+export function daysUntil(end: Date, now: Date = new Date()): number {
+  return istDay(end) - istDay(now);
+}
+
+export const EXPIRING_SOON_DAYS = 7;
+
+export type SubscriptionState = 'active' | 'expiring' | 'expired' | 'cancelled' | 'none';
+
+// Admin-facing status for a therapist from their current + most recent term.
+export function subscriptionState(
+  current: { currentPeriodEnd: Date } | null,
+  latest: { status: string } | null,
+  now: Date = new Date()
+): SubscriptionState {
+  if (current) return daysUntil(current.currentPeriodEnd, now) <= EXPIRING_SOON_DAYS ? 'expiring' : 'active';
+  if (!latest) return 'none';
+  return latest.status === 'CANCELLED' ? 'cancelled' : 'expired';
+}
+
+// Validate the admin-written plan card bullets. undefined = not sent;
+// a string = the error to show; else the cleaned list (empties dropped).
+export const MAX_PLAN_FEATURES = 10;
+export const MAX_PLAN_FEATURE_LENGTH = 120;
+export function parseFeatures(raw: unknown): string[] | string | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === null) return [];
+  if (!Array.isArray(raw)) return 'features must be a list of text lines.';
+  const list = raw.map((f) => String(f ?? '').trim()).filter(Boolean);
+  if (list.length > MAX_PLAN_FEATURES) return `A plan can list at most ${MAX_PLAN_FEATURES} features.`;
+  if (list.some((f) => f.length > MAX_PLAN_FEATURE_LENGTH)) {
+    return `Each feature must be ${MAX_PLAN_FEATURE_LENGTH} characters or fewer.`;
+  }
+  return list;
+}
+
 // Plan usage limits (null = unlimited). See docx/PLANS.md.
 export const PLAN_LIMIT_FIELDS = ['maxClients', 'maxSessionsPerMonth', 'maxAiReportsPerMonth'] as const;
 export type PlanLimitField = (typeof PLAN_LIMIT_FIELDS)[number];

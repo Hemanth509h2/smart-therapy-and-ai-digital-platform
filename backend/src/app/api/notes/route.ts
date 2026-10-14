@@ -1,7 +1,18 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireAuth } from '@/lib/apiAuth';
 import { requireTherapist } from '@/lib/progressAuth';
 import { requireActivePlan } from '@/lib/subscriptions';
+import { errorResponse } from '@/lib/apiError';
+
+// Session notes belong to the session's therapist; admins may read them too.
+async function mayAccessSession(uid: string, sessionId: string) {
+  const [session, user] = await Promise.all([
+    prisma.session.findUnique({ where: { id: sessionId }, select: { therapist: { select: { userId: true } } } }),
+    prisma.user.findUnique({ where: { id: uid }, select: { role: true } }),
+  ]);
+  return session?.therapist.userId === uid || user?.role === 'ADMIN';
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +37,11 @@ export async function GET(request: Request) {
     if (!sessionId) {
       return NextResponse.json({ error: 'sessionId or clientId is required' }, { status: 400 });
     }
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
+    if (!(await mayAccessSession(auth.uid, sessionId))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const notes = await prisma.therapistNote.findMany({
       where: { sessionId },
@@ -34,13 +50,23 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ notes });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'notes GET');
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
+
     const { sessionId, therapistId, content, isPrivate } = await request.json();
+    // Only the session's own therapist may write its notes.
+    const session = sessionId
+      ? await prisma.session.findUnique({ where: { id: sessionId }, select: { therapistId: true, therapist: { select: { userId: true } } } })
+      : null;
+    if (!session || session.therapistId !== therapistId || session.therapist.userId !== auth.uid) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     if (typeof therapistId === 'string') {
       const noPlan = await requireActivePlan({ therapistId });
       if (noPlan) return noPlan;
@@ -57,6 +83,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ note });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'notes POST');
   }
 }

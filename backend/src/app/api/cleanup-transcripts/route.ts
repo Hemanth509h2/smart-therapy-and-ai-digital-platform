@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { initializeApp, getApps, cert } from 'firebase-admin/app'
 import { getFirestore, Timestamp } from 'firebase-admin/firestore'
+import { prisma } from '@/lib/db'
+import { getSetting } from '@/lib/settings'
+
+export const dynamic = 'force-dynamic'
 
 if (!getApps().length) {
   initializeApp({
@@ -12,41 +16,65 @@ if (!getApps().length) {
   })
 }
 
+const JOB = 'cleanup-transcripts'
+
+// Clears live-session transcripts older than the admin retention window
+// (setting 'retention.transcriptHours', default 24). Called by Vercel cron
+// (Authorization: Bearer <CRON_SECRET>) or manually with x-cron-secret.
 export async function GET(req: NextRequest) {
-  const secret = req.headers.get('x-cron-secret')
-  if (secret !== process.env.CRON_SECRET) {
+  const expected = process.env.CRON_SECRET
+  const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+  const secret = req.headers.get('x-cron-secret') || bearer
+  if (!expected || secret !== expected) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }
     )
   }
 
-  const db = getFirestore()
-  const cutoff = Timestamp.fromDate(
-    new Date(Date.now() - 24 * 60 * 60 * 1000)
-  )
+  const run = await prisma.cronRun.create({ data: { job: JOB, ok: false } }).catch(() => null)
+  const finish = (ok: boolean, detail: Record<string, unknown>) =>
+    run
+      ? prisma.cronRun
+          .update({ where: { id: run.id }, data: { ok, detail: detail as any, finishedAt: new Date() } })
+          .catch((e) => console.error('[cleanup-transcripts] could not record run:', e?.message))
+      : Promise.resolve()
 
-  const stale = await db
-    .collection('sessions')
-    .where('transcriptLastUpdated', '<', cutoff)
-    .get()
+  try {
+    const hours = Math.max(1, Number(await getSetting('retention.transcriptHours')) || 24)
+    const db = getFirestore()
+    const cutoff = Timestamp.fromDate(new Date(Date.now() - hours * 60 * 60 * 1000))
 
-  let deleted = 0
-  const batch = db.batch()
+    const stale = await db
+      .collection('sessions')
+      .where('transcriptLastUpdated', '<', cutoff)
+      .get()
 
-  stale.docs.forEach(docSnap => {
-    batch.update(docSnap.ref, {
-      transcript: [],
-      transcriptLastUpdated: null,
-    })
-    deleted++
-  })
+    // Firestore batches hold at most 500 writes.
+    let deleted = 0
+    for (let i = 0; i < stale.docs.length; i += 400) {
+      const batch = db.batch()
+      for (const docSnap of stale.docs.slice(i, i + 400)) {
+        batch.update(docSnap.ref, {
+          transcript: [],
+          transcriptLastUpdated: null,
+        })
+        deleted++
+      }
+      await batch.commit()
+    }
 
-  await batch.commit()
-
-  return NextResponse.json({
-    success: true,
-    sessionsCleared: deleted,
-    cutoff: cutoff.toDate().toISOString(),
-  })
+    const result = {
+      success: true,
+      sessionsCleared: deleted,
+      retentionHours: hours,
+      cutoff: cutoff.toDate().toISOString(),
+    }
+    await finish(true, result)
+    return NextResponse.json(result)
+  } catch (e: any) {
+    console.error('[cleanup-transcripts]', e)
+    await finish(false, { error: e?.message || String(e) })
+    return NextResponse.json({ error: 'Cleanup failed' }, { status: 500 })
+  }
 }

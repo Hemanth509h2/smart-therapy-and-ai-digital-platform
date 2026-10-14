@@ -6,7 +6,7 @@ import {
 import { apiFetch } from '@/lib/api';
 import '@livekit/components-styles'
 import { Room, RoomEvent, Track, VideoPresets, type LocalTrackPublication, type RoomOptions } from 'livekit-client'
-import { useEffect, useState, useMemo, useCallback, createContext, useContext } from 'react'
+import { useEffect, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react'
 
 // Video quality policy (see Smart_Therapy_Video_Quality_Report):
 //  - Capture and publish at most 720p / 30fps. A 1080p camera is capped to 720p;
@@ -87,6 +87,8 @@ export default function StaadVideo({
 }: StaadVideoProps) {
   const [token, setToken] = useState<string>('')
   const [error, setError] = useState('')
+  // Client only: the backend withholds the token until the therapist is in the room.
+  const [waiting, setWaiting] = useState(false)
 
   const room = useMemo(() => new Room(ROOM_OPTIONS), [])
   const [connected, setConnected] = useState(false)
@@ -99,24 +101,44 @@ export default function StaadVideo({
     }
   }, [room])
 
+  // Languages are signed into the token as participant attributes, which is
+  // how the translation agent learns who speaks and reads what. They are read
+  // from a ref at fetch time and are NOT effect dependencies: a new token
+  // remounts the whole call. Changes mid-call are pushed to the room by the
+  // backend instead (POST /api/sessions/[id]/translation).
+  const langs = useRef({ sourceLang, targetLang })
+  langs.current = { sourceLang, targetLang }
+
   useEffect(() => {
     if (!sessionId || !userName) return
-    // Languages are signed into the token as participant attributes, which is
-    // how the translation agent learns who speaks and reads what. Changing them
-    // mid-session therefore requires a reconnect — the effect re-runs and a
-    // fresh token is minted.
-    const params = new URLSearchParams({ room: sessionId, name: userName, role })
-    if (sourceLang) params.set('sourceLang', sourceLang)
-    if (targetLang) params.set('targetLang', targetLang)
 
-    apiFetch(`/api/livekit-token?${params.toString()}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.token) setToken(d.token)
-        else setError('Could not get video token')
-      })
-      .catch(() => setError('Video connection failed'))
-  }, [sessionId, userName, role, sourceLang, targetLang])
+    let cancelled = false
+    let retry: ReturnType<typeof setTimeout> | undefined
+    const fetchToken = () => {
+      const params = new URLSearchParams({ room: sessionId, name: userName, role })
+      if (langs.current.sourceLang) params.set('sourceLang', langs.current.sourceLang)
+      if (langs.current.targetLang) params.set('targetLang', langs.current.targetLang)
+      apiFetch(`/api/livekit-token?${params.toString()}`)
+        .then(r => r.json())
+        .then(d => {
+          if (cancelled) return
+          if (d.waiting) {
+            // Therapist hasn't joined yet — ask again shortly.
+            setWaiting(true)
+            retry = setTimeout(fetchToken, 3000)
+          } else if (d.token) {
+            setWaiting(false)
+            setToken(d.token)
+          } else setError('Could not get video token')
+        })
+        .catch(() => { if (!cancelled) setError('Video connection failed') })
+    }
+    fetchToken()
+    return () => {
+      cancelled = true
+      clearTimeout(retry)
+    }
+  }, [sessionId, userName, role])
 
   const disconnect = useCallback(() => {
     room.disconnect()
@@ -128,6 +150,13 @@ export default function StaadVideo({
   if (error) return (
     <div className="h-full flex items-center justify-center" style={{ color: 'var(--ink-muted)', fontSize: 13 }}>
       {error}
+    </div>
+  )
+
+  if (!token && waiting) return (
+    <div className="h-full flex flex-col items-center justify-center gap-2" style={{ color: 'var(--ink-muted)', fontSize: 13 }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>Waiting for your therapist to join…</div>
+      <div>You'll be connected automatically as soon as they arrive.</div>
     </div>
   )
 

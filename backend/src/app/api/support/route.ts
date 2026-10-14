@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-
-// Where all helpdesk tickets are delivered.
-const SUPPORT_INBOX = 'om.cofounder@staad.in';
+import { prisma } from '@/lib/db';
+import { requireAuth } from '@/lib/apiAuth';
+import { getSetting } from '@/lib/settings';
+import { errorResponse } from '@/lib/apiError';
 
 const CATEGORIES = ['Technical Issue', 'Billing', 'Account', 'Feedback', 'Other'];
 
-// POST /api/support — a logged-in user raises a helpdesk ticket.
-// The submission is emailed to the support inbox via SMTP.
+// POST /api/support — a user raises a helpdesk ticket.
+// The ticket is stored (admin Support inbox) and then emailed to the support
+// inbox (Settings → support.email) via SMTP. The ticket is kept even if the
+// email fails. Signing in is optional; a valid token links the ticket to the user.
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -34,7 +37,33 @@ export async function POST(request: Request) {
       );
     }
 
-    const ticketCategory = CATEGORIES.includes(category || '') ? category : 'Other';
+    const ticketCategory = (CATEGORIES.includes(category || '') ? category : 'Other') as string;
+
+    let userId: string | null = null;
+    if (request.headers.get('authorization') || request.headers.get('x-dev-uid')) {
+      const auth = await requireAuth(request);
+      if (auth.ok) userId = auth.uid;
+    }
+
+    const safeName = name?.trim() || 'STAAD user';
+    let ref = `STAAD-${Date.now().toString(36).toUpperCase()}`;
+    const ticketData = {
+      userId,
+      name: name?.trim() || null,
+      email: String(email).trim().slice(0, 320),
+      role: role || null,
+      category: ticketCategory,
+      subject: subject.trim().slice(0, 300),
+      message: message.slice(0, 20_000),
+    };
+    try {
+      await prisma.supportTicket.create({ data: { ref, ...ticketData } });
+    } catch (e: any) {
+      if (e?.code !== 'P2002') throw e;
+      // Two tickets in the same millisecond: make the ref unique and retry.
+      ref = `${ref}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+      await prisma.supportTicket.create({ data: { ref, ...ticketData } });
+    }
 
     const host = process.env.SMTP_HOST || 'smtp.gmail.com';
     const port = Number(process.env.SMTP_PORT || 587);
@@ -43,10 +72,7 @@ export async function POST(request: Request) {
 
     if (!user || !pass) {
       console.error('Support email not configured: SMTP_USER / SMTP_PASS missing');
-      return NextResponse.json(
-        { error: 'Support email is not configured on the server.' },
-        { status: 503 }
-      );
+      return NextResponse.json({ ok: true, ref, emailed: false, note: 'Ticket saved; the email notification is not configured.' });
     }
 
     const transporter = nodemailer.createTransport({
@@ -55,9 +81,6 @@ export async function POST(request: Request) {
       secure: port === 465, // true for 465, false for 587 (STARTTLS)
       auth: { user, pass },
     });
-
-    const ref = `STAAD-${Date.now().toString(36).toUpperCase()}`;
-    const safeName = name?.trim() || 'STAAD user';
 
     const text = [
       `New helpdesk ticket (${ref})`,
@@ -86,21 +109,22 @@ export async function POST(request: Request) {
       </div>
     `;
 
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || `STAAD Helpdesk <${user}>`,
-      to: SUPPORT_INBOX,
-      replyTo: email,
-      subject: `[Helpdesk · ${ticketCategory}] ${subject}`,
-      text,
-      html,
-    });
+    try {
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM || `STAAD Helpdesk <${user}>`,
+        to: await getSetting('support.email'),
+        replyTo: email,
+        subject: `[Helpdesk · ${ticketCategory}] ${subject}`,
+        text,
+        html,
+      });
+    } catch (e: any) {
+      console.error(`Support ticket ${ref} saved but the email failed:`, e?.message);
+      return NextResponse.json({ ok: true, ref, emailed: false, note: 'Ticket saved; the email notification could not be sent.' });
+    }
 
-    return NextResponse.json({ ok: true, ref });
+    return NextResponse.json({ ok: true, ref, emailed: true });
   } catch (error: any) {
-    console.error('Support ticket error:', error);
-    return NextResponse.json(
-      { error: error?.message || 'Failed to send ticket' },
-      { status: 500 }
-    );
+    return errorResponse(error, 'Support ticket error', 'Failed to send ticket');
   }
 }

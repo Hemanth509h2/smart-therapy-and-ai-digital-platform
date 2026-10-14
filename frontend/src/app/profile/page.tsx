@@ -9,7 +9,7 @@ import { usePracticeData } from '@/hooks/usePracticeData';
 import { StaadShell } from '@/components/staad/Shell';
 import { TopBar } from '@/components/staad/TopBar';
 import { Btn, InlineError, Section, SkeletonCard, cx } from '@/components/staad/parts';
-import { IconCheckSm, IconDownload, IconRowA, IconRowB, IconRowC } from '@/components/staad/icons';
+import { IconCheckSm, IconRowA, IconRowB, IconRowC } from '@/components/staad/icons';
 import { DsDialog, toast } from '@/components/practice/ui';
 import {
   DAY_NAMES,
@@ -44,6 +44,7 @@ export default function ProfilePage() {
   const [experience, setExperience] = useState('');
   const [specialties, setSpecialties] = useState<string[]>([]);
   const [bio, setBio] = useState('');
+  const [phone, setPhone] = useState('');
   const [availability, setAvailability] = useState<Availability>(DEFAULT_AVAILABILITY);
 
   const [saving, setSaving] = useState(false);
@@ -66,6 +67,7 @@ export default function ProfilePage() {
     setExperience(profile.experience ?? '');
     setSpecialties(profile.specialty ?? []);
     setBio(profile.bio ?? '');
+    setPhone(profile.phoneNumber ? `+${profile.phoneNumber}` : '');
     setAvailability(loadAvailability(profile.id));
   }, [profile]);
 
@@ -79,11 +81,12 @@ export default function ProfilePage() {
         experience: profile?.experience ?? '',
         specialties: profile?.specialty ?? [],
         bio: profile?.bio ?? '',
+        phone: profile?.phoneNumber ? `+${profile.phoneNumber}` : '',
       }),
     [profile]
   );
   const dirty =
-    !!profile && initial !== snapshot({ firstName, lastName, qualification, experience, specialties, bio });
+    !!profile && initial !== snapshot({ firstName, lastName, qualification, experience, specialties, bio, phone });
 
   const toggleSpecialty = (s: string) =>
     setSpecialties((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
@@ -113,12 +116,17 @@ export default function ProfilePage() {
     setExperience(profile.experience ?? '');
     setSpecialties(profile.specialty ?? []);
     setBio(profile.bio ?? '');
+    setPhone(profile.phoneNumber ? `+${profile.phoneNumber}` : '');
   };
 
   const save = async () => {
     if (!uid || !role) return;
     if (!firstName.trim()) {
       toast('First name is required.', 'error');
+      return;
+    }
+    if (isTherapist && phone.replace(/\D/g, '').length < 10) {
+      toast('Enter a valid mobile number.', 'error');
       return;
     }
     setSaving(true);
@@ -128,7 +136,7 @@ export default function ProfilePage() {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
       };
-      if (isTherapist) Object.assign(body, { qualification, experience, specialty: specialties, bio });
+      if (isTherapist) Object.assign(body, { qualification, experience, specialty: specialties, bio, phoneNumber: phone });
       const res = await apiFetch('/api/users/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -256,6 +264,16 @@ export default function ProfilePage() {
                 </div>
                 {isTherapist && (
                   <>
+                    <div className="field">
+                      <label htmlFor="p-phone">Mobile number</label>
+                      <input
+                        id="p-phone"
+                        type="tel"
+                        value={phone}
+                        placeholder="+91 98765 43210"
+                        onChange={(e) => setPhone(e.target.value)}
+                      />
+                    </div>
                     <div className="field">
                       <label htmlFor="p-qual">Professional title</label>
                       <select id="p-qual" value={qualification} onChange={(e) => setQualification(e.target.value)}>

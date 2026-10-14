@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Copy, Loader2, Mail, MessageCircle, Send } from 'lucide-react';
+import { Loader2, Send } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { auth } from '@/lib/firebase';
 import { DsDialog, Drawer, Field, Spinner, toast } from './ui';
@@ -27,6 +27,7 @@ import {
   type PracticeSession,
 } from '@/lib/practice';
 import { apiFetch } from '@/lib/api';
+import { MODULE_CATEGORIES, resolveAllowedModuleIds } from '@/lib/modules';
 
 const DURATIONS = [30, 45, 50, 60, 80];
 
@@ -216,10 +217,17 @@ export function StartSessionDialog({
   const [patientLink, setPatientLink] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [pickedModule, setPickedModule] = useState('');
+  // '' = auto (reuse a due session or open a new one), 'new' = force a new room, else a session id.
+  const [pickedSession, setPickedSession] = useState('');
+
+  const allowedModules = useMemo(() => new Set(resolveAllowedModuleIds(profile)), [profile]);
 
   useEffect(() => {
     if (!open) return;
     setClientId(defaultClientId ?? clients[0]?.id ?? '');
+    setPickedModule(moduleId ?? '');
+    setPickedSession('');
     setError('');
     setStarting(false);
     setPatientLink(null);
@@ -228,13 +236,26 @@ export function StartSessionDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Reuse a session that's live or due within the hour instead of opening a second room.
-  const existing = sessions.find(
-    (s) =>
-      sessionClientId(s) === clientId &&
-      (s.status === 'ACTIVE' ||
-        (s.status === 'SCHEDULED' && Math.abs(new Date(s.scheduledAt).getTime() - Date.now()) < 60 * 60_000))
+  // The selected client's live and upcoming sessions, soonest first.
+  const clientSessions = useMemo(
+    () =>
+      sessions
+        .filter(
+          (s) =>
+            sessionClientId(s) === clientId &&
+            (s.status === 'ACTIVE' ||
+              (s.status === 'SCHEDULED' && new Date(s.scheduledAt).getTime() > Date.now() - 60 * 60_000))
+        )
+        .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()),
+    [sessions, clientId]
   );
+
+  // Reuse a session that's live or due within the hour instead of opening a second room.
+  const due = clientSessions.find(
+    (s) => s.status === 'ACTIVE' || Math.abs(new Date(s.scheduledAt).getTime() - Date.now()) < 60 * 60_000
+  );
+  const existing =
+    pickedSession === 'new' ? undefined : pickedSession ? clientSessions.find((s) => s.id === pickedSession) ?? due : due;
 
   const start = async () => {
     if (!profile?.id || !clientId) return setError('Choose a client.');
@@ -256,7 +277,7 @@ export function StartSessionDialog({
   };
 
   const joinVideo = () => {
-    if (sessionId) router.push(sessionRoomUrl(sessionId, moduleId));
+    if (sessionId) router.push(sessionRoomUrl(sessionId, pickedModule || undefined));
   };
 
   const copyLink = async () => {
@@ -323,7 +344,15 @@ export function StartSessionDialog({
       ) : (
         <div className="space-y-4">
           <Field label="Client" htmlFor="start-client">
-            <select id="start-client" className="ds-input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
+            <select
+              id="start-client"
+              className="ds-input"
+              value={clientId}
+              onChange={(e) => {
+                setClientId(e.target.value);
+                setPickedSession('');
+              }}
+            >
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>
                   {fullName(c)}
@@ -331,9 +360,61 @@ export function StartSessionDialog({
               ))}
             </select>
           </Field>
+          {!moduleName && (
+            <Field label="Module (optional)" htmlFor="start-module">
+              <select id="start-module" className="ds-input" value={pickedModule} onChange={(e) => setPickedModule(e.target.value)}>
+                <option value="">No module — start with video only</option>
+                {MODULE_CATEGORIES.map((c) => {
+                  const mods = c.modules.filter((m) => allowedModules.has(m.id));
+                  return mods.length > 0 ? (
+                    <optgroup key={c.id} label={c.name}>
+                      {mods.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.emoji} {m.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null;
+                })}
+              </select>
+            </Field>
+          )}
+          {clientSessions.length > 0 && (
+            <Field label="Scheduled sessions">
+              <div className="space-y-2" role="radiogroup">
+                {[...clientSessions.map((s) => ({ id: s.id, session: s })), { id: 'new', session: undefined }].map(({ id, session }) => {
+                  const selected = session ? existing?.id === id : !existing;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setPickedSession(id)}
+                      className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-[13.5px]"
+                      style={{
+                        background: 'var(--ds-surface-2)',
+                        border: `1px solid ${selected ? 'var(--ds-ink)' : 'var(--ds-border)'}`,
+                        color: 'var(--ds-ink)',
+                      }}
+                    >
+                      <span className="truncate">
+                        {session ? fmtDayTime(session.scheduledAt) : 'New session now'}
+                      </span>
+                      {session?.status === 'ACTIVE' && (
+                        <span className="text-[12px] font-medium" style={{ color: 'var(--ds-green)' }}>
+                          Live
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+          )}
           {existing && (
             <p className="ds-muted text-[12.5px]">
-              {existing.status === 'ACTIVE' ? 'This client already has a live session' : `This client has a session at ${fmtDayTime(existing.scheduledAt)}`}{' '}
+              {existing.status === 'ACTIVE' ? 'This client already has a live session' : `Starting the session at ${fmtDayTime(existing.scheduledAt)}`}{' '}
               — you&apos;ll join that room.
             </p>
           )}

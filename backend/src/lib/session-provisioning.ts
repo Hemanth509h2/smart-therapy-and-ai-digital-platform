@@ -97,17 +97,21 @@ export async function provisionSessionDocs(
     })
   }
 
-  await db
-    .collection('sessions')
-    .doc(sessionId)
-    .set(
-      {
-        sessionId,
-        aiConsent: {},
-        createdAt: new Date().toISOString(),
-      },
-      { merge: true }
-    )
+  // Create the durable record once. This runs on every start/end/guest-join, and
+  // `set({ aiConsent: {} }, { merge: true })` REPLACES the whole aiConsent map
+  // with an empty one (an empty map is a leaf in a merge), silently wiping any
+  // consent already given and switching transcription off on every rejoin.
+  const sessionRef = db.collection('sessions').doc(sessionId)
+  const sessionSnap = await sessionRef.get()
+  if (!sessionSnap.exists) {
+    await sessionRef.set({
+      sessionId,
+      aiConsent: {},
+      createdAt: new Date().toISOString(),
+    })
+  } else if (!sessionSnap.data()?.sessionId) {
+    await sessionRef.set({ sessionId }, { merge: true })
+  }
 
   return { sessionId, allowedUids }
 }

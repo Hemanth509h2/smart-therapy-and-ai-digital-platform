@@ -1,158 +1,298 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useAuthStore } from '@/store/useAuthStore';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Shield, Plus, Loader2, Mail } from 'lucide-react';
-import DashboardLayout from '@/components/layout/DashboardLayout';
-import { apiFetch } from '@/lib/api';
-
-const CARD_BASE =
-  'rounded-[14px] border-[0.5px] border-[var(--glass-border)] shadow-[var(--glass-shadow)] bg-[var(--glass-bg)] dark:bg-[#16221e] animate-fade-up';
-const GLASS_CARD = `${CARD_BASE} hover-lift`;
+import React, { useState } from 'react';
+import { Copy, Lock, Mail, UserPlus } from 'lucide-react';
+import {
+  AdminPage, Badge, Btn, ConfirmDialog, DataTable, ErrorBanner, Field, Input, Modal, Section, Select,
+  useAdmin, useAdminQuery, type Column,
+} from '@/components/admin/kit';
+import { adminFetch, fmtDate, timeAgo } from '@/lib/adminApi';
+import { ADMIN_ROLE_LABELS, type AdminRole } from '@/lib/adminRoles';
+import { toast } from '@/components/practice/ui';
 
 interface AdminRow {
-  id: string;
+  id: string | null;
   userId: string;
   name: string;
   email: string;
+  adminRole: AdminRole;
+  status: string;
+  lastSeenAt: string | null;
   createdAt: string;
 }
 
-const inputStyle = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--ink)' } as const;
+interface InviteRow {
+  id: string;
+  email: string;
+  adminRole: AdminRole;
+  expiresAt: string;
+  expired: boolean;
+  createdAt: string;
+}
+
+const ROLES = Object.keys(ADMIN_ROLE_LABELS) as AdminRole[];
+const ROLE_OPTIONS = ROLES.map((r) => ({ value: r, label: ADMIN_ROLE_LABELS[r].label }));
+
+function RoleBadge({ role }: { role: AdminRole }) {
+  return <Badge tone={role === 'SUPER_ADMIN' ? 'info' : 'neutral'}>{ADMIN_ROLE_LABELS[role].label}</Badge>;
+}
 
 export default function AdminsPage() {
-  const { uid, role, profile } = useAuthStore();
-  const router = useRouter();
+  const { uid } = useAdmin();
+  const { data, loading, error, reload } = useAdminQuery<{ admins: AdminRow[]; invites: InviteRow[] }>('/api/admin/admins');
 
-  const [admins, setAdmins] = useState<AdminRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [roleChange, setRoleChange] = useState<{ admin: AdminRow; role: AdminRole } | null>(null);
+  const [removing, setRemoving] = useState<AdminRow | null>(null);
+  const [revoking, setRevoking] = useState<InviteRow | null>(null);
 
-  const [open, setOpen] = useState(false);
+  const admins = data?.admins ?? [];
+  const invites = data?.invites ?? [];
+
+  const columns: Column<AdminRow>[] = [
+    {
+      key: 'name',
+      header: 'Name',
+      render: (a) => (
+        <div className="flex items-center gap-2">
+          <span className="font-semibold">{a.name || '—'}</span>
+          {a.userId === uid && <Badge tone="good">You</Badge>}
+          {a.status === 'SUSPENDED' && <Badge tone="bad">Suspended</Badge>}
+        </div>
+      ),
+    },
+    { key: 'email', header: 'Email', render: (a) => <span style={{ color: 'var(--ink-muted)' }}>{a.email}</span> },
+    {
+      key: 'role',
+      header: 'Role',
+      render: (a) =>
+        a.userId === uid ? (
+          <span title="You can't change your own role"><RoleBadge role={a.adminRole} /></span>
+        ) : (
+          <Select
+            ariaLabel={`Role for ${a.email}`}
+            value={a.adminRole}
+            options={ROLE_OPTIONS}
+            onChange={(v) => v !== a.adminRole && setRoleChange({ admin: a, role: v as AdminRole })}
+          />
+        ),
+    },
+    { key: 'seen', header: 'Last seen', render: (a) => <span title={a.lastSeenAt ?? undefined}>{timeAgo(a.lastSeenAt)}</span> },
+    { key: 'added', header: 'Added', render: (a) => fmtDate(a.createdAt) },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      render: (a) =>
+        a.userId === uid ? null : (
+          <Btn size="sm" variant="danger" onClick={() => setRemoving(a)}>Remove</Btn>
+        ),
+    },
+  ];
+
+  const inviteColumns: Column<InviteRow>[] = [
+    { key: 'email', header: 'Email', render: (i) => <span className="font-semibold">{i.email}</span> },
+    { key: 'role', header: 'Role', render: (i) => <RoleBadge role={i.adminRole} /> },
+    { key: 'sent', header: 'Sent', render: (i) => timeAgo(i.createdAt) },
+    {
+      key: 'expires',
+      header: 'Expires',
+      render: (i) => (i.expired ? <Badge tone="warn">Expired</Badge> : fmtDate(i.expiresAt)),
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      render: (i) => <Btn size="sm" variant="ghost" onClick={() => setRevoking(i)}>{i.expired ? 'Remove' : 'Revoke'}</Btn>,
+    },
+  ];
+
+  return (
+    <AdminPage
+      title="Admins"
+      description="Who can use the admin portal, and what each person may do."
+      permission="admins.manage"
+      actions={<Btn icon={<UserPlus className="h-4 w-4" />} onClick={() => setInviteOpen(true)}>Invite admin</Btn>}
+    >
+      <div className="flex items-start gap-2 rounded-xl px-4 py-3 text-sm font-medium" style={{ background: 'var(--sage-light)', color: 'var(--ink)' }}>
+        <Lock className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--sage)' }} />
+        <span>
+          Inviting, changing a role and removing an admin ask for your password again if you signed in more than 15 minutes ago.
+          You can&apos;t change or remove yourself, and the last super admin can&apos;t be demoted or removed.
+        </span>
+      </div>
+
+      {error && <ErrorBanner message={error} onRetry={reload} />}
+
+      <Section title="Admin accounts" description={data ? `${admins.length} admin${admins.length === 1 ? '' : 's'}` : undefined}>
+        <DataTable columns={columns} rows={admins} rowKey={(a) => a.userId} loading={loading} empty="No admins found." />
+      </Section>
+
+      <Section title="Pending invites" description="Invites that haven't been accepted yet. Links expire after 7 days.">
+        <DataTable columns={inviteColumns} rows={invites} rowKey={(i) => i.id} loading={loading} empty="No pending invites." />
+      </Section>
+
+      <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} onInvited={reload} />
+
+      <ConfirmDialog
+        open={!!roleChange}
+        onClose={() => setRoleChange(null)}
+        title="Change role?"
+        body={
+          roleChange && (
+            <>
+              {roleChange.admin.email} goes from <strong>{ADMIN_ROLE_LABELS[roleChange.admin.adminRole].label}</strong> to{' '}
+              <strong>{ADMIN_ROLE_LABELS[roleChange.role].label}</strong>: {ADMIN_ROLE_LABELS[roleChange.role].description.toLowerCase()}.
+            </>
+          )
+        }
+        confirmLabel="Change role"
+        onConfirm={async () => {
+          if (!roleChange) return;
+          await adminFetch(`/api/admin/admins/${encodeURIComponent(roleChange.admin.userId)}`, {
+            method: 'PATCH',
+            json: { adminRole: roleChange.role },
+          });
+          toast('Role updated');
+          reload();
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!removing}
+        onClose={() => setRemoving(null)}
+        title="Remove admin access?"
+        body={
+          removing && (
+            <>
+              {removing.name || removing.email} will lose access to the admin portal straight away. Their account stays; if they
+              also have a professional or client profile they keep using that.
+            </>
+          )
+        }
+        confirmLabel="Remove admin"
+        danger
+        onConfirm={async () => {
+          if (!removing) return;
+          await adminFetch(`/api/admin/admins/${encodeURIComponent(removing.userId)}`, { method: 'DELETE' });
+          toast('Admin removed');
+          reload();
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!revoking}
+        onClose={() => setRevoking(null)}
+        title={revoking?.expired ? 'Remove invite?' : 'Revoke invite?'}
+        body={revoking && <>The link sent to {revoking.email} will stop working.</>}
+        confirmLabel={revoking?.expired ? 'Remove' : 'Revoke'}
+        danger
+        onConfirm={async () => {
+          if (!revoking) return;
+          await adminFetch(`/api/admin/invites?id=${encodeURIComponent(revoking.id)}`, { method: 'DELETE' });
+          toast('Invite revoked');
+          reload();
+        }}
+      />
+    </AdminPage>
+  );
+}
+
+function InviteModal({ open, onClose, onInvited }: { open: boolean; onClose: () => void; onInvited: () => void }) {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [role, setRole] = useState<AdminRole>('SUPPORT');
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [result, setResult] = useState<{ link: string; emailed: boolean; email: string } | null>(null);
 
-  useEffect(() => {
-    if (!uid) { router.push('/auth'); return; }
-    if (role && role !== 'ADMIN') { router.push('/'); return; }
-    if (role === 'ADMIN') fetchAdmins();
-  }, [uid, role]);
-
-  const fetchAdmins = async () => {
-    setLoading(true);
-    try {
-      const res = await apiFetch('/api/admin/admins');
-      if (res.ok) { const d = await res.json(); setAdmins(d.admins || []); }
-    } catch (err) { console.error(err); }
-    setLoading(false);
+  const close = () => {
+    onClose();
+    setTimeout(() => { setEmail(''); setRole('SUPPORT'); setError(''); setResult(null); }, 200);
   };
 
-  const reset = () => {
-    setOpen(false); setEmail(''); setPassword(''); setFirstName(''); setLastName(''); setError('');
-  };
-
-  const handleAdd = async () => {
+  const send = async () => {
+    setBusy(true);
     setError('');
-    if (!email.trim()) { setError('Email is required.'); return; }
-    setSaving(true);
     try {
-      const res = await apiFetch('/api/admin/admins', {
+      const d = await adminFetch<{ link: string; emailed: boolean }>('/api/admin/invites', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password, firstName: firstName.trim(), lastName: lastName.trim() }),
+        json: { email: email.trim(), adminRole: role },
       });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Could not create admin.'); }
-      else { reset(); fetchAdmins(); }
-    } catch (err) { setError('Network error. Please try again.'); }
-    setSaving(false);
+      setResult({ link: d.link, emailed: d.emailed, email: email.trim() });
+      onInvited();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copy = async () => {
+    if (!result) return;
+    try {
+      await navigator.clipboard.writeText(result.link);
+      toast('Link copied');
+    } catch {
+      toast('Could not copy — select the link and copy it.', 'error');
+    }
   };
 
   return (
-    <DashboardLayout role={role} profile={profile}>
-    <div className="relative">
-      <div className="relative z-10 space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="font-heading text-[28px]" style={{ color: 'var(--ink)' }}>Admins</h1>
-            <p className="text-sm font-medium mt-1" style={{ color: 'var(--ink-muted)' }}>
-              {admins.length} admin{admins.length !== 1 ? 's' : ''} with full access
-            </p>
-          </div>
-          <Button onClick={() => setOpen(true)} className="btn-press rounded-xl flex items-center gap-2 py-5 px-4 shadow-sm" style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}>
-            <Plus className="h-4 w-4" /> Add Admin
-          </Button>
-        </div>
-
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-[var(--sage)] border-t-transparent"></div>
-          </div>
+    <Modal
+      open={open}
+      onClose={close}
+      title={result ? 'Invite created' : 'Invite admin'}
+      description={
+        result
+          ? result.emailed
+            ? `We emailed the link to ${result.email}. You can also copy it below.`
+            : `Email isn't set up on the server, so send this link to ${result.email} yourself.`
+          : 'They get a link to accept. They must sign in (or sign up) with this email to accept it.'
+      }
+      footer={
+        result ? (
+          <Btn onClick={close}>Done</Btn>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {admins.map((a, i) => (
-              <div key={a.id} className={`${GLASS_CARD} p-5 stagger-${Math.min(i + 1, 4)}`}>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white" style={{ background: 'linear-gradient(135deg, var(--sage), var(--sage-mid))' }}>
-                    <Shield className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>{a.name || 'Admin'}</p>
-                    <p className="text-xs truncate" style={{ color: 'var(--ink-muted)' }}>{a.email}</p>
-                  </div>
-                </div>
-                <p className="text-xs mt-3" style={{ color: 'var(--ink-muted)' }}>Added {new Date(a.createdAt).toLocaleDateString()}</p>
-              </div>
+          <>
+            <Btn variant="ghost" onClick={close}>Cancel</Btn>
+            <Btn icon={<Mail className="h-4 w-4" />} onClick={send} loading={busy} disabled={!email.trim()}>Send invite</Btn>
+          </>
+        )
+      }
+    >
+      {result ? (
+        <div className="space-y-2">
+          <Field label="Invite link" hint="Works once, for 7 days, only for that email.">
+            <div className="flex gap-2">
+              <Input readOnly value={result.link} onFocus={(e) => e.target.select()} />
+              <Btn variant="ghost" icon={<Copy className="h-4 w-4" />} onClick={copy} aria-label="Copy link" />
+            </div>
+          </Field>
+        </div>
+      ) : (
+        <>
+          <Field label="Email">
+            <Input type="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@staad.in" onKeyDown={(e) => e.key === 'Enter' && email.trim() && send()} />
+          </Field>
+          <fieldset className="space-y-2">
+            <legend className="mb-1 text-sm font-semibold" style={{ color: 'var(--ink-muted)' }}>Role</legend>
+            {ROLES.map((r) => (
+              <label
+                key={r}
+                className="flex cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5"
+                style={{ border: `1px solid ${role === r ? 'var(--sage)' : 'var(--glass-border)'}`, background: role === r ? 'var(--sage-light)' : 'var(--glass-bg)' }}
+              >
+                <input type="radio" name="admin-role" checked={role === r} onChange={() => setRole(r)} className="mt-1" style={{ accentColor: 'var(--sage)' }} />
+                <span>
+                  <span className="block text-sm font-semibold" style={{ color: 'var(--ink)' }}>{ADMIN_ROLE_LABELS[r].label}</span>
+                  <span className="block text-xs" style={{ color: 'var(--ink-muted)' }}>{ADMIN_ROLE_LABELS[r].description}</span>
+                </span>
+              </label>
             ))}
-          </div>
-        )}
-      </div>
-
-      <Dialog open={open} onOpenChange={(o) => { if (!o) reset(); else setOpen(true); }}>
-        <DialogContent className="rounded-2xl max-w-md" style={{ background: 'var(--glass-strong)', backdropFilter: 'blur(24px)', border: '1px solid var(--glass-border)' }}>
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-heading" style={{ color: 'var(--ink)' }}>Add Admin</DialogTitle>
-            <DialogDescription className="font-medium" style={{ color: 'var(--ink-muted)' }}>
-              Creates a new admin login, or promotes an existing user to admin.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-sm font-semibold" style={{ color: 'var(--ink-muted)' }}>First Name</label>
-                <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jane" className="w-full rounded-xl p-3 text-sm focus-visible:outline-none" style={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-semibold" style={{ color: 'var(--ink-muted)' }}>Last Name</label>
-                <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Doe" className="w-full rounded-xl p-3 text-sm focus-visible:outline-none" style={inputStyle} />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-semibold" style={{ color: 'var(--ink-muted)' }}>Email</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@staad.in" className="w-full rounded-xl p-3 text-sm focus-visible:outline-none" style={inputStyle} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-semibold" style={{ color: 'var(--ink-muted)' }}>Password</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min 6 characters (new accounts)" className="w-full rounded-xl p-3 text-sm focus-visible:outline-none" style={inputStyle} />
-              <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>For an existing user, leave blank to keep their password.</p>
-            </div>
-            {error && <p className="text-sm font-medium" style={{ color: '#ef4444' }}>{error}</p>}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={reset} className="btn-press rounded-xl font-medium" style={{ color: 'var(--ink-muted)' }}>Cancel</Button>
-            <Button onClick={handleAdd} disabled={saving || !email.trim()} className="btn-press rounded-xl font-semibold px-5 flex items-center gap-2" style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />} Save admin
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-    </DashboardLayout>
+          </fieldset>
+          {error && <ErrorBanner message={error} />}
+        </>
+      )}
+    </Modal>
   );
 }

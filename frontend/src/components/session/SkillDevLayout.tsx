@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode, useMemo } from 'react'
+import { useState, type ReactNode } from 'react';
 import { useTracks, useLocalParticipant, VideoTrack } from '@livekit/components-react'
 import type { TrackReference } from '@livekit/components-react'
 import { Track } from 'livekit-client'

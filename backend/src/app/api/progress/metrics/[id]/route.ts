@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireTherapist } from '@/lib/progressAuth';
 import { requireActivePlan } from '@/lib/subscriptions';
+import { errorResponse } from '@/lib/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,8 +46,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     return NextResponse.json({ metric });
   } catch (error: any) {
-    console.error('Progress metrics PATCH error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Progress metrics PATCH error');
   }
 }
 
@@ -70,7 +70,6 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     await prisma.progressMetric.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Progress metrics DELETE error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Progress metrics DELETE error');
   }
 }

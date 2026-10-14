@@ -1,17 +1,41 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireActivePlan } from '@/lib/subscriptions';
+import { requireAuth } from '@/lib/apiAuth';
 import { sendSessionBookedWhatsApp } from '@/lib/session-whatsapp';
+import { errorResponse } from '@/lib/apiError';
+
+// The caller must own the referenced therapist/client profile or be an ADMIN.
+async function mayAccess(uid: string, ref: { therapistId?: string | null; clientId?: string | null }) {
+  const [therapist, client, user] = await Promise.all([
+    ref.therapistId
+      ? prisma.profileTherapist.findUnique({ where: { id: ref.therapistId }, select: { userId: true } })
+      : null,
+    ref.clientId
+      ? prisma.profileClient.findUnique({ where: { id: ref.clientId }, select: { userId: true } })
+      : null,
+    prisma.user.findUnique({ where: { id: uid }, select: { role: true } }),
+  ]);
+  if (user?.role === 'ADMIN') return true;
+  return ref.therapistId ? therapist?.userId === uid : client?.userId === uid;
+}
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
+
     const { searchParams } = new URL(request.url);
     const therapistId = searchParams.get('therapistId');
     const clientId = searchParams.get('clientId');
 
     if (therapistId) {
+      const owner = await prisma.profileTherapist.findUnique({ where: { id: therapistId }, select: { userId: true } });
+      if (!owner || owner.userId !== auth.uid) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
       // Note count + report presence let the UI flag completed sessions whose
       // documentation is still outstanding ("Notes pending").
       const sessions = await prisma.session.findMany({
@@ -27,6 +51,13 @@ export async function GET(request: Request) {
     }
 
     if (clientId) {
+      const client = await prisma.profileClient.findUnique({
+        where: { id: clientId },
+        select: { userId: true, therapist: { select: { userId: true } } },
+      });
+      if (!client || (client.userId !== auth.uid && client.therapist?.userId !== auth.uid)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
       const sessions = await prisma.session.findMany({
         where: { clientId },
         include: {
@@ -39,14 +70,19 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ error: 'Missing filter parameter' }, { status: 400 });
   } catch (error: any) {
-    console.error('Sessions GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Sessions GET error');
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
+
     const { therapistId, clientId, scheduledAt, booking } = await request.json();
+    if (!therapistId || !(await mayAccess(auth.uid, { therapistId }))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     const noPlan = await requireActivePlan({ therapistId });
     if (noPlan) return noPlan;
 
@@ -82,7 +118,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ session });
   } catch (error: any) {
-    console.error('Session creation error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Session creation error');
   }
 }

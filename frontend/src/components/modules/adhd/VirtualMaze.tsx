@@ -1,25 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useId, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
-import {
-  Leaf,
-  Waves,
-  Moon,
-  Timer,
-  Box,
-  Flag,
-  Ban,
-  Footprints,
-  ArrowUp,
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  Lock,
-  RotateCcw,
-  Square,
-  Route,
-} from 'lucide-react'
+import { Leaf, Waves, Moon, Timer, Box, Ban, Footprints, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Lock, RotateCcw, Square, Route } from 'lucide-react';
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { staadPraise, staadSpeak } from '@/lib/voice/staadVoice'

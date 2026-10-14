@@ -5,12 +5,12 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { usePracticeData, useTherapistGuard } from '@/hooks/usePracticeData';
 import { StaadShell } from '@/components/staad/Shell';
 import { TopBar } from '@/components/staad/TopBar';
-import { Badge, Btn, Chips, InlineError, Notch, Section, SkeletonCard, cx } from '@/components/staad/parts';
+import { Btn, Chips, InlineError, Notch, Section, SkeletonCard, cx } from '@/components/staad/parts';
 import { IconArrowRightXs, IconTick } from '@/components/staad/icons';
 import { DsDialog, toast } from '@/components/practice/ui';
 import { ALL_MODULE_IDS, MODULE_CATEGORIES, resolveAllowedModuleIds } from '@/lib/modules';
 import { fmtDate } from '@/lib/practice';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, apiFetchCached, clearApiCache } from '@/lib/api';
 import { openCashfreeCheckout } from '@/lib/cashfree';
 
 interface Plan {
@@ -20,6 +20,7 @@ interface Plan {
   priceMonthly: number;
   durationMonths: number;
   toolQuota: number | null;
+  features?: string[];
   maxClients?: number | null;
   maxSessionsPerMonth?: number | null;
   maxAiReportsPerMonth?: number | null;
@@ -47,10 +48,12 @@ interface Pending {
 const MONTH_OPTIONS = [1, 3, 6, 12] as const;
 type Term = (typeof MONTH_OPTIONS)[number];
 
+// Admin-written bullets win; otherwise the built-in list.
 const limitText = (n: number | null | undefined, unit: string, unlimited: string) =>
   n == null ? unlimited : `${n.toLocaleString('en-IN')} ${unit}`;
 
-const planFeatures = (p: Plan) => [
+// Keep in sync with builtInFeatures() in app/admin/plans/page.tsx (its preview).
+const planFeatures = (p: Plan) => Array.isArray(p.features) && p.features.length ? p.features : [
   p.toolQuota == null ? 'Every therapy tool, including new ones' : `Any ${p.toolQuota} therapy tools you choose`,
   limitText(p.maxClients, p.maxClients === 1 ? 'active client' : 'active clients', 'Unlimited clients'),
   limitText(p.maxSessionsPerMonth, 'sessions a month', 'Unlimited sessions'),
@@ -92,8 +95,8 @@ export default function PlansPage() {
     setLoading(true);
     try {
       const [pRes, sRes] = await Promise.all([
-        apiFetch('/api/plans'),
-        apiFetch(`/api/subscriptions?therapistId=${profile.id}`),
+        apiFetchCached('/api/plans'),
+        apiFetchCached(`/api/subscriptions?therapistId=${profile.id}`),
       ]);
       if (pRes.ok) setPlans((await pRes.json()).plans || []);
       if (sRes.ok) {
@@ -136,6 +139,9 @@ export default function PlansPage() {
             ? 'Payment received — your plan is active.'
             : 'Payment received — activating your plan…'
         );
+        // The plan was activated server-side by a GET, which doesn't clear
+        // cached reads — drop them so load() sees the new subscription.
+        clearApiCache();
         await Promise.all([load(), refreshProfile()]);
         return true;
       }

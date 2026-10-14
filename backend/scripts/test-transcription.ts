@@ -5,10 +5,7 @@ import {
   getSessionTranscript,
   deleteSessionTranscript,
 } from '../src/lib/rag/transcript-store'
-import {
-  getRecentTranscript,
-  formatTranscriptForLLM,
-} from '../src/lib/rag/transcription'
+import { formatTranscriptForLLM } from '../src/lib/rag/transcription';
 import type { TranscriptChunk } from '../src/lib/rag/types'
 
 const TEST_SESSION_ID = 'test-session-transcription-001'

@@ -3,6 +3,10 @@
     {
       "path": "/api/cleanup-transcripts",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/subscriptions",
+      "schedule": "30 2 * * *"
     }
   ]
 }

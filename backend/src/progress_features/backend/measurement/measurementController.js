@@ -10,6 +10,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getClientMetrics } from './measurementService.js';
+import { errorResponse } from '@/lib/apiError';
 
 export async function GET(request, { params }) {
   try {
@@ -26,7 +27,6 @@ export async function GET(request, { params }) {
     const metrics = await getClientMetrics(prisma, clientId);
     return NextResponse.json({ metrics });
   } catch (error) {
-    console.error('measurementController GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'measurementController GET');
   }
 }

@@ -22,7 +22,9 @@ export async function runAnalysis(
   } = options
 
   console.log(`[Analysis] Starting for session ${sessionId}`)
-  console.log(`[Analysis] Client: ${clientProfile.name}, Window: ${transcriptWindowMinutes}min`)
+  // Never log client identity, transcript text or clinical inferences here —
+  // these logs leave the app (Vercel/server logs). Counts and timings only.
+  console.log(`[Analysis] Window: ${transcriptWindowMinutes}min`)
 
   const context = await retrieveRAGContext(
     sessionId,
@@ -31,7 +33,7 @@ export async function runAnalysis(
     transcriptWindowMinutes
   )
 
-  console.log(`[Analysis] Context retrieved — transcript: ${context.transcript.slice(0, 80)}...`)
+  console.log(`[Analysis] Context retrieved — transcript: ${context.transcript.length} chars`)
   console.log(`[Analysis] Study material chunks: ${context.studyMaterial.length}`)
   console.log(`[Analysis] Previous notes: ${context.previousNotes.length}`)
 
@@ -48,7 +50,7 @@ export async function runAnalysis(
     runSafetyScan(context.transcript),
   ])
   const llmDuration = Date.now() - llmStart
-  console.log(`[Analysis] LLM + safety responded in ${llmDuration}ms (safety: ${safety.level})`)
+  console.log(`[Analysis] LLM + safety responded in ${llmDuration}ms`)
 
   const insight = parseInsight(raw, transcriptWindowMinutes)
 
@@ -57,8 +59,6 @@ export async function runAnalysis(
   insight.riskLevel = safety.level
   insight.riskDetail = safety.rationale || insight.riskDetail || ''
   if (safety.level !== 'none') insight.riskFlag = true
-
-  console.log(`[Analysis] Parsed — emotions: [${insight.emotions.join(', ')}], risk: ${insight.riskFlag} (${insight.riskLevel})`)
 
   return insight
 }

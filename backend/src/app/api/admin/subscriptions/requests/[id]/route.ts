@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
+import { audit } from '@/lib/audit';
 import { ALL_MODULE_IDS } from '@/lib/modules';
 import { activatePlan } from '@/lib/subscriptions';
+import { errorResponse } from '@/lib/apiError';
+
+export const dynamic = 'force-dynamic';
 
 // POST /api/admin/subscriptions/requests/[id] — approve or reject a plan request.
 // Body: { action: 'approve' | 'reject', modules?, months? }
@@ -11,7 +15,7 @@ import { activatePlan } from '@/lib/subscriptions';
 // — unlimited plans grant all tools.
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireAdmin(request, 'billing.write');
     if (!auth.ok) return auth.response;
     const { action, modules, months } = await request.json();
 
@@ -20,6 +24,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
       include: { plan: true },
     });
     if (!req) return NextResponse.json({ error: 'Request not found' }, { status: 404 });
+    const target = { type: 'SubscriptionRequest', id: req.id };
+    const before = { status: req.status, planId: req.planId, planName: req.plan.name, months: req.months, modules: req.modules };
     if (req.status !== 'PENDING') {
       return NextResponse.json({ error: 'Request already reviewed.' }, { status: 409 });
     }
@@ -29,6 +35,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         where: { id: req.id },
         data: { status: 'REJECTED', reviewedAt: new Date() },
       });
+      await audit(request, auth, 'subscription_request.reject', target, { before, after: { status: updated.status } });
       return NextResponse.json({ success: true, request: updated });
     }
 
@@ -59,8 +66,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     const months_ = Math.max(1, Math.min(36, Number(months) || req.months || 1));
 
-    await prisma.$transaction(async (tx) => {
-      const { grantedModules } = await activatePlan(tx, {
+    const created = await prisma.$transaction(async (tx) => {
+      // Recorded for the audit log; activatePlan supersedes them.
+      const superseded = await tx.subscription.findMany({
+        where: { therapistId: req.therapistId, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      const { subscription: sub, grantedModules } = await activatePlan(tx, {
         therapistId: req.therapistId,
         plan,
         months: months_,
@@ -71,11 +83,24 @@ export async function POST(request: Request, { params }: { params: { id: string 
         where: { id: req.id },
         data: { status: 'APPROVED', reviewedAt: new Date(), modules: grantedModules },
       });
+      return { sub, grantedModules, superseded: superseded.map((s) => s.id) };
+    });
+
+    await audit(request, auth, 'subscription_request.approve', target, {
+      before,
+      after: {
+        status: 'APPROVED',
+        months: months_,
+        modules: created.grantedModules,
+        unlimited,
+        subscriptionId: created.sub.id,
+        currentPeriodEnd: created.sub.currentPeriodEnd,
+        supersededSubscriptionIds: created.superseded,
+      },
     });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Subscription request review error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Subscription request review error');
   }
 }
