@@ -30,3 +30,16 @@ Next.js (App Router) implementation of `docx/Anonymous-Feedback-Comment-System-D
 
 Notes: rate-limit counters are in-memory (swap `src/lib/ratelimit.ts` for Redis when running multiple instances).
 Soft-deleted rows and resolved reports are purged when the admin queue is loaded.
+
+## Deploy to Vercel
+
+`vercel.json` is set up for this folder (Next.js, region `sin1` next to the Neon database in ap-southeast-1).
+
+1. Import the repo in Vercel and set **Root Directory** to `feedback-board`.
+2. Add the environment variables from `.env.example`: `DATABASE_URL`, `HMAC_SECRET`, `ADMIN_PASSWORD`,
+   and optionally `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `BLOCKLIST`, `AUTO_HIDE_REPORTS`.
+3. Set `NEXT_PUBLIC_PUBLIC_URL` to the deployed URL so the `/present` QR code points at it.
+4. Run `npm run db:init` once against the database (locally, with `DATABASE_URL` set).
+
+Note: rate-limit counters are in memory, so on Vercel each serverless instance counts separately.
+Swap `src/lib/ratelimit.ts` for a shared store (e.g. Upstash Redis) if strict limits matter.
