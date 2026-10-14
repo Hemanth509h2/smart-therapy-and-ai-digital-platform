@@ -5,6 +5,7 @@ import { doc, onSnapshot, updateDoc, increment } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { AnimatePresence, motion } from 'motion/react'
+import { RotateCcw, Volume2, VolumeX, ChevronDown, Puzzle } from 'lucide-react'
 
 interface BuildTogetherProps {
   sessionId: string
@@ -58,10 +59,10 @@ const FQ: Array<{ en: string; hi: string }> = [
 const SCENARIOS: Scenario[] = [
   {
     id: 'easy_1', level: 'easy', theme: 'bridge',
-    title_en: 'Build a Bridge', title_hi: 'पुल बनाओ',
+    title_en: 'Thought Build', title_hi: 'पुल बनाओ',
     therapistClue: {
-      en: "This bridge needs to hold a heavy truck. Don't use rope — it's too weak for something this heavy.",
-      hi: 'यह पुल एक भारी ट्रक का वज़न सहेगा। रस्सी का इस्तेमाल मत करो — यह इतनी भारी चीज़ के लिए कमज़ोर है।',
+      en: "This bridge needs to carry Teddy safely across to his friend. Don't use rope — it's too weak for Teddy's weight.",
+      hi: 'यह पुल टेडी को उसके दोस्त तक सुरक्षित पहुँचाएगा। रस्सी का इस्तेमाल मत करो — यह टेडी के लिए कमज़ोर है।',
     },
     childClue: {
       en: "Here's what each material can hold:", hi: 'हर सामान क्या सह सकता है:',
@@ -73,7 +74,7 @@ const SCENARIOS: Scenario[] = [
       ],
     },
     materials: [{ type: 'stone', count: 4 }, { type: 'metal', count: 3 }, { type: 'wood', count: 4 }, { type: 'rope', count: 3 }],
-    slotCount: 5,
+    slotCount: 4,
     correctCombination: { require: { stone: 2, metal: 1 }, forbid: ['rope'], minPieces: 4 },
     facilitatorQuestions: FQ,
   },
@@ -945,6 +946,959 @@ function SceneBackdrop({ theme }: { theme: Theme }) {
   )
 }
 
+/* ===========================================================================
+   THOUGHT BUILD (LEVEL 1) AUDIO & DEDICATED EXPERIENCE
+   Gentle Web Audio API synthesizer for ambient background music & success chime.
+   Zero external asset dependencies, therapist-controlled volume and mute.
+=========================================================================== */
+
+class ThoughtBuildAudioManager {
+  private ctx: AudioContext | null = null
+  private bgmGain: GainNode | null = null
+  private sfxGain: GainNode | null = null
+  private bgmTimer: ReturnType<typeof setInterval> | null = null
+  private isBgmRunning = false
+  private volume = 0.5
+  private muted = false
+
+  init() {
+    if (this.ctx) return
+    const AudioCtx =
+      typeof window !== 'undefined'
+        ? window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+        : null
+    if (!AudioCtx) return
+    try {
+      this.ctx = new AudioCtx()
+      this.bgmGain = this.ctx.createGain()
+      this.sfxGain = this.ctx.createGain()
+      this.bgmGain.connect(this.ctx.destination)
+      this.sfxGain.connect(this.ctx.destination)
+      this.applyVolume()
+    } catch {}
+  }
+
+  setVolume(vol: number, isMuted: boolean) {
+    this.volume = vol
+    this.muted = isMuted
+    this.applyVolume()
+  }
+
+  private applyVolume() {
+    if (!this.ctx || !this.bgmGain || !this.sfxGain) return
+    const now = this.ctx.currentTime
+    const bgmTarget = this.muted ? 0 : this.volume * 0.06
+    const sfxTarget = this.muted ? 0 : this.volume * 0.22
+    this.bgmGain.gain.setValueAtTime(this.bgmGain.gain.value, now)
+    this.bgmGain.gain.linearRampToValueAtTime(bgmTarget, now + 0.08)
+    this.sfxGain.gain.setValueAtTime(this.sfxGain.gain.value, now)
+    this.sfxGain.gain.linearRampToValueAtTime(sfxTarget, now + 0.08)
+  }
+
+  startBgm() {
+    if (this.isBgmRunning) return
+    this.init()
+    if (!this.ctx) return
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {})
+    }
+    this.isBgmRunning = true
+
+    // Warm, peaceful pentatonic kalimba arpeggio (soothing and gentle)
+    const notes = [
+      261.63, 329.63, 392.0, 523.25,
+      440.0, 392.0, 329.63, 261.63,
+      293.66, 349.23, 440.0, 523.25,
+      392.0, 329.63, 293.66, 261.63,
+    ]
+    let step = 0
+
+    const playStep = () => {
+      if (!this.ctx || !this.bgmGain || !this.isBgmRunning) return
+      const freq = notes[step % notes.length]
+      step++
+      try {
+        const osc = this.ctx.createOscillator()
+        const gain = this.ctx.createGain()
+        const filter = this.ctx.createBiquadFilter()
+
+        filter.type = 'lowpass'
+        filter.frequency.value = 700
+
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime)
+
+        const t = this.ctx.currentTime
+        gain.gain.setValueAtTime(0.0001, t)
+        gain.gain.linearRampToValueAtTime(0.3, t + 0.25)
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 2.4)
+
+        osc.connect(filter)
+        filter.connect(gain)
+        gain.connect(this.bgmGain)
+
+        osc.start(t)
+        osc.stop(t + 2.5)
+      } catch {}
+    }
+
+    playStep()
+    this.bgmTimer = setInterval(playStep, 1750)
+  }
+
+  stopBgm() {
+    this.isBgmRunning = false
+    if (this.bgmTimer) {
+      clearInterval(this.bgmTimer)
+      this.bgmTimer = null
+    }
+  }
+
+  playSuccessChime() {
+    this.init()
+    if (!this.ctx || !this.sfxGain || this.muted) return
+    if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {})
+    // Uplifting warm celestial chime chord: C5, E5, G5, C6
+    const freqs = [523.25, 659.25, 783.99, 1046.5]
+    freqs.forEach((freq, idx) => {
+      try {
+        const t = this.ctx!.currentTime + idx * 0.12
+        const osc = this.ctx!.createOscillator()
+        const g = this.ctx!.createGain()
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(freq, t)
+        g.gain.setValueAtTime(0.001, t)
+        g.gain.linearRampToValueAtTime(0.38, t + 0.04)
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 1.25)
+        osc.connect(g)
+        g.connect(this.sfxGain!)
+        osc.start(t)
+        osc.stop(t + 1.3)
+      } catch {}
+    })
+  }
+
+  playPlaceSound() {
+    this.init()
+    if (!this.ctx || !this.sfxGain || this.muted) return
+    if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {})
+    try {
+      const t = this.ctx.currentTime
+      const osc = this.ctx.createOscillator()
+      const g = this.ctx.createGain()
+      osc.type = 'triangle'
+      osc.frequency.setValueAtTime(360, t)
+      osc.frequency.exponentialRampToValueAtTime(220, t + 0.08)
+      g.gain.setValueAtTime(0.18, t)
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.08)
+      osc.connect(g)
+      g.connect(this.sfxGain)
+      osc.start(t)
+      osc.stop(t + 0.09)
+    } catch {}
+  }
+
+  playEncouragingSound() {
+    this.init()
+    if (!this.ctx || !this.sfxGain || this.muted) return
+    if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {})
+    try {
+      const t = this.ctx.currentTime
+      const notes = [220.0, 261.63]
+      notes.forEach((freq, idx) => {
+        const nt = t + idx * 0.18
+        const osc = this.ctx!.createOscillator()
+        const g = this.ctx!.createGain()
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(freq, nt)
+        g.gain.setValueAtTime(0.14, nt)
+        g.gain.exponentialRampToValueAtTime(0.001, nt + 0.4)
+        osc.connect(g)
+        g.connect(this.sfxGain!)
+        osc.start(nt)
+        osc.stop(nt + 0.45)
+      })
+    } catch {}
+  }
+
+  destroy() {
+    this.stopBgm()
+    if (this.ctx) {
+      try {
+        this.ctx.close()
+      } catch {}
+      this.ctx = null
+    }
+  }
+}
+
+interface ThoughtBuildLevel1Props {
+  scenario: Scenario
+  role: 'therapist' | 'client'
+  canDrag: boolean
+  filled: Record<string, string>
+  used: Partial<Record<MaterialType, number>>
+  completed: boolean
+  dragOver: number | null
+  shake: boolean
+  onDrop: (slotIdx: number, type: string) => void
+  onClearSlot: (slotIdx: number) => void
+  onTryCrossing: () => void
+  onReset: () => void
+  onNext: () => void
+  volume: number
+  muted: boolean
+  onVolumeChange: (vol: number) => void
+  onToggleMute: () => void
+  teddyStep: number
+  encourageMessage: string | null
+  startAudio: () => void
+}
+
+const TB_PIECE_ART: Record<MaterialType, string> = {
+  stone: '/assets/modules/skill/piece_stone.png',
+  metal: '/assets/modules/skill/piece_metal.png',
+  wood: '/assets/modules/skill/piece_wood.png',
+  rope: '/assets/modules/skill/piece_rope.png',
+}
+
+const TB_BOX_COORDS = [
+  { left: '30.5%', top: '60.0%', width: '9.2%', height: '11.0%' },
+  { left: '40.7%', top: '60.0%', width: '9.2%', height: '11.0%' },
+  { left: '50.9%', top: '60.0%', width: '9.2%', height: '11.0%' },
+  { left: '61.1%', top: '60.0%', width: '9.2%', height: '11.0%' },
+]
+
+function ThoughtBuildLevel1({
+  scenario,
+  role,
+  canDrag,
+  filled,
+  used,
+  completed,
+  dragOver,
+  shake,
+  onDrop,
+  onClearSlot,
+  onTryCrossing,
+  onReset,
+  onNext,
+  volume,
+  muted,
+  onVolumeChange,
+  onToggleMute,
+  teddyStep,
+  encourageMessage,
+  startAudio,
+}: ThoughtBuildLevel1Props) {
+  const isT = role === 'therapist'
+  const [showVolSlider, setShowVolSlider] = useState(false)
+  const [clueOpen, setClueOpen] = useState(false)
+  const [selectedMaterial, setSelectedMaterial] = useState<MaterialType | null>(null)
+
+  // Teddy's position along the path from starting rock across the 4 bridge slots to Bunny
+  const getTeddyStyle = (): React.CSSProperties => {
+    if (teddyStep === -1) {
+      return { left: '16.5%', top: '48%' }
+    }
+    if (teddyStep === 0) {
+      return { left: '30.5%', top: '51.5%' }
+    }
+    if (teddyStep === 1) {
+      return { left: '40.7%', top: '51.5%' }
+    }
+    if (teddyStep === 2) {
+      return { left: '50.9%', top: '51.5%' }
+    }
+    if (teddyStep === 3) {
+      return { left: '61.1%', top: '51.5%' }
+    }
+    // teddyStep >= 4: reached Teddy's friend on the right bank!
+    return { left: '71.5%', top: '47.5%' }
+  }
+
+  return (
+    <>
+      <style>{`
+        @keyframes tbBreathe {
+          0%, 100% { transform: scale(1) translateY(0); }
+          50% { transform: scale(1.02) translateY(-3px); }
+        }
+        @keyframes tbWaterWave {
+          0% { transform: translateX(0); opacity: 0.35; }
+          50% { transform: translateX(14px); opacity: 0.65; }
+          100% { transform: translateX(0); opacity: 0.35; }
+        }
+        @keyframes tbFloatLily {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          50% { transform: translateY(-3px) rotate(2deg); }
+        }
+        @keyframes tbWobbleSlot {
+          0%, 100% { transform: translateX(0); }
+          20% { transform: translateX(-4px) rotate(-1deg); }
+          40% { transform: translateX(4px) rotate(1deg); }
+          60% { transform: translateX(-2px); }
+          80% { transform: translateX(2px); }
+        }
+      `}</style>
+
+      <div
+        onClick={startAudio}
+        onDragStart={startAudio}
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: '100%',
+          minHeight: 460,
+          overflow: 'hidden',
+          borderRadius: 16,
+          fontFamily: "'Nunito', sans-serif",
+          userSelect: 'none',
+        }}
+      >
+        {/* Layer 1: Painted backdrop from reference image (arrow on sign cleanly removed) */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/assets/modules/skill/thought_build_clean_bg.png"
+          alt="Thought Build Landscape"
+          draggable={false}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            pointerEvents: 'none',
+            userSelect: 'none',
+          }}
+        />
+
+        {/* Layer 2: Subtle water movement & gentle ripples */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '52%',
+            left: '20%',
+            right: '20%',
+            height: '24%',
+            pointerEvents: 'none',
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background:
+                'radial-gradient(ellipse at 35% 45%, rgba(255,255,255,0.4) 0%, transparent 60%), radial-gradient(ellipse at 70% 65%, rgba(255,255,255,0.3) 0%, transparent 55%)',
+              animation: 'tbWaterWave 5s ease-in-out infinite',
+            }}
+          />
+        </div>
+
+        {/* Gentle floating water lilies */}
+        <div
+          style={{
+            position: 'absolute',
+            left: '25%',
+            top: '68%',
+            width: 18,
+            height: 10,
+            borderRadius: '50%',
+            background: 'rgba(235, 215, 110, 0.75)',
+            boxShadow: '0 0 6px rgba(255, 230, 130, 0.4)',
+            animation: 'tbFloatLily 4s ease-in-out infinite',
+            pointerEvents: 'none',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            left: '73%',
+            top: '67%',
+            width: 16,
+            height: 9,
+            borderRadius: '50%',
+            background: 'rgba(235, 215, 110, 0.7)',
+            boxShadow: '0 0 6px rgba(255, 230, 130, 0.4)',
+            animation: 'tbFloatLily 4.6s ease-in-out infinite 0.8s',
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* Layer 3: Top Navigation Bar */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 14,
+            left: 18,
+            right: 18,
+            zIndex: 40,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          {/* Top-Left Pill: "Thought Build" */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '7px 16px',
+              borderRadius: 999,
+              background: 'rgba(250, 246, 238, 0.94)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '0 3px 10px rgba(45, 60, 50, 0.08)',
+              fontSize: 15,
+              fontWeight: 800,
+              color: '#34473d',
+            }}
+          >
+            <Puzzle size={18} color="#2f5c46" />
+            <span>Thought Build</span>
+            <ChevronDown size={14} color="#64766c" />
+          </div>
+
+          {/* Top-Center Pill: "Level 1" with 7 progress dots */}
+          <div
+            style={{
+              position: 'absolute',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '7px 18px',
+              borderRadius: 999,
+              background: 'rgba(250, 246, 238, 0.94)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '0 3px 10px rgba(45, 60, 50, 0.08)',
+              fontSize: 14,
+              fontWeight: 800,
+              color: '#34473d',
+            }}
+          >
+            <span>Level 1</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: 3,
+                  right: 3,
+                  height: 1.5,
+                  background: '#d2dbd5',
+                  zIndex: 0,
+                }}
+              />
+              {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                <span
+                  key={i}
+                  style={{
+                    width: i === 0 ? 10 : 7,
+                    height: i === 0 ? 10 : 7,
+                    borderRadius: '50%',
+                    background: i === 0 ? '#26543d' : '#cfd8d2',
+                    zIndex: 1,
+                    transition: 'all 0.2s',
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Top-Right Controls: Therapist view only (HIDDEN completely on client view) */}
+          {isT ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              {/* Reset button */}
+              <button
+                onClick={onReset}
+                title="Reset bridge, materials, and Teddy"
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: '50%',
+                  background: 'rgba(250, 246, 238, 0.94)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(0,0,0,0.06)',
+                  boxShadow: '0 3px 10px rgba(45, 60, 50, 0.08)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#34473d',
+                  transition: 'transform 0.15s, background 0.15s',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.08)')}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+              >
+                <RotateCcw size={17} />
+              </button>
+
+              {/* Volume / Sound button + slider popover */}
+              <div
+                style={{ position: 'relative' }}
+                onMouseEnter={() => setShowVolSlider(true)}
+                onMouseLeave={() => setShowVolSlider(false)}
+              >
+                <button
+                  onClick={onToggleMute}
+                  title={muted ? 'Unmute game audio' : 'Mute game audio'}
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: '50%',
+                    background: 'rgba(250, 246, 238, 0.94)',
+                    backdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(0,0,0,0.06)',
+                    boxShadow: '0 3px 10px rgba(45, 60, 50, 0.08)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: muted ? '#b24c3d' : '#34473d',
+                    transition: 'transform 0.15s, background 0.15s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.08)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                >
+                  {muted ? <VolumeX size={17} /> : <Volume2 size={17} />}
+                </button>
+
+                {showVolSlider && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 44,
+                      right: 0,
+                      padding: '8px 14px',
+                      background: 'rgba(250, 246, 238, 0.98)',
+                      borderRadius: 12,
+                      boxShadow: '0 6px 20px rgba(0,0,0,0.14)',
+                      border: '1px solid rgba(0,0,0,0.08)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      zIndex: 60,
+                    }}
+                  >
+                    <span style={{ fontSize: 12, fontWeight: 800, color: '#34473d' }}>
+                      {muted ? '0%' : `${Math.round(volume * 100)}%`}
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={muted ? 0 : volume}
+                      onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
+                      style={{ width: 80, accentColor: '#26543d', cursor: 'pointer' }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Therapist clue popover button */}
+              <button
+                onClick={() => setClueOpen((o) => !o)}
+                title="Therapist instructions (private)"
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 999,
+                  background: clueOpen ? 'rgba(47, 92, 70, 0.9)' : 'rgba(250, 246, 238, 0.94)',
+                  color: clueOpen ? '#fff' : '#34473d',
+                  border: '1px solid rgba(0,0,0,0.06)',
+                  boxShadow: '0 3px 10px rgba(45, 60, 50, 0.08)',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 800,
+                }}
+              >
+                Clue ▾
+              </button>
+            </div>
+          ) : (
+            // Client view: Reset and Sound controls are completely hidden
+            <div style={{ width: 40 }} />
+          )}
+        </div>
+
+        {/* Therapist clue card (Private to therapist, never visible to client) */}
+        {isT && clueOpen && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 60,
+              right: 18,
+              zIndex: 50,
+              width: 250,
+              background: 'rgba(255, 252, 245, 0.98)',
+              borderRadius: 14,
+              padding: '12px 14px',
+              border: '1.5px solid rgba(139,90,43,0.2)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.16)',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                color: '#8a5a2a',
+                marginBottom: 4,
+              }}
+            >
+              🧑‍⚕️ Therapist Note (Hidden from client)
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#2c1f0e', lineHeight: 1.4 }}>
+              {scenario.therapistClue.en}
+            </div>
+          </div>
+        )}
+
+        {/* Layer 4: Characters */}
+        {/* Layer 4: Character - Teddy starts on the left bank and walks across bridge to Bunny */}
+        <div
+          style={{
+            position: 'absolute',
+            zIndex: 32,
+            ...getTeddyStyle(),
+            transition: 'all 0.45s cubic-bezier(0.25, 1, 0.5, 1)',
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            style={{
+              position: 'relative',
+              animation: 'tbBreathe 3.2s ease-in-out infinite',
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/assets/modules/skill/teddy_character.png"
+              alt="Teddy"
+              draggable={false}
+              style={{ width: 94, height: 104, display: 'block', objectFit: 'contain' }}
+            />
+          </div>
+        </div>
+
+        {/* Layer 5: Bridge Drop Zones (4 dashed slots spanning the river) */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            animation: shake ? 'tbWobbleSlot 0.36s ease' : 'none',
+          }}
+        >
+          {TB_BOX_COORDS.map((box, i) => {
+            const val = filled[String(i)] as MaterialType | undefined
+            const isOver = dragOver === i
+            return (
+              <div
+                key={i}
+                onDragOver={(e) => {
+                  if (canDrag && !completed) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const type = e.dataTransfer.getData('text/plain')
+                  if (type) onDrop(i, type)
+                }}
+                onClick={() => {
+                  if (val) {
+                    onClearSlot(i)
+                  } else if (selectedMaterial && canDrag && !completed) {
+                    onDrop(i, selectedMaterial)
+                    setSelectedMaterial(null)
+                  }
+                }}
+                onDoubleClick={() => onClearSlot(i)}
+                title={val ? 'Click to remove' : selectedMaterial ? `Click to place ${selectedMaterial}` : undefined}
+                style={{
+                  position: 'absolute',
+                  left: box.left,
+                  top: box.top,
+                  width: box.width,
+                  height: box.height,
+                  borderRadius: 12,
+                  border: `2px dashed ${
+                    isOver ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.72)'
+                  }`,
+                  background: isOver ? 'rgba(255, 255, 255, 0.28)' : 'rgba(255, 255, 255, 0.12)',
+                  boxShadow: isOver ? '0 0 18px rgba(255, 255, 255, 0.6)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'auto',
+                  cursor: val ? 'pointer' : selectedMaterial ? 'pointer' : 'default',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {val && (
+                  <motion.div
+                    key={`${i}-${val}`}
+                    initial={{ scale: 0.2, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: 'spring', stiffness: 360, damping: 20 }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={TB_PIECE_ART[val]}
+                      alt={val}
+                      draggable={false}
+                      style={{
+                        maxWidth: '82%',
+                        maxHeight: '80%',
+                        objectFit: 'contain',
+                        filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.28))',
+                      }}
+                    />
+                  </motion.div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Gentle speech/encouraging bubble */}
+        {encourageMessage && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 145,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 36,
+              background: 'rgba(255, 252, 245, 0.96)',
+              borderRadius: 14,
+              padding: '8px 16px',
+              border: '1.5px solid rgba(47, 92, 70, 0.25)',
+              boxShadow: '0 4px 18px rgba(45, 60, 50, 0.14)',
+              fontSize: 13.5,
+              fontWeight: 700,
+              color: '#264234',
+              maxWidth: 420,
+              textAlign: 'center',
+              lineHeight: 1.4,
+            }}
+          >
+            {encourageMessage}
+          </div>
+        )}
+
+        {/* Compact "Try Crossing" Button positioned above the materials tray */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 96,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 35,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          {completed ? (
+            isT ? (
+              <button
+                onClick={onNext}
+                style={{
+                  padding: '7px 20px',
+                  borderRadius: 999,
+                  cursor: 'pointer',
+                  fontSize: 14.5,
+                  fontWeight: 800,
+                  background: 'linear-gradient(135deg, #2f5c46 0%, #204533 100%)',
+                  border: '1px solid rgba(255, 255, 255, 0.4)',
+                  color: '#fff',
+                  boxShadow: '0 4px 14px rgba(32, 69, 51, 0.3)',
+                  transition: 'transform 0.15s',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.04)')}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+              >
+                Next level →
+              </button>
+            ) : (
+              <div
+                style={{
+                  padding: '6px 18px',
+                  borderRadius: 999,
+                  background: 'rgba(47, 92, 70, 0.92)',
+                  color: '#fff',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  boxShadow: '0 3px 10px rgba(0,0,0,0.15)',
+                }}
+              >
+                🎉 Teddy made it safely!
+              </div>
+            )
+          ) : (
+            <button
+              onClick={onTryCrossing}
+              style={{
+                padding: '7px 22px',
+                borderRadius: 999,
+                cursor: 'pointer',
+                fontSize: 14.5,
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #37634f 0%, #294e3e 100%)',
+                border: '1.5px solid rgba(255, 255, 255, 0.4)',
+                color: '#fff',
+                boxShadow: '0 4px 14px rgba(41, 78, 62, 0.28)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+                transition: 'transform 0.15s, box-shadow 0.15s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+            >
+              <span>🐾</span>
+              <span>Try Crossing</span>
+            </button>
+          )}
+        </div>
+
+        {/* Layer 6: Floating Materials Tray at the bottom */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 12,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 30,
+            background: 'rgba(250, 246, 238, 0.95)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: 22,
+            border: '1.5px solid rgba(255, 255, 255, 0.8)',
+            boxShadow: '0 8px 26px rgba(45, 60, 50, 0.14)',
+            padding: '7px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+          }}
+        >
+          {scenario.materials.map((m) => {
+            const left = m.count - (used[m.type] || 0)
+            const disabled = !canDrag || completed || left <= 0
+            return (
+              <div
+                key={m.type}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 3,
+                }}
+              >
+                <div
+                  draggable={!disabled}
+                  onDragStart={(e) => {
+                    if (!disabled) {
+                      e.dataTransfer.setData('text/plain', m.type)
+                      startAudio()
+                    }
+                  }}
+                  onClick={() => {
+                    if (!disabled) {
+                      setSelectedMaterial(selectedMaterial === m.type ? null : m.type)
+                      startAudio()
+                    }
+                  }}
+                  style={{
+                    position: 'relative',
+                    width: 78,
+                    height: 52,
+                    borderRadius: 12,
+                    background:
+                      selectedMaterial === m.type
+                        ? 'rgba(230, 243, 235, 0.95)'
+                        : 'rgba(238, 232, 220, 0.75)',
+                    border:
+                      selectedMaterial === m.type
+                        ? '2px solid #294e3e'
+                        : '1.5px solid rgba(215, 205, 190, 0.8)',
+                    boxShadow:
+                      selectedMaterial === m.type
+                        ? '0 0 12px rgba(41, 78, 62, 0.35)'
+                        : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    opacity: disabled ? 0.42 : 1,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {/* Badge count in the top-right corner */}
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: -6,
+                      right: -6,
+                      minWidth: 19,
+                      height: 19,
+                      borderRadius: '50%',
+                      background: '#294e3e',
+                      color: '#fff',
+                      fontSize: 12,
+                      fontWeight: 900,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '2px solid #faf6ee',
+                    }}
+                  >
+                    {left}
+                  </span>
+
+                  {/* Authentic Material Artwork */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={TB_PIECE_ART[m.type]}
+                    alt={m.type}
+                    draggable={false}
+                    style={{
+                      maxWidth: '78%',
+                      maxHeight: '74%',
+                      objectFit: 'contain',
+                      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.18))',
+                    }}
+                  />
+                </div>
+
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: '#44524a',
+                    textTransform: 'capitalize',
+                  }}
+                >
+                  {m.type}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </>
+  )
+}
+
 export default function BuildTogether({ sessionId, role, isLocked }: BuildTogetherProps) {
   const isT = role === 'therapist'
   const canDrag = isT || !isLocked
@@ -955,6 +1909,12 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
   const [language, setLanguage] = useState<Lang>('both')
   const [completed, setCompleted] = useState(false)
   const [attempts, setAttempts] = useState(0)
+
+  const [volume, setVolume] = useState(0.5)
+  const [muted, setMuted] = useState(false)
+  const [teddyStep, setTeddyStep] = useState(-1)
+  const [encourageMsg, setEncourageMsg] = useState<string | null>(null)
+  const audioRef = useRef<ThoughtBuildAudioManager | null>(null)
 
   const [dragOver, setDragOver] = useState<number | null>(null)
   const [shake, setShake] = useState(false)
@@ -968,6 +1928,13 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
   }, [sessionId])
 
   useEffect(() => {
+    audioRef.current = new ThoughtBuildAudioManager()
+    return () => {
+      audioRef.current?.destroy()
+    }
+  }, [])
+
+  useEffect(() => {
     const unsub = onSnapshot(doc(db, 'liveSessions', sessionId), (snap) => {
       if (!snap.exists()) return
       const s = snap.data().moduleState || {}
@@ -977,6 +1944,14 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
       if (s.btLanguage === 'en' || s.btLanguage === 'hi' || s.btLanguage === 'both') setLanguage(s.btLanguage)
       if (typeof s.btCompleted === 'boolean') setCompleted(s.btCompleted)
       if (typeof s.btAttempts === 'number') setAttempts(s.btAttempts)
+      if (typeof s.btVolume === 'number') {
+        setVolume(s.btVolume)
+        audioRef.current?.setVolume(s.btVolume, s.btMuted ?? false)
+      }
+      if (typeof s.btMuted === 'boolean') {
+        setMuted(s.btMuted)
+        audioRef.current?.setVolume(s.btVolume ?? 0.5, s.btMuted)
+      }
     })
     return () => unsub()
   }, [sessionId])
@@ -999,6 +1974,25 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
     setBurst(true)
     if (burstT.current) clearTimeout(burstT.current)
     burstT.current = setTimeout(() => setBurst(false), 3200)
+  }, [completed, scenario.id])
+
+  // Level 1: Animate Teddy crossing across the 4 bridge slots to Bunny
+  useEffect(() => {
+    if (scenario.id !== 'easy_1') return
+    if (!completed) {
+      setTeddyStep(-1)
+      return
+    }
+    let step = -1
+    const timer = setInterval(() => {
+      step++
+      setTeddyStep(step)
+      if (step >= 4) {
+        clearInterval(timer)
+        audioRef.current?.playSuccessChime()
+      }
+    }, 450)
+    return () => clearInterval(timer)
   }, [completed, scenario.id])
 
   const showEn = language === 'en' || language === 'both'
@@ -1049,6 +2043,84 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
     }
   }, [isT, filled, scenario, write, sessionId, level, attempts])
 
+  const handleResetLevel1 = useCallback(() => {
+    write({
+      'moduleState.btFilledSlots': {},
+      'moduleState.btCompleted': false,
+      'moduleState.btAttempts': 0,
+    })
+    setTeddyStep(-1)
+    setEncourageMsg(null)
+  }, [write])
+
+  const handleTryCrossing = useCallback(() => {
+    audioRef.current?.startBgm()
+    const pieces: MaterialType[] = []
+    for (let i = 0; i < scenario.slotCount; i++) {
+      const v = filled[String(i)]
+      if (v) pieces.push(v as MaterialType)
+    }
+
+    if (pieces.length < scenario.slotCount) {
+      setEncourageMsg(
+        "Teddy looks at the river... The bridge isn't finished yet! Place materials in all 4 spots to give Teddy a safe path."
+      )
+      audioRef.current?.playEncouragingSound()
+      setShake(true)
+      if (shakeT.current) clearTimeout(shakeT.current)
+      shakeT.current = setTimeout(() => setShake(false), 360)
+      return
+    }
+
+    if (pieces.includes('rope')) {
+      setEncourageMsg(
+        "Teddy steps gently... The bridge wobbles! Rope is too weak for Teddy's weight, try replacing it with sturdy stone or metal."
+      )
+      audioRef.current?.playEncouragingSound()
+      setShake(true)
+      if (shakeT.current) clearTimeout(shakeT.current)
+      shakeT.current = setTimeout(() => setShake(false), 360)
+      return
+    }
+
+    const counts: Partial<Record<MaterialType, number>> = {}
+    for (const p of pieces) counts[p] = (counts[p] || 0) + 1
+    if ((counts.stone || 0) < 2 || (counts.metal || 0) < 1) {
+      setEncourageMsg(
+        "Teddy tests the bridge with a paw... It feels a bit unsteady! Add more stone or metal pieces so it's strong enough."
+      )
+      audioRef.current?.playEncouragingSound()
+      setShake(true)
+      if (shakeT.current) clearTimeout(shakeT.current)
+      shakeT.current = setTimeout(() => setShake(false), 360)
+      return
+    }
+
+    setEncourageMsg(null)
+    write({ 'moduleState.btCompleted': true })
+    logModuleEvent(sessionId, {
+      module: 'build-together',
+      type: 'build_completed',
+      detail: `Thought Build Level 1 completed successfully!`,
+    })
+  }, [filled, scenario.slotCount, sessionId, write])
+
+  const handleVolumeChange = useCallback(
+    (vol: number) => {
+      setVolume(vol)
+      audioRef.current?.setVolume(vol, muted)
+      write({ 'moduleState.btVolume': vol })
+    },
+    [muted, write]
+  )
+
+  const handleToggleMute = useCallback(() => {
+    const nextMuted = !muted
+    setMuted(nextMuted)
+    audioRef.current?.setVolume(volume, nextMuted)
+    write({ 'moduleState.btMuted': nextMuted })
+  }, [muted, volume, write])
+
   const loadScenario = useCallback((id: string, lvl: Level) => {
     write({
       'moduleState.btCurrentScenarioId': id,
@@ -1057,6 +2129,8 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
       'moduleState.btCompleted': false,
       'moduleState.btAttempts': 0,
     })
+    setTeddyStep(-1)
+    setEncourageMsg(null)
   }, [write])
 
   const handleNext = useCallback(() => {
@@ -1077,6 +2151,36 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
   }
 
   const myClueIsTherapist = isT
+
+  if (scenario.id === 'easy_1') {
+    return (
+      <ThoughtBuildLevel1
+        scenario={scenario}
+        role={role}
+        canDrag={canDrag}
+        filled={filled}
+        used={used}
+        completed={completed}
+        dragOver={dragOver}
+        shake={shake}
+        onDrop={(slotIdx, type) => {
+          handleDrop(slotIdx, type)
+          audioRef.current?.playPlaceSound()
+        }}
+        onClearSlot={clearSlot}
+        onTryCrossing={handleTryCrossing}
+        onReset={handleResetLevel1}
+        onNext={handleNext}
+        volume={volume}
+        muted={muted}
+        onVolumeChange={handleVolumeChange}
+        onToggleMute={handleToggleMute}
+        teddyStep={teddyStep}
+        encourageMessage={encourageMsg}
+        startAudio={() => audioRef.current?.startBgm()}
+      />
+    )
+  }
 
   return (
     <>

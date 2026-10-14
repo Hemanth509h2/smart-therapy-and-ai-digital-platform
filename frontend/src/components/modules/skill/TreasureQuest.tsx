@@ -5,11 +5,15 @@ import { doc, onSnapshot, updateDoc, arrayUnion, increment } from 'firebase/fire
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { AnimatePresence, motion } from 'motion/react'
+import TreasureHunt3DScene, { type SceneHotspot } from './treasure-hunt/TreasureHunt3DScene'
+import TreasureHuntRadar from './treasure-hunt/TreasureHuntRadar'
+import { sound } from './treasure-hunt/TreasureHuntAudio'
 
 interface TreasureQuestProps {
-  sessionId: string
-  role: 'therapist' | 'client'
-  isLocked: boolean
+  sessionId?: string
+  role?: 'therapist' | 'client'
+  isLocked?: boolean
+  userName?: string
 }
 
 type Level = 'easy' | 'moderate' | 'advanced'
@@ -1877,7 +1881,12 @@ function ShapeArt({ shape }: { shape: Shape }) {
   }
 }
 
-export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQuestProps) {
+export default function TreasureQuest({
+  sessionId,
+  role = 'client',
+  isLocked = false,
+  userName = 'Harini B',
+}: TreasureQuestProps) {
   const isT = role === 'therapist'
 
   const [scenarioId, setScenarioId] = useState('easy_1')
@@ -1889,15 +1898,40 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
   const [shakeId, setShakeId] = useState<string | null>(null)
   const [missMsg, setMissMsg] = useState(false)
   const [fqOpen, setFqOpen] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState(true)
+
+  // Player position for radar mini-map
+  const [playerCoords, setPlayerCoords] = useState({ x: 0, z: 0.4, rot: 0 })
 
   const advanceT = useRef<ReturnType<typeof setTimeout>>()
   const shakeT = useRef<ReturnType<typeof setTimeout>>()
 
-  const write = useCallback(async (d: Record<string, unknown>) => {
-    try { await updateDoc(doc(db, 'liveSessions', sessionId), { ...d, 'timestamps.updatedAt': new Date().toISOString() }) } catch {}
-  }, [sessionId])
+  const write = useCallback(
+    async (d: Record<string, unknown>) => {
+      // Apply locally for instant responsiveness & solo play
+      if (typeof d['moduleState.tqCurrentScenarioId'] === 'string') setScenarioId(d['moduleState.tqCurrentScenarioId'] as string)
+      if (d['moduleState.tqLevel'] === 'easy' || d['moduleState.tqLevel'] === 'moderate' || d['moduleState.tqLevel'] === 'advanced') {
+        setLevel(d['moduleState.tqLevel'] as Level)
+      }
+      if (typeof d['moduleState.tqCurrentStage'] === 'number') setStage(d['moduleState.tqCurrentStage'] as number)
+      if (typeof d['moduleState.tqCompleted'] === 'boolean') setCompleted(d['moduleState.tqCompleted'] as boolean)
+      if (d['moduleState.tqLanguage'] === 'en' || d['moduleState.tqLanguage'] === 'hi' || d['moduleState.tqLanguage'] === 'both') {
+        setLanguage(d['moduleState.tqLanguage'] as Lang)
+      }
+
+      if (!sessionId) return
+      try {
+        await updateDoc(doc(db, 'liveSessions', sessionId), {
+          ...d,
+          'timestamps.updatedAt': new Date().toISOString(),
+        })
+      } catch {}
+    },
+    [sessionId]
+  )
 
   useEffect(() => {
+    if (!sessionId) return
     const unsub = onSnapshot(doc(db, 'liveSessions', sessionId), (snap) => {
       if (!snap.exists()) return
       const s = snap.data().moduleState || {}
@@ -1924,10 +1958,9 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
   const stageIdx = Math.min(stage, scenario.stages.length - 1)
   const stageData = scenario.stages[stageIdx]
 
-  // The stage's own `searcherRole` is authoritative — tqSearcherRole is kept in
-  // sync on every transition, but deriving from the data can never drift.
+  // The stage's own `searcherRole` is authoritative in live session; in solo/preview, allow interaction
   const isSearcher = role === stageData.searcherRole
-  const canClick = isSearcher && (isT || !isLocked) && !completed
+  const canClick = (isSearcher || !sessionId || isT) && (isT || !isLocked) && !completed
 
   const showEn = language === 'en' || language === 'both'
   const showHi = language === 'hi' || language === 'both'
@@ -1936,42 +1969,93 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
     (h) => h.isCorrect && revealed.includes(hotspotKey(scenario.id, stageData.stageIndex, h.id))
   )
 
+  // Map stage hotspots to 3D room objects
+  const sceneHotspots: SceneHotspot[] = useMemo(() => {
+    return stageData.hotspots.map((h) => {
+      let x = 0, y = 2.2, z = -2.8, type: SceneHotspot['type'] = 'painting'
+      if (h.shape === 'painting') {
+        x = 0; y = 2.2; z = -2.8; type = 'painting'
+      } else if (h.shape === 'notebook' || h.shape === 'map') {
+        x = -2.4; y = 1.1; z = -2.35; type = 'bookshelf'
+      } else if (h.shape === 'lantern') {
+        x = 1.95; y = 1.5; z = -2.25; type = 'lamp'
+      } else if (h.shape === 'chest' || h.shape === 'box') {
+        x = 1.1; y = 0.35; z = -2.0; type = 'chest'
+      } else if (h.shape === 'jar') {
+        x = -3.2; y = 0.6; z = -1.2; type = 'jar'
+      } else {
+        x = 2.4; y = 0.55; z = -2.25; type = 'credenza'
+      }
+      return {
+        id: h.id,
+        name: h.shape,
+        x, y, z,
+        isCorrect: h.isCorrect,
+        type,
+      }
+    })
+  }, [stageData])
+
+  const targetCoords = useMemo(() => {
+    const correct = sceneHotspots.find((h) => h.isCorrect) || sceneHotspots[0]
+    return { x: correct?.x ?? 0, z: correct?.z ?? -2.8 }
+  }, [sceneHotspots])
+
   const handleHotspot = useCallback((h: Hotspot) => {
     if (!canClick || foundHere) return
     if (!h.isCorrect) {
+      sound.playMiss()
       setShakeId(h.id)
       setMissMsg(true)
       if (shakeT.current) clearTimeout(shakeT.current)
       shakeT.current = setTimeout(() => { setShakeId(null); setMissMsg(false) }, 1600)
       return
     }
+
+    sound.playClueFound()
     const k = hotspotKey(scenario.id, stageData.stageIndex, h.id)
-    write({
-      'moduleState.tqFoundClues': arrayUnion(k),
-      'moduleState.tqRevealedHotspots': arrayUnion(k),
-    })
-    // Only the clicking client schedules the advance — if both ran this timer the
-    // stage would increment twice.
+    setRevealed((prev) => [...prev, k])
+
+    if (sessionId) {
+      write({
+        'moduleState.tqFoundClues': arrayUnion(k),
+        'moduleState.tqRevealedHotspots': arrayUnion(k),
+      })
+    }
+
     if (advanceT.current) clearTimeout(advanceT.current)
     advanceT.current = setTimeout(() => {
       if (stageData.stageIndex >= scenario.stages.length - 1) {
+        sound.playVictory()
+        setCompleted(true)
         write({ 'moduleState.tqCompleted': true })
-        logModuleEvent(sessionId, {
-          module: 'treasure-quest',
-          type: 'quest_completed',
-          detail: `${scenario.id} (${level}) "${scenario.title_en}" completed — found ${scenario.treasureReveal.en}`,
-        })
+        if (sessionId) {
+          logModuleEvent(sessionId, {
+            module: 'treasure-quest',
+            type: 'quest_completed',
+            detail: `${scenario.id} (${level}) "${scenario.title_en}" completed — found ${scenario.treasureReveal.en}`,
+          })
+        }
       } else {
+        const nextStage = stageData.stageIndex + 1
+        setStage(nextStage)
         write({
-          'moduleState.tqCurrentStage': increment(1),
+          'moduleState.tqCurrentStage': nextStage,
           'moduleState.tqSearcherRole': stageData.searcherRole === 'therapist' ? 'client' : 'therapist',
         })
       }
-    }, 2000)
+    }, 2400)
   }, [canClick, foundHere, scenario, stageData, write, sessionId, level])
 
   const loadScenario = useCallback((id: string, lvl: Level) => {
     const sc = SCENARIOS.find((s) => s.id === id)
+    setScenarioId(id)
+    setLevel(lvl)
+    setStage(0)
+    setRevealed([])
+    setCompleted(false)
+    setFqOpen(false)
+
     write({
       'moduleState.tqCurrentScenarioId': id,
       'moduleState.tqLevel': lvl,
@@ -1981,42 +2065,46 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
       'moduleState.tqCompleted': false,
       'moduleState.tqSearcherRole': sc?.stages[0].searcherRole ?? 'client',
     })
-    setFqOpen(false)
   }, [write])
 
   const handleNextQuest = useCallback(() => {
-    if (!isT) return
     const i = levelScenarios.findIndex((s) => s.id === scenario.id)
     if (i < levelScenarios.length - 1) { loadScenario(levelScenarios[i + 1].id, level); return }
     const nl = LEVEL_ORDER[LEVEL_ORDER.indexOf(level) + 1]
     if (nl) loadScenario(scenariosFor(nl)[0].id, nl)
     else loadScenario('easy_1', 'easy')
-  }, [isT, levelScenarios, scenario.id, level, loadScenario])
+  }, [levelScenarios, scenario.id, level, loadScenario])
 
   const questIdx = levelScenarios.findIndex((s) => s.id === scenario.id)
-  const badge = LEVEL_BADGE[level]
-  const parchment: React.CSSProperties = {
-    background: 'linear-gradient(160deg, rgba(250,240,220,0.97), rgba(236,220,190,0.97))',
-    borderRadius: 14, border: '2px solid rgba(120,80,40,0.28)',
-    boxShadow: '0 8px 22px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -8px 18px rgba(160,120,70,0.14)',
-    padding: '10px 12px', fontFamily: NUNITO,
+
+  const toggleSound = () => {
+    sound.enabled = !soundEnabled
+    setSoundEnabled(!soundEnabled)
   }
 
   return (
     <>
       <style>{`
-        @keyframes tqFlicker { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
-        @keyframes tqMote { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: 0.4; } 80% { opacity: 0.3; } 100% { transform: translateY(-120px); opacity: 0; } }
-        @keyframes tqPulse { 0%,100% { opacity: 0.1; transform: scale(1); } 50% { opacity: 0.2; transform: scale(1.12); } }
-        @keyframes tqShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
         @keyframes tqSpark { 0% { transform: translate(0,0) scale(1); opacity: 1; } 100% { transform: translate(var(--tqx), var(--tqy)) scale(0.4); opacity: 0; } }
         @keyframes tqFall { 0% { transform: translateY(-40px) translateX(0) rotate(0deg); opacity: 0; } 12% { opacity: 1; } 100% { transform: translateY(420px) translateX(var(--tqsway)) rotate(220deg); opacity: 0; } }
       `}</style>
 
-      <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 420, overflow: 'hidden', borderRadius: 16, fontFamily: NUNITO }}>
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: '100%',
+          minHeight: 520,
+          overflow: 'hidden',
+          borderRadius: 16,
+          fontFamily: NUNITO,
+          background: '#d7c9b8',
+          userSelect: 'none',
+        }}
+      >
         <AnimatePresence mode="wait">
           {completed ? (
-            /* ===== Treasure reveal ===== */
+            /* ===== Treasure reveal Screen ===== */
             <motion.div
               key="treasure"
               initial={{ opacity: 0, scale: 0.94 }}
@@ -2024,20 +2112,32 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
               exit={{ opacity: 0, scale: 0.94 }}
               transition={{ duration: 0.4 }}
               style={{
-                position: 'absolute', inset: 0,
+                position: 'absolute',
+                inset: 0,
                 background: 'radial-gradient(ellipse at 50% 45%, #a87434 0%, #7a5327 45%, #513a26 100%)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 24,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 12,
+                padding: 24,
+                zIndex: 40,
               }}
             >
-              {/* gold shower */}
-              {Array.from({ length: 22 }).map((_, i) => (
+              {/* Confetti gold shower */}
+              {Array.from({ length: 24 }).map((_, i) => (
                 <span
                   key={i}
                   style={{
-                    position: 'absolute', top: 0, left: `${(i * 4.3 + 4) % 96}%`, width: 6, height: 6, borderRadius: '50%',
+                    position: 'absolute',
+                    top: 0,
+                    left: `${(i * 4.3 + 4) % 96}%`,
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
                     background: GOLD[i % GOLD.length],
-                    '--tqsway': `${(i % 2 ? 1 : -1) * (10 + (i % 5) * 6)}px`,
-                    animation: `tqFall ${2600 + (i % 6) * 260}ms linear ${(i % 8) * 0.22}s infinite`,
+                    '--tqsway': `${(i % 2 ? 1 : -1) * (12 + (i % 5) * 8)}px`,
+                    animation: `tqFall ${2400 + (i % 6) * 260}ms linear ${(i % 8) * 0.22}s infinite`,
                     pointerEvents: 'none',
                   } as React.CSSProperties}
                 />
@@ -2047,54 +2147,64 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: 'spring', stiffness: 320, damping: 16, delay: 0.15 }}
-                style={{ fontSize: 70, lineHeight: 1, zIndex: 2 }}
+                style={{ fontSize: 78, lineHeight: 1, zIndex: 2 }}
               >
                 {scenario.treasureReveal.emoji}
               </motion.div>
-              <div style={{ fontSize: 21, fontWeight: 900, color: '#fff6e2', zIndex: 2 }}>
-                {showEn && 'You found it!'}
+              <div style={{ fontSize: 24, fontWeight: 900, color: '#fff6e2', zIndex: 2, textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
+                {showEn && 'Grandmother’s Treasure Unlocked!'}
                 {language === 'both' && ' · '}
-                {showHi && <span style={{ fontFamily: DEVANAGARI }}>तुमने पा लिया!</span>}
+                {showHi && <span style={{ fontFamily: DEVANAGARI }}>दादी का खज़ाना मिल गया!</span>}
               </div>
-              <div style={{ maxWidth: 460, textAlign: 'center', zIndex: 2 }}>
-                {showEn && <div style={{ fontSize: 17.5, fontWeight: 700, color: '#fdf0d8', lineHeight: 1.5 }}>{scenario.treasureReveal.en}</div>}
-                {showHi && <div style={{ fontSize: 17.5, fontWeight: 600, fontFamily: DEVANAGARI, color: 'rgba(253,240,216,0.8)', lineHeight: 1.6, marginTop: 4 }}>{scenario.treasureReveal.hi}</div>}
+              <div style={{ maxWidth: 480, textAlign: 'center', zIndex: 2 }}>
+                {showEn && <div style={{ fontSize: 18, fontWeight: 700, color: '#fdf0d8', lineHeight: 1.5 }}>{scenario.treasureReveal.en}</div>}
+                {showHi && <div style={{ fontSize: 18, fontWeight: 600, fontFamily: DEVANAGARI, color: 'rgba(253,240,216,0.85)', lineHeight: 1.6, marginTop: 4 }}>{scenario.treasureReveal.hi}</div>}
               </div>
 
-              {isT && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: 220, marginTop: 10, zIndex: 2 }}>
-                  <button
-                    onClick={handleNextQuest}
-                    style={{ width: '100%', padding: '8px 0', borderRadius: 50, cursor: 'pointer', fontSize: 16, fontWeight: 800, fontFamily: NUNITO, background: 'rgba(74,124,111,0.9)', border: 'none', color: '#fff' }}
-                  >
-                    Next quest →
-                  </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: 240, marginTop: 12, zIndex: 2 }}>
+                <button
+                  onClick={handleNextQuest}
+                  style={{
+                    width: '100%', padding: '9px 0', borderRadius: 50, cursor: 'pointer',
+                    fontSize: 16, fontWeight: 800, fontFamily: NUNITO,
+                    background: 'rgba(74,124,111,0.95)', border: 'none', color: '#fff',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+                  }}
+                >
+                  Next Quest →
+                </button>
+                <button
+                  onClick={() => loadScenario('easy_1', 'easy')}
+                  style={{
+                    width: '100%', padding: '8px 0', borderRadius: 50, cursor: 'pointer',
+                    fontSize: 14, fontWeight: 800, fontFamily: NUNITO,
+                    background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff',
+                  }}
+                >
+                  Play Again ↺
+                </button>
+                {isT && (
                   <button
                     onClick={() => setFqOpen((o) => !o)}
-                    style={{ width: '100%', padding: '7px 0', borderRadius: 50, cursor: 'pointer', fontSize: 14, fontWeight: 800, fontFamily: NUNITO, background: 'rgba(107,92,231,0.85)', border: 'none', color: '#fff' }}
-                  >
-                    💬 Talk about it
-                  </button>
-                  <button
-                    onClick={() => {
-                      loadScenario('easy_1', 'easy')
-                      logModuleEvent(sessionId, { module: 'treasure-quest', type: 'module_ended', detail: `Therapist ended the module after "${scenario.title_en}".` })
+                    style={{
+                      width: '100%', padding: '8px 0', borderRadius: 50, cursor: 'pointer',
+                      fontSize: 14, fontWeight: 800, fontFamily: NUNITO,
+                      background: 'rgba(107,92,231,0.88)', border: 'none', color: '#fff',
                     }}
-                    style={{ width: '100%', padding: '7px 0', borderRadius: 50, cursor: 'pointer', fontSize: 14, fontWeight: 700, fontFamily: NUNITO, background: 'transparent', border: '1px solid rgba(255,246,226,0.3)', color: 'rgba(255,246,226,0.6)' }}
                   >
-                    End module
+                    💬 Reflection Questions
                   </button>
-                </div>
-              )}
+                )}
+              </div>
 
               {isT && fqOpen && (
-                <div style={{ zIndex: 2, marginTop: 6, width: 'min(90%, 420px)', background: 'rgba(107,92,231,0.9)', border: '1px solid rgba(107,92,231,0.5)', borderRadius: 10, padding: '10px 12px' }}>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 6 }}>💬 Ask the child</div>
-                  <ol style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ zIndex: 2, marginTop: 8, width: 'min(90%, 460px)', background: 'rgba(34,26,48,0.92)', border: '1px solid rgba(140,120,230,0.5)', borderRadius: 12, padding: '12px 16px', backdropFilter: 'blur(8px)' }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 8 }}>💬 Facilitator Questions</div>
+                  <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {scenario.facilitatorQuestions.map((q, i) => (
-                      <li key={i} style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.92)', lineHeight: 1.35 }}>
+                      <li key={i} style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.95)', lineHeight: 1.4 }}>
                         <span style={{ display: 'block' }}>{q.en}</span>
-                        <span style={{ display: 'block', fontFamily: DEVANAGARI, color: 'rgba(255,255,255,0.7)' }}>{q.hi}</span>
+                        <span style={{ display: 'block', fontFamily: DEVANAGARI, color: 'rgba(255,255,255,0.72)' }}>{q.hi}</span>
                       </li>
                     ))}
                   </ol>
@@ -2102,84 +2212,361 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
               )}
             </motion.div>
           ) : (
-            /* ===== Scene ===== */
+            /* ===== 3D GAME SCENE & HUD OVERLAYS ===== */
             <motion.div
-              key={`${scenario.id}-${stageIdx}`}
+              key={scenario.id}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.45 }}
               style={{ position: 'absolute', inset: 0 }}
             >
-              {/* Layer 1 — room base */}
-              <div style={{ position: 'absolute', inset: 0, background: SCENE[stageData.sceneTheme].base }} />
+              {/* --- 3D THREE.JS WORLD CANVAS --- */}
+              <TreasureHunt3DScene
+                hotspots={sceneHotspots}
+                isFound={foundHere}
+                shakeId={shakeId}
+                canInteract={canClick && !foundHere}
+                onInteract={(sh) => {
+                  const targetH = stageData.hotspots.find((h) => h.id === sh.id) || stageData.hotspots[0]
+                  handleHotspot(targetH)
+                }}
+                onPlayerMove={(x, z, rot) => {
+                  setPlayerCoords({ x, z, rot })
+                }}
+                stageTheme={stageData.sceneTheme}
+              />
 
-              {/* Layer 2 — lantern glow pools */}
-              {SCENE[stageData.sceneTheme].glow.map((pos, i) => (
+              {/* --- HUD TOP HEADER BAR --- */}
+              {/* Left Profile Avatar (matching screenshot) */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 14,
+                  left: 18,
+                  zIndex: 32,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  background: 'rgba(34, 44, 38, 0.78)',
+                  backdropFilter: 'blur(10px)',
+                  padding: '5px 14px 5px 6px',
+                  borderRadius: 999,
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.22)',
+                }}
+              >
                 <div
-                  key={i}
                   style={{
-                    position: 'absolute', inset: 0, pointerEvents: 'none',
-                    background: `radial-gradient(circle at ${pos}, rgba(255,200,120,0.15) 0%, transparent 45%)`,
-                    animation: `tqFlicker ${3 + i * 0.7}s ease-in-out ${i * 0.5}s infinite`,
+                    width: 30,
+                    height: 30,
+                    borderRadius: '50%',
+                    background: '#4a7c6f',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#fff',
+                    fontSize: 13,
+                    fontWeight: 800,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <img
+                    src="/assests/harini.jpg"
+                    alt="Harini B"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none'
+                    }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                  <span>H</span>
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#ffffff', letterSpacing: 0.2 }}>
+                  {userName}
+                </span>
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    background: '#54d48a',
+                    boxShadow: '0 0 6px #54d48a',
                   }}
                 />
-              ))}
+              </div>
 
-              {/* Layer 3 — silhouettes */}
-              <Silhouettes theme={stageData.sceneTheme} />
+              {/* Center Scroll Banner (Treasure Quest / Stage 1 of 3) & Difficulty Pills */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 10,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  zIndex: 32,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                {/* Parchment scroll title */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '5px 28px',
+                    borderRadius: 22,
+                    background: 'linear-gradient(180deg, #faf2e4 0%, #ece0cb 100%)',
+                    boxShadow: '0 8px 22px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.9)',
+                    border: '1.5px solid #c9b08b',
+                  }}
+                >
+                  <span style={{ fontSize: 20 }}>🧭</span>
+                  <div style={{ textAlign: 'center' }}>
+                    <div
+                      style={{
+                        fontSize: 19,
+                        fontWeight: 900,
+                        color: '#4a2f18',
+                        fontFamily: 'Georgia, serif',
+                        letterSpacing: 0.4,
+                        lineHeight: 1.15,
+                      }}
+                    >
+                      Treasure Quest
+                    </div>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: '#8a6540', letterSpacing: 0.3 }}>
+                      Stage {stageIdx + 1} of {scenario.stages.length}
+                    </div>
+                  </div>
+                </div>
 
-              {/* Layer 4 — dust motes */}
-              <DustMotes />
+                {/* Difficulty selector pills: Easy, Moderate, Advanced */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {LEVEL_ORDER.map((l) => (
+                    <button
+                      key={l}
+                      onClick={() => loadScenario(scenariosFor(l)[0].id, l)}
+                      style={{
+                        padding: '3px 14px',
+                        borderRadius: 999,
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        textTransform: 'capitalize',
+                        fontFamily: NUNITO,
+                        background: level === l ? '#579b76' : 'rgba(38, 48, 42, 0.72)',
+                        color: level === l ? '#ffffff' : '#cfd9d3',
+                        boxShadow: level === l ? '0 2px 8px rgba(87,155,118,0.45)' : 'none',
+                        transition: 'all 0.18s ease',
+                      }}
+                    >
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-              {/* Layer 5 — hotspots */}
-              {stageData.hotspots.map((h) => {
-                const k = hotspotKey(scenario.id, stageData.stageIndex, h.id)
-                const isFound = revealed.includes(k)
-                const hide = foundHere && !h.isCorrect
-                return (
-                  <motion.div
-                    key={h.id}
-                    animate={
-                      isFound
-                        ? { scale: 1.25, rotate: 4, opacity: 0.9 }
-                        : { scale: 1, rotate: 0, opacity: hide ? 0.3 : 1 }
-                    }
-                    transition={{ type: 'spring', stiffness: 300, damping: 18 }}
-                    whileHover={canClick && !foundHere ? { scale: 1.08 } : undefined}
-                    onClick={() => handleHotspot(h)}
-                    style={{
-                      position: 'absolute', left: `${h.x}%`, top: `${h.y}%`, transform: 'translate(-50%,-50%)',
-                      zIndex: 12, cursor: canClick && !foundHere ? 'pointer' : 'default',
-                      pointerEvents: canClick && !foundHere ? 'auto' : 'none',
-                      animation: shakeId === h.id ? 'tqShake 0.25s ease 2' : 'none',
-                    }}
-                  >
-                    {/* equal hint pulse on every hotspot — never gives the answer away */}
-                    <div style={{ position: 'absolute', inset: -10, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,220,150,0.6) 0%, transparent 70%)', animation: 'tqPulse 3s ease-in-out infinite', pointerEvents: 'none' }} />
-                    <ShapeArt shape={h.shape} />
+              {/* Top-Right Controls: Sound toggle, Language pill, Role badge */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 14,
+                  right: 18,
+                  zIndex: 32,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                }}
+              >
+                {/* Sound Toggle */}
+                <button
+                  onClick={toggleSound}
+                  title={soundEnabled ? 'Mute sound' : 'Unmute sound'}
+                  style={{
+                    background: 'rgba(34, 44, 38, 0.78)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 999,
+                    width: 32,
+                    height: 32,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    color: '#fff',
+                  }}
+                >
+                  {soundEnabled ? '🔊' : '🔇'}
+                </button>
 
-                    {isFound && (
-                      <div style={{ position: 'absolute', top: '50%', left: '50%', width: 0, height: 0, pointerEvents: 'none' }}>
-                        {Array.from({ length: 12 }).map((_, i) => (
-                          <span
-                            key={i}
-                            style={{
-                              position: 'absolute', width: 5, height: 5, borderRadius: '50%',
-                              background: GOLD[i % GOLD.length],
-                              '--tqx': `${Math.round(Math.cos((i / 12) * Math.PI * 2) * 60)}px`,
-                              '--tqy': `${Math.round(Math.sin((i / 12) * Math.PI * 2) * 55)}px`,
-                              animation: `tqSpark ${800 + (i % 4) * 120}ms ease-out ${(i % 5) * 0.04}s forwards`,
-                            } as React.CSSProperties}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </motion.div>
-                )
-              })}
+                {/* Language pill: [ EN | हिंदी ] */}
+                <div
+                  style={{
+                    display: 'flex',
+                    background: 'rgba(34, 44, 38, 0.85)',
+                    backdropFilter: 'blur(10px)',
+                    borderRadius: 999,
+                    padding: 2,
+                    border: '1px solid rgba(255,255,255,0.15)',
+                  }}
+                >
+                  {([['en', 'EN'], ['hi', 'हिंदी']] as [Lang, string][]).map(([key, txt]) => (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        setLanguage(key)
+                        write({ 'moduleState.tqLanguage': key })
+                      }}
+                      style={{
+                        border: 'none',
+                        cursor: 'pointer',
+                        borderRadius: 999,
+                        padding: '4px 11px',
+                        fontSize: 12,
+                        fontWeight: 800,
+                        fontFamily: key === 'hi' ? DEVANAGARI : NUNITO,
+                        background: language === key ? '#ffffff' : 'transparent',
+                        color: language === key ? '#1e2d27' : '#cfd9d3',
+                        transition: 'all 0.16s ease',
+                      }}
+                    >
+                      {txt}
+                    </button>
+                  ))}
+                </div>
 
-              {/* Layer 6 — reveal banner */}
+                {/* Role badge card: [ C Client ] matching screenshot */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(20, 28, 24, 0.92)',
+                    backdropFilter: 'blur(10px)',
+                    padding: '4px 14px',
+                    borderRadius: 10,
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    minWidth: 56,
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 14, fontWeight: 900, color: '#ffffff' }}>
+                      {isT ? 'T' : 'C'}
+                    </span>
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: '#54d48a',
+                        boxShadow: '0 0 5px #54d48a',
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.65)' }}>
+                    {isT ? 'Therapist' : 'Client'}
+                  </span>
+                </div>
+              </div>
+
+              {/* --- LEFT CLUE PARCHMENT CARD (Matching Screenshot) --- */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 86,
+                  left: 20,
+                  zIndex: 30,
+                  width: 250,
+                  background: 'linear-gradient(170deg, #fbf6ec 0%, #f4e8d3 100%)',
+                  borderRadius: 14,
+                  padding: '16px 18px',
+                  boxShadow: '0 12px 36px rgba(0,0,0,0.28), 0 2px 6px rgba(0,0,0,0.12)',
+                  border: '1px solid rgba(180, 150, 110, 0.4)',
+                }}
+              >
+                {/* Vintage folded corner effect */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    width: 0,
+                    height: 0,
+                    borderStyle: 'solid',
+                    borderWidth: '0 16px 16px 0',
+                    borderColor: 'transparent rgba(120,80,40,0.22) transparent transparent',
+                  }}
+                />
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: 18 }}>🔑</span>
+                  <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.6, color: '#68451f', textTransform: 'uppercase' }}>
+                    {sessionId && !isSearcher && !isT ? 'YOU HOLD THE CLUE' : 'SEARCH THE ROOM'}
+                  </div>
+                </div>
+
+                {/* English Clue */}
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: '#2d1e10', lineHeight: 1.45 }}>
+                  {sessionId && isSearcher ? stageData.searcherPrompt.en : stageData.decoderClue.en}
+                </div>
+
+                {/* Divider Line */}
+                <div style={{ height: 1, background: 'rgba(120, 80, 40, 0.18)', margin: '10px 0' }} />
+
+                {/* Hindi Clue */}
+                <div style={{ fontSize: 13.5, fontWeight: 600, fontFamily: DEVANAGARI, color: '#573d24', lineHeight: 1.55 }}>
+                  {sessionId && isSearcher ? stageData.searcherPrompt.hi : stageData.decoderClue.hi}
+                </div>
+              </div>
+
+              {/* --- BOTTOM-LEFT HINT / STATUS BAR --- */}
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: 20,
+                  left: 20,
+                  zIndex: 30,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  background: 'rgba(24, 30, 27, 0.88)',
+                  backdropFilter: 'blur(10px)',
+                  padding: '7px 18px',
+                  borderRadius: 999,
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: 'rgba(255, 246, 226, 0.9)',
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                }}
+              >
+                <span>🔍</span>
+                <span>
+                  {isSearcher || !sessionId || isT
+                    ? 'Walk with W,A,S,D / Arrow keys or click to explore and inspect objects'
+                    : 'Your partner is searching — tell them what your clue says'}
+                </span>
+              </div>
+
+              {/* --- BOTTOM-RIGHT NAUTICAL 3D RADAR COMPASS --- */}
+              <div style={{ position: 'absolute', bottom: 16, right: 20, zIndex: 30 }}>
+                <TreasureHuntRadar
+                  playerRotation={playerCoords.rot}
+                  playerX={playerCoords.x}
+                  playerZ={playerCoords.z}
+                  targetX={targetCoords.x}
+                  targetZ={targetCoords.z}
+                  isTargetFound={foundHere}
+                />
+              </div>
+
+              {/* Reveal Banner when clue is found */}
               <AnimatePresence>
                 {foundHere && (
                   <motion.div
@@ -2187,17 +2574,50 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: -60, opacity: 0 }}
                     transition={{ type: 'spring', stiffness: 260, damping: 24 }}
-                    style={{ position: 'absolute', top: 72, left: '50%', transform: 'translateX(-50%)', zIndex: 32, width: 'min(76%, 420px)' }}
+                    style={{
+                      position: 'absolute',
+                      top: 76,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      zIndex: 35,
+                      width: 'min(82%, 440px)',
+                    }}
                   >
-                    <div style={{ ...parchment, textAlign: 'center' }}>
-                      {showEn && <div style={{ fontSize: 16, fontWeight: 800, color: '#4a2f18' }}>{stageData.onFoundReveal.en}</div>}
-                      {showHi && <div style={{ fontSize: 16, fontWeight: 600, fontFamily: DEVANAGARI, color: '#6b5030', marginTop: 2 }}>{stageData.onFoundReveal.hi}</div>}
+                    <div
+                      style={{
+                        background: 'linear-gradient(160deg, #fff7ea 0%, #f7e6ca 100%)',
+                        borderRadius: 16,
+                        border: '2px solid #caa873',
+                        boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+                        padding: '12px 20px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: 20, marginBottom: 2 }}>✨</div>
+                      {showEn && (
+                        <div style={{ fontSize: 16, fontWeight: 800, color: '#4a2f18' }}>
+                          {stageData.onFoundReveal.en}
+                        </div>
+                      )}
+                      {showHi && (
+                        <div
+                          style={{
+                            fontSize: 15.5,
+                            fontWeight: 600,
+                            fontFamily: DEVANAGARI,
+                            color: '#6b5030',
+                            marginTop: 4,
+                          }}
+                        >
+                          {stageData.onFoundReveal.hi}
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              {/* soft miss nudge */}
+              {/* Soft Miss Nudge */}
               <AnimatePresence>
                 {missMsg && (
                   <motion.div
@@ -2205,9 +2625,19 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 8 }}
                     style={{
-                      position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 32,
-                      background: 'rgba(250,240,220,0.95)', borderRadius: 999, padding: '5px 14px',
-                      fontSize: 14, fontWeight: 700, color: '#6b5030', whiteSpace: 'nowrap',
+                      position: 'absolute',
+                      bottom: 64,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      zIndex: 35,
+                      background: 'rgba(250,240,220,0.95)',
+                      borderRadius: 999,
+                      padding: '6px 16px',
+                      fontSize: 13.5,
+                      fontWeight: 700,
+                      color: '#6b5030',
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
                     }}
                   >
                     {showEn && 'Not this one — try talking about it again'}
@@ -2216,88 +2646,6 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
                   </motion.div>
                 )}
               </AnimatePresence>
-
-              {/* Layer 7 — stage header */}
-              <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 30, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 20, background: 'rgba(250,240,220,0.95)', boxShadow: '0 4px 14px rgba(0,0,0,0.28)', fontSize: 16, fontWeight: 800, color: '#5a3a1a', whiteSpace: 'nowrap' }}>
-                  <span>🧭</span>
-                  {showEn && <span>{scenario.title_en}</span>}
-                  {showHi && <span style={{ fontFamily: DEVANAGARI, fontWeight: 600 }}>{scenario.title_hi}</span>}
-                  <span style={{ opacity: 0.55 }}>Stage {stageIdx + 1} of {scenario.stages.length}</span>
-                  <span style={{ background: badge.bg, color: badge.color, borderRadius: 999, padding: '1px 7px', fontSize: 13, textTransform: 'capitalize' }}>{level}</span>
-                  <span style={{ opacity: 0.45, fontSize: 13 }}>{questIdx + 1}/{levelScenarios.length}</span>
-                </div>
-
-                {isT && (
-                  <div style={{ display: 'flex', background: 'rgba(250,240,220,0.95)', borderRadius: 999, padding: 2, boxShadow: '0 4px 14px rgba(0,0,0,0.28)' }}>
-                    {([['en', 'EN'], ['hi', 'हिं'], ['both', 'Both']] as [Lang, string][]).map(([key, txt]) => (
-                      <button
-                        key={key}
-                        onClick={() => write({ 'moduleState.tqLanguage': key })}
-                        style={{
-                          border: 'none', cursor: 'pointer', borderRadius: 999, padding: '3px 8px', fontSize: 13, fontWeight: 800,
-                          fontFamily: key === 'hi' ? DEVANAGARI : NUNITO,
-                          background: language === key ? 'rgba(74,124,111,0.3)' : 'transparent',
-                          color: language === key ? '#2f5c50' : '#9a8570',
-                        }}
-                      >
-                        {txt}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* therapist level chips */}
-              {isT && (
-                <div style={{ position: 'absolute', top: 44, left: '50%', transform: 'translateX(-50%)', zIndex: 30, display: 'flex', gap: 4 }}>
-                  {LEVEL_ORDER.map((l) => (
-                    <button
-                      key={l}
-                      onClick={() => loadScenario(scenariosFor(l)[0].id, l)}
-                      style={{
-                        padding: '2px 10px', borderRadius: 999, cursor: 'pointer', fontSize: 13, fontWeight: 800, textTransform: 'capitalize',
-                        fontFamily: NUNITO, border: 'none',
-                        background: level === l ? 'rgba(74,124,111,0.85)' : 'rgba(250,240,220,0.85)',
-                        color: level === l ? '#fff' : '#8a6a4a',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                      }}
-                    >
-                      {l}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Layer 8 — role card. Each person sees ONLY their own half. */}
-              <div style={{ position: 'absolute', top: 78, [isT ? 'left' : 'right']: 16, zIndex: 25, width: 200 } as React.CSSProperties}>
-                <div style={parchment}>
-                  <div style={{ position: 'absolute', top: 0, right: 0, width: 0, height: 0, borderStyle: 'solid', borderWidth: '0 14px 14px 0', borderColor: 'transparent rgba(120,80,40,0.2) transparent transparent' }} />
-                  <div style={{ fontSize: 13, fontWeight: 800, textTransform: 'uppercase', color: '#8a5a2a', marginBottom: 6, letterSpacing: 0.3 }}>
-                    {isSearcher ? '🔍 You are searching this room' : '🗝️ You hold the clue'}
-                  </div>
-                  {isSearcher ? (
-                    <>
-                      {showEn && <div style={{ fontSize: 14, fontWeight: 700, color: '#2c1f0e', lineHeight: 1.4 }}>{stageData.searcherPrompt.en}</div>}
-                      {language === 'both' && <div style={{ height: 1, background: 'rgba(120,80,40,0.18)', margin: '6px 0' }} />}
-                      {showHi && <div style={{ fontSize: 14, fontWeight: 600, fontFamily: DEVANAGARI, color: '#6b5540', lineHeight: 1.5 }}>{stageData.searcherPrompt.hi}</div>}
-                    </>
-                  ) : (
-                    <>
-                      {showEn && <div style={{ fontSize: 14, fontWeight: 700, color: '#2c1f0e', lineHeight: 1.4 }}>{stageData.decoderClue.en}</div>}
-                      {language === 'both' && <div style={{ height: 1, background: 'rgba(120,80,40,0.18)', margin: '6px 0' }} />}
-                      {showHi && <div style={{ fontSize: 14, fontWeight: 600, fontFamily: DEVANAGARI, color: '#6b5540', lineHeight: 1.5 }}>{stageData.decoderClue.hi}</div>}
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* locked / waiting hint */}
-              {!canClick && !foundHere && (
-                <div style={{ position: 'absolute', bottom: 24, left: 16, zIndex: 30, fontSize: 13, fontWeight: 700, color: 'rgba(255,240,215,0.75)', textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
-                  {isLocked && !isT ? 'Therapist is controlling' : isSearcher ? '' : 'Your partner is searching — tell them what your clue says'}
-                </div>
-              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -2305,3 +2653,4 @@ export default function TreasureQuest({ sessionId, role, isLocked }: TreasureQue
     </>
   )
 }
+

@@ -42,7 +42,6 @@ const moduleLoaders: Record<string, ModuleLoader> = {
   '5-4-3-2-1-grounding': () => import('@/components/modules/anxiety/GroundingGame').then(m => ({ default: m.default })),
   'emotional-charades': () => import('@/components/modules/anxiety/EmotionalCharades').then(m => ({ default: m.default })),
   'virtual-box-popping': () => import('@/components/modules/anxiety/BoxPopping').then(m => ({ default: m.default })),
-  'worry-box': () => import('@/components/modules/anxiety/WorryBox').then(m => ({ default: m.default })),
 
   // ID modules
   'drag-drop-sorting': () => import('@/components/modules/id/DragDropSorting').then(m => ({ default: m.default })),
@@ -63,6 +62,7 @@ const moduleLoaders: Record<string, ModuleLoader> = {
   'emotion-detective': () => import('@/components/modules/skill/EmotionDetective').then(m => ({ default: m.default })),
   'build-together': () => import('@/components/modules/skill/BuildTogether').then(m => ({ default: m.default })),
   'treasure-quest': () => import('@/components/modules/skill/TreasureQuest').then(m => ({ default: m.default })),
+  'treasure-hunt': () => import('@/components/modules/skill/TreasureQuest').then(m => ({ default: m.default })),
 }
 
 // Cache for loaded modules
@@ -174,7 +174,6 @@ export const MODULE_METADATA: Record<string, {
   '5-4-3-2-1-grounding': { title: 'Grounding Game', subtitle: 'Sensory anchoring · anxiety reduction', icon: '🌱', label: 'Grounding', category: 'anxiety' },
   'emotional-charades': { title: 'Emotional Charades', subtitle: 'Emotion identification · social learning', icon: '🎭', label: 'Charades', category: 'anxiety' },
   'virtual-box-popping': { title: 'Virtual Box Popping', subtitle: 'Tension release · cognitive defusion', icon: '📦', label: 'Box Pop', category: 'anxiety' },
-  'worry-box': { title: 'Worry Box', subtitle: 'Worry containment · externalisation', icon: '🗃️', label: 'Worry Box', category: 'anxiety' },
 
   'drag-drop-sorting': { title: 'Drag & Drop Sorting', subtitle: 'Categorisation · concept formation', icon: '🗂️', label: 'Sorting', category: 'id' },
   'social-story-sequencing': { title: 'Social Story Sequencing', subtitle: 'Narrative comprehension · social prep', icon: '📖', label: 'Stories', category: 'id' },
@@ -191,7 +190,8 @@ export const MODULE_METADATA: Record<string, {
   'story-choice-adventure': { title: 'Story Choice Adventure', subtitle: 'Consequential thinking · emotional intelligence', icon: '📖', label: 'Story', category: 'skill' },
   'emotion-detective': { title: 'Emotion Detective', subtitle: 'Emotion identification · perspective taking', icon: '🔍', label: 'Detective', category: 'skill' },
   'build-together': { title: 'Build Together', subtitle: 'Shared problem solving · communication', icon: '🌉', label: 'Build', category: 'skill' },
-  'treasure-quest': { title: 'Treasure Quest', subtitle: 'Sequential clue chain · shared discovery', icon: '🗺️', label: 'Quest', category: 'skill' },
+  'treasure-quest': { title: 'Treasure Hunt (3D)', subtitle: '3D Treasure Quest · Sequential clue chain · shared discovery', icon: '🧭', label: 'Quest', category: 'skill' },
+  'treasure-hunt': { title: 'Treasure Hunt (3D)', subtitle: '3D Treasure Quest · Sequential clue chain · shared discovery', icon: '🧭', label: 'Quest', category: 'skill' },
 }
 
 // Category display order and labels
@@ -210,6 +210,7 @@ export const SKILL_MODULE_IDS = new Set([
   'emotion-detective',
   'build-together',
   'treasure-quest',
+  'treasure-hunt',
 ])
 
 export function isSkillModule(moduleId: string): boolean {

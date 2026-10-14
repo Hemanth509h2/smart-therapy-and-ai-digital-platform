@@ -55,7 +55,6 @@ export const AVAILABLE_MODULES = [
   'grounding-game',
   'emotional-charades',
   'box-popping',
-  'worry-box',
   'drag-drop-sorting',
   'social-story',
   'virtual-shop',
