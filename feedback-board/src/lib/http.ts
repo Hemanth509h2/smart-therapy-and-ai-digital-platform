@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isConnectError } from "./db";
 import { deriveKey, ipHash, safeEqual, sha256 } from "./crypto";
 import { hit } from "./ratelimit";
 import { verifyCaptcha } from "./captcha";
@@ -22,6 +23,9 @@ export function route(fn: Handler) {
     } catch (e) {
       if (e instanceof HttpError) return NextResponse.json({ error: e.message }, { status: e.status });
       console.error("route error:", (e as Error).message || (e as { code?: string }).code || e);
+      if (isConnectError(e)) {
+        return NextResponse.json({ error: "Can't reach the database right now. Please try again in a moment." }, { status: 503 });
+      }
       return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
     }
   };
