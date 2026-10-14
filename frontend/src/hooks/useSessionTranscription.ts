@@ -33,9 +33,9 @@ interface Pipe {
 
 const STT_RELAY_URL = process.env.NEXT_PUBLIC_STT_RELAY_URL
 
-// With NEXT_PUBLIC_STT_RELAY_URL set we connect to the external relay (Fly.io)
-// using a signed token. Without it we fall back to the same-origin proxy in
-// server.js (local dev / self-hosted Node).
+// With NEXT_PUBLIC_STT_RELAY_URL set we connect to the external relay (Fly.io);
+// without it we use the same-origin proxy in server.js. Both require the
+// signed token.
 function buildProxyUrl(sessionId: string, speaker: string, token: string): string {
   const url = STT_RELAY_URL
     ? new URL('/sarvam-stream', STT_RELAY_URL)
@@ -49,7 +49,7 @@ function buildProxyUrl(sessionId: string, speaker: string, token: string): strin
   url.searchParams.set('vad_signals', 'true')
   url.searchParams.set('sid', sessionId)
   url.searchParams.set('speaker', speaker)
-  if (token) url.searchParams.set('token', token)
+  url.searchParams.set('token', token)
   
   return url.toString()
 }
@@ -171,18 +171,26 @@ export function useSessionTranscription({
     async (key: string, track: MediaStreamTrack, speaker: TranscriptChunk['speaker']) => {
       if (pipesRef.current.has(key)) return
 
-      let token = ''
-      if (STT_RELAY_URL) try {
+      // Both the same-origin proxy and the external relay require a signed,
+      // session-bound token from the authenticated /api/stt-token endpoint.
+      let token: string
+      try {
         const { auth } = await import('@/lib/firebase')
-        const idToken = await auth.currentUser?.getIdToken()
-        const res = await apiFetch(`/api/stt-token?sessionId=${sessionId}`, {
-          headers: { Authorization: `Bearer ${idToken}` }
-        })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || 'Failed to get STT token')
+        if (!auth.currentUser) throw new Error('Not signed in')
+        // apiFetch attaches the Firebase ID token as the Bearer header.
+        const res = await apiFetch(
+          `/api/stt-token?sessionId=${encodeURIComponent(sessionId)}`
+        )
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || typeof data.token !== 'string' || !data.token) {
+          throw new Error(data.error || 'Failed to get STT token')
+        }
         token = data.token
       } catch (err) {
-        console.error('[Transcription] Failed to get token:', err)
+        console.error(
+          '[Transcription] Failed to get token:',
+          err instanceof Error ? err.message : 'unknown error'
+        )
         setState((s) => ({ ...s, error: 'Transcription auth error' }))
         return
       }
