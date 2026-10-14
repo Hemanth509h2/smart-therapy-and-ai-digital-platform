@@ -44,7 +44,7 @@ interface SessionState {
   sessionId: string;
   activeModuleId: string | null;
   status?: string;
-  participants: Record<string, { uid: string; name: string; role: string; isOnline: boolean }>;
+  participants: Record<string, { uid: string; name: string; role: string; isOnline: boolean; lastSeen?: string }>;
   timestamps: { createdAt: string; updatedAt: string };
 }
 
@@ -739,6 +739,19 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   const clientName = clientParticipant?.name || 'Client';
 
   const participantName = isTherapist ? clientName : (Object.values(participants).find((p) => p.role === 'therapist')?.name || 'Therapist');
+  // The participants popup shows exactly two tiles: you, and the person on the
+  // other side of the call. `participants` keeps every uid that ever joined (a
+  // guest rejoining gets a new uid, and a closed tab never flips isOnline back
+  // to false), so listing it raw showed the same remote video several times.
+  // Keep only the most recently joined online participant of the other role.
+  const popupParticipants = (() => {
+    const all = Object.values(participants);
+    const self = all.find((p) => p.uid === uid);
+    const peer = all
+      .filter((p) => p.uid !== uid && p.isOnline && p.role !== (isTherapist ? 'therapist' : 'client'))
+      .sort((a, b) => (b.lastSeen ?? '').localeCompare(a.lastSeen ?? ''))[0];
+    return [self, peer].filter((p): p is NonNullable<typeof p> => !!p);
+  })();
   const minutes = Math.floor(elapsed / 60);
   const seconds = elapsed % 60;
   const timerStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
@@ -1076,7 +1089,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                   </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflowY: 'auto' }}>
-                  {Object.values(participants).map((p) =>
+                  {popupParticipants.map((p) =>
                     p.uid === uid ? (
                       // Doctor: resizing only grows/shrinks the CLIENT's tile; the
                       // doctor's own self-view stays at the default small size.
@@ -1139,7 +1152,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                   </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflowY: 'auto' }}>
-                  {Object.values(participants).map((p) =>
+                  {popupParticipants.map((p) =>
                     p.uid === uid ? (
                       // Client: own video stays fixed; doctor's video is resizable.
                       <LocalVideoPip

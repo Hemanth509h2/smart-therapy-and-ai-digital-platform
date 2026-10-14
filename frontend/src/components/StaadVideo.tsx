@@ -87,6 +87,8 @@ export default function StaadVideo({
 }: StaadVideoProps) {
   const [token, setToken] = useState<string>('')
   const [error, setError] = useState('')
+  // Client only: the backend withholds the token until the therapist is in the room.
+  const [waiting, setWaiting] = useState(false)
 
   const room = useMemo(() => new Room(ROOM_OPTIONS), [])
   const [connected, setConnected] = useState(false)
@@ -109,13 +111,29 @@ export default function StaadVideo({
     if (sourceLang) params.set('sourceLang', sourceLang)
     if (targetLang) params.set('targetLang', targetLang)
 
-    apiFetch(`/api/livekit-token?${params.toString()}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.token) setToken(d.token)
-        else setError('Could not get video token')
-      })
-      .catch(() => setError('Video connection failed'))
+    let cancelled = false
+    let retry: ReturnType<typeof setTimeout> | undefined
+    const fetchToken = () => {
+      apiFetch(`/api/livekit-token?${params.toString()}`)
+        .then(r => r.json())
+        .then(d => {
+          if (cancelled) return
+          if (d.waiting) {
+            // Therapist hasn't joined yet — ask again shortly.
+            setWaiting(true)
+            retry = setTimeout(fetchToken, 3000)
+          } else if (d.token) {
+            setWaiting(false)
+            setToken(d.token)
+          } else setError('Could not get video token')
+        })
+        .catch(() => { if (!cancelled) setError('Video connection failed') })
+    }
+    fetchToken()
+    return () => {
+      cancelled = true
+      clearTimeout(retry)
+    }
   }, [sessionId, userName, role, sourceLang, targetLang])
 
   const disconnect = useCallback(() => {
@@ -128,6 +146,13 @@ export default function StaadVideo({
   if (error) return (
     <div className="h-full flex items-center justify-center" style={{ color: 'var(--ink-muted)', fontSize: 13 }}>
       {error}
+    </div>
+  )
+
+  if (!token && waiting) return (
+    <div className="h-full flex flex-col items-center justify-center gap-2" style={{ color: 'var(--ink-muted)', fontSize: 13 }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>Waiting for your therapist to join…</div>
+      <div>You'll be connected automatically as soon as they arrive.</div>
     </div>
   )
 
