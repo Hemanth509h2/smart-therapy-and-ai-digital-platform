@@ -562,6 +562,12 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
         const data = snap.data();
         const aiConsent = data?.aiConsent ?? {};
         setConsentStatus(aiConsent);
+        // Diagnostic (booleans only): a pending local write that later flips back
+        // to false means the server rejected/rolled back the consent write.
+        console.log(
+          `[Consent] therapist=${aiConsent.therapist ?? 'unset'} client=${aiConsent.client ?? 'unset'} ` +
+          `pendingWrite=${snap.metadata.hasPendingWrites} fromCache=${snap.metadata.fromCache}`
+        );
 
         const myKey = isTherapist ? 'therapist' : 'client';
         if (aiConsent[myKey] != null) {
@@ -956,7 +962,10 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     >
       {/* Renders translated captions published by the translation agent on the
           lk.transcription topic. Inside the room provider, like the bridges. */}
-      <CaptionOverlay enabled={translationSettings.enabled} />
+      {/* Shown whenever transcription is consent-enabled (Sarvam captions) or the
+          translation agent is on. Previously gated on the translation toggle
+          alone (default off), which hid every Sarvam caption. */}
+      <CaptionOverlay enabled={transcriptionEnabled || translationSettings.enabled} />
       {/* Runs the Sarvam pipeline inside the room provider so it can access the
           LiveKit room; reports recording state up to this page for the chip. */}
       <TranscriptionBridge

@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSessionRoom } from '@/components/StaadVideo'
 import { RC } from '@/components/session/roomTheme'
 import { languageLabel } from '@/lib/translationLanguages'
+import { shouldShowCaption } from '@/lib/stt/sarvam'
 
 const TRANSCRIPTION_TOPIC = 'lk.transcription'
 /** Captions older than this fade out, so stale text does not linger on screen. */
@@ -50,10 +51,8 @@ export default function CaptionOverlay({ enabled }: { enabled: boolean }) {
 
   const addCaption = (payload: CaptionPayload) => {
     const text = payload.text.trim()
-    if (!enabledRef.current || !text) return
-
-    const attrs = payload.attributes
-    if (attrs['staad.kind'] !== 'translation') return
+    const attrs = payload.attributes ?? {}
+    if (!shouldShowCaption(enabledRef.current, { text, attributes: attrs })) return
 
     const caption: Caption = {
       segmentId: attrs['lk.segment_id'] || `${Date.now()}`,
