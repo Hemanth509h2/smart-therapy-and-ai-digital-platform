@@ -131,6 +131,20 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   const [showAssistantPopup, setShowAssistantPopup] = useState(false);
   const [showNotesPopup, setShowNotesPopup] = useState(false);
   const [showCaptionsPopup, setShowCaptionsPopup] = useState(false);
+  // Therapist opt-in: also show the client-style subtitle bar on the video.
+  // Remembered per browser; storage can be unavailable (private mode).
+  const [captionsOnVideo, setCaptionsOnVideo] = useState(false);
+  useEffect(() => {
+    try {
+      setCaptionsOnVideo(localStorage.getItem('staad.captionsOnVideo') === '1');
+    } catch {}
+  }, []);
+  const changeCaptionsOnVideo = (on: boolean) => {
+    setCaptionsOnVideo(on);
+    try {
+      localStorage.setItem('staad.captionsOnVideo', on ? '1' : '0');
+    } catch {}
+  };
   const [screenSharing, setScreenSharing] = useState(false);
   const [shareWhiteboardAsk, setShareWhiteboardAsk] = useState(false);
   const whiteboardPromptedRef = useRef(false);
@@ -978,8 +992,9 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
         enabled={transcriptionEnabled || translationSettings.enabled}
         sessionId={sessionId}
         store={isTherapist}
-        // The therapist reads captions in the Captions popup instead.
-        visible={!isTherapist}
+        // The therapist reads captions in the Captions popup, unless they
+        // switched on "Live captions on video" there.
+        visible={!isTherapist || captionsOnVideo}
         viewerRole={userRole}
       />
       {/* Applies caption-language changes to the room without reconnecting. */}
@@ -1313,6 +1328,8 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
             live={transcription.isRecording || translationSettings.enabled}
             translation={translationSettings}
             onTranslationChange={(patch) => writeTranslationSettings(sessionId, patch)}
+            liveOnVideo={captionsOnVideo}
+            onLiveOnVideoChange={changeCaptionsOnVideo}
             onClose={() => setShowCaptionsPopup(false)}
           />
         )}

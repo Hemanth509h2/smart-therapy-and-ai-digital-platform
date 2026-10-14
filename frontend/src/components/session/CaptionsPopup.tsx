@@ -3,7 +3,7 @@
 // Floating, draggable card listing every caption stored for this session (see
 // lib/captionLog.ts). Same chrome as the AI Assistant / AI Notes popups.
 
-import { Captions, Copy, Download, GripHorizontal, X } from 'lucide-react'
+import { Captions, Copy, Download, GripHorizontal, Subtitles, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { GLASS } from './roomTheme'
 import { useCaptionLog, type StoredCaption } from '@/lib/captionLog'
@@ -15,6 +15,9 @@ interface CaptionsPopupProps {
   live: boolean
   translation: TranslationSettings
   onTranslationChange: (patch: Partial<TranslationSettings>) => void
+  /** Also show the subtitle bar at the bottom of the video, like the client sees. */
+  liveOnVideo: boolean
+  onLiveOnVideoChange: (on: boolean) => void
   onClose: () => void
   initialPosition?: { x: number; y: number }
 }
@@ -31,6 +34,8 @@ export default function CaptionsPopup({
   live,
   translation,
   onTranslationChange,
+  liveOnVideo,
+  onLiveOnVideoChange,
   onClose,
   initialPosition = { x: 460, y: 160 },
 }: CaptionsPopupProps) {
@@ -204,6 +209,31 @@ export default function CaptionsPopup({
       {/* Translation settings (moved here from the top bar) */}
       <div style={{ padding: '12px 14px 0' }}>
         <TranslationControl settings={translation} onChange={onTranslationChange} />
+        <label
+          style={{
+            marginTop: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '10px 12px',
+            borderRadius: 12,
+            background: liveOnVideo ? 'rgba(76,175,134,0.14)' : GLASS.fill,
+            border: `1px solid ${liveOnVideo ? 'rgba(76,175,134,0.45)' : GLASS.fillBorder}`,
+            cursor: 'pointer',
+          }}
+        >
+          <Subtitles size={14} color={liveOnVideo ? '#4caf86' : GLASS.accent} />
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: GLASS.ink }}>Live captions on video</span>
+            <span style={{ fontSize: 10, color: GLASS.inkFaint }}>Subtitles at the bottom of the call, as the client sees them</span>
+          </span>
+          <input
+            type="checkbox"
+            checked={liveOnVideo}
+            onChange={(e) => onLiveOnVideoChange(e.target.checked)}
+            style={{ accentColor: '#4caf86', width: 15, height: 15, cursor: 'pointer' }}
+          />
+        </label>
       </div>
 
       {/* Caption list */}
