@@ -24,7 +24,8 @@ import { saveCaption } from '@/lib/captionLog'
 const TRANSCRIPTION_TOPIC = 'lk.transcription'
 /** Captions older than this fade out, so stale text does not linger on screen. */
 const CAPTION_TTL_MS = 12_000
-const MAX_VISIBLE = 3
+/** The latest line plus the one before it, subtitle style. */
+const MAX_VISIBLE = 2
 
 interface Caption {
   segmentId: string
@@ -45,11 +46,17 @@ export default function CaptionOverlay({
   enabled,
   sessionId,
   store = false,
+  visible = true,
+  viewerRole,
 }: {
   enabled: boolean
   sessionId?: string
   /** Also append each caption to the session record (therapist browser only). */
   store?: boolean
+  /** false = collect/store only, draw nothing (the therapist reads the Captions popup). */
+  visible?: boolean
+  /** Lets the viewer's own lines read "You". */
+  viewerRole?: 'therapist' | 'client'
 }) {
   const { room } = useSessionRoom()
   const [captions, setCaptions] = useState<Caption[]>([])
@@ -146,99 +153,114 @@ export default function CaptionOverlay({
     return () => clearInterval(timer)
   }, [captions.length])
 
-  if (!enabled || captions.length === 0) return null
+  if (!visible || !enabled || captions.length === 0) return null
+
+  const label = (speaker: string) => {
+    const role = speaker.toLowerCase()
+    if (viewerRole && role === viewerRole) return 'You'
+    if (role === 'therapist') return 'Therapist'
+    if (role === 'client') return 'Client'
+    return speaker
+  }
+  // Sarvam's browser captions carry the same text as "original"; only offer the
+  // toggle when a caption really has a different source-language line.
+  const hasOriginals = captions.some((c) => c.original && c.original !== c.text)
 
   return (
     <div
       style={{
         position: 'absolute',
         left: '50%',
-        bottom: 18,
+        // Clears the floating call controls at the bottom of the client view.
+        bottom: 112,
         transform: 'translateX(-50%)',
         zIndex: 60,
-        width: 'min(92%, 720px)',
+        width: 'min(92%, 680px)',
         display: 'flex',
         flexDirection: 'column',
+        alignItems: 'center',
         gap: 8,
         pointerEvents: 'none',
       }}
     >
-      {captions.map((caption, index) => {
-        const isLatest = index === captions.length - 1
-        return (
-          <div
-            key={caption.segmentId}
-            style={{
-              background: 'rgba(16,24,20,0.86)',
-              backdropFilter: 'blur(8px)',
-              borderRadius: 14,
-              border: `1px solid ${isLatest ? RC.green : 'rgba(255,255,255,0.14)'}`,
-              padding: '10px 14px',
-              opacity: isLatest ? 1 : 0.55,
-              transition: 'opacity 0.3s',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                marginBottom: 4,
-                fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: 0.3,
-                textTransform: 'uppercase',
-                color: 'rgba(255,255,255,0.55)',
-              }}
-            >
-              <span>{caption.speaker}</span>
-              {caption.sourceLang && caption.targetLang && (
-                <span>
-                  {languageLabel(caption.sourceLang)} → {languageLabel(caption.targetLang)}
-                </span>
-              )}
-            </div>
-
-            {/* White on a near-opaque dark plate: legible over any video frame. */}
-            <div style={{ fontSize: 16, lineHeight: 1.45, color: '#ffffff', fontWeight: 500 }}>
-              {caption.text}
-            </div>
-
-            {showOriginal && caption.original && (
-              <div
-                style={{
-                  marginTop: 6,
-                  paddingTop: 6,
-                  borderTop: '1px solid rgba(255,255,255,0.14)',
-                  fontSize: 13,
-                  lineHeight: 1.4,
-                  color: 'rgba(255,255,255,0.62)',
-                }}
-              >
-                {caption.original}
-              </div>
-            )}
-          </div>
-        )
-      })}
-
-      <button
-        onClick={() => setShowOriginal((v) => !v)}
+      {/* One subtitle plate: the latest line, with the previous one dimmed above it. */}
+      <div
         style={{
-          alignSelf: 'center',
-          pointerEvents: 'auto',
-          padding: '4px 12px',
-          borderRadius: 20,
-          border: '1px solid rgba(255,255,255,0.18)',
-          background: 'rgba(16,24,20,0.86)',
-          color: 'rgba(255,255,255,0.75)',
-          fontSize: 10,
-          fontWeight: 600,
-          cursor: 'pointer',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          padding: '12px 18px',
+          borderRadius: 14,
+          background: 'rgba(0,0,0,0.72)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          boxShadow: '0 6px 24px rgba(0,0,0,0.3)',
         }}
       >
-        {showOriginal ? 'Hide original' : 'Show original'}
-      </button>
+        {captions.map((caption, index) => {
+          const isLatest = index === captions.length - 1
+          const who = label(caption.speaker)
+          return (
+            <div
+              key={caption.segmentId}
+              style={{
+                fontSize: isLatest ? 18 : 14.5,
+                lineHeight: 1.45,
+                fontWeight: isLatest ? 500 : 400,
+                color: isLatest ? '#ffffff' : 'rgba(255,255,255,0.55)',
+                transition: 'font-size 0.25s, color 0.25s',
+                animation: isLatest ? 'captionIn 0.25s ease-out' : undefined,
+              }}
+            >
+              <span
+                style={{
+                  marginRight: 8,
+                  fontSize: isLatest ? 13 : 12,
+                  fontWeight: 700,
+                  color: who === 'You' ? '#7FD3A6' : '#F0C878',
+                  opacity: isLatest ? 1 : 0.7,
+                }}
+              >
+                {who}
+              </span>
+              {caption.text}
+              {showOriginal && caption.original && caption.original !== caption.text && (
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontStyle: 'italic', marginTop: 2 }}>
+                  {caption.original}
+                  {caption.sourceLang && ` (${languageLabel(caption.sourceLang)})`}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {hasOriginals && (
+        <button
+          onClick={() => setShowOriginal((v) => !v)}
+          style={{
+            pointerEvents: 'auto',
+            padding: '3px 10px',
+            borderRadius: 20,
+            border: '1px solid rgba(255,255,255,0.18)',
+            background: 'rgba(12,16,14,0.7)',
+            color: 'rgba(255,255,255,0.75)',
+            fontSize: 10,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          {showOriginal ? 'Hide original' : 'Show original'}
+        </button>
+      )}
+
+      <style>{`
+        @keyframes captionIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: none; }
+        }
+      `}</style>
     </div>
   )
 }

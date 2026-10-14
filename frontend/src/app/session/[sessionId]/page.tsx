@@ -979,6 +979,9 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
         enabled={transcriptionEnabled || translationSettings.enabled}
         sessionId={sessionId}
         store={isTherapist}
+        // The therapist reads captions in the Captions popup instead.
+        visible={!isTherapist}
+        viewerRole={userRole}
       />
       {/* Applies caption-language changes to the room without reconnecting. */}
       {isTherapist && <TranslationSync sessionId={sessionId} settings={translationSettings} />}
