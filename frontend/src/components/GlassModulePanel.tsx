@@ -70,21 +70,6 @@ function ModuleErrorFallback({ moduleId, onRetry }: { moduleId: string; onRetry:
   )
 }
 
-function ModuleNotFound({ moduleId }: { moduleId: string }) {
-  const meta = MODULE_METADATA[moduleId]
-  return (
-    <div className="flex flex-col items-center justify-center h-full text-center px-4" style={{ minHeight: 300 }}>
-      <div style={{ fontSize: 36, marginBottom: 12 }}>🎯</div>
-      <div style={{ fontSize: 14, fontWeight: 500, color: '#FFFFFF', marginBottom: 4 }}>
-        {meta?.title || 'Module not found'}
-      </div>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
-        This module is not available or not yet implemented.
-      </div>
-    </div>
-  )
-}
-
 export function ModuleContent({
   activeModule,
   sessionId,

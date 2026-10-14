@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { provisionSessionDocs } from '@/lib/session-provisioning';
 import { markSessionEnded } from '@/lib/session-provisioning';
 import { sendSessionLinkWhatsApp } from '@/lib/session-whatsapp';
+import { errorResponse } from '@/lib/apiError';
 
 // GET /api/sessions/[sessionId] — fetch a single session (with client + therapist).
 export async function GET(
@@ -19,8 +20,7 @@ export async function GET(
     }
     return NextResponse.json({ session });
   } catch (error: any) {
-    console.error('Session GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Session GET error');
   }
 }
 
@@ -166,7 +166,6 @@ export async function PATCH(
 
     return NextResponse.json({ session });
   } catch (error: any) {
-    console.error('Session PATCH error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Session PATCH error');
   }
 }

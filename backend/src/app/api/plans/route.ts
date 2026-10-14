@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { errorResponse } from '@/lib/apiError';
 
-// GET /api/plans — list active subscription plans (therapist + admin facing).
+// GET /api/plans — list active subscription plans (therapist + admin facing),
+// full rows including `features` (the admin-written card bullets).
 // Pass ?all=1 to include inactive plans (admin catalog management).
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +19,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ plans });
   } catch (error: any) {
-    console.error('Plans GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Plans GET error');
   }
 }

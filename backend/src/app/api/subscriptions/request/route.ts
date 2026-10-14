@@ -1,6 +1,17 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireAuth } from '@/lib/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules';
+import { errorResponse } from '@/lib/apiError';
+
+// The caller must own the therapist profile or be an ADMIN.
+async function mayAccessTherapist(uid: string, therapistId: string) {
+  const [therapist, user] = await Promise.all([
+    prisma.profileTherapist.findUnique({ where: { id: therapistId }, select: { userId: true } }),
+    prisma.user.findUnique({ where: { id: uid }, select: { role: true } }),
+  ]);
+  return therapist?.userId === uid || user?.role === 'ADMIN';
+}
 
 // POST /api/subscriptions/request — a therapist requests a plan (pending admin
 // approval). Body: { therapistId, planId, months?, modules?, note? }
@@ -8,10 +19,16 @@ import { ALL_MODULE_IDS } from '@/lib/modules';
 // toolQuota (ignored for unlimited plans).
 export async function POST(request: Request) {
   try {
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
+
     const { therapistId, planId, months, modules, note } = await request.json();
 
     if (!therapistId || !planId) {
       return NextResponse.json({ error: 'therapistId and planId are required' }, { status: 400 });
+    }
+    if (!(await mayAccessTherapist(auth.uid, therapistId))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const [therapist, plan, existingPending] = await Promise.all([
@@ -63,7 +80,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, request: created });
   } catch (error: any) {
-    console.error('Subscription request POST error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Subscription request POST error');
   }
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter, usePathname } from 'next/navigation';
@@ -28,7 +28,14 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         }
 
         // Skip profile fetch on pages that handle their own auth flow
-        if (pathname === '/auth' || pathname === '/onboarding' || pathname.startsWith('/join')) {
+        // (/admin/invite/<token>: the invitee may have no profile yet, and
+        // must not be sent to onboarding).
+        if (
+          pathname === '/auth' ||
+          pathname === '/onboarding' ||
+          pathname.startsWith('/join') ||
+          pathname.startsWith('/admin/invite/')
+        ) {
           setLoading(false);
           return;
         }
@@ -41,11 +48,15 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
             const data = await res.json();
             if (data.user) {
               const role = data.user.role;
-              const profile =
-                role === 'THERAPIST' ? data.user.therapist
-                : role === 'ADMIN' ? data.user.admin
-                : data.user.client;
-              setRoleAndProfile(role, profile);
+              if (role === 'CLIENT') {
+                // Patients no longer have accounts; they join through the link their therapist sends.
+                await signOut(auth);
+                clearAuth();
+                router.push('/auth?clients=removed');
+                setLoading(false);
+                return;
+              }
+              setRoleAndProfile(role, role === 'THERAPIST' ? data.user.therapist : data.user.admin);
             }
           } else if (res.status === 404) {
             // Profile doesn't exist yet, needs onboarding
@@ -63,7 +74,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         const devPreview =
           process.env.NODE_ENV !== 'production' && pathname === '/session/preview';
         // /join/<token> is the public guest invite page — no session needed.
-        const guestInvite = pathname.startsWith('/join');
+        // /admin/invite/<token> explains how to sign in before accepting.
+        const guestInvite = pathname.startsWith('/join') || pathname.startsWith('/admin/invite/');
         if (pathname !== '/auth' && pathname !== '/onboarding' && !devPreview && !guestInvite) {
           router.push('/auth');
         }

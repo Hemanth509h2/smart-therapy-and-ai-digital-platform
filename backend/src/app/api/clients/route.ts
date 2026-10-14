@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
-import { normalizeWhatsAppNumber } from '@/lib/whatsapp-cloud-api';
+import { requireTherapist } from '@/lib/progressAuth';
+import { normalizePhoneNumber } from '@/lib/phone';
+import { errorResponse } from '@/lib/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,7 +55,7 @@ export async function POST(request: Request) {
           diagnosis: Array.isArray(diagnosis) ? diagnosis : [],
           phoneNumber:
             typeof phoneNumber === 'string' && phoneNumber.trim()
-              ? normalizeWhatsAppNumber(phoneNumber)
+              ? normalizePhoneNumber(phoneNumber)
               : null,
           dateOfBirth: dob ?? new Date(),
           gender: typeof gender === 'string' && gender.trim() ? gender.trim() : null,
@@ -66,67 +68,66 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ client }, { status: 201 });
   } catch (error: any) {
-    console.error('Client create error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Client create error');
   }
 }
 
+// GET /api/clients — the authenticated therapist's clients. The therapist is
+// derived from the verified ID token; `therapistId` in the query is optional
+// and must match it (it can never widen access).
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const therapistId = searchParams.get('therapistId');
+    const auth = await requireTherapist(request);
+    if (!auth.ok) return auth.response;
+    const therapistId = auth.therapist.id;
 
-    if (therapistId) {
-      // Clients of this therapist: directly added ones PLUS any linked via sessions.
-      const sessions = await prisma.session.findMany({
-        where: { therapistId },
-        select: { clientId: true },
-        distinct: ['clientId'],
-      });
-      const directClients = await prisma.profileClient.findMany({
-        where: { therapistId },
-        select: { id: true },
-      });
-      const clientIds = [...new Set([...sessions.map((s) => s.clientId), ...directClients.map((c) => c.id)])];
-
-      const clients = await prisma.profileClient.findMany({
-        where: { id: { in: clientIds } },
-        include: { user: true },
-      });
-
-      // Attach session count, last held session and next scheduled session per client
-      const now = new Date();
-      const clientsWithMeta = await Promise.all(
-        clients.map(async (client) => {
-          const clientSessions = await prisma.session.findMany({
-            where: { therapistId, clientId: client.id },
-            orderBy: { scheduledAt: 'desc' },
-            select: { id: true, scheduledAt: true, status: true },
-          });
-          const held = clientSessions.filter(
-            (s) => s.status !== 'CANCELLED' && (s.status !== 'SCHEDULED' || s.scheduledAt <= now)
-          );
-          const next = clientSessions
-            .filter((s) => s.status === 'SCHEDULED' && s.scheduledAt > now)
-            .at(-1);
-          return {
-            ...client,
-            sessionCount: clientSessions.length,
-            lastSession: held[0]?.scheduledAt || null,
-            nextSession: next ? { id: next.id, scheduledAt: next.scheduledAt } : null,
-          };
-        })
-      );
-
-      return NextResponse.json({ clients: clientsWithMeta });
+    const requested = new URL(request.url).searchParams.get('therapistId');
+    if (requested && requested !== therapistId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Backward-compatible: return all clients if no therapistId
-    const clients = await prisma.profileClient.findMany({
-      include: { user: true },
+    // One query for every session of this therapist; everything else is
+    // derived in memory (was: 3 queries + one per client).
+    const sessions = await prisma.session.findMany({
+      where: { therapistId },
+      orderBy: { scheduledAt: 'desc' },
+      select: { id: true, clientId: true, scheduledAt: true, status: true },
     });
-    return NextResponse.json({ clients });
+
+    // Clients of this therapist: directly added ones PLUS any linked via sessions.
+    const sessionClientIds = [...new Set(sessions.map((s) => s.clientId))];
+    const clients = await prisma.profileClient.findMany({
+      where: { OR: [{ therapistId }, { id: { in: sessionClientIds } }] },
+      include: { user: { select: { email: true } } },
+    });
+
+    const byClient = new Map<string, typeof sessions>();
+    for (const s of sessions) {
+      const list = byClient.get(s.clientId);
+      if (list) list.push(s);
+      else byClient.set(s.clientId, [s]);
+    }
+
+    // Attach session count, last held session and next scheduled session per client
+    const now = new Date();
+    const clientsWithMeta = clients.map((client) => {
+      const clientSessions = byClient.get(client.id) ?? [];
+      const held = clientSessions.filter(
+        (s) => s.status !== 'CANCELLED' && (s.status !== 'SCHEDULED' || s.scheduledAt <= now)
+      );
+      const next = clientSessions
+        .filter((s) => s.status === 'SCHEDULED' && s.scheduledAt > now)
+        .at(-1);
+      return {
+        ...client,
+        sessionCount: clientSessions.length,
+        lastSession: held[0]?.scheduledAt || null,
+        nextSession: next ? { id: next.id, scheduledAt: next.scheduledAt } : null,
+      };
+    });
+
+    return NextResponse.json({ clients: clientsWithMeta });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'clients GET');
   }
 }

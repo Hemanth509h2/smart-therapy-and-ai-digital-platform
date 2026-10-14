@@ -7,10 +7,22 @@ import { deleteField, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import type { KidMood, SceneSpot } from './SocialStoryScene3D'
+import { STORY_DATA } from './socialStoryShared'
 import { ModuleHeaderSlot } from '@/components/session/moduleHeaderSlot'
 
 // three.js only runs in the browser, and only this module needs it.
 const Scene3D = dynamic(() => import('./SocialStoryScene3D'), {
+  ssr: false,
+  loading: () => (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(23,58,94,0.5)', fontSize: 14 }}>
+      Building the room…
+    </div>
+  ),
+})
+
+// The themed stories (everything but the school home) run on Babylon.js with
+// real lighting and shadows; the school home and custom stories stay on three.js.
+const SceneBabylon = dynamic(() => import('./SocialStoryScene.babylon'), {
   ssr: false,
   loading: () => (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(23,58,94,0.5)', fontSize: 14 }}>
@@ -134,6 +146,39 @@ const ACTION_SAYS: Record<string, string> = {
   s1p3: 'My school uniform! 👕',
   s1p4: 'Yum, breakfast! 🥣',
   s1p5: 'Bye! Off to school! 👋',
+  s2p1: 'Oh, someone new! 👀',
+  s2p2: 'Hello! 😊',
+  s2p3: "Hi, I'm Maya! 🤝",
+  s2p4: "What's your name? 🗣️",
+  s3p1: 'Grrr! I feel so angry! 😡',
+  s3p2: 'Stop… breathe in… and out. ✋',
+  s3p3: "Hmm, why am I angry? 💭",
+  s3p4: "I feel angry because… 🗣️",
+  s3p5: 'Ahh, I feel calmer. 😌',
+  s4p1: "We're at the doctor's! 🏥",
+  s4p2: 'I wait quietly. 🪑',
+  s4p3: "Yes, that's me! 🙋",
+  s4p4: 'Ahh… breathe in. 🩺',
+  s4p5: 'Thank you, doctor! 😊',
+  s5p1: 'I love this toy! 🎮',
+  s5p2: 'My friend wants to play too. 👦',
+  s5p3: 'Here, you can have a turn! 🤝',
+  s5p4: 'We play together! 😊',
+  s6p1: "Hmm… I don't understand. 😕",
+  s6p2: 'I raise my hand. 🙋',
+  s6p3: 'Can you help me please? 🗣️',
+  s6p4: 'Now I understand! 😊',
+  s7p1: "I can't wait! 🤩",
+  s7p2: "Oh no, it didn't happen. 😞",
+  s7p3: 'I feel sad… 😢',
+  s7p4: "It's okay to feel sad. 💭",
+  s7p5: "Maybe something else will be fun! 🌈",
+  s8p1: 'An invitation! 💌',
+  s8p2: 'A present for my friend! 🎁',
+  s8p3: "We're at the party! 🏠",
+  s8p4: 'Happy birthday! 🎈',
+  s8p5: 'Yum, cake! 🎂',
+  s8p6: 'Thank you! Bye! 👋',
 }
 
 /** Where each story happens, for the header. The 3D room itself is drawn in SocialStoryScene3D. */
@@ -447,8 +492,6 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     () => [...activePanels].sort((a, b) => a.correctIndex - b.correctIndex),
     [activePanels],
   )
-  const orderedRef = useRef(orderedPanels)
-  orderedRef.current = orderedPanels
   /** Changes only when the story's actual content does, unlike the array identity. */
   const replaySig = useMemo(
     () => `${storyId}::${orderedPanels.map(p => `${p.correctIndex}:${p.caption}`).join('|')}`,
@@ -719,6 +762,9 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     }]
   }), [resolvedShuffled, panelMap, spots, slotOf, wrongSlots, correctSlots, instantFeedback, completed, showAnswer, playIdx, orderedPanels, kid, acting, showGuide, nextCorrectId, hintPanel, canDrop, placedCount])
 
+  const storyData = STORY_DATA[storyId]
+  const SceneView = storyData && sceneSpots.length > 0 && sceneSpots.every(s => storyData.spots[s.id]) ? SceneBabylon : Scene3D
+
   const onSpot = useCallback((id: string) => {
     const slot = slotOf.get(id)
     if (slot !== undefined) removeFromSlot(slot)
@@ -837,6 +883,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
         @keyframes ss-burst{0%{transform:translate(-50%,0) scale(.3);opacity:0}30%{opacity:1}100%{transform:translate(-50%,-70px) scale(1.25);opacity:0}}
         @keyframes ss-spark{0%{transform:translate(0,0) scale(.4);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}
         @keyframes ss-say3{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+        @keyframes ss-zzz{0%{transform:translate(0,0) scale(.7);opacity:0}25%{opacity:1}100%{transform:translate(18px,-46px) scale(1.15);opacity:0}}
         @keyframes ss-chip{0%{transform:scale(0)}70%{transform:scale(1.25)}100%{transform:scale(1)}}
         .ss-spot3{transition:transform .15s}
         .ss-spot3:not(:disabled):hover{transform:scale(1.12)!important}
@@ -911,7 +958,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
             background: 'linear-gradient(180deg,#e8f3fb,#d6e6f4)',
             boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.06), 0 6px 18px rgba(23,58,94,0.08)',
           }}>
-            <Scene3D
+            <SceneView
               storyId={storyId}
               spots={sceneSpots}
               kidAt={kid.at}

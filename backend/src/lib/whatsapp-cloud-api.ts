@@ -12,6 +12,8 @@
  * - WHATSAPP_APP_SECRET: App Secret (optional, for token refresh)
  */
 
+import { PublicError } from '@/lib/apiError'
+
 const GRAPH_API_BASE = 'https://graph.facebook.com/v20.0'
 
 export interface WhatsAppMessageResult {
@@ -49,7 +51,7 @@ export function normalizeWhatsAppNumber(value: string): string {
       : `+${compact}`
 
   if (!/^\+[1-9]\d{7,14}$/.test(withCountryCode)) {
-    throw new Error('Enter a valid WhatsApp number with country code')
+    throw new PublicError('Enter a valid WhatsApp number with country code', 400)
   }
 
   return withCountryCode
@@ -144,6 +146,32 @@ export async function sendCloudApiTemplate(
     status: 'sent',
     to,
   }
+}
+
+/**
+ * Send an interactive message (buttons / list) via Cloud API
+ */
+export async function sendCloudApiInteractive(
+  toNumber: string,
+  interactive: Record<string, unknown>
+): Promise<WhatsAppMessageResult> {
+  const { accessToken, phoneNumberId } = getCloudApiConfig()
+  const to = normalizeWhatsAppNumber(toNumber)
+
+  const response = await fetch(`${GRAPH_API_BASE}/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'interactive', interactive }),
+    cache: 'no-store',
+  })
+  const payload = (await response.json().catch(() => ({}))) as {
+    messages?: Array<{ id: string }>
+    error?: { message: string }
+  }
+  if (!response.ok || !payload.messages?.[0]?.id) {
+    throw new Error(payload.error?.message || 'Cloud API could not send the interactive message')
+  }
+  return { id: payload.messages[0].id, status: 'sent', to }
 }
 
 /**

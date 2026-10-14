@@ -16,7 +16,7 @@ import {
   type ProgressReport,
   type ProgressNote,
 } from '@/lib/progressApi';
-import { apiFetch } from '@/lib/api';
+import { apiFetchCached } from '@/lib/api';
 
 const CARD =
   'rounded-[14px] border-[0.5px] border-[var(--glass-border)] shadow-[var(--glass-shadow)] bg-[var(--glass-bg)] dark:bg-[#16221e]';
@@ -60,7 +60,7 @@ export default function ClientProgressPage() {
         fetchClientMetrics(clientId),
         fetchClientReports(clientId),
         fetchClientNotes(clientId),
-        apiFetch(`/api/clients?therapistId=${profile?.id || ''}`).then((res) => res.json()),
+        apiFetchCached(`/api/clients?therapistId=${profile?.id || ''}`).then((res) => res.json()),
       ]);
       setMetrics(m);
       setReports(r);

@@ -1,23 +1,31 @@
-import { normalizeWhatsAppNumber } from './whatsapp-cloud-api'
+import {
+  normalizeWhatsAppNumber,
+  sendCloudApiText,
+  sendCloudApiTemplate,
+} from './whatsapp-cloud-api'
+import { getSetting } from './settings'
 
-// Messages are delivered by the self-hosted Baileys bot (whatapps/), which
-// exposes POST /send guarded by the shared x-bot-secret header.
-async function sendViaBot(to: string, text: string): Promise<WhatsAppMessageResult> {
-  const url = process.env.WHATSAPP_BOT_URL
-  const secret = process.env.WHATSAPP_BOT_SECRET
-  if (!url || !secret) {
-    throw new Error('WhatsApp bot not configured. Set WHATSAPP_BOT_URL and WHATSAPP_BOT_SECRET')
+// Admin kill switch (Settings → features.whatsapp). Callers record the
+// thrown error on the message row.
+async function assertWhatsAppEnabled() {
+  if (!(await getSetting('features.whatsapp'))) {
+    throw new Error('WhatsApp messaging is turned off by an admin.')
   }
+}
 
-  const res = await fetch(`${url.replace(/\/+$/, '')}/send`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-bot-secret': secret },
-    body: JSON.stringify({ to, text }),
-    signal: AbortSignal.timeout(15_000),
-  })
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || `WhatsApp bot responded ${res.status}`)
-  return { id: data.id ?? '', status: 'sent', to }
+// Messages go out through the official WhatsApp Business Cloud API (Meta).
+// Free-form text only reaches people who messaged us in the last 24 hours, so
+// set WHATSAPP_INVITE_TEMPLATE / WHATSAPP_SCHEDULED_TEMPLATE to approved
+// template names to reach patients cold. Without them we fall back to text.
+const TEMPLATE_LANG = () => process.env.WHATSAPP_TEMPLATE_LANGUAGE || 'en'
+
+function bodyParams(values: string[]) {
+  return [{ type: 'body', parameters: values.map((text) => ({ type: 'text', text })) }]
+}
+
+export async function sendViaBot(to: string, text: string): Promise<WhatsAppMessageResult> {
+  await assertWhatsAppEnabled()
+  return sendCloudApiText(to, text)
 }
 
 export interface WhatsAppInviteInput {
@@ -41,9 +49,7 @@ export interface SessionScheduledInput {
 }
 
 /**
- * Send a WhatsApp invite message (free-form text)
- * Works within 24-hour customer service window
- * For first-time invites outside the window, use a template instead
+ * Send the patient invite on WhatsApp
  */
 export async function sendWhatsAppInvite(input: WhatsAppInviteInput): Promise<WhatsAppMessageResult> {
   const to = normalizeWhatsAppNumber(input.to)
@@ -58,6 +64,17 @@ Tap the link below to join — no sign-up needed:
 
 See you there. 🌿`
 
+  const template = process.env.WHATSAPP_INVITE_TEMPLATE
+  if (template) {
+    await assertWhatsAppEnabled()
+    // Template body variables: {{1}} patient name, {{2}} therapist, {{3}} link
+    return sendCloudApiTemplate(
+      to,
+      template,
+      TEMPLATE_LANG(),
+      bodyParams([name, input.therapistName || 'Your therapist', input.inviteLink])
+    )
+  }
   return sendViaBot(to, text)
 }
 
@@ -82,5 +99,16 @@ We'll send you the link to join when your session starts.
 
 Take a deep breath — we'll see you there. 🌿`
 
+  const template = process.env.WHATSAPP_SCHEDULED_TEMPLATE
+  if (template) {
+    await assertWhatsAppEnabled()
+    // Template body variables: {{1}} patient name, {{2}} therapist, {{3}} date/time
+    return sendCloudApiTemplate(
+      to,
+      template,
+      TEMPLATE_LANG(),
+      bodyParams([name, input.therapistName || 'your therapist', when])
+    )
+  }
   return sendViaBot(to, text)
 }

@@ -57,11 +57,16 @@ enum WhatsAppMessageType {
 }
 
 model User {
-  id        String   @id // Firebase Auth UID
-  email     String   @unique
-  role      Role     @default(CLIENT)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String     @id // Firebase Auth UID
+  email         String     @unique
+  role          Role       @default(CLIENT)
+  // Admin-controlled. SUSPENDED users are rejected by requireAuth.
+  status        UserStatus @default(ACTIVE)
+  suspendedAt   DateTime?
+  suspendReason String?
+  lastSeenAt    DateTime? // last authenticated API call (throttled)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   therapist ProfileTherapist?
   client    ProfileClient?
@@ -69,13 +74,15 @@ model User {
 }
 
 model ProfileAdmin {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  firstName String   @default("Admin")
-  lastName  String   @default("")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(uuid())
+  userId    String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName String    @default("Admin")
+  lastName  String    @default("")
+  // What this admin may do; see ADMIN_PERMISSIONS in lib/adminRoles.ts.
+  adminRole AdminRole @default(SUPER_ADMIN)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 model ProfileTherapist {
@@ -88,6 +95,7 @@ model ProfileTherapist {
   qualification     String?
   experience        String?
   bio               String?
+  phoneNumber       String?  @unique // E.164 format; used for WhatsApp notifications
   // Per-therapist module/tool access. When allModulesAllowed is true the
   // therapist may launch any module; otherwise only those listed in moduleAccess.
   allModulesAllowed Boolean  @default(true)
@@ -107,6 +115,7 @@ model ProfileTherapist {
   progressMetrics ProgressMetric[]
   progressReports ProgressReport[]
   progressNotes   ProgressNote[]
+  whatsAppMessages WhatsAppMessage[]
 }
 
 model ProfileClient {
@@ -162,6 +171,9 @@ model Booking {
   status      String           @default("pending") // pending, confirmed, cancelled
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
+
+  @@index([therapistId, dateTime])
+  @@index([clientId, dateTime])
 }
 
 model Session {
@@ -181,6 +193,9 @@ model Session {
   notes            TherapistNote[]
   report           SessionReport?
   whatsAppMessages WhatsAppMessage[]
+
+  @@index([therapistId, scheduledAt])
+  @@index([clientId, scheduledAt])
 }
 
 // End-of-session AI clinical report. One per session. Generated from the full
@@ -233,6 +248,7 @@ model WhatsAppMessage {
   inviteId          String?
   sessionId         String?
   clientId          String?
+  therapistId       String?
   phoneNumber       String
   generatedLink     String
   messageType       WhatsAppMessageType   @default(CLIENT_INVITE)
@@ -252,6 +268,7 @@ model WhatsAppMessage {
   invite            Invite?               @relation(fields: [inviteId], references: [id], onDelete: Cascade)
   session           Session?              @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   client            ProfileClient?        @relation(fields: [clientId], references: [id])
+  therapist         ProfileTherapist?     @relation(fields: [therapistId], references: [id], onDelete: Cascade)
 
   // Nullable columns don't collide under Postgres uniqueness (NULL != NULL),
   // so CLIENT_INVITE rows (inviteId set, sessionId null) and
@@ -260,6 +277,7 @@ model WhatsAppMessage {
   @@unique([inviteId, messageType])
   @@unique([sessionId, messageType])
   @@index([clientId])
+  @@index([therapistId])
   @@index([status, nextAttemptAt])
 }
 
@@ -283,16 +301,22 @@ model UsageEvent {
 // priceMonthly is display-only. `toolQuota` caps how many therapy tools a plan
 // grants (null = all tools / unlimited).
 model Plan {
-  id             String   @id @default(uuid())
-  name           String   @unique
-  description    String?
-  priceMonthly   Int      @default(0) // display only (INR)
-  durationMonths Int      @default(1) // suggested default term length
-  toolQuota      Int? // null = unlimited (all tools); else max tools allowed
-  isActive       Boolean  @default(true)
-  sortOrder      Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                   String   @id @default(uuid())
+  name                 String   @unique
+  description          String?
+  priceMonthly         Int      @default(0) // display only (INR)
+  durationMonths       Int      @default(1) // suggested default term length
+  toolQuota            Int? // null = unlimited (all tools); else max tools allowed
+  isActive             Boolean  @default(true)
+  sortOrder            Int      @default(0)
+  // Bullet points shown on the therapist /plans card (empty = built-in list).
+  features             String[] @default([])
+  // Usage limits per plan; null = unlimited. Documented in docx/PLANS.md.
+  maxClients           Int? // active clients at once
+  maxSessionsPerMonth  Int? // video sessions per calendar month
+  maxAiReportsPerMonth Int? // AI session analyses per calendar month
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   subscriptions Subscription[]
   requests      SubscriptionRequest[]
@@ -418,4 +442,137 @@ model TherapistNote {
   isPrivate   Boolean          @default(true)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
+}
+
+// ─── Admin portal ────────────────────────────────────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum AdminRole {
+  SUPER_ADMIN // everything, including managing admins
+  BILLING // plans and subscriptions (payments live on the payment branch)
+  SUPPORT // read-only on people + support inbox + messages
+  CONTENT // module library + settings
+}
+
+// Append-only record of every admin mutation and PHI reveal. Never updated
+// or deleted by the app.
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorUid   String
+  actorEmail String?
+  action     String // e.g. 'plan.update', 'user.suspend', 'phi.reveal'
+  targetType String // e.g. 'Plan', 'User', 'Subscription'
+  targetId   String?
+  before     Json?
+  after      Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorUid])
+  @@index([targetType, targetId])
+}
+
+model AdminInvite {
+  id         String    @id @default(uuid())
+  email      String
+  adminRole  AdminRole @default(SUPPORT)
+  token      String    @unique
+  invitedBy  String // admin uid
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email])
+}
+
+enum TicketStatus {
+  OPEN
+  PENDING // waiting on the user
+  RESOLVED
+}
+
+model SupportTicket {
+  id          String         @id @default(uuid())
+  ref         String         @unique // STAAD-XXXX shown to the user
+  userId      String? // Firebase uid when signed in
+  name        String?
+  email       String
+  role        String?
+  category    String
+  subject     String
+  message     String
+  status      TicketStatus   @default(OPEN)
+  assigneeUid String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  replies     SupportReply[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SupportReply {
+  id          String        @id @default(uuid())
+  ticketId    String
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorUid   String
+  authorEmail String?
+  body        String
+  internal    Boolean       @default(false) // internal note, not emailed
+  emailed     Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+
+  @@index([ticketId])
+}
+
+// AI risk flags (self-harm / violence) raised during a session, persisted so
+// an admin can confirm someone followed up.
+model RiskFlag {
+  id             String    @id @default(uuid())
+  sessionId      String
+  therapistId    String? // ProfileTherapist.id
+  level          String // watch | urgent
+  detail         String?
+  raisedAt       DateTime  @default(now())
+  acknowledgedAt DateTime?
+  acknowledgedBy String? // admin uid
+  note           String?
+
+  @@index([acknowledgedAt])
+  @@index([sessionId])
+}
+
+// Admin-editable app settings (feature flags, retention, contact details).
+model Setting {
+  key       String   @id
+  value     Json
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+// Per-module overrides for the built-in library in lib/modules.ts.
+model ModuleSetting {
+  moduleId  String   @id
+  enabled   Boolean  @default(true)
+  featured  Boolean  @default(false)
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+// Result of each scheduled job run, shown on the System health page.
+model CronRun {
+  id         String    @id @default(uuid())
+  job        String
+  ok         Boolean
+  detail     Json?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([job, startedAt])
 }

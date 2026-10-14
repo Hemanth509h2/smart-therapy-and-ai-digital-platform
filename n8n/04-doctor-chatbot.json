@@ -1,0 +1,528 @@
+{
+  "name": "STAAD - Doctor chatbot (WhatsApp)",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "id": "f44c8ab6-b4fd-4bab-9228-700c54583baa",
+      "name": "WhatsApp Trigger",
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "whatsAppTriggerApi": {
+          "id": "",
+          "name": "WhatsApp OAuth account"
+        }
+      },
+      "webhookId": "8b3d94af-bbd9-4ad0-bb2e-a1c04cc6eeeb"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "aea60394-ec43-4c8d-9244-9b435995341b",
+              "leftValue": "={{ $json.messages[0].type }}",
+              "rightValue": "text",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d410bae7-abd1-4732-9e20-8f3ff4580a46",
+      "name": "Is a text message?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://YOUR-BACKEND-URL/api/automation/doctor/overview",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "phone",
+              "value": "={{ $json.messages[0].from }}"
+            }
+          ]
+        }
+      },
+      "id": "7ba38158-8ca2-4cc5-bb31-d9a376bad51a",
+      "name": "Find doctor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "STAAD Automation API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "8e723677-e8e1-4c62-8170-6357f59197ed",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "61d89140-e78d-44b8-a980-a0a4c3837792",
+      "name": "Registered doctor?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('WhatsApp Trigger').item.json.messages[0].text.body }}",
+        "options": {
+          "systemMessage": "=You are the STAAD assistant for a therapist, replying on WhatsApp.\nThe doctor you are talking to: {{ $('Find doctor').item.json.body.doctor.name }}.\nToday is {{ $now.setZone('Asia/Kolkata').toFormat('cccc, d LLLL yyyy') }} (India time).\n\nRules:\n- Answer ONLY from the tools. If the tools do not have it, say you don't have that information. Never invent sessions, clients or times.\n- You can only see this doctor's own data. Never discuss other doctors.\n- You have no access to clinical notes or reports; if asked, say they are in the STAAD app.\n- Dates for the schedule tool are YYYY-MM-DD in India time. Work out 'tomorrow', 'next week', etc. from today's date.\n- Keep replies short and easy to read on a phone: plain text, numbered lists for sessions (time - client), no tables, no markdown headings.\n- Do not give medical advice. For anything outside schedules, sessions and clients, say what you can help with."
+        }
+      },
+      "id": "37aac010-9d2a-4aa8-b2ab-2fab24dd2f1d",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        900,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-5-5",
+          "mode": "id"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "d95ee60a-66a0-4126-aac7-cdacce47d405",
+      "name": "Chat model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        780,
+        160
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('WhatsApp Trigger').item.json.messages[0].from }}",
+        "contextWindowLength": 8
+      },
+      "id": "a47f1b35-3b6a-4560-ac06-174d0fc31773",
+      "name": "Conversation memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        920,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Get the doctor's profile, today's sessions, the next 7 days of scheduled sessions, and headline counts (clients, scheduled/completed/cancelled sessions). Use for general questions like 'what's my day look like' or 'how many clients do I have'.",
+        "method": "GET",
+        "url": "https://YOUR-BACKEND-URL/api/automation/doctor/overview",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "phone",
+              "valueProvider": "fieldValue",
+              "value": "={{ $('WhatsApp Trigger').item.json.messages[0].from }}"
+            }
+          ]
+        }
+      },
+      "id": "234cf3e2-0ce5-4362-ac62-bcde7443736e",
+      "name": "Tool: my overview",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1060,
+        160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "STAAD Automation API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "List the doctor's sessions between two dates (inclusive). Returns time and client name for each. Use for 'today', 'tomorrow', 'this week', 'last Monday', etc. Defaults to today only.",
+        "method": "GET",
+        "url": "https://YOUR-BACKEND-URL/api/automation/doctor/schedule",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "phone",
+              "valueProvider": "fieldValue",
+              "value": "={{ $('WhatsApp Trigger').item.json.messages[0].from }}"
+            },
+            {
+              "name": "from",
+              "description": "Start date, YYYY-MM-DD, India time. Defaults to today.",
+              "valueProvider": "modelOptional"
+            },
+            {
+              "name": "to",
+              "description": "End date, YYYY-MM-DD, India time. Defaults to the start date. At most 31 days after from.",
+              "valueProvider": "modelOptional"
+            },
+            {
+              "name": "status",
+              "description": "Optional comma-separated filter: SCHEDULED, ACTIVE, COMPLETED, CANCELLED. Default excludes cancelled.",
+              "valueProvider": "modelOptional"
+            }
+          ]
+        }
+      },
+      "id": "2f51723d-5aed-4a6d-a621-8b7f5d12bdfa",
+      "name": "Tool: my schedule",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "STAAD Automation API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "List the doctor's clients with age, diagnosis, phone, session count, last and next session. Optionally filter by part of a name.",
+        "method": "GET",
+        "url": "https://YOUR-BACKEND-URL/api/automation/doctor/clients",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "phone",
+              "valueProvider": "fieldValue",
+              "value": "={{ $('WhatsApp Trigger').item.json.messages[0].from }}"
+            },
+            {
+              "name": "q",
+              "description": "Part of the client's first or last name.",
+              "valueProvider": "modelOptional"
+            }
+          ]
+        }
+      },
+      "id": "599303d0-d9bd-4f34-ae6e-14a16ff88061",
+      "name": "Tool: my clients",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1340,
+        160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "STAAD Automation API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Get one client's details and their session history with this doctor (latest 20). Needs the client id from the clients tool.",
+        "method": "GET",
+        "url": "https://YOUR-BACKEND-URL/api/automation/doctor/client",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "phone",
+              "valueProvider": "fieldValue",
+              "value": "={{ $('WhatsApp Trigger').item.json.messages[0].from }}"
+            },
+            {
+              "name": "clientId",
+              "description": "The client's id, taken from the clients tool.",
+              "valueProvider": "modelRequired"
+            }
+          ]
+        }
+      },
+      "id": "74d4488e-6191-4209-8060-adbf2e87683a",
+      "name": "Tool: client details",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1480,
+        160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "STAAD Automation API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "YOUR_WHATSAPP_PHONE_NUMBER_ID",
+        "recipientPhoneNumber": "={{ $('WhatsApp Trigger').item.json.messages[0].from.replace('+', '') }}",
+        "textBody": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "id": "cff8e533-75e3-4794-8bd6-1cbfef650953",
+      "name": "Reply to doctor",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1180,
+        -120
+      ],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "YOUR_WHATSAPP_PHONE_NUMBER_ID",
+        "recipientPhoneNumber": "={{ $('WhatsApp Trigger').item.json.messages[0].from.replace('+', '') }}",
+        "textBody": "This WhatsApp number is not registered as a doctor on STAAD. Please message from the number on your STAAD profile.",
+        "additionalFields": {}
+      },
+      "id": "90c9402e-46d3-442b-9c3d-f7fe47825846",
+      "name": "Reply: not registered",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        -300
+      ],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "",
+          "name": "WhatsApp account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "Is a text message?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is a text message?": {
+      "main": [
+        [
+          {
+            "node": "Find doctor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find doctor": {
+      "main": [
+        [
+          {
+            "node": "Registered doctor?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registered doctor?": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply: not registered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Reply to doctor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversation memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool: my overview": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool: my schedule": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool: my clients": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool: client details": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  },
+  "pinData": {},
+  "tags": []
+}

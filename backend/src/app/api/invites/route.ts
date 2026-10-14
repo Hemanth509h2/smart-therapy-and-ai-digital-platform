@@ -2,7 +2,17 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/apiAuth';
-import { normalizeWhatsAppNumber } from '@/lib/whatsapp-cloud-api';
+import { normalizePhoneNumber } from '@/lib/phone';
+import { errorResponse } from '@/lib/apiError';
+
+// The caller must own the therapist profile or be an ADMIN.
+async function mayAccessTherapist(uid: string, therapistId: string) {
+  const [therapist, user] = await Promise.all([
+    prisma.profileTherapist.findUnique({ where: { id: therapistId }, select: { userId: true } }),
+    prisma.user.findUnique({ where: { id: uid }, select: { role: true } }),
+  ]);
+  return therapist?.userId === uid || user?.role === 'ADMIN';
+}
 
 // POST /api/invites — therapist creates a patient invite (name + diagnosis only).
 // Returns the generated token so the client can build a shareable link.
@@ -29,7 +39,7 @@ export async function POST(request: Request) {
 
     const normalizedPhoneNumber =
       typeof phoneNumber === 'string' && phoneNumber.trim()
-        ? normalizeWhatsAppNumber(phoneNumber)
+        ? normalizePhoneNumber(phoneNumber)
         : null;
 
     const invite = await prisma.invite.create({
@@ -46,18 +56,23 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ token: invite.token, invite });
   } catch (error: any) {
-    console.error('Invite creation error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Invite creation error');
   }
 }
 
 // GET /api/invites?therapistId=... — list a therapist's invites (optional, for dashboard).
 export async function GET(request: Request) {
   try {
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth.response;
+
     const { searchParams } = new URL(request.url);
     const therapistId = searchParams.get('therapistId');
     if (!therapistId) {
       return NextResponse.json({ error: 'therapistId is required' }, { status: 400 });
+    }
+    if (!(await mayAccessTherapist(auth.uid, therapistId))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const invites = await prisma.invite.findMany({
@@ -67,6 +82,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ invites });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'invites GET');
   }
 }

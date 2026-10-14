@@ -59,6 +59,9 @@
   /* `--sage` = primary accent #8B6340 (variable name kept for compatibility) */
   --sage: #8B6340;
   --sage-light: #F0E8D8;
+  /* Admin charts — validated (dataviz validator) against the light glass surface */
+  --viz-series: #B8662A;
+  --viz-grid: rgba(44, 31, 14, 0.08);
   --sage-mid: #A87A4F;
   /* `--c-accent` = secondary accent #C4784A (highlights, tags, live dot) */
   --c-accent: #C4784A;
@@ -113,6 +116,9 @@
   /* Keep dark mode's existing warm accents (don't inherit the light values) */
   --sage: #9c7d59;
   --sage-light: rgba(156, 125, 89, 0.08);
+  /* Admin charts — validated against the dark glass surface */
+  --viz-series: #C9732F;
+  --viz-grid: rgba(255, 255, 255, 0.08);
   --sage-mid: #b39873;
   --c-accent: #d6814f;
   --c-accent-bg: rgba(214, 129, 79, 0.18);

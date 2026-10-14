@@ -34,7 +34,49 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
       headers.set('x-dev-uid', user.uid);
       if (user.email) headers.set('x-dev-email', user.email);
     }
+    const method = (init?.method || 'GET').toUpperCase();
+    // Any write may change what a cached read returned — drop them all.
+    if (method !== 'GET' && method !== 'HEAD') apiCache.clear();
     return fetch(`${API_URL}${input}`, { ...init, headers });
   }
   return fetch(input, init);
 }
+
+// ---- Cached GETs -----------------------------------------------------------
+// Pages that load the same read-only data on every visit (plans, notes, admin
+// lists…) use apiFetchCached so moving between pages doesn't re-request it.
+// Entries are per signed-in user, expire after `ttlMs`, are shared by
+// concurrent callers, and are cleared by any write made through apiFetch.
+interface CachedResponse {
+  at: number
+  status: number
+  statusText: string
+  body: string
+}
+const apiCache = new Map<string, CachedResponse>()
+const apiInflight = new Map<string, Promise<CachedResponse>>()
+
+export async function apiFetchCached(url: string, ttlMs = 60_000): Promise<Response> {
+  const key = `${auth.currentUser?.uid ?? 'anon'}:${url}`
+  const hit = apiCache.get(key)
+  let entry: CachedResponse
+  if (hit && Date.now() - hit.at < ttlMs) {
+    entry = hit
+  } else {
+    let job = apiInflight.get(key)
+    if (!job) {
+      job = (async () => {
+        const res = await apiFetch(url)
+        const out = { at: Date.now(), status: res.status, statusText: res.statusText, body: await res.text() }
+        if (res.ok) apiCache.set(key, out) // never cache failures
+        return out
+      })().finally(() => apiInflight.delete(key))
+      apiInflight.set(key, job)
+    }
+    entry = await job
+  }
+  return new Response(entry.body, { status: entry.status, statusText: entry.statusText })
+}
+
+/** Forget cached reads (e.g. on sign-out). */
+export const clearApiCache = () => apiCache.clear()

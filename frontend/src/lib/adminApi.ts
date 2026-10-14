@@ -1,0 +1,107 @@
+// Admin API helpers: adminFetch (apiFetch + JSON + the "confirm your
+// password" step-up for destructive actions), formatting and CSV export.
+import { apiFetch } from '@/lib/api';
+
+export class AdminApiError extends Error {
+  status: number;
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+// The admin layout registers a password prompt here (see ReauthPrompt in
+// components/admin/kit.tsx). Resolves true once the admin has re-signed-in.
+let reauthPrompt: (() => Promise<boolean>) | null = null;
+export function registerReauthPrompt(fn: (() => Promise<boolean>) | null) {
+  reauthPrompt = fn;
+}
+
+/**
+ * fetch + JSON for /api/admin/* (and other API) calls. Throws AdminApiError
+ * with the server's message on failure. When the backend answers
+ * REAUTH_REQUIRED, asks for the password once and retries.
+ */
+export async function adminFetch<T = any>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
+  const doFetch = () =>
+    apiFetch(path, {
+      ...init,
+      headers: { ...(init?.json !== undefined ? { 'Content-Type': 'application/json' } : {}), ...init?.headers },
+      body: init?.json !== undefined ? JSON.stringify(init.json) : init?.body,
+    });
+
+  let res = await doFetch();
+  let data = await res.json().catch(() => ({}));
+  if (res.status === 401 && data?.code === 'REAUTH_REQUIRED' && reauthPrompt) {
+    if (await reauthPrompt()) {
+      res = await doFetch();
+      data = await res.json().catch(() => ({}));
+    }
+  }
+  if (!res.ok) throw new AdminApiError(data?.error || `Request failed (${res.status})`, res.status, data?.code);
+  return data as T;
+}
+
+// ─── Formatting ──────────────────────────────────────────────────────────────
+
+export const inr = (n: number | string | null | undefined) =>
+  n == null || n === '' ? '—' : `₹${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+
+export const num = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString('en-IN'));
+
+export const fmtDate = (d: string | Date | null | undefined) =>
+  d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+export const fmtDateTime = (d: string | Date | null | undefined) =>
+  d
+    ? new Date(d).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : '—';
+
+export function timeAgo(d: string | Date | null | undefined) {
+  if (!d) return 'never';
+  const s = Math.round((Date.now() - new Date(d).getTime()) / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `${h}h ago`;
+  const days = Math.round(h / 24);
+  if (days < 60) return `${days}d ago`;
+  return fmtDate(d);
+}
+
+export const fmtMinutes = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${Math.round(m % 60)}m` : `${Math.round(m)}m`);
+
+// ─── CSV export ──────────────────────────────────────────────────────────────
+
+export function downloadCsv<T>(filename: string, rows: T[], columns: { header: string; value: (row: T) => unknown }[]) {
+  const escape = (v: unknown) => {
+    const s = v == null ? '' : v instanceof Date ? v.toISOString() : String(v);
+    // Leading =,+,-,@ would run as a formula in Excel/Sheets.
+    const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;
+    return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  };
+  const lines = [columns.map((c) => escape(c.header)).join(','), ...rows.map((r) => columns.map((c) => escape(c.value(r))).join(','))];
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename.endsWith('.csv') ? filename : `${filename}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Fetch every page of an admin list endpoint (for CSV export). */
+export async function fetchAllPages<T>(path: string, key: string, params: Record<string, string> = {}): Promise<T[]> {
+  const out: T[] = [];
+  for (let page = 1; page <= 100; page++) {
+    const qs = new URLSearchParams({ ...params, page: String(page), pageSize: '200' });
+    const data = await adminFetch<any>(`${path}?${qs}`);
+    const rows: T[] = data[key] || [];
+    out.push(...rows);
+    if (rows.length < 200) break;
+  }
+  return out;
+}

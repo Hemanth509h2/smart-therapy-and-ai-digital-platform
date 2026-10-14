@@ -2,11 +2,23 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules';
+import { normalizePhoneNumber } from '@/lib/phone';
+import { errorResponse } from '@/lib/apiError';
+
+// A malformed stored number must not break the whole overview.
+function toE164(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    return normalizePhoneNumber(raw);
+  } catch {
+    return null;
+  }
+}
 
 // GET /api/admin/overview — per-therapist resource usage for the admin dashboard.
 export async function GET(request: Request) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireAdmin(request, 'people.read');
     if (!auth.ok) return auth.response;
     const therapists = await prisma.profileTherapist.findMany({
       include: { user: { select: { email: true } } },
@@ -64,6 +76,9 @@ export async function GET(request: Request) {
           id: t.id,
           userId: t.userId,
           name: `${t.firstName} ${t.lastName}`.trim(),
+          firstName: t.firstName,
+          lastName: t.lastName,
+          phoneNumber: toE164(t.phoneNumber),
           email: t.user?.email ?? '',
           specialty: t.specialty,
           clients: clientGroups.length,
@@ -90,7 +105,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ therapists: rows });
   } catch (error: any) {
-    console.error('Admin overview error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin overview error');
   }
 }
