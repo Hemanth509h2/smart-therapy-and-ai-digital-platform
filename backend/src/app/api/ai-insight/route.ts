@@ -8,6 +8,7 @@ import type { ClientProfile } from '@/lib/rag/retrieval'
 import type { AIInsight } from '@/lib/rag/types'
 import { getSetting } from '@/lib/settings'
 import { errorResponse, logError } from '@/lib/apiError'
+import { firebasePrivateKey } from '@/lib/firebaseKey'
 
 export async function POST(request: Request) {
   try {
@@ -127,7 +128,7 @@ export async function POST(request: Request) {
         credential: cert({
           projectId: process.env.FIREBASE_PROJECT_ID,
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+          privateKey: firebasePrivateKey(),
         }),
       })
     }

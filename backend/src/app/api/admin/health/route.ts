@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/apiAuth';
+import { firebasePrivateKey } from '@/lib/firebaseKey'
 
 export const dynamic = 'force-dynamic';
 
@@ -140,7 +141,7 @@ async function checkSmtp(): Promise<Check> {
 
 async function checkFirebase(): Promise<Check> {
   const base = { id: 'firebase', label: 'Firebase admin' };
-  const ok = !!(process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY);
+  const ok = !!(process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && firebasePrivateKey());
   return ok
     ? { ...base, status: 'ok', latencyMs: null, message: 'Service account configured.' }
     : { ...base, status: 'down', latencyMs: null, message: 'Service account not configured (transcript cleanup and admin invites need it).' };
