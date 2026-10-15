@@ -16,15 +16,17 @@ export function middleware(request: NextRequest) {
   }
   return response;
 }
-// Frontends allowed to call the API from the browser. localhost covers dev.
-const ALLOWED_ORIGINS = new Set([
-  'https://staad2.vercel.app',
-  'https://smart-therapy-and-ai-zhvhdcyf.onslate.in',
-  'localhost:3000',
-]);
+// Frontends allowed to call the API from the browser: comma-separated
+// ALLOWED_ORIGINS, e.g. "https://app.example.com,http://localhost:3000".
+const ALLOWED_ORIGINS = new Set(
+  (process.env.ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim().replace(/\/+$/, ''))
+    .filter(Boolean),
+);
 
 function isAllowedOrigin(origin: string): boolean {
-  return ALLOWED_ORIGINS.has(origin) || /^http:\/\/localhost(:\d+)?$/.test(origin);
+  return ALLOWED_ORIGINS.has(origin);
 }
 
 function corsHeaders(request: NextRequest): Record<string, string> {
