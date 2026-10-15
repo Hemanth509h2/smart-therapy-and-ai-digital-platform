@@ -5,7 +5,7 @@ import { trackBusy } from '@/lib/buttonBusy';
  * Base URL of the standalone backend API. Empty string means same-origin
  * (used when a rewrite/proxy puts the API on the same host).
  */
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
 
 /** Fired on window when the backend refuses an action because the therapist has no active plan. */
 export const PLAN_REQUIRED_EVENT = 'staad:plan-required';
