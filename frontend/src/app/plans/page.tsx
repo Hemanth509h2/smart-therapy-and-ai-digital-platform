@@ -45,6 +45,14 @@ interface Pending {
   modules: string[];
 }
 
+interface AppliedCoupon {
+  code: string;
+  description: string | null;
+  months: number;
+  discount: number;
+  total: number;
+}
+
 const MONTH_OPTIONS = [1, 3, 6, 12] as const;
 type Term = (typeof MONTH_OPTIONS)[number];
 
@@ -84,6 +92,11 @@ export default function PlansPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [phone, setPhone] = useState('');
+  // coupon: what's typed, and the server-priced result once applied
+  const [couponInput, setCouponInput] = useState('');
+  const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
+  const [couponBusy, setCouponBusy] = useState(false);
+  const [couponError, setCouponError] = useState('');
 
   // cancel plan
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -166,6 +179,40 @@ export default function PlansPage() {
     setMonths(term || p.durationMonths || 1);
     setSelected(new Set(current?.moduleAccess?.slice(0, p.toolQuota ?? undefined) ?? []));
     setError('');
+    setCouponInput('');
+    setCoupon(null);
+    setCouponError('');
+  };
+
+  // Prices the order with the code; checkout checks it again server-side.
+  const applyCoupon = async (term = months) => {
+    if (!reqPlan || !couponInput.trim()) return;
+    setCouponBusy(true);
+    setCouponError('');
+    try {
+      const res = await apiFetch('/api/coupons/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: couponInput, planId: reqPlan.id, months: term }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCoupon(null);
+        setCouponError(data.error || 'Could not apply that coupon.');
+      } else {
+        setCoupon({ code: data.code, description: data.description, months: term, discount: data.discount, total: data.total });
+      }
+    } catch {
+      setCouponError('Network error. Please try again.');
+    } finally {
+      setCouponBusy(false);
+    }
+  };
+
+  // A coupon is priced for one term; re-price it when the term changes.
+  const changeMonths = (m: number) => {
+    setMonths(m);
+    if (coupon) applyCoupon(m);
   };
 
   const toggleTool = (id: string) => {
@@ -233,10 +280,13 @@ export default function PlansPage() {
           modules: Array.from(selected),
           customerPhone: phone,
           returnUrl: `${window.location.origin}/plans`,
+          couponCode: coupon?.code,
         }),
       });
       const order = await res.json().catch(() => ({}));
       if (!res.ok) {
+        // e.g. the coupon expired or ran out since it was applied
+        if (coupon) setCoupon(null);
         setError(order.error || 'Could not start payment.');
         return;
       }
@@ -283,7 +333,9 @@ export default function PlansPage() {
     }
   };
 
-  const reqTotal = reqPlan ? reqPlan.priceMonthly * months : 0;
+  const reqSubtotal = reqPlan ? reqPlan.priceMonthly * months : 0;
+  const couponApplies = !!coupon && coupon.months === months;
+  const reqTotal = couponApplies ? coupon!.total : reqSubtotal;
   const reqIsPaid = !!reqPlan && reqPlan.priceMonthly > 0;
   // "Manage Plan" opens this same dialog for the plan they're already on.
   const managing = !!reqPlan && current?.planName === reqPlan.name;
@@ -557,7 +609,7 @@ export default function PlansPage() {
               </div>
               <Chips<number>
                 value={months}
-                onChange={setMonths}
+                onChange={changeMonths}
                 options={MONTH_OPTIONS.map((m) => ({ key: m, label: m === 1 ? '1 month' : `${m} months` }))}
               />
             </div>
@@ -607,8 +659,57 @@ export default function PlansPage() {
                   onChange={(e) => setPhone(e.target.value)}
                   style={{ width: '100%' }}
                 />
+
+                <div className="eyebrow" style={{ margin: '16px 0 8px' }}>
+                  Coupon code
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    className="ds-input"
+                    placeholder="Have a code?"
+                    value={couponInput}
+                    disabled={!!coupon || couponBusy}
+                    onChange={(e) => {
+                      setCouponInput(e.target.value.toUpperCase());
+                      setCouponError('');
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && applyCoupon()}
+                    style={{ flex: 1, textTransform: 'uppercase' }}
+                    aria-label="Coupon code"
+                  />
+                  {coupon ? (
+                    <button
+                      type="button"
+                      className="ds-btn ds-btn-ghost"
+                      onClick={() => {
+                        setCoupon(null);
+                        setCouponInput('');
+                      }}
+                    >
+                      Remove
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="ds-btn ds-btn-outline"
+                      onClick={() => applyCoupon()}
+                      disabled={couponBusy || !couponInput.trim()}
+                    >
+                      {couponBusy ? 'Checking…' : 'Apply'}
+                    </button>
+                  )}
+                </div>
+                {couponError && <InlineError message={couponError} />}
+                {couponApplies && (
+                  <p className="lsub" style={{ marginTop: 8 }}>
+                    <b>{coupon!.code}</b> applied{coupon!.description ? ` — ${coupon!.description}` : ''}: −{inr(coupon!.discount)}
+                  </p>
+                )}
+
                 <p className="lsub" style={{ marginTop: 8 }}>
-                  Total: <b>{inr(reqTotal)}</b> for {months} month{months === 1 ? '' : 's'}
+                  Total:{' '}
+                  {couponApplies && <s style={{ marginRight: 6 }}>{inr(reqSubtotal)}</s>}
+                  <b>{inr(reqTotal)}</b> for {months} month{months === 1 ? '' : 's'}
                 </p>
               </div>
             )}

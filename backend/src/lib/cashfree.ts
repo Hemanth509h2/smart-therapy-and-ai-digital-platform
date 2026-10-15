@@ -66,6 +66,7 @@ export async function createCashfreeOrder(opts: {
   returnUrl?: string;
   note?: string;
   plan?: { planId: string; therapistId: string; months: number; modules: string[] };
+  coupon?: { couponId: string; couponCode: string; discount: number };
 }) {
   // customer_id: 3-50 alphanumerics. order_id: 3-45 of [A-Za-z0-9_-].
   const customerId = `u${opts.uid.replace(/[^A-Za-z0-9]/g, '')}`.slice(0, 50).padEnd(3, '0');
@@ -81,6 +82,7 @@ export async function createCashfreeOrder(opts: {
       orderStatus: 'ACTIVE',
       environment: cashfreeEnv(),
       ...(opts.plan ?? {}),
+      ...(opts.coupon ?? {}),
     },
   });
 

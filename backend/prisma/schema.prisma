@@ -112,9 +112,9 @@ model ProfileTherapist {
   subscriptions        Subscription[]
   subscriptionRequests SubscriptionRequest[]
 
-  progressMetrics ProgressMetric[]
-  progressReports ProgressReport[]
-  progressNotes   ProgressNote[]
+  progressMetrics  ProgressMetric[]
+  progressReports  ProgressReport[]
+  progressNotes    ProgressNote[]
   whatsAppMessages WhatsAppMessage[]
 }
 
@@ -471,12 +471,47 @@ model Payment {
   // Set when the paid plan is activated; the unique claim on this column is
   // what stops duplicate webhooks from activating the same payment twice.
   subscriptionId String?   @unique
+  // Coupon applied at checkout; `amount` is already net of `discount`.
+  couponId       String?
+  coupon         Coupon?   @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  couponCode     String?
+  discount       Decimal?  @db.Decimal(12, 2)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   @@index([userId])
   @@index([orderStatus])
   @@index([therapistId])
+  @@index([couponId])
+}
+
+enum CouponType {
+  PERCENT // discountValue is a percentage (1-99)
+  FLAT // discountValue is rupees off the whole order
+}
+
+// Discount codes for paid plan checkout. Admin-managed. A redemption is a
+// PAID Payment carrying the coupon; limits count those, never pending orders.
+model Coupon {
+  id               String     @id @default(uuid())
+  code             String     @unique // stored upper-case
+  description      String?
+  type             CouponType @default(PERCENT)
+  discountValue    Int
+  planIds          String[]   @default([]) // empty = every paid plan
+  minMonths        Int        @default(1) // shortest term the code works for
+  maxRedemptions   Int? // null = unlimited
+  oncePerTherapist Boolean    @default(true)
+  startsAt         DateTime?
+  expiresAt        DateTime?
+  isActive         Boolean    @default(true)
+  createdBy        String? // admin uid
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  payments Payment[]
+
+  @@index([isActive])
 }
 
 // ─── Admin portal ────────────────────────────────────────────────────────────
