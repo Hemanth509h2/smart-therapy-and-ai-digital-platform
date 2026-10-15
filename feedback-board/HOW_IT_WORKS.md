@@ -31,7 +31,7 @@ It is a separate Next.js app in `feedback-board/`, built from
 
 The whole board is one page.
 
-- **Top section:** "How did the demo land?", a **Write a note** button (jumps to the typing bar), a **Take the 2-min survey** button (see section 6a) and a link to the privacy explanation.
+- **Top section:** "How did the demo land?", a **Take the 2-min survey** button (see section 6a), a **Write a note** button (jumps to the typing bar) and a link to the privacy explanation.
 - **Note count, Sort by (Top / Newest) and category tabs** (All, Ideas, Issues, Praise, Questions).
 - **Notes:** laid out like YouTube comments. Each note shows:
   - a nickname such as `@quiet-otter-94`

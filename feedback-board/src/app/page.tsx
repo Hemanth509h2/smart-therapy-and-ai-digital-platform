@@ -226,12 +226,12 @@ export default function Board() {
             and what you&apos;d change. No login, no names.
           </p>
           <div className="mh-row">
-            <button className="mh-cta" onClick={() => { setReplyTo(null); setFocusKey((k) => k + 1); }}>Write a note</button>
             {surveyed ? (
               <span className="mh-done">Survey done · thanks</span>
             ) : (
-              <button className="mh-cta secondary" onClick={openSurvey}>Take the 2-min survey</button>
+              <button className="mh-cta" onClick={openSurvey}>Take the 2-min survey</button>
             )}
+            <button className={surveyed ? 'mh-cta' : 'mh-cta secondary'} onClick={() => { setReplyTo(null); setFocusKey((k) => k + 1); }}>Write a note</button>
           </div>
           <button className="mh-link" onClick={openPrivacy}>How we keep it anonymous</button>
           <QuickQuestion />
