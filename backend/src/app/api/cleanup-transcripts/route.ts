@@ -1,21 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { initializeApp, getApps, cert } from 'firebase-admin/app'
-import { getFirestore, Timestamp } from 'firebase-admin/firestore'
+import { Timestamp } from 'firebase-admin/firestore'
 import { prisma } from '@/lib/db'
 import { getSetting } from '@/lib/settings'
-import { firebasePrivateKey } from '@/lib/firebaseKey'
+import { adminDb } from '@/lib/firebaseAdmin'
 
 export const dynamic = 'force-dynamic'
-
-if (!getApps().length) {
-  initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: firebasePrivateKey(),
-    }),
-  })
-}
 
 const JOB = 'cleanup-transcripts'
 
@@ -43,7 +32,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const hours = Math.max(1, Number(await getSetting('retention.transcriptHours')) || 24)
-    const db = getFirestore()
+    const db = adminDb()
     const cutoff = Timestamp.fromDate(new Date(Date.now() - hours * 60 * 60 * 1000))
 
     const stale = await db

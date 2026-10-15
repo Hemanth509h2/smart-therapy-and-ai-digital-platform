@@ -1,19 +1,4 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app'
-import { getFirestore } from 'firebase-admin/firestore'
-import { firebasePrivateKey } from '@/lib/firebaseKey'
-
-// Idempotent Admin init (matches src/lib/rag/transcript-store.ts).
-if (!getApps().length) {
-  initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: firebasePrivateKey(),
-    }),
-  })
-}
-
-const db = getFirestore()
+import { adminDb } from '@/lib/firebaseAdmin'
 
 export interface ModuleEvent {
   module: string
@@ -50,7 +35,7 @@ export interface ReportInputs {
  */
 export async function saveReportStats(sessionId: string, stats: unknown): Promise<void> {
   try {
-    await db.collection('sessions').doc(sessionId).set({ reportStats: stats }, { merge: true })
+    await adminDb().collection('sessions').doc(sessionId).set({ reportStats: stats }, { merge: true })
   } catch (e) {
     // A stats failure must never block the report itself.
     console.warn('[report] Failed to save session stats:', e)
@@ -59,7 +44,7 @@ export async function saveReportStats(sessionId: string, stats: unknown): Promis
 
 export async function getReportStats(sessionId: string): Promise<unknown | null> {
   try {
-    const snap = await db.collection('sessions').doc(sessionId).get()
+    const snap = await adminDb().collection('sessions').doc(sessionId).get()
     return snap.exists ? (snap.data()?.reportStats ?? null) : null
   } catch (e) {
     console.warn('[report] Failed to read session stats:', e)
@@ -71,7 +56,7 @@ export async function getReportStats(sessionId: string): Promise<unknown | null>
 // Firestore doc: the (English) transcript, the in-module activity timeline, and
 // the therapist's in-call notes.
 export async function getReportInputs(sessionId: string): Promise<ReportInputs> {
-  const snap = await db.collection('sessions').doc(sessionId).get()
+  const snap = await adminDb().collection('sessions').doc(sessionId).get()
   const d = snap.exists ? snap.data() ?? {} : {}
   return {
     transcript: Array.isArray(d.transcript) ? (d.transcript as TranscriptLine[]) : [],

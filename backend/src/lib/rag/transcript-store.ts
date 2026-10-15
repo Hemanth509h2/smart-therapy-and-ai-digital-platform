@@ -1,25 +1,12 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app'
-import { getFirestore, FieldValue } from 'firebase-admin/firestore'
+import { FieldValue } from 'firebase-admin/firestore'
 import type { TranscriptChunk } from './types'
-import { firebasePrivateKey } from '@/lib/firebaseKey'
-
-if (!getApps().length) {
-  initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: firebasePrivateKey(),
-    }),
-  })
-}
-
-const db = getFirestore()
+import { adminDb } from '@/lib/firebaseAdmin'
 
 export async function appendTranscriptChunk(
   sessionId: string,
   chunk: TranscriptChunk
 ): Promise<void> {
-  const ref = db.collection('sessions').doc(sessionId)
+  const ref = adminDb().collection('sessions').doc(sessionId)
 
   await ref.set(
     {
@@ -38,7 +25,7 @@ export async function appendTranscriptChunk(
 export async function getSessionTranscript(
   sessionId: string
 ): Promise<TranscriptChunk[]> {
-  const ref = db.collection('sessions').doc(sessionId)
+  const ref = adminDb().collection('sessions').doc(sessionId)
   const doc = await ref.get()
   if (!doc.exists) return []
   return (doc.data()?.transcript ?? []) as TranscriptChunk[]
@@ -47,7 +34,7 @@ export async function getSessionTranscript(
 export async function deleteSessionTranscript(
   sessionId: string
 ): Promise<void> {
-  const ref = db.collection('sessions').doc(sessionId)
+  const ref = adminDb().collection('sessions').doc(sessionId)
   const doc = await ref.get()
   if (!doc.exists) return
   await ref.update({
@@ -59,7 +46,7 @@ export async function deleteSessionTranscript(
 export async function checkAIConsent(
   sessionId: string
 ): Promise<boolean> {
-  const ref = db.collection('sessions').doc(sessionId)
+  const ref = adminDb().collection('sessions').doc(sessionId)
   const doc = await ref.get()
   if (!doc.exists) return false
   const consent = doc.data()?.aiConsent
@@ -79,7 +66,7 @@ export interface SessionActivity {
 export async function getSessionActivity(
   sessionId: string
 ): Promise<SessionActivity> {
-  const doc = await db.collection('sessions').doc(sessionId).get()
+  const doc = await adminDb().collection('sessions').doc(sessionId).get()
   const d = doc.exists ? doc.data() ?? {} : {}
   const moduleEvents = Array.isArray(d.moduleEvents)
     ? (d.moduleEvents as Array<{ detail?: unknown }>)
@@ -112,7 +99,7 @@ export async function appendCopilotEvent(
   event: CopilotEventLog
 ): Promise<void> {
   try {
-    await db.collection('sessions').doc(sessionId).set(
+    await adminDb().collection('sessions').doc(sessionId).set(
       {
         copilotEvents: FieldValue.arrayUnion(event),
         copilotEventsLastUpdated: FieldValue.serverTimestamp(),
