@@ -57,6 +57,7 @@ export async function GET(req: NextRequest) {
       for (const docSnap of stale.docs.slice(i, i + 400)) {
         batch.update(docSnap.ref, {
           transcript: [],
+          captions: [],
           transcriptLastUpdated: null,
         })
         deleted++

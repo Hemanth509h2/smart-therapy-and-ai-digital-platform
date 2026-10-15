@@ -20,8 +20,13 @@ interface Props {
   isFound: boolean;
   shakeId: string | null;
   canInteract: boolean;
-  onPlayerMove?: (x: number, z: number, rot: number) => void;
+  /** `local` is false while the character is walking to a position sent by the other side. */
+  onPlayerMove?: (x: number, z: number, rot: number, local: boolean) => void;
   stageTheme?: string;
+  /** Where the other side moved the shared explorer; `n` changes on every update. */
+  remoteMove?: { x: number; z: number; rot: number; n: number } | null;
+  /** Whether this viewer may walk the explorer (keys / floor clicks). */
+  canMove?: boolean;
 }
 
 export default function TreasureHunt3DScene({
@@ -32,8 +37,18 @@ export default function TreasureHunt3DScene({
   canInteract,
   onPlayerMove,
   stageTheme = 'study',
+  remoteMove = null,
+  canMove = true,
 }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
+
+  // The render loop is set up once, so it reads these through refs.
+  const onPlayerMoveRef = useRef(onPlayerMove);
+  onPlayerMoveRef.current = onPlayerMove;
+  const canMoveRef = useRef(canMove);
+  canMoveRef.current = canMove;
+  // False while walking to a position the other side sent, so it is not echoed back.
+  const localDriven = useRef(true);
 
   // Character state refs for render loop
   const playerPos = useRef({ x: 0, z: 0.4, rot: 0 });
@@ -754,7 +769,7 @@ export default function TreasureHunt3DScene({
           sound.playStep();
         }
 
-        onPlayerMove?.(playerPos.current.x, playerPos.current.z, playerPos.current.rot);
+        onPlayerMoveRef.current?.(playerPos.current.x, playerPos.current.z, playerPos.current.rot, localDriven.current);
       }
 
       // Update Character Transform & Bone Animations
@@ -872,11 +887,27 @@ export default function TreasureHunt3DScene({
     }
   }, [shakeId, hotspots]);
 
+  // Walk the explorer to where the other side moved it. A far jump (joining
+  // mid-stage) snaps instead of walking across the room.
+  useEffect(() => {
+    if (!remoteMove) return;
+    localDriven.current = false;
+    const dist = Math.hypot(remoteMove.x - playerPos.current.x, remoteMove.z - playerPos.current.z);
+    if (dist > 2) {
+      playerPos.current = { x: remoteMove.x, z: remoteMove.z, rot: remoteMove.rot };
+      targetPos.current = null;
+    } else {
+      targetPos.current = { x: remoteMove.x, z: remoteMove.z };
+    }
+  }, [remoteMove]);
+
   // Keyboard navigation listeners
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
+        if (!canMoveRef.current) return;
+        localDriven.current = true;
         keysPressed.current[k] = true;
       }
     };
@@ -946,6 +977,7 @@ export default function TreasureHunt3DScene({
         const dz = hitHotspot.z - playerPos.current.z;
         playerPos.current.rot = Math.atan2(dx, dz);
         // Walk a step towards the hotspot
+        localDriven.current = true;
         targetPos.current = {
           x: Math.max(-2.5, Math.min(2.5, hitHotspot.x * 0.7)),
           z: Math.max(-1.5, Math.min(1.2, hitHotspot.z + 1.2)),
@@ -954,16 +986,18 @@ export default function TreasureHunt3DScene({
       }
 
       // Otherwise click on floor to walk character there
+      if (!canMove) return;
       const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
       const intersectionPoint = new THREE.Vector3();
       if (raycaster.ray.intersectPlane(floorPlane, intersectionPoint)) {
+        localDriven.current = true;
         targetPos.current = {
           x: Math.max(-2.8, Math.min(2.8, intersectionPoint.x)),
           z: Math.max(-1.8, Math.min(1.5, intersectionPoint.z)),
         };
       }
     },
-    [canInteract, onInteract]
+    [canInteract, canMove, onInteract]
   );
 
   const handlePointerMove = useCallback(

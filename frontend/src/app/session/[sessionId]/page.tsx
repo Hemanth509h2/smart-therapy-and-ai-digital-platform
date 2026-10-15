@@ -27,13 +27,14 @@ import { loadModuleSettings } from '@/hooks/useModuleSettings';
 import { RC } from '@/components/session/roomTheme';
 import type { SidebarPanel } from '@/components/session/sessionPanels';
 import CaptionOverlay from '@/components/session/CaptionOverlay';
-import TranslationControl from '@/components/session/TranslationControl';
 import TranslationSync from '@/components/session/TranslationSync';
 import { useTranslationSettings, pairForRole, writeTranslationSettings } from '@/lib/translation';
 import SessionTopBar from '@/components/session/SessionTopBar';
 import SessionBottomBar from '@/components/session/SessionBottomBar';
 import AIAssistantPopup from '@/components/session/AIAssistantPopup';
 import AINotesPopup from '@/components/session/AINotesPopup';
+import CaptionsPopup from '@/components/session/CaptionsPopup';
+import WaitingLobby from '@/components/session/WaitingLobby';
 import TherapyModulesPanel from '@/components/session/TherapyModulesPanel';
 import { ShareWhiteboardModal } from '@/components/session/WhiteboardStage';
 import StaadWhiteboard from '@/components/session/StaadWhiteboard';
@@ -52,9 +53,6 @@ interface SessionState {
 
 /* The room colour palette now lives in components/session/roomTheme.ts (same
    values) so the top bar, bottom bar and the swappable panels share one source. */
-
-// How long the client sees the session-ended details before the window closes.
-const CLIENT_CLOSE_SECONDS = 10;
 
 // Thin wrapper so the transcription hook runs INSIDE <StaadVideo>'s room
 // context (it reads the LiveKit room via useSessionRoom). Renders nothing;
@@ -133,6 +131,21 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   // AI Assistant & AI Notes are now floating popups instead of sidebar panels
   const [showAssistantPopup, setShowAssistantPopup] = useState(false);
   const [showNotesPopup, setShowNotesPopup] = useState(false);
+  const [showCaptionsPopup, setShowCaptionsPopup] = useState(false);
+  // Therapist opt-in: also show the client-style subtitle bar on the video.
+  // Remembered per browser; storage can be unavailable (private mode).
+  const [captionsOnVideo, setCaptionsOnVideo] = useState(false);
+  useEffect(() => {
+    try {
+      setCaptionsOnVideo(localStorage.getItem('staad.captionsOnVideo') === '1');
+    } catch {}
+  }, []);
+  const changeCaptionsOnVideo = (on: boolean) => {
+    setCaptionsOnVideo(on);
+    try {
+      localStorage.setItem('staad.captionsOnVideo', on ? '1' : '0');
+    } catch {}
+  };
   const [screenSharing, setScreenSharing] = useState(false);
   const [shareWhiteboardAsk, setShareWhiteboardAsk] = useState(false);
   const whiteboardPromptedRef = useRef(false);
@@ -879,27 +892,17 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       .catch(() => {});
   }, [sessionEnded, sessionId]);
 
-  // For client: show the session details, then close the window after a
-  // countdown. For therapist: the session-ended screen stays up until "Done".
-  // Must sit above the early returns — hooks can't be called conditionally.
-  const [closeIn, setCloseIn] = useState(CLIENT_CLOSE_SECONDS);
+  // When the therapist ends the call the client's window closes straight away.
+  // Browsers only let script close a tab that script opened, and clients
+  // usually arrive from a WhatsApp link, so if the tab is still here a moment
+  // later it is replaced (no Back into the room) with a plain "session ended"
+  // page. Must sit above the early returns — hooks can't be called conditionally.
   useEffect(() => {
     if (!sessionEnded || isTherapist) return;
-    const interval = setInterval(() => setCloseIn((s) => Math.max(0, s - 1)), 1000);
-    const timer = setTimeout(() => {
-      window.close();
-      // Fallback if window.close() doesn't work (not opened by JS)
-      if (auth.currentUser?.uid?.startsWith('guest:')) {
-        auth.signOut().catch(() => {});
-        window.location.href = '/auth';
-      } else {
-        window.location.href = '/';
-      }
-    }, CLIENT_CLOSE_SECONDS * 1000);
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timer);
-    };
+    if (auth.currentUser?.uid?.startsWith('guest:')) auth.signOut().catch(() => {});
+    window.close();
+    const fallback = setTimeout(() => window.location.replace('/session-ended'), 300);
+    return () => clearTimeout(fallback);
   }, [sessionEnded, isTherapist]);
 
   if (planBlocked) {
@@ -964,11 +967,6 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
           >
             {isTherapist ? 'Done' : 'Close'}
           </button>
-          {!isTherapist && (
-            <p className="mt-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
-              This window will close in {closeIn}s
-            </p>
-          )}
         </div>
       </div>
     );
@@ -988,13 +986,22 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
       // transcribing on a GPU for output nobody is showing.
       sourceLang={translationSettings.enabled ? translationPair.source : undefined}
       targetLang={translationSettings.enabled ? translationPair.target : undefined}
+      waitingScreen={<WaitingLobby therapistName={participantName} selfName={displayName} />}
     >
       {/* Renders translated captions published by the translation agent on the
           lk.transcription topic. Inside the room provider, like the bridges. */}
       {/* Shown whenever transcription is consent-enabled (Sarvam captions) or the
           translation agent is on. Previously gated on the translation toggle
           alone (default off), which hid every Sarvam caption. */}
-      <CaptionOverlay enabled={transcriptionEnabled || translationSettings.enabled} />
+      <CaptionOverlay
+        enabled={transcriptionEnabled || translationSettings.enabled}
+        sessionId={sessionId}
+        store={isTherapist}
+        // The therapist reads captions in the Captions popup, unless they
+        // switched on "Live captions on video" there.
+        visible={!isTherapist || captionsOnVideo}
+        viewerRole={userRole}
+      />
       {/* Applies caption-language changes to the room without reconnecting. */}
       {isTherapist && <TranslationSync sessionId={sessionId} settings={translationSettings} />}
       {/* Runs the Sarvam pipeline inside the room provider so it can access the
@@ -1050,32 +1057,6 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
             startedAt={startTime.current}
             sessionId={sessionId}
             onlineCount={onlineCount}
-            transcriptLine={
-              isTherapist ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  {transcriptionEnabled && transcription.isRecording && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: RC.greenDark,
-                      }}
-                    >
-                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: RC.green, animation: 'pulse 1.4s ease infinite' }} />
-                      {`${transcription.chunkCount} lines`}
-                    </div>
-                  )}
-                  {/* Therapist-only: turns captions on and sets who speaks what. */}
-                  <TranslationControl
-                    settings={translationSettings}
-                    onChange={(patch) => writeTranslationSettings(sessionId, patch)}
-                  />
-                </div>
-              ) : null
-            }
             // Timer action handlers
             onToggleParticipants={isTherapist ? toggleParticipants : toggleParticipantsClient}
             showParticipants={isTherapist ? showParticipants : showParticipantsClient}
@@ -1311,6 +1292,8 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
                 onToggleScreenShare={() => setScreenSharing((s) => !s)}
                 showBackToVideo={whiteboardMode || moduleMode}
                 onBackToVideo={() => (whiteboardMode ? closeWhiteboard() : handleModuleClose())}
+                captionsOpen={showCaptionsPopup}
+                onToggleCaptions={() => setShowCaptionsPopup((open) => !open)}
               />
             )}
           </div>
@@ -1340,6 +1323,19 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
             insight={aiInsight}
             initialPosition={{ x: 820, y: 140 }}
             onClose={() => setShowNotesPopup(false)}
+          />
+        )}
+
+        {/* Captions Popup — every caption stored for this session */}
+        {isTherapist && showCaptionsPopup && (
+          <CaptionsPopup
+            sessionId={sessionId}
+            live={transcription.isRecording || translationSettings.enabled}
+            translation={translationSettings}
+            onTranslationChange={(patch) => writeTranslationSettings(sessionId, patch)}
+            liveOnVideo={captionsOnVideo}
+            onLiveOnVideoChange={changeCaptionsOnVideo}
+            onClose={() => setShowCaptionsPopup(false)}
           />
         )}
 

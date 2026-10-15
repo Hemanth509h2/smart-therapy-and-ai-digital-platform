@@ -8,6 +8,14 @@ import { AnimatePresence, motion } from 'motion/react'
 import TreasureHunt3DScene, { type SceneHotspot } from './treasure-hunt/TreasureHunt3DScene'
 import TreasureHuntRadar from './treasure-hunt/TreasureHuntRadar'
 import { sound } from './treasure-hunt/TreasureHuntAudio'
+import { RoomEvent } from 'livekit-client'
+import { useSessionRoom } from '@/components/StaadVideo'
+
+// Live moves (explorer position, wrong guesses) go over the call's data
+// channel: Firestore takes about one write a second per document, far too few
+// for a walking character. Quest progress stays in Firestore.
+const LIVE_TOPIC = 'treasure-hunt'
+const MOVE_SEND_MS = 80
 
 interface TreasureQuestProps {
   sessionId?: string
@@ -1695,6 +1703,29 @@ export default function TreasureQuest({
 
   // Player position for radar mini-map
   const [playerCoords, setPlayerCoords] = useState({ x: 0, z: 0.4, rot: 0 })
+  // Where the other side last moved the shared explorer.
+  const [remoteMove, setRemoteMove] = useState<{ x: number; z: number; rot: number; n: number } | null>(null)
+
+  const { room } = useSessionRoom()
+  const sendLive = useCallback((msg: Record<string, unknown>) => {
+    if (!room || room.state !== 'connected') return
+    room.localParticipant
+      .publishData(new TextEncoder().encode(JSON.stringify(msg)), { reliable: true, topic: LIVE_TOPIC })
+      .catch(() => {})
+  }, [room])
+
+  // At most one position packet per MOVE_SEND_MS, always carrying the latest spot.
+  const pendingMove = useRef<{ x: number; z: number; rot: number } | null>(null)
+  const moveTimer = useRef<ReturnType<typeof setTimeout>>()
+  const sendMove = useCallback((x: number, z: number, rot: number) => {
+    pendingMove.current = { x, z, rot }
+    if (moveTimer.current) return
+    moveTimer.current = setTimeout(() => {
+      moveTimer.current = undefined
+      if (pendingMove.current) sendLive({ t: 'pos', ...pendingMove.current })
+      pendingMove.current = null
+    }, MOVE_SEND_MS)
+  }, [sendLive])
 
   const advanceT = useRef<ReturnType<typeof setTimeout>>()
   const shakeT = useRef<ReturnType<typeof setTimeout>>()
@@ -1738,9 +1769,35 @@ export default function TreasureQuest({
     return () => unsub()
   }, [sessionId])
 
+  const showMiss = useCallback((id: string) => {
+    setShakeId(id)
+    setMissMsg(true)
+    if (shakeT.current) clearTimeout(shakeT.current)
+    shakeT.current = setTimeout(() => { setShakeId(null); setMissMsg(false) }, 1600)
+  }, [])
+
+  useEffect(() => {
+    if (!room) return
+    let n = 0
+    const onData = (payload: Uint8Array, _p?: unknown, _k?: unknown, topic?: string) => {
+      if (topic !== LIVE_TOPIC) return
+      let msg: { t?: string; x?: unknown; z?: unknown; rot?: unknown; id?: unknown }
+      try { msg = JSON.parse(new TextDecoder().decode(payload)) } catch { return }
+      if (msg.t === 'pos' && typeof msg.x === 'number' && typeof msg.z === 'number' && typeof msg.rot === 'number') {
+        setRemoteMove({ x: msg.x, z: msg.z, rot: msg.rot, n: ++n })
+      } else if (msg.t === 'miss' && typeof msg.id === 'string') {
+        sound.playMiss()
+        showMiss(msg.id)
+      }
+    }
+    room.on(RoomEvent.DataReceived, onData)
+    return () => { room.off(RoomEvent.DataReceived, onData) }
+  }, [room, showMiss])
+
   useEffect(() => () => {
     if (advanceT.current) clearTimeout(advanceT.current)
     if (shakeT.current) clearTimeout(shakeT.current)
+    if (moveTimer.current) clearTimeout(moveTimer.current)
   }, [])
 
   const levelScenarios = useMemo(() => scenariosFor(level), [level])
@@ -1798,10 +1855,8 @@ export default function TreasureQuest({
     if (!canClick || foundHere) return
     if (!h.isCorrect) {
       sound.playMiss()
-      setShakeId(h.id)
-      setMissMsg(true)
-      if (shakeT.current) clearTimeout(shakeT.current)
-      shakeT.current = setTimeout(() => { setShakeId(null); setMissMsg(false) }, 1600)
+      showMiss(h.id)
+      sendLive({ t: 'miss', id: h.id })
       return
     }
 
@@ -1838,7 +1893,7 @@ export default function TreasureQuest({
         })
       }
     }, 2400)
-  }, [canClick, foundHere, scenario, stageData, write, sessionId, level])
+  }, [canClick, foundHere, scenario, stageData, write, sessionId, level, showMiss, sendLive])
 
   const loadScenario = useCallback((id: string, lvl: Level) => {
     const sc = SCENARIOS.find((s) => s.id === id)
@@ -2024,9 +2079,12 @@ export default function TreasureQuest({
                   const targetH = stageData.hotspots.find((h) => h.id === sh.id) || stageData.hotspots[0]
                   handleHotspot(targetH)
                 }}
-                onPlayerMove={(x, z, rot) => {
+                onPlayerMove={(x, z, rot, local) => {
                   setPlayerCoords({ x, z, rot })
+                  if (local) sendMove(x, z, rot)
                 }}
+                remoteMove={remoteMove}
+                canMove={canClick}
                 stageTheme={stageData.sceneTheme}
               />
 

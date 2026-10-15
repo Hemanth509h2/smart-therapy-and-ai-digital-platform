@@ -1,4 +1,5 @@
 import { auth } from '@/lib/firebase';
+import { trackBusy } from '@/lib/buttonBusy';
 
 /**
  * Base URL of the standalone backend API. Empty string means same-origin
@@ -34,8 +35,15 @@ function notifyPlanRequired(res: Response) {
  * `Authorization: Bearer <token>` so the backend can verify the caller.
  * Callers that already set their own Authorization header are left as-is,
  * and non-API URLs pass through untouched.
+ *
+ * A request started by a button click shows that button as loading until it
+ * settles (see lib/buttonBusy.ts).
  */
-export async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
+export function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
+  return trackBusy(request(input, init));
+}
+
+async function request(input: RequestInfo | URL, init?: RequestInit) {
   if (typeof input === 'string' && input.startsWith('/')) {
     const headers = new Headers(init?.headers);
     const user = auth.currentUser;

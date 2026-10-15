@@ -104,8 +104,12 @@ async function therapistInRoom(roomName: string): Promise<boolean> {
         return false
       }
     })
-  } catch {
-    // The room does not exist until someone joins it — so no therapist yet.
-    return false
+  } catch (err) {
+    // A room nobody has joined yet lists as empty rather than throwing, so an
+    // error here means the lookup itself failed (wrong LIVEKIT_URL, key or
+    // secret, or the network). Treating that as "no therapist" would strand
+    // every client in the waiting room; let them in, as when LIVEKIT_URL is unset.
+    console.error('[livekit-token] could not list participants — waiting room bypassed:', err)
+    return true
   }
 }
