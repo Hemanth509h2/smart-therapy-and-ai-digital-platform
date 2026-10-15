@@ -15,8 +15,9 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Heart, Sparkles, Video, ShieldCheck } from 'lucide-react';
+import { Heart, Sparkles, Video, ShieldCheck, Mail, Clock } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { SUPPORT_EMAIL, SUPPORT_HOURS } from '@/content/help';
 
 function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
@@ -276,7 +277,7 @@ function AuthForm() {
             Google Auth
           </Button>
         </CardContent>
-        <CardFooter className="justify-center pt-2 pb-6">
+        <CardFooter className="flex-col gap-3 pt-2 pb-6">
           <button 
             onClick={() => setIsLogin(!isLogin)} 
             className="text-sm font-semibold transition-all rounded-lg px-3 py-1.5"
@@ -284,6 +285,22 @@ function AuthForm() {
           >
             {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Login'}
           </button>
+          <div
+            className="w-full space-y-1.5 border-t pt-4 text-center text-xs"
+            style={{ borderColor: 'var(--glass-border)', color: 'var(--ink-muted)' }}
+          >
+            <p className="font-semibold uppercase tracking-wide">Need help? Contact us</p>
+            <a
+              href={`mailto:${SUPPORT_EMAIL}`}
+              className="inline-flex items-center gap-1.5 font-semibold hover:underline"
+              style={{ color: 'var(--sage)' }}
+            >
+              <Mail className="h-3.5 w-3.5" /> {SUPPORT_EMAIL}
+            </a>
+            <p className="flex items-center justify-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" /> {SUPPORT_HOURS}
+            </p>
+          </div>
         </CardFooter>
       </Card>
         </div>
