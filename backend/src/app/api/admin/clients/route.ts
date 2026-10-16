@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
-import { prisma } from '@/lib/db';
-import { requireAdmin } from '@/lib/apiAuth';
-import { audit } from '@/lib/audit';
-import { can } from '@/lib/adminRoles';
-import { listParams } from '@/lib/adminList';
+import { prisma } from '@/lib/core/db';
+import { requireAdmin } from '@/lib/http/apiAuth';
+import { audit } from '@/lib/admin/audit';
+import { can } from '@/lib/admin/adminRoles';
+import { listParams } from '@/lib/admin/adminList';
 
 export const dynamic = 'force-dynamic';
 

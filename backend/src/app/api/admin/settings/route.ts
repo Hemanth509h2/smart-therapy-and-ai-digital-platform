@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { requireAdmin } from '@/lib/apiAuth';
-import { audit } from '@/lib/audit';
-import { SETTING_DEFAULTS, coerceSetting, isSettingKey, type SettingKey } from '@/lib/settings';
+import { prisma } from '@/lib/core/db';
+import { requireAdmin } from '@/lib/http/apiAuth';
+import { audit } from '@/lib/admin/audit';
+import { SETTING_DEFAULTS, coerceSetting, isSettingKey, type SettingKey } from '@/lib/core/settings';
 
 export const dynamic = 'force-dynamic';
 

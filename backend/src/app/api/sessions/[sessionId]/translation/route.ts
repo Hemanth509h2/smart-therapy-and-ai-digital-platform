@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { RoomServiceClient } from 'livekit-server-sdk';
-import { prisma } from '@/lib/db';
-import { requireAuth } from '@/lib/apiAuth';
-import { errorResponse } from '@/lib/apiError';
-import { isTranslationLanguage } from '@/lib/translationLanguages';
+import { prisma } from '@/lib/core/db';
+import { requireAuth } from '@/lib/http/apiAuth';
+import { errorResponse } from '@/lib/http/apiError';
+import { isTranslationLanguage } from '@/lib/sessions/translationLanguages';
 
 // POST /api/sessions/[sessionId]/translation — push the caption languages to
 // everyone already in the LiveKit room, without a reconnect.

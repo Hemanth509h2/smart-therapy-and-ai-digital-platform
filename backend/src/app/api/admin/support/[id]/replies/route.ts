@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import { prisma } from '@/lib/db';
-import { requireAdmin } from '@/lib/apiAuth';
-import { audit } from '@/lib/audit';
-import { getSetting } from '@/lib/settings';
+import { prisma } from '@/lib/core/db';
+import { requireAdmin } from '@/lib/http/apiAuth';
+import { audit } from '@/lib/admin/audit';
+import { getSetting } from '@/lib/core/settings';
 
 export const dynamic = 'force-dynamic';
 

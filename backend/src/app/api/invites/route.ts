@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { prisma } from '@/lib/db';
-import { requireAuth } from '@/lib/apiAuth';
-import { requireActivePlan } from '@/lib/subscriptions';
-import { normalizePhoneNumber } from '@/lib/phone';
-import { errorResponse } from '@/lib/apiError';
+import { prisma } from '@/lib/core/db';
+import { requireAuth } from '@/lib/http/apiAuth';
+import { requireActivePlan } from '@/lib/billing/subscriptions';
+import { normalizePhoneNumber } from '@/lib/core/phone';
+import { errorResponse } from '@/lib/http/apiError';
 
 // The caller must own the therapist profile or be an ADMIN.
 async function mayAccessTherapist(uid: string, therapistId: string) {

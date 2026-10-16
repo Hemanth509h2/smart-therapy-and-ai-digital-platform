@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { requireAdmin } from '@/lib/apiAuth';
-import { audit } from '@/lib/audit';
-import { ALL_MODULE_IDS } from '@/lib/modules';
-import { activatePlan } from '@/lib/subscriptions';
-import { errorResponse } from '@/lib/apiError';
+import { prisma } from '@/lib/core/db';
+import { requireAdmin } from '@/lib/http/apiAuth';
+import { audit } from '@/lib/admin/audit';
+import { ALL_MODULE_IDS } from '@/lib/modules/modules';
+import { activatePlan } from '@/lib/billing/subscriptions';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 

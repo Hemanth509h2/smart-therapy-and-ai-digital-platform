@@ -11,13 +11,13 @@ const prismaMock = vi.hoisted(() => ({
   $transaction: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({ prisma: prismaMock }))
-vi.mock('@/lib/apiAuth', () => ({
+vi.mock('@/lib/core/db', () => ({ prisma: prismaMock }))
+vi.mock('@/lib/http/apiAuth', () => ({
   requireAuth: vi.fn(async () => ({ ok: true, uid: 'therapist-uid', email: null })),
 }))
 // Imported transitively by session-report; irrelevant to PATCH.
-vi.mock('@/lib/report/generate', () => ({ generateSessionReport: vi.fn() }))
-vi.mock('@/lib/report/session-data', () => ({ getReportStats: vi.fn() }))
+vi.mock('@/lib/ai/report/generate', () => ({ generateSessionReport: vi.fn() }))
+vi.mock('@/lib/ai/report/session-data', () => ({ getReportStats: vi.fn() }))
 
 const REPORT_TEXT = 'Child disclosed self-harm thoughts during session 4'
 

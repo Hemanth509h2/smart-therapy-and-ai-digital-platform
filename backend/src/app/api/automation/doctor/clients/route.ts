@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { errorResponse } from '@/lib/apiError'
+import { prisma } from '@/lib/core/db'
+import { errorResponse } from '@/lib/http/apiError'
 import { ageFrom, doctorClientsWhere } from '@/lib/automation/sessions'
 import { requireDoctorByPhone } from '@/lib/automation/doctor'
 

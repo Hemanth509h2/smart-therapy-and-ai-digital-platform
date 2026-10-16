@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { normalizeWhatsAppNumber } from '@/lib/whatsapp-cloud-api'
-import { PublicError } from '@/lib/apiError'
+import { prisma } from '@/lib/core/db'
+import { normalizeWhatsAppNumber } from '@/lib/messaging/whatsapp-cloud-api'
+import { PublicError } from '@/lib/http/apiError'
 import { rejectUnlessAutomation } from './auth'
 
 const doctorSelect = {

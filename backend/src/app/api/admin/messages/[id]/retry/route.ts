@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { requireAdmin } from '@/lib/apiAuth';
-import { audit } from '@/lib/audit';
-import { getSetting } from '@/lib/settings';
-import { retryWhatsAppMessage, WHATSAPP_OFF } from '@/lib/session-whatsapp';
+import { prisma } from '@/lib/core/db';
+import { requireAdmin } from '@/lib/http/apiAuth';
+import { audit } from '@/lib/admin/audit';
+import { getSetting } from '@/lib/core/settings';
+import { retryWhatsAppMessage, WHATSAPP_OFF } from '@/lib/sessions/session-whatsapp';
 
 export const dynamic = 'force-dynamic';
 

@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
 import nodemailer from 'nodemailer';
 import type { AdminRole } from '@prisma/client';
-import { prisma } from '@/lib/db';
-import { requireAdmin, requireRecentLogin } from '@/lib/apiAuth';
-import { audit } from '@/lib/audit';
-import { appUrl } from '@/lib/app-url';
+import { prisma } from '@/lib/core/db';
+import { requireAdmin, requireRecentLogin } from '@/lib/http/apiAuth';
+import { audit } from '@/lib/admin/audit';
+import { appUrl } from '@/lib/core/app-url';
 
 export const dynamic = 'force-dynamic';
 

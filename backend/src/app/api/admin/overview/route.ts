@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { requireAdmin } from '@/lib/apiAuth';
-import { ALL_MODULE_IDS } from '@/lib/modules';
-import { normalizePhoneNumber } from '@/lib/phone';
-import { errorResponse } from '@/lib/apiError';
+import { prisma } from '@/lib/core/db';
+import { requireAdmin } from '@/lib/http/apiAuth';
+import { ALL_MODULE_IDS } from '@/lib/modules/modules';
+import { normalizePhoneNumber } from '@/lib/core/phone';
+import { errorResponse } from '@/lib/http/apiError';
 
 // A malformed stored number must not break the whole overview.
 function toE164(raw: string | null): string | null {

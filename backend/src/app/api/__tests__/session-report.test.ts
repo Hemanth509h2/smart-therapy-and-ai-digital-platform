@@ -6,12 +6,12 @@ import { Prisma } from '@prisma/client'
 // report generator and Firestore stats are faked. All records are synthetic.
 
 const verifyIdToken = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/firebaseAdmin', () => ({ adminAuth: () => ({ verifyIdToken }) }))
+vi.mock('@/lib/core/firebaseAdmin', () => ({ adminAuth: () => ({ verifyIdToken }) }))
 
 const generateSessionReport = vi.hoisted(() => vi.fn())
 const getReportStats = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/report/generate', () => ({ generateSessionReport }))
-vi.mock('@/lib/report/session-data', () => ({ getReportStats }))
+vi.mock('@/lib/ai/report/generate', () => ({ generateSessionReport }))
+vi.mock('@/lib/ai/report/session-data', () => ({ getReportStats }))
 
 const db = vi.hoisted(() => ({ users: [] as any[], sessions: [] as any[], reports: [] as any[], clients: [] as any[] }))
 
@@ -62,7 +62,7 @@ const prismaMock = vi.hoisted(() => ({
   session: { findFirst: vi.fn(), count: vi.fn() },
   sessionReport: { findFirst: vi.fn(), upsert: vi.fn(), update: vi.fn() },
 }))
-vi.mock('@/lib/db', () => ({ prisma: prismaMock }))
+vi.mock('@/lib/core/db', () => ({ prisma: prismaMock }))
 
 function installPrismaFakes() {
   prismaMock.user.findUnique.mockImplementation(async ({ where }: any) => {

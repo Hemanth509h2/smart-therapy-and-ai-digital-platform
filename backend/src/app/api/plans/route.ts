@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { errorResponse } from '@/lib/apiError';
+import { prisma } from '@/lib/core/db';
+import { errorResponse } from '@/lib/http/apiError';
 
 // GET /api/plans — list active subscription plans (therapist + admin facing),
 // full rows including `features` (the admin-written card bullets).

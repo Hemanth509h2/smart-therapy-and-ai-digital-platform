@@ -8,7 +8,7 @@ import type { AddressInfo } from 'net'
 
 const require = createRequire(import.meta.url)
 const { WebSocketServer, WebSocket } = require('ws')
-const { handleProxyConnection, verifySttToken, upstreamUrl } = require('../stt-proxy')
+const { handleProxyConnection, verifySttToken, upstreamUrl } = require('../server/stt-proxy')
 
 const SECRET = 'test-secret'
 const mint = (sid: string, expSec = Math.floor(Date.now() / 1000) + 60, secret = SECRET) => {

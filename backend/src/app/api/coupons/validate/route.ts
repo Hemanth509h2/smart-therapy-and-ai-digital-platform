@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/apiAuth';
-import { prisma } from '@/lib/db';
-import { applyCoupon } from '@/lib/coupons';
-import { errorResponse } from '@/lib/apiError';
+import { requireAuth } from '@/lib/http/apiAuth';
+import { prisma } from '@/lib/core/db';
+import { applyCoupon } from '@/lib/billing/coupons';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 

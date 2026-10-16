@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { requireAdmin, requireRecentLogin } from '@/lib/apiAuth';
-import { audit } from '@/lib/audit';
-import { parseFeatures, parsePlanLimits } from '@/lib/subscriptions';
-import { errorResponse } from '@/lib/apiError';
+import { prisma } from '@/lib/core/db';
+import { requireAdmin, requireRecentLogin } from '@/lib/http/apiAuth';
+import { audit } from '@/lib/admin/audit';
+import { parseFeatures, parsePlanLimits } from '@/lib/billing/subscriptions';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 

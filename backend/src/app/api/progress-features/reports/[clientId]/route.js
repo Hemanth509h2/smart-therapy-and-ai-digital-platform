@@ -1,1 +1,1 @@
-export { GET } from '@/progress_features/backend/reports/reportController.js';
+export { GET } from '@/lib/progress/reports/reportController.js';

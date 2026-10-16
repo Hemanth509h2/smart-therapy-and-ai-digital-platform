@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { requireAuth } from '@/lib/apiAuth';
-import { requireTherapist } from '@/lib/progressAuth';
-import { requireActivePlan } from '@/lib/subscriptions';
-import { errorResponse } from '@/lib/apiError';
+import { prisma } from '@/lib/core/db';
+import { requireAuth } from '@/lib/http/apiAuth';
+import { requireTherapist } from '@/lib/http/progressAuth';
+import { requireActivePlan } from '@/lib/billing/subscriptions';
+import { errorResponse } from '@/lib/http/apiError';
 
 // Session notes belong to the session's therapist; admins may read them too.
 async function mayAccessSession(uid: string, sessionId: string) {

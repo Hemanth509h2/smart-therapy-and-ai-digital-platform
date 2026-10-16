@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { Prisma } from '@prisma/client'
-import { prisma } from '@/lib/db'
-import { requireActivePlan } from '@/lib/subscriptions'
-import { requireAuth } from '@/lib/apiAuth'
-import { requireTherapist } from '@/lib/progressAuth'
-import { generateSessionReport } from '@/lib/report/generate'
-import { getReportStats } from '@/lib/report/session-data'
-import { errorResponse } from '@/lib/apiError'
+import { prisma } from '@/lib/core/db'
+import { requireActivePlan } from '@/lib/billing/subscriptions'
+import { requireAuth } from '@/lib/http/apiAuth'
+import { requireTherapist } from '@/lib/http/progressAuth'
+import { generateSessionReport } from '@/lib/ai/report/generate'
+import { getReportStats } from '@/lib/ai/report/session-data'
+import { errorResponse } from '@/lib/http/apiError'
 
 function ageFrom(dob: Date | null | undefined): number | undefined {
   if (!dob) return undefined

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { AdminRole, Role } from '@prisma/client';
-import { prisma } from '@/lib/db';
-import { requireAdmin, requireRecentLogin } from '@/lib/apiAuth';
-import { audit } from '@/lib/audit';
-import { adminAuth } from '@/lib/firebaseAdmin';
+import { prisma } from '@/lib/core/db';
+import { requireAdmin, requireRecentLogin } from '@/lib/http/apiAuth';
+import { audit } from '@/lib/admin/audit';
+import { adminAuth } from '@/lib/core/firebaseAdmin';
 
 export const dynamic = 'force-dynamic';
 

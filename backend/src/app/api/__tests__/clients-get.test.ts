@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // records are synthetic.
 
 const verifyIdToken = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/firebaseAdmin', () => ({ adminAuth: () => ({ verifyIdToken }) }))
+vi.mock('@/lib/core/firebaseAdmin', () => ({ adminAuth: () => ({ verifyIdToken }) }))
 
 const future = new Date(Date.now() + 7 * 24 * 3600 * 1000)
 const past = new Date(Date.now() - 7 * 24 * 3600 * 1000)
@@ -61,7 +61,7 @@ const prismaMock = vi.hoisted(() => ({
   profileTherapist: { findUnique: vi.fn() },
   $transaction: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({ prisma: prismaMock }))
+vi.mock('@/lib/core/db', () => ({ prisma: prismaMock }))
 
 function installPrismaFakes() {
   prismaMock.user.findUnique.mockImplementation(async ({ where }: any) => {

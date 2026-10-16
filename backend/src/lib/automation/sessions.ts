@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/core/db'
 import type { SessionStatus } from '@prisma/client'
 import { istRange, timeLabel } from './time'
 

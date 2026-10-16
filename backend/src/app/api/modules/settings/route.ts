@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { requireAuth } from '@/lib/apiAuth';
+import { prisma } from '@/lib/core/db';
+import { requireAuth } from '@/lib/http/apiAuth';
 
 export const dynamic = 'force-dynamic';
 

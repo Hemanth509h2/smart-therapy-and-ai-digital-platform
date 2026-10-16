@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/apiAuth';
-import { prisma } from '@/lib/db';
-import { mintSttToken } from '@/lib/stt-token';
-import { getSetting } from '@/lib/settings';
+import { requireAuth } from '@/lib/http/apiAuth';
+import { prisma } from '@/lib/core/db';
+import { mintSttToken } from '@/lib/sessions/stt-token';
+import { getSetting } from '@/lib/core/settings';
 
 export const dynamic = 'force-dynamic';
 

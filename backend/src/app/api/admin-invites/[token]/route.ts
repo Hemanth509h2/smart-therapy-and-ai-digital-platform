@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { requireAuth } from '@/lib/apiAuth';
-import { audit } from '@/lib/audit';
-import { adminAuth } from '@/lib/firebaseAdmin';
+import { prisma } from '@/lib/core/db';
+import { requireAuth } from '@/lib/http/apiAuth';
+import { audit } from '@/lib/admin/audit';
+import { adminAuth } from '@/lib/core/firebaseAdmin';
 
 export const dynamic = 'force-dynamic';
 

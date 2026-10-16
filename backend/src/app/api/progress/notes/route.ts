@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { requireTherapist } from '@/lib/progressAuth';
-import { requireActivePlan } from '@/lib/subscriptions';
-import { errorResponse } from '@/lib/apiError';
+import { prisma } from '@/lib/core/db';
+import { requireTherapist } from '@/lib/http/progressAuth';
+import { requireActivePlan } from '@/lib/billing/subscriptions';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 

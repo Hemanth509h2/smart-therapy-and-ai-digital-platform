@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
 // Same Neon pooler idle-close filtering as the backend client (see
-// backend/src/lib/db.ts). Don't log every query by default — set
+// backend/src/lib/core/db.ts). Don't log every query by default — set
 // PRISMA_LOG_QUERIES=true when debugging.
 const VERBOSE = process.env.PRISMA_LOG_QUERIES === 'true';
 

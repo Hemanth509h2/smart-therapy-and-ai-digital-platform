@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/apiAuth';
-import { cashfreeConfigured, createCashfreeOrder } from '@/lib/cashfree';
+import { requireAuth } from '@/lib/http/apiAuth';
+import { cashfreeConfigured, createCashfreeOrder } from '@/lib/billing/cashfree';
 
 export const dynamic = 'force-dynamic';
 

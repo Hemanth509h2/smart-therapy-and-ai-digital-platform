@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { requireActivePlan } from '@/lib/subscriptions';
-import { provisionSessionDocs } from '@/lib/session-provisioning';
-import { markSessionEnded } from '@/lib/session-provisioning';
-import { sendSessionLinkWhatsApp } from '@/lib/session-whatsapp';
-import { errorResponse } from '@/lib/apiError';
+import { prisma } from '@/lib/core/db';
+import { requireActivePlan } from '@/lib/billing/subscriptions';
+import { provisionSessionDocs } from '@/lib/sessions/session-provisioning';
+import { markSessionEnded } from '@/lib/sessions/session-provisioning';
+import { sendSessionLinkWhatsApp } from '@/lib/sessions/session-whatsapp';
+import { errorResponse } from '@/lib/http/apiError';
 
 // GET /api/sessions/[sessionId] — fetch a single session (with client + therapist).
 export async function GET(

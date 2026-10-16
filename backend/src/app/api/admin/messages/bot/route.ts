@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin, requireRecentLogin } from '@/lib/apiAuth';
-import { audit } from '@/lib/audit';
+import { requireAdmin, requireRecentLogin } from '@/lib/http/apiAuth';
+import { audit } from '@/lib/admin/audit';
 
 export const dynamic = 'force-dynamic';
 

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import { prisma } from '@/lib/db';
-import { requireAdmin } from '@/lib/apiAuth';
-import { firebasePrivateKey } from '@/lib/firebaseKey'
+import { prisma } from '@/lib/core/db';
+import { requireAdmin } from '@/lib/http/apiAuth';
+import { firebasePrivateKey } from '@/lib/core/firebaseKey'
 
 export const dynamic = 'force-dynamic';
 

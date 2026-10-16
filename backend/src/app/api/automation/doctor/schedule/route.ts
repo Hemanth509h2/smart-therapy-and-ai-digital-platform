@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { SessionStatus } from '@prisma/client'
-import { errorResponse } from '@/lib/apiError'
+import { errorResponse } from '@/lib/http/apiError'
 import { getDoctorSessions } from '@/lib/automation/sessions'
 import { daysBetween, istDateString, isValidDateString } from '@/lib/automation/time'
 import { requireDoctorByPhone } from '@/lib/automation/doctor'

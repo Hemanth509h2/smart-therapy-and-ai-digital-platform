@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { requireAdmin } from '@/lib/apiAuth';
-import { audit } from '@/lib/audit';
-import { daysAgo } from '@/lib/adminList';
-import { ALL_MODULE_IDS, MODULE_CATEGORIES } from '@/lib/modules';
+import { prisma } from '@/lib/core/db';
+import { requireAdmin } from '@/lib/http/apiAuth';
+import { audit } from '@/lib/admin/audit';
+import { daysAgo } from '@/lib/admin/adminList';
+import { ALL_MODULE_IDS, MODULE_CATEGORIES } from '@/lib/modules/modules';
 
 export const dynamic = 'force-dynamic';
 

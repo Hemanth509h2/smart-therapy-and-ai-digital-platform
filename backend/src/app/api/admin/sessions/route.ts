@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { Prisma, type SessionStatus } from '@prisma/client';
-import { prisma } from '@/lib/db';
-import { requireAdmin } from '@/lib/apiAuth';
-import { daysAgo, listParams } from '@/lib/adminList';
+import { prisma } from '@/lib/core/db';
+import { requireAdmin } from '@/lib/http/apiAuth';
+import { daysAgo, listParams } from '@/lib/admin/adminList';
 
 export const dynamic = 'force-dynamic';
 

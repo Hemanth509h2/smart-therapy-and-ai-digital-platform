@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { timingSafeEqual } from 'crypto'
-import { requireTherapist } from '@/lib/progressAuth'
+import { requireTherapist } from '@/lib/http/progressAuth'
 
 /** Constant-time string compare that tolerates different lengths. */
 export function safeEqual(a: string, b: string): boolean {

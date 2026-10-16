@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/apiAuth';
-import { prisma } from '@/lib/db';
-import { cashfreeConfigured, syncCashfreeOrder } from '@/lib/cashfree';
+import { requireAuth } from '@/lib/http/apiAuth';
+import { prisma } from '@/lib/core/db';
+import { cashfreeConfigured, syncCashfreeOrder } from '@/lib/billing/cashfree';
 
 export const dynamic = 'force-dynamic';
 

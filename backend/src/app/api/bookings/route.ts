@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { requireActivePlan } from '@/lib/subscriptions';
-import { requireAuth } from '@/lib/apiAuth';
-import { errorResponse } from '@/lib/apiError';
+import { prisma } from '@/lib/core/db';
+import { requireActivePlan } from '@/lib/billing/subscriptions';
+import { requireAuth } from '@/lib/http/apiAuth';
+import { errorResponse } from '@/lib/http/apiError';
 
 // The caller must own the referenced therapist/client profile or be an ADMIN.
 async function mayAccess(uid: string, ref: { therapistId?: string | null; clientId?: string | null }) {

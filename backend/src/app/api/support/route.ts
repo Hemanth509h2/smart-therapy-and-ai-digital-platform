@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import { prisma } from '@/lib/db';
-import { requireAuth } from '@/lib/apiAuth';
-import { getSetting } from '@/lib/settings';
-import { errorResponse } from '@/lib/apiError';
+import { prisma } from '@/lib/core/db';
+import { requireAuth } from '@/lib/http/apiAuth';
+import { getSetting } from '@/lib/core/settings';
+import { errorResponse } from '@/lib/http/apiError';
 
 const CATEGORIES = ['Technical Issue', 'Billing', 'Account', 'Feedback', 'Other'];
 

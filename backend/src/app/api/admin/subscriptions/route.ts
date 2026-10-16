@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
-import { prisma } from '@/lib/db';
-import { requireAdmin } from '@/lib/apiAuth';
-import { listParams } from '@/lib/adminList';
-import { daysUntil, resolveCurrent, serializeSubscription, subscriptionState } from '@/lib/subscriptions';
-import { errorResponse } from '@/lib/apiError';
+import { prisma } from '@/lib/core/db';
+import { requireAdmin } from '@/lib/http/apiAuth';
+import { listParams } from '@/lib/admin/adminList';
+import { daysUntil, resolveCurrent, serializeSubscription, subscriptionState } from '@/lib/billing/subscriptions';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 

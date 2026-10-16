@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
-import { requireAuth } from '@/lib/apiAuth'
-import { requireActivePlan } from '@/lib/subscriptions'
-import { prisma } from '@/lib/db'
-import { sendWhatsAppInvite } from '@/lib/whatsapp-bot'
-import { errorResponse, logError } from '@/lib/apiError'
+import { requireAuth } from '@/lib/http/apiAuth'
+import { requireActivePlan } from '@/lib/billing/subscriptions'
+import { prisma } from '@/lib/core/db'
+import { sendWhatsAppInvite } from '@/lib/messaging/whatsapp-bot'
+import { errorResponse, logError } from '@/lib/http/apiError'
 
 export const dynamic = 'force-dynamic'
 

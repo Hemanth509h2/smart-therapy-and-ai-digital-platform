@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { errorResponse } from '@/lib/apiError';
+import { prisma } from '@/lib/core/db';
+import { errorResponse } from '@/lib/http/apiError';
 
 // GET /api/invites/[token] — fetch invite details for the signup banner + onboarding prefill.
 export async function GET(request: Request, { params }: { params: { token: string } }) {

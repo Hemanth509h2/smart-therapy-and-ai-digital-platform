@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
-import { appUrl } from '@/lib/app-url'
-import { errorResponse } from '@/lib/apiError'
+import { prisma } from '@/lib/core/db'
+import { appUrl } from '@/lib/core/app-url'
+import { errorResponse } from '@/lib/http/apiError'
 import { rejectUnlessAutomation } from '@/lib/automation/auth'
 import { joinLinkMessage } from '@/lib/automation/messages'
-import { getOrCreateGuestInvite } from '@/lib/session-whatsapp'
+import { getOrCreateGuestInvite } from '@/lib/sessions/session-whatsapp'
 
 export const dynamic = 'force-dynamic'
 

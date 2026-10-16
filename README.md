@@ -6,11 +6,26 @@ Monorepo with two deployables that talk **only over HTTP APIs**:
 ├── frontend/   # Next.js UI (pages, components, hooks, store) — port 3000
 │   └── src/lib/api.ts        # apiFetch(): prefixes NEXT_PUBLIC_API_URL
 ├── backend/    # Next.js API server (app/api routes + Prisma + STT proxy) — port 4000
-│   ├── server.js             # custom server: API + Sarvam STT WebSocket proxy
+│   ├── server.js             # custom server entry: API + Sarvam STT WebSocket proxy
+│   ├── server/stt-proxy.js   # STT WebSocket relay (token check + Sarvam upstream)
 │   ├── src/middleware.ts     # CORS headers for cross-origin frontend calls
+│   ├── src/app/api/          # route handlers (folder path = URL, so these don't move)
+│   ├── src/lib/              # shared server code, grouped by feature:
+│   │   ├── core/             #   db, Firebase Admin, settings, app URL, phone
+│   │   ├── http/             #   auth guards (apiAuth, progressAuth), error responses
+│   │   ├── admin/            #   admin roles, list helpers, audit log
+│   │   ├── billing/          #   Cashfree, coupons, subscriptions
+│   │   ├── sessions/         #   provisioning, STT token, transcript crypto, attention
+│   │   ├── modules/          #   therapy module library
+│   │   ├── progress/         #   progress measurement + reports
+│   │   ├── ai/rag/           #   in-call copilot (retrieval, safety, prompt, ingest)
+│   │   ├── ai/report/        #   end-of-session report generation (OpenRouter)
+│   │   ├── messaging/        #   WhatsApp Cloud API + bot
+│   │   └── automation/       #   n8n automation endpoints' logic
 │   ├── prisma/               # DB schema + migrations
-│   ├── scripts/              # seeding, pgvector setup, RAG test scripts
-│   └── whatsapp-bot/         # standalone Fly.io WhatsApp bot service
+│   ├── scripts/              # seed/, maintenance/, checks/ (RAG/provider smoke tests), reports/
+│   ├── tests/                # Firestore rules + STT proxy tests
+│   └── _archive/             # unused code kept for reference; not built or type-checked
 └── ...
 ```
 

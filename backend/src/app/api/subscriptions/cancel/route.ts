@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/apiAuth';
-import { prisma } from '@/lib/db';
-import { resolveCurrent, serializeSubscription } from '@/lib/subscriptions';
+import { requireAuth } from '@/lib/http/apiAuth';
+import { prisma } from '@/lib/core/db';
+import { resolveCurrent, serializeSubscription } from '@/lib/billing/subscriptions';
 
 export const dynamic = 'force-dynamic';
 

@@ -1,6 +1,6 @@
 import { AccessToken, RoomServiceClient } from 'livekit-server-sdk'
 import { NextRequest, NextResponse } from 'next/server'
-import { isTranslationLanguage } from '@/lib/translationLanguages'
+import { isTranslationLanguage } from '@/lib/sessions/translationLanguages'
 
 export const dynamic = 'force-dynamic';
 

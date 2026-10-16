@@ -5,10 +5,10 @@ const prismaMock = vi.hoisted(() => ({
   profileClient: { findMany: vi.fn(), findFirst: vi.fn(), count: vi.fn() },
   session: { findMany: vi.fn(), findUnique: vi.fn(), groupBy: vi.fn() },
 }))
-vi.mock('@/lib/db', () => ({ prisma: prismaMock }))
+vi.mock('@/lib/core/db', () => ({ prisma: prismaMock }))
 const requireTherapist = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/progressAuth', () => ({ requireTherapist }))
-vi.mock('@/lib/session-whatsapp', () => ({ getOrCreateGuestInvite: vi.fn().mockResolvedValue({ token: 'tok-1' }) }))
+vi.mock('@/lib/http/progressAuth', () => ({ requireTherapist }))
+vi.mock('@/lib/sessions/session-whatsapp', () => ({ getOrCreateGuestInvite: vi.fn().mockResolvedValue({ token: 'tok-1' }) }))
 
 import { addDays, daysBetween, istDateString, istRange, isValidDateString } from '../time'
 import { reminderMessage, dailyScheduleMessage } from '../messages'

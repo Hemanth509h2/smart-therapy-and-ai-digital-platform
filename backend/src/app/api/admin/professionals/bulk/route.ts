@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { requireAdmin } from '@/lib/apiAuth';
-import { audit } from '@/lib/audit';
-import { ALL_MODULE_IDS } from '@/lib/modules';
+import { prisma } from '@/lib/core/db';
+import { requireAdmin } from '@/lib/http/apiAuth';
+import { audit } from '@/lib/admin/audit';
+import { ALL_MODULE_IDS } from '@/lib/modules/modules';
 
 export const dynamic = 'force-dynamic';
 

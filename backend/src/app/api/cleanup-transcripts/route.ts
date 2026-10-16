@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Timestamp } from 'firebase-admin/firestore'
-import { prisma } from '@/lib/db'
-import { getSetting } from '@/lib/settings'
-import { adminDb } from '@/lib/firebaseAdmin'
+import { prisma } from '@/lib/core/db'
+import { getSetting } from '@/lib/core/settings'
+import { adminDb } from '@/lib/core/firebaseAdmin'
 
 export const dynamic = 'force-dynamic'
 

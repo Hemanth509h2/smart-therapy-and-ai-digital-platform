@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { prisma } from '@/lib/db';
-import { adminAuth } from '@/lib/firebaseAdmin';
-import { provisionSessionDocs } from '@/lib/session-provisioning';
-import { errorResponse } from '@/lib/apiError';
+import { prisma } from '@/lib/core/db';
+import { adminAuth } from '@/lib/core/firebaseAdmin';
+import { provisionSessionDocs } from '@/lib/sessions/session-provisioning';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 

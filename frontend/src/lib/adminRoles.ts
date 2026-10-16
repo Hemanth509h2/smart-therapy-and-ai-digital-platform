@@ -1,4 +1,4 @@
-// Mirror of backend/src/lib/adminRoles.ts — used only to hide what an admin
+// Mirror of backend/src/lib/admin/adminRoles.ts — used only to hide what an admin
 // role can't use. The backend enforces it on every request.
 
 export type AdminRole = 'SUPER_ADMIN' | 'BILLING' | 'SUPPORT' | 'CONTENT';

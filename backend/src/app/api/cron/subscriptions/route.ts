@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import { prisma } from '@/lib/db';
-import { audit } from '@/lib/audit';
-import { FREE_TIER_ACCESS, daysUntil, resolveCurrent } from '@/lib/subscriptions';
+import { prisma } from '@/lib/core/db';
+import { audit } from '@/lib/admin/audit';
+import { FREE_TIER_ACCESS, daysUntil, resolveCurrent } from '@/lib/billing/subscriptions';
 
 export const dynamic = 'force-dynamic';
 

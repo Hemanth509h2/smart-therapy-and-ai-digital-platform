@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { prisma } from '@/lib/db';
-import { sendViaBot } from '@/lib/whatsapp-bot';
-import { normalizeWhatsAppNumber, sendCloudApiInteractive } from '@/lib/whatsapp-cloud-api';
+import { prisma } from '@/lib/core/db';
+import { sendViaBot } from '@/lib/messaging/whatsapp-bot';
+import { normalizeWhatsAppNumber, sendCloudApiInteractive } from '@/lib/messaging/whatsapp-cloud-api';
 import { requireAutomationOrTherapist } from '@/lib/automation/auth';
 
 export const dynamic = 'force-dynamic';

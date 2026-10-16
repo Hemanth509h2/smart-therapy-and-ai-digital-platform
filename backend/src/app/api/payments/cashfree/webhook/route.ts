@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { cashfreeConfigured, syncCashfreeOrder, verifyCashfreeSignature } from '@/lib/cashfree';
+import { cashfreeConfigured, syncCashfreeOrder, verifyCashfreeSignature } from '@/lib/billing/cashfree';
 
 export const dynamic = 'force-dynamic';
 

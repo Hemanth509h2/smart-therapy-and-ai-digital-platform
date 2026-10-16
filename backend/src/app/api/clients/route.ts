@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { prisma } from '@/lib/db';
-import { requireAuth } from '@/lib/apiAuth';
-import { requireActivePlan } from '@/lib/subscriptions';
-import { requireTherapist } from '@/lib/progressAuth';
-import { normalizePhoneNumber } from '@/lib/phone';
-import { errorResponse } from '@/lib/apiError';
+import { prisma } from '@/lib/core/db';
+import { requireAuth } from '@/lib/http/apiAuth';
+import { requireActivePlan } from '@/lib/billing/subscriptions';
+import { requireTherapist } from '@/lib/http/progressAuth';
+import { normalizePhoneNumber } from '@/lib/core/phone';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 

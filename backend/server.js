@@ -55,7 +55,7 @@ if (process.env.AUTH_DISABLED === 'true') {
   console.warn('⚠️  [auth] AUTH_DISABLED=true — API routes trust client-supplied identity (x-dev-uid). DEV ONLY, never deploy like this.')
 }
 
-const { handleProxyConnection } = require('./stt-proxy')
+const { handleProxyConnection } = require('./server/stt-proxy')
 
 app.prepare().then(() => {
   const server = createServer((req, res) => {

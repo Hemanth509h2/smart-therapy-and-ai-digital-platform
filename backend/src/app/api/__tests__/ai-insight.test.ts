@@ -13,7 +13,7 @@ vi.hoisted(() => {
 })
 
 const verifyIdToken = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/firebaseAdmin', () => ({ adminAuth: () => ({ verifyIdToken }) }))
+vi.mock('@/lib/core/firebaseAdmin', () => ({ adminAuth: () => ({ verifyIdToken }) }))
 
 const prismaMock = vi.hoisted(() => ({
   user: { findUnique: vi.fn() },
@@ -21,10 +21,10 @@ const prismaMock = vi.hoisted(() => ({
   profileTherapist: { findUnique: vi.fn() },
   usageEvent: { create: vi.fn() },
 }))
-vi.mock('@/lib/db', () => ({ prisma: prismaMock }))
+vi.mock('@/lib/core/db', () => ({ prisma: prismaMock }))
 
 // Admin feature switches (Settings → features.aiInsights): on, as by default.
-vi.mock('@/lib/settings', () => ({ getSetting: vi.fn(async () => true) }))
+vi.mock('@/lib/core/settings', () => ({ getSetting: vi.fn(async () => true) }))
 
 const store = vi.hoisted(() => ({
   checkAIConsent: vi.fn(),
@@ -32,7 +32,7 @@ const store = vi.hoisted(() => ({
   getSessionActivity: vi.fn(),
   appendCopilotEvent: vi.fn(),
 }))
-vi.mock('@/lib/rag/transcript-store', () => store)
+vi.mock('@/lib/ai/rag/transcript-store', () => store)
 
 // Neon tagged-template SQL used by retrieval (previous notes, study material).
 const sqlCalls = vi.hoisted(() => [] as { text: string; values: unknown[] }[])
@@ -45,11 +45,11 @@ vi.mock('@neondatabase/serverless', () => ({
 }))
 
 const generateEmbedding = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/rag/nvidia-client', () => ({ generateEmbedding }))
+vi.mock('@/lib/ai/rag/nvidia-client', () => ({ generateEmbedding }))
 
 const chatJSON = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/report/openrouter-client', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/report/openrouter-client')>()),
+vi.mock('@/lib/ai/report/openrouter-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/ai/report/openrouter-client')>()),
   chatJSON,
 }))
 
@@ -61,11 +61,11 @@ vi.mock('firebase-admin/firestore', () => ({
 vi.mock('firebase-admin/app', () => ({ getApps: () => [{}], initializeApp, cert: vi.fn() }))
 
 // Real runAnalysis, wrapped so calls can be asserted.
-vi.mock('@/lib/rag/analysis', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/rag/analysis')>()
+vi.mock('@/lib/ai/rag/analysis', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/ai/rag/analysis')>()
   return { ...actual, runAnalysis: vi.fn(actual.runAnalysis) }
 })
-import { runAnalysis } from '@/lib/rag/analysis'
+import { runAnalysis } from '@/lib/ai/rag/analysis'
 
 const USERS: Record<string, any> = {
   'uid-t1': { id: 'uid-t1', role: 'THERAPIST', therapist: { id: 't1', userId: 'uid-t1' } },

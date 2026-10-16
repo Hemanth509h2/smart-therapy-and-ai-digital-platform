@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/apiAuth';
-import { prisma } from '@/lib/db';
-import { cashfreeConfigured, createCashfreeOrder } from '@/lib/cashfree';
-import { cleanPlanModules } from '@/lib/subscriptions';
-import { applyCoupon } from '@/lib/coupons';
+import { requireAuth } from '@/lib/http/apiAuth';
+import { prisma } from '@/lib/core/db';
+import { cashfreeConfigured, createCashfreeOrder } from '@/lib/billing/cashfree';
+import { cleanPlanModules } from '@/lib/billing/subscriptions';
+import { applyCoupon } from '@/lib/billing/coupons';
 
 export const dynamic = 'force-dynamic';
 

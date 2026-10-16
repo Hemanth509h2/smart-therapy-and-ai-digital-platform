@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { requireAuth } from '@/lib/apiAuth';
-import { requireActivePlan } from '@/lib/subscriptions';
-import { getOrCreateGuestInvite, sendSessionLinkWhatsApp } from '@/lib/session-whatsapp';
-import { errorResponse } from '@/lib/apiError';
+import { prisma } from '@/lib/core/db';
+import { requireAuth } from '@/lib/http/apiAuth';
+import { requireActivePlan } from '@/lib/billing/subscriptions';
+import { getOrCreateGuestInvite, sendSessionLinkWhatsApp } from '@/lib/sessions/session-whatsapp';
+import { errorResponse } from '@/lib/http/apiError';
 
 // POST /api/sessions/[sessionId]/guest-link — create (or reuse) a patient
 // join link for an already-created session ("Start a new session"). The
