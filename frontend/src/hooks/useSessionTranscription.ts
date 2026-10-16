@@ -41,15 +41,12 @@ interface Pipe {
   closing: boolean
 }
 
-const STT_RELAY_URL = process.env.NEXT_PUBLIC_STT_RELAY_URL
+// The STT relay in the Python AI service (ai/, stt package; port 4100 locally). It holds the Sarvam
+// key and checks the signed token minted by the backend's /api/stt-token.
+const STT_RELAY_URL = process.env.NEXT_PUBLIC_STT_RELAY_URL || 'http://localhost:4100'
 
-// With NEXT_PUBLIC_STT_RELAY_URL set we connect to the external relay (Fly.io)
-// using a signed token. Without it we fall back to the same-origin proxy in
-// server.js (local dev / self-hosted Node).
 function buildProxyUrl(sessionId: string, speaker: string, token: string): string {
-  const url = STT_RELAY_URL
-    ? new URL('/sarvam-stream', STT_RELAY_URL)
-    : new URL('/api/sarvam-stream', window.location.origin)
+  const url = new URL('/sarvam-stream', STT_RELAY_URL)
   // Ensure wss:// or ws://
   url.protocol = url.protocol.replace('http', 'ws')
   
@@ -163,7 +160,7 @@ export function useSessionTranscription({
       if (pipesRef.current.has(key) || pendingRef.current.has(key)) return
       pendingRef.current.add(key)
 
-      // The proxy verifies this token when STT_TOKEN_SECRET is set on the server.
+      // The relay verifies this token when its STT_TOKEN_SECRET is set.
       // Dev without a secret may proceed tokenless; production may not.
       let token = ''
       try {
@@ -179,7 +176,7 @@ export function useSessionTranscription({
         if (!res.ok) throw new Error(data.error || 'Failed to get STT token')
         token = data.token
       } catch (err) {
-        if (process.env.NODE_ENV === 'production' || STT_RELAY_URL) {
+        if (process.env.NODE_ENV === 'production') {
           console.error('[Transcription] Failed to get token:', err)
           pendingRef.current.delete(key)
           setState((s) => ({ ...s, error: 'Transcription auth error' }))

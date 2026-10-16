@@ -1,13 +1,12 @@
 # STAAD — Smart Therapy & AI Digital Platform
 
-Monorepo with two deployables that talk **only over HTTP APIs**:
+Monorepo with three deployables that talk **only over HTTP/WebSocket**:
 
 ```
 ├── frontend/   # Next.js UI (pages, components, hooks, store) — port 3000
 │   └── src/lib/api.ts        # apiFetch(): prefixes NEXT_PUBLIC_API_URL
-├── backend/    # Next.js API server (app/api routes + Prisma + STT proxy) — port 4000
-│   ├── server.js             # custom server entry: API + Sarvam STT WebSocket proxy
-│   ├── server/stt-proxy.js   # STT WebSocket relay (token check + Sarvam upstream)
+├── backend/    # Next.js API server (app/api routes + Prisma) — port 4000
+│   ├── server.js             # custom server entry (network tweaks + request logging)
 │   ├── src/middleware.ts     # CORS headers for cross-origin frontend calls
 │   ├── src/app/api/          # route handlers (folder path = URL, so these don't move)
 │   ├── src/lib/              # shared server code, grouped by feature:
@@ -24,8 +23,10 @@ Monorepo with two deployables that talk **only over HTTP APIs**:
 │   │   └── automation/       #   n8n automation endpoints' logic
 │   ├── prisma/               # DB schema + migrations
 │   ├── scripts/              # seed/, maintenance/, checks/ (RAG/provider smoke tests), reports/
-│   ├── tests/                # Firestore rules + STT proxy tests
 │   └── _archive/             # unused code kept for reference; not built or type-checked
+├── ai/         # Python AI service — port 4100
+│   ├── server.py             # entry: /health + routes WebSockets to feature packages
+│   └── stt/                  # package: Sarvam speech-to-text relay
 └── ...
 ```
 
@@ -41,9 +42,14 @@ npm run dev
 cd frontend
 cp .env.example .env
 npm run dev
+
+# 3. AI service (STT WebSocket at ws://localhost:4100/sarvam-stream)
+#    see ai/README.md
 ```
 
 The frontend calls the backend via `apiFetch('/api/...')`, which resolves to
-`NEXT_PUBLIC_API_URL` (default `http://localhost:4000`). Set
-`NEXT_PUBLIC_STT_RELAY_URL` in `frontend/.env` to the backend origin so the
-browser connects to its Sarvam STT WebSocket proxy.
+`NEXT_PUBLIC_API_URL` (default `http://localhost:4000`). Live captions go
+straight from the browser to the STT relay at `NEXT_PUBLIC_STT_RELAY_URL`
+(default `http://localhost:4100`). The backend only mints the relay's token
+(`/api/stt-token`); `STT_TOKEN_SECRET` must match in `backend/.env` and
+`ai/.env`.

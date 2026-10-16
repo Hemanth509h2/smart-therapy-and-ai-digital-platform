@@ -1,13 +1,5 @@
-// Custom Next.js server that also runs the Sarvam speech-to-text WebSocket proxy.
-//
-// Why this exists: Sarvam's streaming STT WebSocket only accepts the API key as
-// an HTTP *header*, and browsers cannot set headers on a WebSocket. So the
-// browser connects to our same-origin /api/sarvam-stream endpoint (no key), and
-// this server opens the upstream Sarvam socket with the header and relays audio
-// frames up and transcript messages back down. The key never reaches the client.
-//
-// Next's App Router can't host a WebSocket route, hence this thin custom server.
-// HMR (dev) is preserved by delegating non-proxy upgrades to Next.
+// Custom Next.js server: network tweaks and one-line request logging.
+// Live speech-to-text is handled by the standalone relay in ../ai (stt package).
 
 // Keep generated output outside OneDrive through the local `.next` junction.
 // Node resolves modules from a junction's physical target, so explicitly expose
@@ -38,7 +30,6 @@ Module.Module._initPaths()
 const { createServer } = require('http')
 const { parse } = require('url')
 const next = require('next')
-const { WebSocketServer, WebSocket } = require('ws')
 const { loadEnvConfig } = require('@next/env')
 
 loadEnvConfig(process.cwd())
@@ -55,8 +46,6 @@ if (process.env.AUTH_DISABLED === 'true') {
   console.warn('⚠️  [auth] AUTH_DISABLED=true — API routes trust client-supplied identity (x-dev-uid). DEV ONLY, never deploy like this.')
 }
 
-const { handleProxyConnection } = require('./server/stt-proxy')
-
 app.prepare().then(() => {
   const server = createServer((req, res) => {
     // Request logging: one line per HTTP request, written when the response
@@ -65,8 +54,8 @@ app.prepare().then(() => {
     res.on('finish', () => {
       const url = req.url || ''
       if (url.startsWith('/_next/') || url.startsWith('/favicon')) return
-      // Log the path only: query strings can carry credentials (e.g. the STT
-      // token on the WebSocket upgrade) and must not land in server logs.
+      // Log the path only: query strings can carry credentials and must not
+      // land in server logs.
       const path = url.split('?')[0]
       const ms = Date.now() - start
       console.log(`[api] ${req.method} ${path} → ${res.statusCode} (${ms}ms)`)
@@ -74,27 +63,14 @@ app.prepare().then(() => {
     handle(req, res, parse(req.url, true))
   })
 
-  const wss = new WebSocketServer({ noServer: true })
-  wss.on('connection', (ws, req) => {
-    const { query } = parse(req.url, true)
-    const sp = new URLSearchParams(query)
-    handleProxyConnection(ws, sp)
-  })
-
+  // Hand WebSocket upgrades (dev HMR) to Next.
   const nextUpgrade = app.getUpgradeHandler ? app.getUpgradeHandler() : null
   server.on('upgrade', (req, socket, head) => {
-    const { pathname } = parse(req.url)
-    if (pathname === '/api/sarvam-stream' || pathname === '/sarvam-stream') {
-      // Auth (HMAC STT token bound to `sid`) is enforced in handleProxyConnection.
-      wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req))
-    } else if (nextUpgrade) {
-      nextUpgrade(req, socket, head)
-    } else {
-      socket.destroy()
-    }
+    if (nextUpgrade) nextUpgrade(req, socket, head)
+    else socket.destroy()
   })
 
   server.listen(port, () => {
-    console.log(`> Ready on http://localhost:${port} (STT proxy at /api/sarvam-stream)`)
+    console.log(`> Ready on http://localhost:${port}`)
   })
 })
