@@ -50,7 +50,9 @@ export async function GET(req: NextRequest) {
     // client's browser polls this endpoint while it gets `waiting: true`.
     const entry = await getLobbyEntry(roomName, auth.uid)
     if (!entry) return NextResponse.json({ error: 'Not invited to this session' }, { status: 403 })
-    if (entry.status === 'denied') return NextResponse.json({ error: 'Not admitted', denied: true }, { status: 403 })
+    if (entry.status === 'denied' || entry.status === 'removed') {
+      return NextResponse.json({ error: 'Not admitted', denied: true }, { status: 403 })
+    }
     if (entry.status !== 'admitted') return NextResponse.json({ waiting: true }, { status: 409 })
     claimedRole = 'client'
   }
@@ -64,7 +66,9 @@ export async function GET(req: NextRequest) {
   // as the role: a participant must not be able to redirect another person's
   // audio to a different model. Anything not on the allow-list is dropped, so
   // the agent falls back to its own defaults rather than trusting free text.
-  const attributes: Record<string, string> = { role: claimedRole }
+  // `uid` lets the server find this participant again (identity is only the
+  // display name), e.g. when the therapist removes a guest from the call.
+  const attributes: Record<string, string> = { role: claimedRole, uid: auth.uid }
   if (isTranslationLanguage(sourceLang)) attributes.source_lang = sourceLang
   if (isTranslationLanguage(targetLang)) attributes.target_lang = targetLang
 

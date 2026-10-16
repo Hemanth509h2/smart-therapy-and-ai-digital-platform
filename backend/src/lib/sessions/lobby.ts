@@ -8,7 +8,8 @@ import { adminDb } from '@/lib/core/firebaseAdmin'
 // path, so browsers can neither read nor write it: only the server (Admin SDK)
 // does, which is what stops a guest from admitting themselves.
 
-export type LobbyStatus = 'waiting' | 'admitted' | 'denied'
+// 'removed': admitted, then taken out of the call by the therapist.
+export type LobbyStatus = 'waiting' | 'admitted' | 'denied' | 'removed'
 
 export interface LobbyEntry {
   uid: string

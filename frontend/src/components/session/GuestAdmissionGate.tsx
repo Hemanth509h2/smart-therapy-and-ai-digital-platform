@@ -5,14 +5,19 @@
 // therapist has admitted this guest; until then the guest's uid has no access to
 // the session at all. Admission is decided server-side (POST
 // /api/sessions/[id]/lobby), so this component only reflects it.
+//
+// It keeps checking after admission too: if the therapist removes the guest,
+// the room unmounts (the server has already cut their video and access).
 
 import { useEffect, useState } from 'react'
 import { apiFetch } from '@/lib/api'
 import WaitingLobby from './WaitingLobby'
 
-type GateStatus = 'checking' | 'waiting' | 'admitted' | 'denied' | 'invalid'
+type GateStatus = 'checking' | 'waiting' | 'admitted' | 'denied' | 'removed' | 'invalid'
 
 const POLL_MS = 3000
+// Slower once in the call: only watching for being removed.
+const ADMITTED_POLL_MS = 5000
 
 export default function GuestAdmissionGate({
   sessionId,
@@ -29,6 +34,7 @@ export default function GuestAdmissionGate({
   useEffect(() => {
     let stopped = false
     let inFlight = false
+    let admitted = false
     let timer: ReturnType<typeof setTimeout> | undefined
 
     const knock = async () => {
@@ -45,7 +51,12 @@ export default function GuestAdmissionGate({
           return
         }
         if (data.therapistName) setTherapistName(data.therapistName)
-        if (data.status === 'admitted' || data.status === 'denied') {
+        if (data.status === 'admitted') {
+          admitted = true
+          setStatus('admitted')
+          return
+        }
+        if (data.status === 'denied' || data.status === 'removed') {
           stopped = true
           setStatus(data.status)
           return
@@ -60,7 +71,7 @@ export default function GuestAdmissionGate({
         // Network blip: keep knocking.
       } finally {
         inFlight = false
-        if (!stopped) timer = setTimeout(knock, POLL_MS)
+        if (!stopped) timer = setTimeout(knock, admitted ? ADMITTED_POLL_MS : POLL_MS)
       }
     }
 
@@ -80,6 +91,10 @@ export default function GuestAdmissionGate({
   }, [sessionId])
 
   if (status === 'admitted') return <>{children}</>
+
+  // Removed from the call: show why for a moment, then the session-ended page
+  // (which also signs the throwaway guest out).
+  if (status === 'removed') return <RemovedThenEnded />
 
   if (status === 'denied' || status === 'invalid') {
     // Same look as the site's ErrorScreen, minus its "Go to home" button:
@@ -111,5 +126,27 @@ export default function GuestAdmissionGate({
       title={`Waiting for ${who} to let you in`}
       message="Your therapist has been told you're here. You'll join the call as soon as they let you in. Please keep this page open."
     />
+  )
+}
+
+const REMOVED_NOTICE_MS = 3000
+
+function RemovedThenEnded() {
+  useEffect(() => {
+    const t = setTimeout(() => window.location.replace('/session-ended?removed=1'), REMOVED_NOTICE_MS)
+    return () => clearTimeout(t)
+  }, [])
+  return (
+    <main className="staad-ui" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 16px' }}>
+      <section className="card" role="alert" style={{ transform: 'none', width: '100%', maxWidth: 480, display: 'grid', gap: 20, padding: 32 }}>
+        <img src="/assests/staad-emblem.svg" alt="STAAD" width={36} height={36} />
+        <div>
+          <h1 className="empty__h">You were removed from this session</h1>
+          <p className="empty__p" style={{ maxWidth: 'none' }}>
+            Your therapist ended your part of the call. To join again, open your invite link and wait to be let in.
+          </p>
+        </div>
+      </section>
+    </main>
   )
 }

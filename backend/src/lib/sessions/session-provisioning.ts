@@ -127,6 +127,21 @@ export async function provisionSessionDocs(
 }
 
 /**
+ * Take one uid's access to the session away again (the therapist removed a
+ * guest from the call): drop it from allowedUids and mark them offline.
+ */
+export async function revokeSessionUid(sessionId: string, uid: string): Promise<void> {
+  await adminDb()
+    .collection('liveSessions')
+    .doc(sessionId)
+    .update({
+      allowedUids: FieldValue.arrayRemove(uid),
+      [`participants.${uid}.isOnline`]: false,
+      'timestamps.updatedAt': FieldValue.serverTimestamp(),
+    })
+}
+
+/**
  * Mark the room as ended in Firestore so every participant (including the
  * client on the other side of the call) learns the session is over. Called
  * from the server on PATCH action 'end'; safe to call when the doc is absent.
