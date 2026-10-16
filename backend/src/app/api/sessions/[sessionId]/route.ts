@@ -102,7 +102,9 @@ export async function PATCH(
     // documents to exist and the entitlement to be current.
     if (finalAction === 'start' || finalAction === 'end') {
       try {
-        await provisionSessionDocs(params.sessionId);
+        await provisionSessionDocs(params.sessionId, {
+          reopen: finalAction === 'start' && existing.status !== 'COMPLETED' && existing.status !== 'CANCELLED',
+        });
       } catch (e) {
         // Surfaced, not swallowed: without provisioning the participants will
         // be locked out of their own session by the rules.

@@ -51,10 +51,16 @@ export interface ProvisionResult {
  * the browser's anonymous Firebase uid is not the guest User row's id. On
  * re-provisioning, uids are UNIONED (not overwritten) so a guest rejoining
  * from a second device (a new anonymous uid) does not lose the first one.
+ *
+ * `opts.reopen` clears a stale `status: 'ended'` on the room. The therapist's
+ * browser writes that flag directly when ending a call, so if the matching
+ * PATCH 'end' never reached the server, Postgres still has the session open
+ * while every client joining it is immediately bounced out as "ended". Pass
+ * it only when Postgres says the session is not COMPLETED/CANCELLED.
  */
 export async function provisionSessionDocs(
   sessionId: string,
-  opts?: { extraUids?: string[] }
+  opts?: { extraUids?: string[]; reopen?: boolean }
 ): Promise<ProvisionResult | null> {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
@@ -95,6 +101,9 @@ export async function provisionSessionDocs(
     await liveRef.update({
       allowedUids: FieldValue.arrayUnion(...allowedUids),
       'timestamps.updatedAt': FieldValue.serverTimestamp(),
+      ...(opts?.reopen && liveSnap.get('status') === 'ended'
+        ? { status: FieldValue.delete(), endedAt: FieldValue.delete() }
+        : {}),
     })
   }
 

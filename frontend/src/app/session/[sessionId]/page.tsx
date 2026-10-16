@@ -743,11 +743,10 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
     }
     setActiveSessionId(null);
     if (typeof window !== 'undefined') {
-      // Guests (anonymous sign-in via invite link) have no dashboard to go
-      // back to — sign the throwaway account out and land on the login page.
+      // Guests (invite link) have no account or dashboard: never send them to
+      // the login page. /session-ended signs the throwaway guest out.
       if (auth.currentUser?.uid?.startsWith('guest:')) {
-        auth.signOut().catch(() => {});
-        window.location.href = '/auth';
+        window.location.href = '/session-ended?left=1';
       } else {
         window.location.href = '/';
       }
@@ -899,7 +898,8 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
   // page. Must sit above the early returns — hooks can't be called conditionally.
   useEffect(() => {
     if (!sessionEnded || isTherapist) return;
-    if (auth.currentUser?.uid?.startsWith('guest:')) auth.signOut().catch(() => {});
+    // Don't sign the guest out here: AuthProvider would bounce a signed-out
+    // user to /auth before the fallback below runs. /session-ended does it.
     window.close();
     const fallback = setTimeout(() => window.location.replace('/session-ended'), 300);
     return () => clearTimeout(fallback);
@@ -938,8 +938,7 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
 
     const done = () => {
       if (auth.currentUser?.uid?.startsWith('guest:')) {
-        auth.signOut().catch(() => {});
-        window.location.href = '/auth';
+        window.location.href = '/session-ended';
       } else {
         window.location.href = '/';
       }

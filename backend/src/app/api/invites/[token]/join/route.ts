@@ -104,7 +104,10 @@ export async function POST(request: Request, { params }: { params: { token: stri
     // outbound access to Google, which some dev networks block — never fail
     // the join over it; the LiveKit call itself does not depend on it.
     try {
-      await provisionSessionDocs(sessionId, { extraUids: [guestUid] });
+      // The session is open in Postgres (ended ones were rejected above), so a
+      // leftover 'ended' flag on the room is stale: clear it, or the guest is
+      // bounced straight back out.
+      await provisionSessionDocs(sessionId, { extraUids: [guestUid], reopen: true });
     } catch (e) {
       console.warn('[invites/join] Firestore provisioning failed (non-fatal):', (e as Error).message);
     }

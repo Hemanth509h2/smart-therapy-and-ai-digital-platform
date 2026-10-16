@@ -75,7 +75,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           process.env.NODE_ENV !== 'production' && pathname === '/session/preview';
         // /join/<token> is the public guest invite page — no session needed.
         // /admin/invite/<token> explains how to sign in before accepting.
-        const guestInvite = pathname.startsWith('/join') || pathname.startsWith('/admin/invite/');
+        // /session-ended is where guests land after a call (they have no account).
+        const guestInvite =
+          pathname.startsWith('/join') || pathname.startsWith('/admin/invite/') || pathname === '/session-ended';
         if (pathname !== '/auth' && pathname !== '/onboarding' && !devPreview && !guestInvite) {
           router.push('/auth');
         }
