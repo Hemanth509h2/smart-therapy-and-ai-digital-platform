@@ -70,6 +70,16 @@ app.prepare().then(() => {
     else socket.destroy()
   })
 
+  // Without this, a busy port makes the process exit silently with code 0.
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`✖ Port ${port} is already in use. Stop the other server or set PORT.`)
+    } else {
+      console.error('✖ Server failed to start:', err.code || err.message)
+    }
+    process.exit(1)
+  })
+
   server.listen(port, () => {
     console.log(`> Ready on http://localhost:${port}`)
   })
