@@ -1,14 +1,14 @@
-"""Standalone Sarvam speech-to-text WebSocket relay.
+"""STAAD AI service: one server, one package per AI feature.
 
-Why this exists: Sarvam's streaming STT WebSocket only accepts the API key as
-an HTTP *header*, and browsers cannot set headers on a WebSocket. So the
-browser connects here (no key), and this server opens the upstream Sarvam
-socket with the header and relays audio frames up and transcript messages
-back down. The key never reaches the client.
+stt/  Sarvam speech-to-text relay. Sarvam's streaming STT WebSocket only accepts
+      the API key as an HTTP *header*, and browsers cannot set headers on a
+      WebSocket. So the browser connects here (no key), and the stt package opens
+      the upstream Sarvam socket with the header and relays audio frames up and
+      transcript messages back down. The key never reaches the client.
 
 Auth: the backend's /api/stt-token mints a short-lived HMAC token bound to
-the session id; handle_proxy_connection verifies it with the same
-STT_TOKEN_SECRET. This service needs no database or Firebase access.
+the session id; stt verifies it with the same STT_TOKEN_SECRET. This service
+needs no database or Firebase access.
 """
 
 import asyncio
@@ -21,10 +21,9 @@ from urllib.parse import parse_qsl, urlsplit
 
 from websockets.asyncio.server import serve
 
-from stt_proxy import handle_proxy_connection
+import stt
 
-STREAM_PATHS = {"/sarvam-stream", "/api/sarvam-stream"}
-log = logging.getLogger("stt-relay")
+log = logging.getLogger("ai")
 
 
 def load_env_file(path):
@@ -73,13 +72,13 @@ def process_request(connection, request):
         del response.headers["Content-Type"]  # Headers is a multidict; replace, don't append
         response.headers["Content-Type"] = "application/json"
         return response
-    if path not in STREAM_PATHS:
+    if path not in stt.STREAM_PATHS:
         return connection.respond(HTTPStatus.FORBIDDEN, "Forbidden\n")
     return None  # continue with the WebSocket handshake
 
 
 async def handler(ws):
-    await handle_proxy_connection(ws, first_values(urlsplit(ws.request.path).query))
+    await stt.handle_proxy_connection(ws, first_values(urlsplit(ws.request.path).query))
 
 
 def make_server(port, host=None):
@@ -90,9 +89,9 @@ def make_server(port, host=None):
 async def main():
     port = int(os.environ.get("PORT") or "4100")
     if os.environ.get("NODE_ENV") == "production" and not os.environ.get("STT_TOKEN_SECRET"):
-        log.warning("[stt-relay] STT_TOKEN_SECRET is not set - every connection will be refused.")
+        log.warning("[ai] STT_TOKEN_SECRET is not set - every STT connection will be refused.")
     async with make_server(port) as server:
-        print(f"> STT relay ready on http://localhost:{port} (WebSocket at /sarvam-stream)", flush=True)
+        print(f"> AI service ready on http://localhost:{port} (STT WebSocket at /sarvam-stream)", flush=True)
         await server.serve_forever()
 
 

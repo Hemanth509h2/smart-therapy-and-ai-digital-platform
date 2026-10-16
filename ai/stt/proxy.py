@@ -1,4 +1,4 @@
-"""Sarvam speech-to-text WebSocket proxy (used by server.py in this folder).
+"""Sarvam speech-to-text WebSocket proxy (served by ai/server.py).
 
 Sarvam's streaming endpoint takes the API key as an HTTP header, which browsers
 cannot set on a WebSocket. The browser connects here without a key; the key is
@@ -24,6 +24,9 @@ from websockets.protocol import State
 log = logging.getLogger("stt-proxy")
 
 DEFAULT_SARVAM_WS = "wss://api.sarvam.ai/speech-to-text/ws"
+
+# WebSocket paths the browser connects to.
+STREAM_PATHS = {"/sarvam-stream", "/api/sarvam-stream"}
 
 # Query params forwarded to Sarvam. input_audio_codec + sample_rate are REQUIRED
 # for raw PCM; dropping them makes Sarvam parse the audio as WAV.
