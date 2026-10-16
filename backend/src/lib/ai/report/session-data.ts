@@ -1,4 +1,5 @@
 import { adminDb } from '@/lib/core/firebaseAdmin'
+import { decryptTranscriptLines } from '@/lib/ai/rag/transcript-store'
 
 export interface ModuleEvent {
   module: string
@@ -59,7 +60,7 @@ export async function getReportInputs(sessionId: string): Promise<ReportInputs> 
   const snap = await adminDb().collection('sessions').doc(sessionId).get()
   const d = snap.exists ? snap.data() ?? {} : {}
   return {
-    transcript: Array.isArray(d.transcript) ? (d.transcript as TranscriptLine[]) : [],
+    transcript: Array.isArray(d.transcript) ? decryptTranscriptLines(d.transcript as TranscriptLine[]) : [],
     moduleEvents: Array.isArray(d.moduleEvents) ? (d.moduleEvents as ModuleEvent[]) : [],
     therapistNotes: Array.isArray(d.therapistNotes) ? (d.therapistNotes as SessionNote[]) : [],
   }
