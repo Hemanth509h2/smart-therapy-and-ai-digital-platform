@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/core/db';
 import { adminAuth } from '@/lib/core/firebaseAdmin';
 import { provisionSessionDocs } from '@/lib/sessions/session-provisioning';
+import { createLobbyEntry } from '@/lib/sessions/lobby';
 import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
@@ -99,22 +100,27 @@ export async function POST(request: Request, { params }: { params: { token: stri
       sessionId = session.id;
     }
 
-    // Grant Firestore access (liveSessions.allowedUids += guestUid) so the
-    // guest can read/write session state. Best-effort: the Admin SDK needs
-    // outbound access to Google, which some dev networks block — never fail
-    // the join over it; the LiveKit call itself does not depend on it.
+    // Make sure the room exists. Best-effort: the Admin SDK needs outbound
+    // access to Google, which some dev networks block. The guest is NOT added to
+    // allowedUids here: they get Firestore access and a LiveKit token only once
+    // the therapist admits them from the waiting room (see lib/sessions/lobby.ts).
     try {
       // The session is open in Postgres (ended ones were rejected above), so a
       // leftover 'ended' flag on the room is stale: clear it, or the guest is
       // bounced straight back out.
-      await provisionSessionDocs(sessionId, { extraUids: [guestUid], reopen: true });
+      await provisionSessionDocs(sessionId, { reopen: true });
     } catch (e) {
       console.warn('[invites/join] Firestore provisioning failed (non-fatal):', (e as Error).message);
     }
 
+    // Put the guest in the waiting room. Required: without this entry the
+    // therapist can never admit them.
+    const clientName = `${invite.firstName} ${invite.lastName}`.trim() || 'Guest';
+    await createLobbyEntry(sessionId, guestUid, clientName);
+
     return NextResponse.json({
       sessionId,
-      clientName: `${invite.firstName} ${invite.lastName}`.trim() || 'Guest',
+      clientName,
       therapistName: `${invite.therapist.firstName} ${invite.therapist.lastName}`.trim(),
       guestUid,
       // Custom token lets the patient sign in with signInWithCustomToken —

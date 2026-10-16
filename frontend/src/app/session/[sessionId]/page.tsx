@@ -35,6 +35,8 @@ import AIAssistantPopup from '@/components/session/AIAssistantPopup';
 import AINotesPopup from '@/components/session/AINotesPopup';
 import CaptionsPopup from '@/components/session/CaptionsPopup';
 import WaitingLobby from '@/components/session/WaitingLobby';
+import GuestAdmissionGate from '@/components/session/GuestAdmissionGate';
+import LobbyRequests from '@/components/session/LobbyRequests';
 import TherapyModulesPanel from '@/components/session/TherapyModulesPanel';
 import { ShareWhiteboardModal } from '@/components/session/WhiteboardStage';
 import StaadWhiteboard from '@/components/session/StaadWhiteboard';
@@ -101,6 +103,21 @@ function AttentionBridge({
 }
 
 export default function SessionRoomPage({ params }: { params: { sessionId: string } }) {
+  const uid = useAuthStore((s) => s.uid);
+  // Invite-link guests wait in the waiting room until the therapist admits
+  // them; the room (and its Firestore/LiveKit access) only mounts after that.
+  if (uid?.startsWith('guest:')) {
+    const name = (typeof window !== 'undefined' && sessionStorage.getItem('guestName')) || 'Guest';
+    return (
+      <GuestAdmissionGate sessionId={params.sessionId} selfName={name}>
+        <SessionRoom params={params} />
+      </GuestAdmissionGate>
+    );
+  }
+  return <SessionRoom params={params} />;
+}
+
+function SessionRoom({ params }: { params: { sessionId: string } }) {
   const sessionId = params.sessionId;
 
   const { uid, role, profile } = useAuthStore();
@@ -1261,6 +1278,9 @@ export default function SessionRoomPage({ params }: { params: { sessionId: strin
               )}
 
               <ReactionOverlay sessionId={sessionId} open={reactionBarOpen} onOpenChange={setReactionBarOpen} />
+
+              {/* Waiting room: invite-link guests asking to join (therapist only). */}
+              {isTherapist && <LobbyRequests sessionId={sessionId} onDecided={showToast} />}
 
               {/* Toast notification */}
               {toast && (

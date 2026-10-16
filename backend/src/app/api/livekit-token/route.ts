@@ -1,14 +1,19 @@
-import { AccessToken, RoomServiceClient } from 'livekit-server-sdk'
+import { AccessToken } from 'livekit-server-sdk'
 import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/core/db'
+import { requireAuth } from '@/lib/http/apiAuth'
+import { getLobbyEntry } from '@/lib/sessions/lobby'
 import { isTranslationLanguage } from '@/lib/sessions/translationLanguages'
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  const auth = await requireAuth(req)
+  if (!auth.ok) return auth.response
+
   const { searchParams } = new URL(req.url)
   const roomName = searchParams.get('room')
   const participantName = searchParams.get('name')
-  const role = searchParams.get('role')
   const sourceLang = searchParams.get('sourceLang')
   const targetLang = searchParams.get('targetLang')
 
@@ -27,13 +32,28 @@ export async function GET(req: NextRequest) {
   // the call — it silently disables attention scoring. See
   // src/hooks/useAttentionScoring.ts.
   //
-  // The token is signed server-side, so a participant cannot forge their own
-  // role here.
-  // Fail closed: only a role we explicitly recognise is published. An absent or
-  // unexpected `role` yields NO role claim rather than a defaulted one, so an
-  // unlabelled participant can never be mistaken for the client and analysed.
-  const claimedRole =
-    role === 'therapist' || role === 'client' ? role : null
+  // The role is decided here from the signed-in user, never taken from the
+  // request: the session's own therapist is 'therapist'; anyone else must be a
+  // guest the therapist admitted from the waiting room, and is 'client'.
+  // Everyone else gets no token at all.
+  const session = await prisma.session.findUnique({
+    where: { id: roomName },
+    select: { therapist: { select: { userId: true } } },
+  })
+  if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+
+  let claimedRole: 'therapist' | 'client'
+  if (session.therapist.userId === auth.uid) {
+    claimedRole = 'therapist'
+  } else {
+    // Waiting room: no token until the therapist admits this guest. The
+    // client's browser polls this endpoint while it gets `waiting: true`.
+    const entry = await getLobbyEntry(roomName, auth.uid)
+    if (!entry) return NextResponse.json({ error: 'Not invited to this session' }, { status: 403 })
+    if (entry.status === 'denied') return NextResponse.json({ error: 'Not admitted', denied: true }, { status: 403 })
+    if (entry.status !== 'admitted') return NextResponse.json({ waiting: true }, { status: 409 })
+    claimedRole = 'client'
+  }
 
   // Live-translation languages, read by the translation agent from participant
   // attributes. `source_lang` is what this person SPEAKS (which STT model to
@@ -44,18 +64,9 @@ export async function GET(req: NextRequest) {
   // as the role: a participant must not be able to redirect another person's
   // audio to a different model. Anything not on the allow-list is dropped, so
   // the agent falls back to its own defaults rather than trusting free text.
-  const attributes: Record<string, string> = {}
-  if (claimedRole) attributes.role = claimedRole
+  const attributes: Record<string, string> = { role: claimedRole }
   if (isTranslationLanguage(sourceLang)) attributes.source_lang = sourceLang
   if (isTranslationLanguage(targetLang)) attributes.target_lang = targetLang
-
-  // Waiting room: a client is not let into the call until the therapist is
-  // actually connected to the LiveKit room. Checked against LiveKit itself
-  // rather than Firestore presence, which goes stale when a tab is closed.
-  // The client's browser polls this endpoint while it gets `waiting: true`.
-  if (claimedRole === 'client' && !(await therapistInRoom(roomName))) {
-    return NextResponse.json({ waiting: true }, { status: 409 })
-  }
 
   const at = new AccessToken(
     process.env.LIVEKIT_API_KEY!,
@@ -64,8 +75,8 @@ export async function GET(req: NextRequest) {
       identity: participantName,
       // Metadata is kept for backwards compatibility: attention scoring reads
       // the role from here, not from attributes.
-      ...(claimedRole ? { metadata: JSON.stringify({ role: claimedRole }) } : {}),
-      ...(Object.keys(attributes).length ? { attributes } : {}),
+      metadata: JSON.stringify({ role: claimedRole }),
+      attributes,
     }
   )
 
@@ -75,41 +86,8 @@ export async function GET(req: NextRequest) {
     canPublish: true,
     canSubscribe: true,
     canPublishData: true,
-    roomAdmin: role === 'therapist',
+    roomAdmin: claimedRole === 'therapist',
   })
 
   return NextResponse.json({ token: await at.toJwt() })
-}
-
-async function therapistInRoom(roomName: string): Promise<boolean> {
-  const url = process.env.LIVEKIT_URL || process.env.NEXT_PUBLIC_LIVEKIT_URL
-  if (!url) {
-    // Without a server URL we cannot look; let the client in rather than
-    // locking every call. Set LIVEKIT_URL on the backend to enable the gate.
-    console.warn('[livekit-token] LIVEKIT_URL not set — waiting room disabled')
-    return true
-  }
-  const svc = new RoomServiceClient(
-    url.replace(/^wss:/i, 'https:').replace(/^ws:/i, 'http:'),
-    process.env.LIVEKIT_API_KEY!,
-    process.env.LIVEKIT_API_SECRET!,
-  )
-  try {
-    const people = await svc.listParticipants(roomName)
-    return people.some((p) => {
-      if (p.attributes?.role === 'therapist') return true
-      try {
-        return JSON.parse(p.metadata || '{}').role === 'therapist'
-      } catch {
-        return false
-      }
-    })
-  } catch (err) {
-    // A room nobody has joined yet lists as empty rather than throwing, so an
-    // error here means the lookup itself failed (wrong LIVEKIT_URL, key or
-    // secret, or the network). Treating that as "no therapist" would strand
-    // every client in the waiting room; let them in, as when LIVEKIT_URL is unset.
-    console.error('[livekit-token] could not list participants — waiting room bypassed:', err)
-    return true
-  }
 }

@@ -17,7 +17,18 @@ const TIPS = [
   'Keep your face well lit and in view of the camera.',
 ]
 
-export default function WaitingLobby({ therapistName, selfName }: { therapistName?: string; selfName?: string }) {
+export default function WaitingLobby({
+  therapistName,
+  selfName,
+  title,
+  message,
+}: {
+  therapistName?: string
+  selfName?: string
+  /** Override the default "Waiting for … to join" copy (e.g. the admission waiting room). */
+  title?: string
+  message?: string
+}) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [cameraOn, setCameraOn] = useState(true)
@@ -184,10 +195,10 @@ export default function WaitingLobby({ therapistName, selfName }: { therapistNam
           </div>
 
           <h1 style={{ margin: 0, fontSize: 22, lineHeight: 1.3, fontWeight: 700, color: RC.ink }}>
-            Waiting for {who} to join
+            {title ?? `Waiting for ${who} to join`}
           </h1>
           <p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.55, color: RC.inkMuted }}>
-            You&apos;ll be connected automatically as soon as they arrive. Please keep this page open.
+            {message ?? "You'll be connected automatically as soon as they arrive. Please keep this page open."}
           </p>
 
           <div
