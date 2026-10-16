@@ -1,6 +1,31 @@
 import { FieldValue } from 'firebase-admin/firestore'
 import type { TranscriptChunk } from './types'
 import { adminDb } from '@/lib/core/firebaseAdmin'
+import { decryptText } from '@/lib/sessions/transcript-crypto'
+
+// Transcript lines may be encrypted ('v1:...') or legacy plain text; decryptText
+// passes plain text through unchanged. A line that cannot be decrypted (wrong
+// or missing key, tampered data) is skipped so a reader never crashes. Never
+// log the text itself.
+export function decryptTranscriptLines<T extends { text: string }>(lines: T[]): T[] {
+  const out: T[] = []
+  let skipped = 0
+  for (const line of lines) {
+    if (typeof line?.text !== 'string') {
+      out.push(line)
+      continue
+    }
+    try {
+      out.push({ ...line, text: decryptText(line.text) })
+    } catch {
+      skipped++
+    }
+  }
+  if (skipped > 0) {
+    console.warn(`[transcript-store] Skipped ${skipped} transcript line(s) that could not be decrypted`)
+  }
+  return out
+}
 
 export async function appendTranscriptChunk(
   sessionId: string,
@@ -28,7 +53,8 @@ export async function getSessionTranscript(
   const ref = adminDb().collection('sessions').doc(sessionId)
   const doc = await ref.get()
   if (!doc.exists) return []
-  return (doc.data()?.transcript ?? []) as TranscriptChunk[]
+  const transcript = (doc.data()?.transcript ?? []) as TranscriptChunk[]
+  return Array.isArray(transcript) ? decryptTranscriptLines(transcript) : transcript
 }
 
 export async function deleteSessionTranscript(
