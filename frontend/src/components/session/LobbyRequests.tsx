@@ -3,10 +3,11 @@
 // Therapist side of the waiting room: lists guests who opened the invite link
 // and are waiting, with Admit / Deny. Polls the backend (the lobby lives in a
 // server-only Firestore path, so it can't be subscribed to from the browser).
+// Styled with the website's STAAD design system (.staad-ui tokens), so it
+// follows the site's light/dark theme even inside the call screen.
 
 import { useCallback, useEffect, useState } from 'react'
 import { apiFetch } from '@/lib/api'
-import { RC } from './roomTheme'
 
 interface Waiting {
   uid: string
@@ -64,31 +65,57 @@ export default function LobbyRequests({ sessionId, onDecided }: { sessionId: str
     <div
       role="region"
       aria-label="Waiting room"
-      style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 70, display: 'flex', flexDirection: 'column', gap: 8, width: 'min(380px, calc(100vw - 32px))' }}
+      className="staad-ui"
+      style={{
+        // .staad-ui is a page shell (full height, page background); here it
+        // only supplies the theme tokens and fonts.
+        minHeight: 0,
+        background: 'transparent',
+        position: 'fixed',
+        top: 16,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 70,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        width: 'min(420px, calc(100vw - 32px))',
+      }}
     >
       {waiting.map((p) => (
         <div
           key={p.uid}
-          style={{ background: RC.panel, border: `1px solid ${RC.border}`, borderRadius: 14, padding: '12px 14px', boxShadow: '0 10px 30px rgba(0,0,0,0.18)', display: 'flex', alignItems: 'center', gap: 12 }}
+          style={{
+            background: 'var(--surface-2)',
+            border: '1px solid var(--line)',
+            borderRadius: 24,
+            padding: '12px 12px 12px 18px',
+            boxShadow: '0 14px 34px rgba(0,0,0,0.16)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+          }}
         >
-          <span style={{ width: 10, height: 10, borderRadius: '50%', background: RC.green, flexShrink: 0 }} />
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--ok)', flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: RC.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-            <div style={{ fontSize: 12, color: RC.inkMuted }}>is waiting to join</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+            <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--muted)' }}>is waiting to join</div>
           </div>
           <button
             type="button"
+            className="btn btn--ghost btn--sm"
             disabled={busy === p.uid}
             onClick={() => decide(p, 'deny')}
-            style={{ padding: '7px 12px', borderRadius: 9, border: `1px solid ${RC.border}`, background: RC.tile, color: RC.ink, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            style={{ padding: '0 16px' }}
           >
             Deny
           </button>
           <button
             type="button"
+            className="btn btn--primary btn--sm"
             disabled={busy === p.uid}
             onClick={() => decide(p, 'admit')}
-            style={{ padding: '7px 14px', borderRadius: 9, border: 'none', background: RC.green, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+            style={{ padding: '0 18px' }}
           >
             Admit
           </button>

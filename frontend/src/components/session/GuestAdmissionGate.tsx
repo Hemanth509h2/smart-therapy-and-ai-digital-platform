@@ -9,7 +9,6 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '@/lib/api'
 import WaitingLobby from './WaitingLobby'
-import { RC } from './roomTheme'
 
 type GateStatus = 'checking' | 'waiting' | 'admitted' | 'denied' | 'invalid'
 
@@ -83,19 +82,24 @@ export default function GuestAdmissionGate({
   if (status === 'admitted') return <>{children}</>
 
   if (status === 'denied' || status === 'invalid') {
+    // Same look as the site's ErrorScreen, minus its "Go to home" button:
+    // guests have no account, so home would only show them a login page.
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: RC.pageBg }}>
-        <div style={{ maxWidth: 420, textAlign: 'center', background: RC.panel, border: `1px solid ${RC.border}`, borderRadius: 16, padding: 28 }}>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: RC.ink }}>
-            {status === 'denied' ? "You weren't let into this session" : 'This link is not valid for this session'}
-          </h1>
-          <p style={{ margin: '10px 0 0', fontSize: 14, lineHeight: 1.55, color: RC.inkMuted }}>
-            {status === 'denied'
-              ? 'Your therapist did not admit you right now. Please contact them, or open your invite link again.'
-              : 'Please open the invite link your therapist sent you.'}
-          </p>
-        </div>
-      </div>
+      <main className="staad-ui" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 16px' }}>
+        <section className="card" role="alert" style={{ transform: 'none', width: '100%', maxWidth: 480, display: 'grid', gap: 20, padding: 32 }}>
+          <img src="/assests/staad-emblem.svg" alt="STAAD" width={36} height={36} />
+          <div>
+            <h1 className="empty__h">
+              {status === 'denied' ? "You weren't let into this session" : 'This link is not valid for this session'}
+            </h1>
+            <p className="empty__p" style={{ maxWidth: 'none' }}>
+              {status === 'denied'
+                ? 'Your therapist did not admit you right now. Please contact them, or open your invite link again.'
+                : 'Please open the invite link your therapist sent you.'}
+            </p>
+          </div>
+        </section>
+      </main>
     )
   }
 
