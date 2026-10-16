@@ -160,6 +160,30 @@ model DocumentChunk {
   @@map("document_chunks")
 }
 
+// STAAD therapy-module reports for RAG, one row per report section. Filled by
+// scripts/ingest-module-reports.ts. Embeddings are
+// nvidia/llama-nemotron-embed-vl-1b-v2 at 1024 dimensions (not document_chunks'
+// retired nv-embedqa-e5-v5), so queries must use that model too. The HNSW index
+// on embedding is created by the script; Prisma can't declare it.
+model ModuleReportChunk {
+  id            String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  moduleName    String                      @map("module_name")
+  category      String
+  fileName      String                      @map("file_name")
+  sectionNumber Int                         @map("section_number")
+  sectionTitle  String                      @map("section_title")
+  chunkIndex    Int                         @map("chunk_index")
+  chunkText     String                      @map("chunk_text")
+  embedding     Unsupported("vector(1024)")
+  metadata      Json                        @default("{}")
+  createdAt     DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([fileName, chunkIndex], map: "module_report_chunks_file_chunk_key")
+  @@index([category], map: "module_report_chunks_category_idx")
+  @@index([moduleName], map: "module_report_chunks_module_name_idx")
+  @@map("module_report_chunks")
+}
+
 model Booking {
   id          String           @id @default(uuid())
   therapistId String
