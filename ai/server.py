@@ -15,6 +15,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 from http import HTTPStatus
 from pathlib import Path
 from urllib.parse import parse_qsl, urlsplit
@@ -61,7 +62,12 @@ def allowed_origins(env=os.environ):
     return origins or None
 
 
+def log_line(text):
+    print(f"[ai] {text}", flush=True)
+
+
 def process_request(connection, request):
+    connection.started_at = time.monotonic()
     # Never log request.path: the query string carries the STT token.
     path = urlsplit(request.path).path
     if path in ("/health", "/"):
@@ -77,13 +83,32 @@ def process_request(connection, request):
     return None  # continue with the WebSocket handshake
 
 
+def process_response(connection, request, response):
+    # One line per HTTP request, path only (the query string carries the STT token).
+    path = urlsplit(request.path).path if request else "?"
+    ms = (time.monotonic() - getattr(connection, "started_at", time.monotonic())) * 1000
+    is_ws = request is not None and request.headers.get("Upgrade", "").lower() == "websocket"
+    if response.status_code == HTTPStatus.SWITCHING_PROTOCOLS:
+        log_line(f"WS  {path} → open ({ms:.0f}ms)")
+    else:
+        log_line(f"{'WS ' if is_ws else 'GET'} {path} → {response.status_code} ({ms:.0f}ms)")
+    return None
+
+
 async def handler(ws):
-    await stt.handle_proxy_connection(ws, first_values(urlsplit(ws.request.path).query))
+    path = urlsplit(ws.request.path).path
+    try:
+        await stt.handle_proxy_connection(ws, first_values(urlsplit(ws.request.path).query))
+    finally:
+        secs = time.monotonic() - getattr(ws, "started_at", time.monotonic())
+        reason = f" {ws.close_reason}" if ws.close_reason else ""
+        log_line(f"WS  {path} → closed {ws.close_code}{reason} after {secs:.1f}s")
 
 
 def make_server(port, host=None):
     """Returns the websockets server (use with `async with`). host=None = all interfaces."""
-    return serve(handler, host, port, process_request=process_request, origins=allowed_origins())
+    return serve(handler, host, port, process_request=process_request, process_response=process_response,
+                 origins=allowed_origins())
 
 
 async def main():
