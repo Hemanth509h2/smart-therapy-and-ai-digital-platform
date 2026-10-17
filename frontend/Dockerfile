@@ -1,71 +1,108 @@
-# STAAD frontend (Next.js), port 3000. Built as a standalone server.
+# =============================================================================
+# STAAD frontend - Docker image
+# =============================================================================
 #
-#   docker build -t staad-frontend \
-#     --build-arg NEXT_PUBLIC_API_URL=https://api.example.com \
-#     --build-arg NEXT_PUBLIC_STT_RELAY_URL=https://stt.example.com \
-#     --build-arg NEXT_PUBLIC_FIREBASE_API_KEY=... \
-#     .
+# What this is:
+#   The website (Next.js). It listens on port 3000.
+#
+# How to build (run inside the frontend/ folder):
+#   docker build -t staad-frontend .
+#
+# How to run:
 #   docker run -p 3000:3000 staad-frontend
 #
-# Every NEXT_PUBLIC_* value is baked into the browser bundle at build time, so
-# pass them as build args (changing one means rebuilding). Instead of
-# NEXT_PUBLIC_API_URL you can set BACKEND_URL to proxy /api/* through this
-# server (see next.config.mjs); it is also read at build time.
+#   -p 3000:3000   makes the site reachable at http://localhost:3000
+#
+# Where the settings come from:
+#   frontend/.env is used while BUILDING. All its values are NEXT_PUBLIC_*,
+#   which Next.js writes into the JavaScript sent to the browser, so they are
+#   public anyway and safe to include. To change one (for example
+#   NEXT_PUBLIC_API_URL), edit .env and build the image again.
+#   Nothing else is needed when the container runs.
+#
+# The build has two stages:
+#   Stage 1 "build"  installs everything and compiles the site.
+#   Stage 2 (final)  keeps only the small standalone server Next.js produces.
+# =============================================================================
 
-FROM node:24.21.0-bookworm-slim AS base
+
+# -----------------------------------------------------------------------------
+# Stage 1: build the site
+# -----------------------------------------------------------------------------
+
+# Start from the official Node.js image (same version as local development).
+FROM node:24.21.0-bookworm-slim AS build
+
+# All following commands run inside /app.
 WORKDIR /app
+
+# Do not send anonymous usage data to Next.js during the build.
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# ---- Dependencies ----
-FROM base AS deps
+# Ask Next.js for a "standalone" build: a small server.js with only the files
+# it needs. next.config.mjs only turns this on when this variable is set.
+ENV NEXT_OUTPUT=standalone
+
+# Optional: the public addresses the browser uses. When passed with
+# --build-arg (docker-compose.yml does this on the cloud server), they replace
+# the values in .env, so .env can keep its localhost addresses for development.
+#   NEXT_PUBLIC_API_URL        backend API, e.g. https://app.example.com
+#   NEXT_PUBLIC_STT_RELAY_URL  speech-to-text relay, e.g. https://app.example.com
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_STT_RELAY_URL
+
+# Copy only the dependency list first. Docker caches this step, so dependencies
+# are reinstalled only when package.json or package-lock.json change.
 COPY package.json package-lock.json ./
+
+# Install the exact versions from package-lock.json.
 RUN npm ci
 
-# ---- Build ----
-FROM base AS build
-ARG NEXT_PUBLIC_API_URL
-ARG BACKEND_URL
-ARG NEXT_PUBLIC_LIVEKIT_URL
-ARG NEXT_PUBLIC_STT_RELAY_URL
-ARG NEXT_PUBLIC_STT_TEST_MODE=false
-ARG NEXT_PUBLIC_FIREBASE_API_KEY
-ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-ARG NEXT_PUBLIC_FIREBASE_DATABASE_URL
-ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID
-ARG NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-ARG NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-ARG NEXT_PUBLIC_FIREBASE_APP_ID
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
-    BACKEND_URL=$BACKEND_URL \
-    NEXT_PUBLIC_LIVEKIT_URL=$NEXT_PUBLIC_LIVEKIT_URL \
-    NEXT_PUBLIC_STT_RELAY_URL=$NEXT_PUBLIC_STT_RELAY_URL \
-    NEXT_PUBLIC_STT_TEST_MODE=$NEXT_PUBLIC_STT_TEST_MODE \
-    NEXT_PUBLIC_FIREBASE_API_KEY=$NEXT_PUBLIC_FIREBASE_API_KEY \
-    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=$NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN \
-    NEXT_PUBLIC_FIREBASE_DATABASE_URL=$NEXT_PUBLIC_FIREBASE_DATABASE_URL \
-    NEXT_PUBLIC_FIREBASE_PROJECT_ID=$NEXT_PUBLIC_FIREBASE_PROJECT_ID \
-    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=$NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET \
-    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=$NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID \
-    NEXT_PUBLIC_FIREBASE_APP_ID=$NEXT_PUBLIC_FIREBASE_APP_ID \
-    NEXT_OUTPUT=standalone
-COPY --from=deps /app/node_modules ./node_modules
+# Now copy the rest of the source code (including .env).
 COPY . .
-# Pages that start Firebase are prerendered, so the build fails without its config.
-RUN if [ -z "$NEXT_PUBLIC_FIREBASE_API_KEY" ]; then \
-      echo "Missing build arg NEXT_PUBLIC_FIREBASE_API_KEY: pass the NEXT_PUBLIC_* values from .env.example as --build-arg." >&2; \
+
+# Stop early with a clear message if .env is missing. Without it the build
+# fails later with many confusing Firebase errors.
+RUN if [ ! -f .env ]; then \
+      echo "frontend/.env is missing: copy .env.example to .env and fill it in." >&2; \
       exit 1; \
     fi
-# prebuild downloads the MediaPipe face model into public/mediapipe.
+
+# Compile the site. This also downloads the MediaPipe face model into
+# public/mediapipe, so the build needs internet access.
 RUN npm run build
 
-# ---- Runtime ----
-FROM base AS runner
-ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0
+
+# -----------------------------------------------------------------------------
+# Stage 2: the image that actually runs
+# -----------------------------------------------------------------------------
+
+# Start again from a clean Node.js image.
+FROM node:24.21.0-bookworm-slim
+
+WORKDIR /app
+
+# Run in production mode on port 3000, reachable from outside the container.
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Copy the standalone server, the static files (JS, CSS) and the public folder
+# (images, MediaPipe model). Files are owned by the "node" user.
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
+
+# Do not run as root.
 USER node
+
+# The port the site listens on.
 EXPOSE 3000
+
+# Docker checks every 30 seconds that the home page still loads.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/').then(r=>process.exit(r.status<500?0:1),()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.status < 500 ? 0 : 1), () => process.exit(1))"
+
+# Start the standalone Next.js server.
 CMD ["node", "server.js"]

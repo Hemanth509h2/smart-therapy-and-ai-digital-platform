@@ -1,0 +1,202 @@
+# =============================================================================
+# STAAD - run the whole platform on a cloud server with Docker Compose
+# =============================================================================
+#
+# Before the first start (see DOCKER_REPORT.md for the full step-by-step):
+#   1. Point your domains (DNS "A" records) to this server's public IP.
+#   2. Open ports 80 and 443 in the server's firewall. Nothing else is needed.
+#   3. Copy .env.example to .env next to this file and fill it in
+#      (domains, e-mail, feedback database password).
+#   4. Copy .env.example to .env in backend/, frontend/, ai/ and feedback-board/
+#      and fill them in.
+#
+# Start everything (builds the images the first time):
+#   docker compose up -d --build
+#
+# Watch the logs:
+#   docker compose logs -f
+#   docker compose logs -f backend        (one service only)
+#
+# See which services are running and healthy:
+#   docker compose ps
+#
+# Update after a git pull:
+#   docker compose up -d --build
+#
+# Stop everything:
+#   docker compose down
+#
+# Where each part is reachable (HTTPS, handled by Caddy):
+#   https://APP_DOMAIN        website, API (/api/...) and speech-to-text
+#   https://FEEDBACK_DOMAIN   anonymous feedback board
+#   https://N8N_DOMAIN        n8n automation
+#
+# How the traffic flows:
+#   internet -> caddy (ports 80/443, HTTPS) -> the right container
+#   Only caddy is open to the internet. The other containers have no public
+#   ports; they talk to each other by service name (http://backend:4000, ...).
+#   Inside a container, "localhost" means that container itself.
+# =============================================================================
+
+
+# Shared log settings: each service keeps at most 3 log files of 10 MB, so the
+# logs can never fill the server's disk.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Caddy: HTTPS front door. The only container open to the internet.
+  # ---------------------------------------------------------------------------
+  caddy:
+    image: caddy:2.11.7-alpine
+    ports:
+      - "80:80"         # HTTP (Caddy redirects it to HTTPS, and uses it for certificates)
+      - "443:443"       # HTTPS
+      - "443:443/udp"   # HTTPS over HTTP/3
+    environment:
+      # Read by the Caddyfile.
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env}
+      FEEDBACK_DOMAIN: ${FEEDBACK_DOMAIN:?Set FEEDBACK_DOMAIN in .env}
+      N8N_DOMAIN: ${N8N_DOMAIN:?Set N8N_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # HTTPS certificates. Keep them, or Let's Encrypt may rate-limit you.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - frontend
+      - backend
+      - ai
+      - feedback-board
+      - n8n
+    restart: unless-stopped
+    logging: *logging
+
+  # ---------------------------------------------------------------------------
+  # Backend API (Next.js + Prisma). Reached at https://APP_DOMAIN/api/...
+  # ---------------------------------------------------------------------------
+  backend:
+    build: ./backend
+    volumes:
+      # Your settings, read-only. server.js loads this file on start.
+      - ./backend/.env:/app/.env:ro
+    environment:
+      # These replace the values in backend/.env on the server.
+      # Links sent to clients (invites, join links) use this address.
+      APP_URL: https://${APP_DOMAIN}
+      # The website's address, allowed to call the API.
+      ALLOWED_ORIGINS: https://${APP_DOMAIN}
+      # The admin health check reaches the AI service by its service name.
+      STT_RELAY_URL: http://ai:4100
+    restart: unless-stopped
+    logging: *logging
+
+  # ---------------------------------------------------------------------------
+  # Website (Next.js). Reached at https://APP_DOMAIN
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # The browser reaches the API and speech-to-text through the same
+        # domain as the website; Caddy forwards them. These replace the
+        # localhost addresses in frontend/.env. The rest of frontend/.env
+        # (Firebase, LiveKit) is used as it is.
+        NEXT_PUBLIC_API_URL: https://${APP_DOMAIN}
+        NEXT_PUBLIC_STT_RELAY_URL: https://${APP_DOMAIN}
+    depends_on:
+      - backend
+      - ai
+    restart: unless-stopped
+    logging: *logging
+
+  # ---------------------------------------------------------------------------
+  # AI service: speech-to-text relay (Python + gunicorn).
+  # Reached at wss://APP_DOMAIN/sarvam-stream
+  # ---------------------------------------------------------------------------
+  ai:
+    build: ./ai
+    # Your settings from ai/.env become environment variables.
+    env_file: ./ai/.env
+    environment:
+      # Always production, whatever ai/.env says, so the token check stays on.
+      NODE_ENV: production
+      # Only the website may open speech-to-text connections.
+      ALLOWED_ORIGINS: https://${APP_DOMAIN}
+    restart: unless-stopped
+    logging: *logging
+
+  # ---------------------------------------------------------------------------
+  # Feedback board (Next.js). Reached at https://FEEDBACK_DOMAIN
+  # ---------------------------------------------------------------------------
+  feedback-board:
+    build:
+      context: ./feedback-board
+      args:
+        # The address encoded in the /present QR code.
+        NEXT_PUBLIC_PUBLIC_URL: https://${FEEDBACK_DOMAIN}
+        # Optional CAPTCHA (public site key).
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
+    # Your settings from feedback-board/.env become environment variables.
+    env_file: ./feedback-board/.env
+    environment:
+      # Use the database container below instead of the address in .env.
+      DATABASE_URL: postgres://feedback:${FEEDBACK_DB_PASSWORD}@feedback-db:5432/feedback
+    depends_on:
+      - feedback-db
+    restart: unless-stopped
+    logging: *logging
+
+  # ---------------------------------------------------------------------------
+  # The feedback board's own database. Not reachable from the internet.
+  # ---------------------------------------------------------------------------
+  feedback-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: feedback
+      POSTGRES_PASSWORD: ${FEEDBACK_DB_PASSWORD:?Set FEEDBACK_DB_PASSWORD in .env}
+      POSTGRES_DB: feedback
+    volumes:
+      # The database files, kept between restarts.
+      - feedback-data:/var/lib/postgresql/data
+      # Creates the tables automatically the first time the database starts.
+      - ./feedback-board/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    restart: unless-stopped
+    logging: *logging
+
+  # ---------------------------------------------------------------------------
+  # n8n automation with the STAAD workflows. Reached at https://N8N_DOMAIN
+  # ---------------------------------------------------------------------------
+  n8n:
+    build: ./n8n
+    environment:
+      # The workflows call the backend directly by its service name.
+      STAAD_BACKEND_URL: http://backend:4000
+      # n8n's public address, used for its editor links and webhook URLs.
+      N8N_HOST: ${N8N_DOMAIN}
+      N8N_PROTOCOL: https
+      WEBHOOK_URL: https://${N8N_DOMAIN}/
+      # n8n sits behind one proxy (Caddy).
+      N8N_PROXY_HOPS: 1
+    volumes:
+      # Workflows, credentials and n8n's encryption key, kept between restarts.
+      - n8n-data:/home/node/.n8n
+    depends_on:
+      - backend
+    restart: unless-stopped
+    logging: *logging
+
+
+# Named volumes: Docker keeps these when containers are removed.
+volumes:
+  caddy-data:
+  caddy-config:
+  feedback-data:
+  n8n-data:

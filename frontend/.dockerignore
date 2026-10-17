@@ -1,14 +1,9 @@
 node_modules
 .next
 public/mediapipe
-.env
-.env.*
-!.env.example
 *.log
 *.tsbuildinfo
 next-env.d.ts
 .vercel
 .git
-.gitignore
-Dockerfile
-.dockerignore
+# .env is NOT ignored: it holds only public NEXT_PUBLIC_* values, read at build time.

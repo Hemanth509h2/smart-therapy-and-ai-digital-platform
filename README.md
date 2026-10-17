@@ -54,25 +54,24 @@ straight from the browser to the STT relay at `NEXT_PUBLIC_STT_RELAY_URL`
 (`/api/stt-token`); `STT_TOKEN_SECRET` must match in `backend/.env` and
 `ai/.env`.
 
-## Docker
+## Docker (cloud server)
 
-Every deployable has its own `Dockerfile` (multi-stage, runs as a non-root
-user, with a health check). Build from inside each folder:
+The whole platform runs on one cloud server with Docker Compose, behind Caddy
+(automatic HTTPS):
 
-| Folder | Image | Port | Runtime config | Build args (baked in) |
-|---|---|---|---|---|
-| `backend/` | `docker build -t staad-backend backend` | 4000 | mount `-v "$PWD/backend/.env:/app/.env:ro"` | `NEXT_PUBLIC_LIVEKIT_URL`, `NEXT_PUBLIC_STT_RELAY_URL` |
-| `frontend/` | `docker build -t staad-frontend frontend` | 3000 | none | every `NEXT_PUBLIC_*` from `frontend/.env.example` (and `BACKEND_URL` if proxying) |
-| `ai/` | `docker build -t staad-ai ai` | 4100 | mount `-v "$PWD/ai/.env:/app/.env:ro"` | none |
-| `feedback-board/` | `docker build -t staad-feedback feedback-board` | 3100 | `--env-file feedback-board/.env` | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `NEXT_PUBLIC_PUBLIC_URL` |
-| `n8n/` | `docker build -t staad-n8n n8n` | 5678 | `STAAD_BACKEND_URL`, `N8N_ENCRYPTION_KEY`, volume on `/home/node/.n8n` | none |
+```bash
+cp .env.example .env      # domains, e-mail, feedback database password
+# plus backend/.env, frontend/.env, ai/.env and feedback-board/.env
+docker compose up -d --build
+```
 
-`NEXT_PUBLIC_*` values end up in the browser bundle, so they are build args
-and changing one means rebuilding. Never bake secrets in as build args.
-Database tasks for the backend use the `tools` target:
-`docker build --target tools -t staad-backend-tools backend`, then
-`docker run --rm -v "$PWD/backend/.env:/app/.env:ro" staad-backend-tools npx prisma db push`.
-The backend and AI service read `/app/.env` themselves, so mounting the file
-keeps `.env` syntax. `--env-file` passes values literally: quotes and inline
-`# comments` (there are some in `backend/.env.example`) become part of the value.
-Each Dockerfile's header comment has the full run command.
+| Address | Goes to |
+|---|---|
+| `https://APP_DOMAIN` | website (frontend) |
+| `https://APP_DOMAIN/api/...` | backend |
+| `wss://APP_DOMAIN/sarvam-stream` | ai (speech-to-text) |
+| `https://FEEDBACK_DOMAIN` | feedback board (with its own Postgres) |
+| `https://N8N_DOMAIN` | n8n |
+
+Only ports 80 and 443 are open. The step-by-step server setup (DNS, firewall,
+settings, Firebase and webhook changes, backups) is in `DOCKER_REPORT.md`.
