@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import { GLASS } from './roomTheme'
 import { useCaptionLog, type StoredCaption } from '@/lib/captionLog'
 import TranslationControl from './TranslationControl'
+import { OnOffButton } from '@/components/ui/on-off-button'
 import type { TranslationSettings } from '@/lib/translation'
 
 interface CaptionsPopupProps {
@@ -209,7 +210,7 @@ export default function CaptionsPopup({
       {/* Translation settings (moved here from the top bar) */}
       <div style={{ padding: '12px 14px 0' }}>
         <TranslationControl settings={translation} onChange={onTranslationChange} />
-        <label
+        <div
           style={{
             marginTop: 8,
             display: 'flex',
@@ -219,7 +220,6 @@ export default function CaptionsPopup({
             borderRadius: 12,
             background: liveOnVideo ? 'rgba(76,175,134,0.14)' : GLASS.fill,
             border: `1px solid ${liveOnVideo ? 'rgba(76,175,134,0.45)' : GLASS.fillBorder}`,
-            cursor: 'pointer',
           }}
         >
           <Subtitles size={14} color={liveOnVideo ? '#4caf86' : GLASS.accent} />
@@ -227,13 +227,8 @@ export default function CaptionsPopup({
             <span style={{ fontSize: 12, fontWeight: 600, color: GLASS.ink }}>Live captions on video</span>
             <span style={{ fontSize: 10, color: GLASS.inkFaint }}>Subtitles at the bottom of the call, as the client sees them</span>
           </span>
-          <input
-            type="checkbox"
-            checked={liveOnVideo}
-            onChange={(e) => onLiveOnVideoChange(e.target.checked)}
-            style={{ accentColor: '#4caf86', width: 15, height: 15, cursor: 'pointer' }}
-          />
-        </label>
+          <OnOffButton on={liveOnVideo} onChange={onLiveOnVideoChange} label="Live captions on video" />
+        </div>
       </div>
 
       {/* Caption list */}

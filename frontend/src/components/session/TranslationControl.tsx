@@ -12,6 +12,7 @@
 
 import { Languages, AlertTriangle } from 'lucide-react'
 import { GLASS } from '@/components/session/roomTheme'
+import { OnOffButton } from '@/components/ui/on-off-button'
 import {
   TRANSLATION_LANGUAGES,
   sttSupported,
@@ -74,16 +75,15 @@ export default function TranslationControl({
         border: `1px solid ${GLASS.fillBorder}`,
       }}
     >
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <Languages size={14} color={GLASS.accent} />
         <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: GLASS.ink }}>Live translated captions</span>
-        <input
-          type="checkbox"
-          checked={settings.enabled}
-          onChange={(e) => onChange({ enabled: e.target.checked })}
-          style={{ accentColor: '#4caf86', width: 15, height: 15, cursor: 'pointer' }}
+        <OnOffButton
+          on={settings.enabled}
+          onChange={(enabled) => onChange({ enabled })}
+          label="Live translated captions"
         />
-      </label>
+      </div>
 
       <div style={{ display: 'flex', gap: 10 }}>
         {select(settings.therapist, (v) => onChange({ therapist: v }), 'You speak')}

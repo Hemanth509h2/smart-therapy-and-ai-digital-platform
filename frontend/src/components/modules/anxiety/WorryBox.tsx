@@ -5,6 +5,7 @@ import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { apiFetch } from '@/lib/api';
+import { OnOffButton } from '@/components/ui/on-off-button'
 
 interface WorryBoxProps {
   sessionId: string
@@ -231,14 +232,14 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
       {/* Therapist controls strip */}
       {isT && (
         <div style={{ flexShrink: 0, padding: '6px 12px', borderBottom: '1px solid var(--glass-border)', display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, flexWrap: 'wrap' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
-            <input type="checkbox" checked={guidedMode} onChange={e => write({ 'moduleState.wbGuidedMode': e.target.checked })} style={{ accentColor: '#4a7c6f' }} />
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(255,255,255,0.5)' }}>
             Guided
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
-            <input type="checkbox" checked={anonymous} onChange={e => write({ 'moduleState.wbAnonymous': e.target.checked })} style={{ accentColor: '#4a7c6f' }} />
+            <OnOffButton on={guidedMode} onChange={on => write({ 'moduleState.wbGuidedMode': on })} label="Guided" accent="#4a7c6f" />
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(255,255,255,0.5)' }}>
             Anonymous
-          </label>
+            <OnOffButton on={anonymous} onChange={on => write({ 'moduleState.wbAnonymous': on })} label="Anonymous" accent="#4a7c6f" />
+          </span>
           <button onClick={clearAll}
             style={{ marginLeft: 'auto', padding: '3px 8px', borderRadius: 4, border: '1px solid rgba(200,60,60,0.3)', background: 'transparent', color: 'rgba(200,80,80,0.7)', cursor: 'pointer', fontSize: 13 }}
           >Clear all</button>

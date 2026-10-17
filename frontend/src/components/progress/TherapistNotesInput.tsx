@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { fetchClientNotes, createNote, type ProgressNote } from '@/lib/progressApi';
+import { OnOffButton } from '@/components/ui/on-off-button';
 
 const CARD =
   'rounded-[14px] border-[0.5px] border-[var(--glass-border)] shadow-[var(--glass-shadow)] bg-[var(--glass-bg)] dark:bg-[#16221e]';
@@ -63,14 +64,16 @@ export default function TherapistNotesInput({ clientId, reportId }: Props) {
           style={{ color: 'var(--ink)' }}
         />
         <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2 text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
-            <input
-              type="checkbox"
-              checked={isPrivate}
-              onChange={(e) => setIsPrivate(e.target.checked)}
-            />
+          <span className="flex items-center gap-2 text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
             Private (therapist-only)
-          </label>
+            <OnOffButton
+              on={isPrivate}
+              onChange={setIsPrivate}
+              label="Private (therapist-only)"
+              variant="page"
+              accent="var(--c-accent)"
+            />
+          </span>
           <button
             type="submit"
             disabled={saving || !content.trim()}
