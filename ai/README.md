@@ -29,5 +29,16 @@ in `frontend/.env`, then restart the frontend.
 ## Deploy
 
 `docker build -t staad-ai .` then run with `SARVAM_API_KEY`,
-`STT_TOKEN_SECRET` and `ALLOWED_ORIGINS` set. The image sets `NODE_ENV=production`,
+`STT_TOKEN_SECRET` and `ALLOWED_ORIGINS` set. The image runs under gunicorn
+(`gunicorn.conf.py`, binds `0.0.0.0:$PORT`, default 4100). `server.py` is a
+plain `websockets` server, not WSGI, so `worker.py` provides a gunicorn worker
+that serves it. Set `WEB_CONCURRENCY` for more worker processes (default 1).
+To run it the same way locally: `gunicorn` from this folder.
+
+Every request gets one access-log line, in the same format as gunicorn's own
+lines: client IP (first `X-Forwarded-For` entry when behind a proxy), method,
+path, status, time and user agent. WebSocket closes get their own line, and so
+do requests that can't be parsed. Query strings are never logged because they
+carry the STT token. gunicorn's `accesslog` setting has no effect here, because
+the custom worker handles HTTP itself. The image sets `NODE_ENV=production`,
 which refuses all STT connections if `STT_TOKEN_SECRET` is missing.

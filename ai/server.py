@@ -25,6 +25,7 @@ from websockets.asyncio.server import serve
 import stt
 
 log = logging.getLogger("ai")
+access_log = logging.getLogger("ai.access")
 
 
 def load_env_file(path):
@@ -62,8 +63,40 @@ def allowed_origins(env=os.environ):
     return origins or None
 
 
-def log_line(text):
-    print(f"[ai] {text}", flush=True)
+class HandshakeFailureFilter(logging.Filter):
+    """websockets logs a full traceback for every failed handshake. A request
+    that was parsed is already in the access log; for one that never parsed
+    (port scanners, dropped connections) keep a single line instead."""
+
+    def filter(self, record):
+        if record.getMessage() != "opening handshake failed" or not record.exc_info:
+            return True
+        ws = getattr(record, "websocket", None)  # set by websockets' LoggerAdapter
+        if ws is not None and ws.request is not None:
+            return False
+        exc = record.exc_info[1]
+        record.msg, record.args, record.exc_info = "%s bad request (%s)", (client_ip(ws), type(exc).__name__), None
+        record.levelno, record.levelname = logging.INFO, "INFO"
+        record.name = access_log.name
+        return True
+
+
+def setup_logging():
+    """Same line format as gunicorn's own log, so both read as one stream."""
+    logging.basicConfig(level=logging.WARNING, format="[%(asctime)s] [%(process)d] [%(levelname)s] %(message)s",
+                        datefmt="%Y-%m-%d %H:%M:%S %z")
+    access_log.setLevel(logging.INFO)
+    logging.getLogger("websockets.server").addFilter(HandshakeFailureFilter())
+
+
+def client_ip(connection, request=None):
+    forwarded = request.headers.get("X-Forwarded-For") if request is not None else None
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    try:
+        return connection.remote_address[0]
+    except (AttributeError, IndexError, TypeError):
+        return "-"
 
 
 def process_request(connection, request):
@@ -88,10 +121,9 @@ def process_response(connection, request, response):
     path = urlsplit(request.path).path if request else "?"
     ms = (time.monotonic() - getattr(connection, "started_at", time.monotonic())) * 1000
     is_ws = request is not None and request.headers.get("Upgrade", "").lower() == "websocket"
-    if response.status_code == HTTPStatus.SWITCHING_PROTOCOLS:
-        log_line(f"WS  {path} → open ({ms:.0f}ms)")
-    else:
-        log_line(f"{'WS ' if is_ws else 'GET'} {path} → {response.status_code} ({ms:.0f}ms)")
+    agent = request.headers.get("User-Agent", "-") if request else "-"
+    access_log.info('%s "%s %s" %s %.0fms "%s"', client_ip(connection, request), "WS" if is_ws else "GET",
+                    path, response.status_code, ms, agent)
     return None
 
 
@@ -102,19 +134,25 @@ async def handler(ws):
     finally:
         secs = time.monotonic() - getattr(ws, "started_at", time.monotonic())
         reason = f" {ws.close_reason}" if ws.close_reason else ""
-        log_line(f"WS  {path} → closed {ws.close_code}{reason} after {secs:.1f}s")
+        access_log.info('%s "WS %s" closed %s%s after %.1fs', client_ip(ws, ws.request), path, ws.close_code,
+                        reason, secs)
 
 
-def make_server(port, host=None):
-    """Returns the websockets server (use with `async with`). host=None = all interfaces."""
-    return serve(handler, host, port, process_request=process_request, process_response=process_response,
-                 origins=allowed_origins())
+def make_server(port=None, host=None, sock=None):
+    """Returns the websockets server (use with `async with`). host=None = all interfaces.
+    Pass `sock` instead of port/host to serve on an already-bound socket (gunicorn)."""
+    return serve(handler, host, port, sock=sock, process_request=process_request,
+                 process_response=process_response, origins=allowed_origins())
+
+
+def warn_if_misconfigured():
+    if os.environ.get("NODE_ENV") == "production" and not os.environ.get("STT_TOKEN_SECRET"):
+        log.warning("[ai] STT_TOKEN_SECRET is not set - every STT connection will be refused.")
 
 
 async def main():
     port = int(os.environ.get("PORT") or "4100")
-    if os.environ.get("NODE_ENV") == "production" and not os.environ.get("STT_TOKEN_SECRET"):
-        log.warning("[ai] STT_TOKEN_SECRET is not set - every STT connection will be refused.")
+    warn_if_misconfigured()
     async with make_server(port) as server:
         print(f"> AI service ready on http://localhost:{port} (STT WebSocket at /sarvam-stream)", flush=True)
         await server.serve_forever()
@@ -122,7 +160,7 @@ async def main():
 
 if __name__ == "__main__":
     load_env_file(Path(__file__).with_name(".env"))
-    logging.basicConfig(level=logging.WARNING, format="%(message)s")
+    setup_logging()
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
