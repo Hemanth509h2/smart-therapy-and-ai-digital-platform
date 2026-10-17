@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // The Dockerfile sets NEXT_OUTPUT=standalone; Vercel keeps its default output.
+  output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
   poweredByHeader: false,
   async headers() {
     return [

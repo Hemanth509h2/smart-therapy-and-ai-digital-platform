@@ -1,0 +1,15 @@
+node_modules
+.next
+_archive
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo
+next-env.d.ts
+.firebase
+.vercel
+.git
+.gitignore
+Dockerfile
+.dockerignore

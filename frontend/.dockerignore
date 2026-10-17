@@ -1,0 +1,14 @@
+node_modules
+.next
+public/mediapipe
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo
+next-env.d.ts
+.vercel
+.git
+.gitignore
+Dockerfile
+.dockerignore

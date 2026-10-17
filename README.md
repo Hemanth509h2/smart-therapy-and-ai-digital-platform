@@ -53,3 +53,26 @@ straight from the browser to the STT relay at `NEXT_PUBLIC_STT_RELAY_URL`
 (default `http://localhost:4100`). The backend only mints the relay's token
 (`/api/stt-token`); `STT_TOKEN_SECRET` must match in `backend/.env` and
 `ai/.env`.
+
+## Docker
+
+Every deployable has its own `Dockerfile` (multi-stage, runs as a non-root
+user, with a health check). Build from inside each folder:
+
+| Folder | Image | Port | Runtime config | Build args (baked in) |
+|---|---|---|---|---|
+| `backend/` | `docker build -t staad-backend backend` | 4000 | mount `-v "$PWD/backend/.env:/app/.env:ro"` | `NEXT_PUBLIC_LIVEKIT_URL`, `NEXT_PUBLIC_STT_RELAY_URL` |
+| `frontend/` | `docker build -t staad-frontend frontend` | 3000 | none | every `NEXT_PUBLIC_*` from `frontend/.env.example` (and `BACKEND_URL` if proxying) |
+| `ai/` | `docker build -t staad-ai ai` | 4100 | mount `-v "$PWD/ai/.env:/app/.env:ro"` | none |
+| `feedback-board/` | `docker build -t staad-feedback feedback-board` | 3100 | `--env-file feedback-board/.env` | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `NEXT_PUBLIC_PUBLIC_URL` |
+| `n8n/` | `docker build -t staad-n8n n8n` | 5678 | `STAAD_BACKEND_URL`, `N8N_ENCRYPTION_KEY`, volume on `/home/node/.n8n` | none |
+
+`NEXT_PUBLIC_*` values end up in the browser bundle, so they are build args
+and changing one means rebuilding. Never bake secrets in as build args.
+Database tasks for the backend use the `tools` target:
+`docker build --target tools -t staad-backend-tools backend`, then
+`docker run --rm -v "$PWD/backend/.env:/app/.env:ro" staad-backend-tools npx prisma db push`.
+The backend and AI service read `/app/.env` themselves, so mounting the file
+keeps `.env` syntax. `--env-file` passes values literally: quotes and inline
+`# comments` (there are some in `backend/.env.example`) become part of the value.
+Each Dockerfile's header comment has the full run command.
