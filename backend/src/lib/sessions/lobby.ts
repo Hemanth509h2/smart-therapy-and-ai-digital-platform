@@ -20,8 +20,10 @@ export interface LobbyEntry {
 }
 
 // The guest's page knocks every few seconds; anyone not seen for this long has
-// closed the tab and is no longer shown to the therapist.
-const STALE_MS = 15_000
+// closed the tab and is no longer shown to the therapist. Generous because a
+// browser throttles timers in a background tab to about once a minute, and a
+// guest waiting in another tab must not vanish from the therapist's list.
+const STALE_MS = 75_000
 
 function entryRef(sessionId: string, uid: string) {
   return adminDb().collection('liveSessions').doc(sessionId).collection('lobby').doc(uid)
@@ -45,17 +47,25 @@ export async function setLobbyStatus(sessionId: string, uid: string, status: Lob
   await entryRef(sessionId, uid).update({ status })
 }
 
-export async function listWaiting(sessionId: string): Promise<Pick<LobbyEntry, 'uid' | 'name' | 'requestedAt'>[]> {
+type LobbyPerson = Pick<LobbyEntry, 'uid' | 'name' | 'requestedAt'>
+
+// What the therapist's "Clients" panel shows: guests waiting to be let in, and
+// admitted guests still in the call (still polling, so they can be removed).
+export async function listLobby(sessionId: string): Promise<{ waiting: LobbyPerson[]; inCall: LobbyPerson[] }> {
   const snap = await adminDb()
     .collection('liveSessions')
     .doc(sessionId)
     .collection('lobby')
-    .where('status', '==', 'waiting')
+    .where('status', 'in', ['waiting', 'admitted'])
     .get()
   const cutoff = Date.now() - STALE_MS
-  return snap.docs
+  const live = snap.docs
     .map((d) => d.data() as LobbyEntry)
     .filter((e) => Date.parse(e.lastSeen) >= cutoff)
     .sort((a, b) => a.requestedAt.localeCompare(b.requestedAt))
-    .map(({ uid, name, requestedAt }) => ({ uid, name, requestedAt }))
+  const pick = ({ uid, name, requestedAt }: LobbyEntry) => ({ uid, name, requestedAt })
+  return {
+    waiting: live.filter((e) => e.status === 'waiting').map(pick),
+    inCall: live.filter((e) => e.status === 'admitted').map(pick),
+  }
 }

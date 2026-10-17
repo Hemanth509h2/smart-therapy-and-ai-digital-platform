@@ -60,6 +60,7 @@ export default function SessionTopBar({
   isTherapist,
   participantsPopupAvailable,
   participantsCount,
+  waitingRoom,
 }: {
   timerStr: string
   sessionType?: string
@@ -74,6 +75,8 @@ export default function SessionTopBar({
   isTherapist?: boolean
   participantsPopupAvailable?: boolean
   participantsCount?: number
+  /** Therapist's waiting-room / clients control, shown beside the timer actions. */
+  waitingRoom?: React.ReactNode
 }) {
   const [infoOpen, setInfoOpen] = useState(false)
 
@@ -167,6 +170,8 @@ export default function SessionTopBar({
 
             {/* Divider */}
             <div style={{ width: 1, height: 26, background: RC.border, flexShrink: 0 }} />
+
+            {waitingRoom}
 
             {/* Timer Actions (Participants + Fullscreen) */}
             {participantsPopupAvailable && (

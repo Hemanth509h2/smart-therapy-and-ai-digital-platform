@@ -4,13 +4,13 @@ import { requireAuth } from '@/lib/http/apiAuth';
 import { errorResponse } from '@/lib/http/apiError';
 import { provisionSessionDocs, revokeSessionUid } from '@/lib/sessions/session-provisioning';
 import { removeParticipantByUid } from '@/lib/sessions/livekit-room';
-import { getLobbyEntry, listWaiting, setLobbyStatus, touchLobbyEntry } from '@/lib/sessions/lobby';
+import { getLobbyEntry, listLobby, setLobbyStatus, touchLobbyEntry } from '@/lib/sessions/lobby';
 
 export const dynamic = 'force-dynamic';
 
 // Waiting room for invite-link guests (see lib/sessions/lobby.ts).
 //   POST  — guest knocks (polled every few seconds); returns their status
-//   GET   — therapist lists who is waiting
+//   GET   — therapist lists who is waiting and who is in the call
 //   PATCH — therapist admits, denies or removes one guest:
 //           { uid, action: 'admit' | 'deny' | 'remove' }
 //           'remove' takes an admitted guest out of the call: off the LiveKit
@@ -37,7 +37,9 @@ export async function POST(request: Request, { params }: Params) {
     if (session.status === 'COMPLETED' || session.status === 'CANCELLED') {
       return NextResponse.json({ status: 'ended' });
     }
-    if (entry.status === 'waiting') await touchLobbyEntry(params.sessionId, auth.uid);
+    // Admitted guests keep polling too (to learn if they were removed), which
+    // is what keeps them listed under "In the call" for the therapist.
+    if (entry.status === 'waiting' || entry.status === 'admitted') await touchLobbyEntry(params.sessionId, auth.uid);
 
     return NextResponse.json({
       status: entry.status,
@@ -52,7 +54,7 @@ export async function GET(request: Request, { params }: Params) {
   try {
     const owner = await requireSessionTherapist(request, params.sessionId);
     if (!owner.ok) return owner.response;
-    return NextResponse.json({ waiting: await listWaiting(params.sessionId) });
+    return NextResponse.json(await listLobby(params.sessionId));
   } catch (error) {
     return errorResponse(error, '[lobby list]');
   }

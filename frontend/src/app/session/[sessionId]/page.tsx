@@ -37,7 +37,6 @@ import CaptionsPopup from '@/components/session/CaptionsPopup';
 import WaitingLobby from '@/components/session/WaitingLobby';
 import GuestAdmissionGate from '@/components/session/GuestAdmissionGate';
 import LobbyRequests from '@/components/session/LobbyRequests';
-import RemoveClientButton from '@/components/session/RemoveClientButton';
 import TherapyModulesPanel from '@/components/session/TherapyModulesPanel';
 import { ShareWhiteboardModal } from '@/components/session/WhiteboardStage';
 import StaadWhiteboard from '@/components/session/StaadWhiteboard';
@@ -774,10 +773,6 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
   const participants = sessionState?.participants || {};
   const onlineCount = Object.values(participants).filter((p) => p.isOnline).length;
   const clientParticipant = Object.values(participants).find((p) => p.role === 'client');
-  // An invite-link guest currently in the call: the therapist can remove them.
-  const removableClient = isTherapist
-    ? Object.values(participants).find((p) => p.role === 'client' && p.isOnline && p.uid?.startsWith('guest:'))
-    : undefined;
   const clientName = clientParticipant?.name || 'Client';
 
   const participantName = isTherapist ? clientName : (Object.values(participants).find((p) => p.role === 'therapist')?.name || 'Therapist');
@@ -1061,6 +1056,8 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
               isLocked={isLocked}
             />
           </SkillDevLayout>
+          {/* No top bar in this layout: float the waiting-room control instead. */}
+          {isTherapist && <LobbyRequests sessionId={sessionId} onDecided={showToast} floating />}
           {showConfirm && (
             <ConfirmEndDialog
               onCancel={() => setShowConfirm(false)}
@@ -1086,6 +1083,7 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
             isTherapist={isTherapist}
             participantsPopupAvailable={participantsPopupAvailable}
             participantsCount={Object.keys(participants).length}
+            waitingRoom={isTherapist ? <LobbyRequests sessionId={sessionId} onDecided={showToast} /> : undefined}
           />
 
             {isTherapist && participantsPopupAvailable && showParticipants && participantsPos && (
@@ -1126,12 +1124,7 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
                         height={isTherapist ? 120 : participantTileH}
                       />
                     ) : (
-                      <div key={p.uid} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <RemoteParticipantThumb name={p.name} online={p.isOnline} width={participantTileW} height={participantTileH} />
-                        {removableClient?.uid === p.uid && (
-                          <RemoveClientButton sessionId={sessionId} uid={p.uid} name={p.name || 'Client'} onDone={showToast} style={{ alignSelf: 'flex-start', boxShadow: 'none', border: `1px solid ${RC.border}` }} />
-                        )}
-                      </div>
+                      <RemoteParticipantThumb key={p.uid} name={p.name} online={p.isOnline} width={participantTileW} height={participantTileH} />
                     )
                   )}
                 </div>
@@ -1275,16 +1268,6 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
                     </span>
                   </div>
 
-                  {removableClient && (
-                    <RemoveClientButton
-                      sessionId={sessionId}
-                      uid={removableClient.uid}
-                      name={removableClient.name || 'Client'}
-                      onDone={showToast}
-                      style={{ position: 'absolute', top: 14, right: 14, zIndex: 15 }}
-                    />
-                  )}
-
                   {/* Floating pill control bar — patient only. The therapist's
                       controls live in the restructured bottom bar (below). */}
                   {!isTherapist && (
@@ -1298,9 +1281,6 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
               )}
 
               <ReactionOverlay sessionId={sessionId} open={reactionBarOpen} onOpenChange={setReactionBarOpen} />
-
-              {/* Waiting room: invite-link guests asking to join (therapist only). */}
-              {isTherapist && <LobbyRequests sessionId={sessionId} onDecided={showToast} />}
 
               {/* Toast notification */}
               {toast && (
