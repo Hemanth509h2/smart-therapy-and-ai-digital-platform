@@ -5,11 +5,16 @@ import {
 } from '@deepgram/sdk'
 import type { TranscriptChunk } from './types'
 
-if (!process.env.DEEPGRAM_API_KEY) {
-  throw new Error('DEEPGRAM_API_KEY is not set in .env')
+// Lazily constructed so a missing key never breaks builds/imports — it only
+// throws when a transcription is actually started.
+let deepgram: ReturnType<typeof createClient> | null = null
+function getDeepgram() {
+  if (!process.env.DEEPGRAM_API_KEY) {
+    throw new Error('DEEPGRAM_API_KEY is not set in .env')
+  }
+  if (!deepgram) deepgram = createClient(process.env.DEEPGRAM_API_KEY)
+  return deepgram
 }
-
-const deepgram = createClient(process.env.DEEPGRAM_API_KEY)
 
 export interface TranscriptionOptions {
   sessionId: string
@@ -34,7 +39,7 @@ export class SessionTranscriber {
   async connect(): Promise<void> {
     this.startTime = Date.now()
 
-    this.connection = deepgram.listen.live({
+    this.connection = getDeepgram().listen.live({
       model: 'nova-3',
       language: 'en-IN',
       smart_format: true,

@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import {
-  nvidiaClient,
+  getNvidiaClient,
   generateEmbedding,
   analyseWithLLM,
   LLM_MODEL,
@@ -13,7 +13,7 @@ async function testNvidia() {
   // ── TEST 1: API key validation ──────────────────
   console.log('Test 1: API key + model list')
   try {
-    const models = await nvidiaClient.models.list()
+    const models = await getNvidiaClient().models.list()
     const modelIds = models.data.map(m => m.id)
     const hasLLM = modelIds.includes(LLM_MODEL)
     const hasEmbed = modelIds.includes(EMBEDDING_MODEL)

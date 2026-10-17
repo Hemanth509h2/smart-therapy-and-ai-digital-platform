@@ -1,10 +1,8 @@
 import fs from 'fs'
 import { PDFParse } from 'pdf-parse'
-import { neon } from '@neondatabase/serverless'
+import { sql } from './sql'
 import { generateEmbedding } from './nvidia-client'
 import { chunkText, extractTextFromString } from './chunker'
-
-const sql = neon(process.env.DATABASE_URL!)
 
 export interface IngestOptions {
   therapistId: string

@@ -1,9 +1,7 @@
-import { neon } from '@neondatabase/serverless'
+import { sql } from './sql'
 import { generateEmbedding } from './nvidia-client'
 import { getSessionTranscript, getSessionActivity } from './transcript-store'
 import { formatTranscriptForLLM } from './transcription'
-
-const sql = neon(process.env.DATABASE_URL!)
 
 export interface ClientProfile {
   clientId: string

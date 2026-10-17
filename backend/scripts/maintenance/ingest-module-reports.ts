@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import mammoth from 'mammoth'
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless'
-import { nvidiaClient } from '../../src/lib/ai/rag/nvidia-client'
+import { getNvidiaClient } from '../../src/lib/ai/rag/nvidia-client'
 
 // Ingests the STAAD therapy-module reports (.docx) into module_report_chunks
 // for RAG. Each report has numbered sections ("1. Module overview" ...
@@ -143,7 +143,7 @@ async function chunkReport(filePath: string): Promise<{ chunks: ReportChunk[]; w
 async function embedPassages(texts: string[]): Promise<number[][]> {
   for (let attempt = 1; ; attempt++) {
     try {
-      const response = await nvidiaClient.embeddings.create({
+      const response = await getNvidiaClient().embeddings.create({
         model: MODULE_EMBEDDING_MODEL,
         input: texts,
         dimensions: EMBEDDING_DIMENSIONS,
