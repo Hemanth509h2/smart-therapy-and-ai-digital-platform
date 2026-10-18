@@ -300,6 +300,15 @@ function AuthForm() {
             <p className="flex items-center justify-center gap-1.5">
               <Clock className="h-3.5 w-3.5" /> {SUPPORT_HOURS}
             </p>
+            <p>
+              <a href="/privacy" target="_blank" rel="noopener" className="font-semibold hover:underline" style={{ color: 'var(--sage)' }}>
+                Privacy Policy
+              </a>
+              {' · '}
+              <a href="/terms" target="_blank" rel="noopener" className="font-semibold hover:underline" style={{ color: 'var(--sage)' }}>
+                Terms &amp; Conditions
+              </a>
+            </p>
           </div>
         </CardFooter>
       </Card>

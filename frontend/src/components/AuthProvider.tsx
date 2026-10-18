@@ -76,8 +76,13 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         // /join/<token> is the public guest invite page — no session needed.
         // /admin/invite/<token> explains how to sign in before accepting.
         // /session-ended is where guests land after a call (they have no account).
+        // /privacy and /terms are linked from sign-up and the session consent prompt.
         const guestInvite =
-          pathname.startsWith('/join') || pathname.startsWith('/admin/invite/') || pathname === '/session-ended';
+          pathname.startsWith('/join') ||
+          pathname.startsWith('/admin/invite/') ||
+          pathname === '/session-ended' ||
+          pathname === '/privacy' ||
+          pathname === '/terms';
         if (pathname !== '/auth' && pathname !== '/onboarding' && !devPreview && !guestInvite) {
           router.push('/auth');
         }

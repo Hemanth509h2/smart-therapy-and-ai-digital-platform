@@ -236,6 +236,24 @@ export default function HelpPage() {
                 <span className="prow__s">{SUPPORT_HOURS}</span>
               </span>
             </div>
+            <Link className="prow" href="/privacy">
+              <span style={{ display: 'flex', width: 38, height: 38, flex: 'none', alignItems: 'center' }}>
+                <IconRowA />
+              </span>
+              <span style={{ minWidth: 0, flex: 1 }}>
+                <span className="prow__t">Privacy Policy</span>
+                <span className="prow__s">What we collect and why</span>
+              </span>
+            </Link>
+            <Link className="prow" href="/terms">
+              <span style={{ display: 'flex', width: 38, height: 38, flex: 'none', alignItems: 'center' }}>
+                <IconRowB />
+              </span>
+              <span style={{ minWidth: 0, flex: 1 }}>
+                <span className="prow__t">Terms &amp; Conditions</span>
+                <span className="prow__s">The rules for using STAAD</span>
+              </span>
+            </Link>
           </div>
         </aside>
       </div>

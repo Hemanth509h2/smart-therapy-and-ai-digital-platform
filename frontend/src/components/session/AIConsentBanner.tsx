@@ -86,7 +86,10 @@ export default function AIConsentBanner({
         </p>
         <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6, marginBottom: 20 }}>
           The AI only observes and summarises — it makes no clinical decisions. Your privacy is
-          protected and you can decline without affecting the session.
+          protected and you can decline without affecting the session.{' '}
+          <a href="/privacy#ai" target="_blank" rel="noopener" style={{ color: '#a89ae8', textDecoration: 'underline' }}>
+            How AI uses session data
+          </a>
         </p>
 
         {!decided ? (
