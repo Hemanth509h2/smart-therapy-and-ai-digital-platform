@@ -39,7 +39,7 @@ export async function POST(request: Request, { params }: Params) {
     }
     // Admitted guests keep polling too (to learn if they were removed), which
     // is what keeps them listed under "In the call" for the therapist.
-    if (entry.status === 'waiting' || entry.status === 'admitted') await touchLobbyEntry(params.sessionId, auth.uid);
+    if (entry.status === 'waiting' || entry.status === 'admitted') await touchLobbyEntry(params.sessionId, entry);
 
     return NextResponse.json({
       status: entry.status,

@@ -24,6 +24,9 @@ export interface LobbyEntry {
 // browser throttles timers in a background tab to about once a minute, and a
 // guest waiting in another tab must not vanish from the therapist's list.
 const STALE_MS = 75_000
+// A waiting guest knocks every 3s, but lastSeen only needs to be far fresher
+// than STALE_MS, so most knocks skip the Firestore write.
+const TOUCH_EVERY_MS = 10_000
 
 function entryRef(sessionId: string, uid: string) {
   return adminDb().collection('liveSessions').doc(sessionId).collection('lobby').doc(uid)
@@ -39,8 +42,9 @@ export async function createLobbyEntry(sessionId: string, uid: string, name: str
   await entryRef(sessionId, uid).set({ uid, name, status: 'waiting', requestedAt: now, lastSeen: now })
 }
 
-export async function touchLobbyEntry(sessionId: string, uid: string): Promise<void> {
-  await entryRef(sessionId, uid).update({ lastSeen: new Date().toISOString() })
+export async function touchLobbyEntry(sessionId: string, entry: LobbyEntry): Promise<void> {
+  if (Date.now() - Date.parse(entry.lastSeen) < TOUCH_EVERY_MS) return
+  await entryRef(sessionId, entry.uid).update({ lastSeen: new Date().toISOString() })
 }
 
 export async function setLobbyStatus(sessionId: string, uid: string, status: LobbyStatus): Promise<void> {

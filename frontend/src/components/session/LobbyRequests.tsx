@@ -7,10 +7,12 @@
 // The badge shows how many are waiting, and the panel opens by itself when
 // someone new starts waiting. Polls the backend: the lobby lives in a
 // server-only Firestore path, so it can't be subscribed to from the browser.
+// The therapist can stop the polling from the panel (and resume it); while
+// stopped, new knocks go unseen.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { UserCheck, UserX, Users, X } from 'lucide-react'
+import { Pause, Play, UserCheck, UserX, Users, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { RC } from './roomTheme'
 
@@ -22,7 +24,23 @@ interface Person {
 
 type Action = 'admit' | 'deny' | 'remove'
 
+// Fast while someone is waiting or the panel is open (the therapist is acting
+// on it); otherwise only watching for a new knock, which can wait a few seconds.
 const POLL_MS = 3000
+const IDLE_POLL_MS = 8000
+// Stop checking by itself after this long with no one waiting. Never while
+// someone is waiting, so no client is left knocking unseen by it.
+const AUTO_STOP_MS = 2 * 60 * 1000
+
+// Why checking is stopped. 'joined': sessions are one client, so once a client
+// is in the call there is no one else to look for.
+type StopReason = 'manual' | 'idle' | 'joined'
+
+const STOP_MESSAGES: Record<StopReason, string> = {
+  manual: 'Stopped checking.',
+  idle: 'Stopped checking automatically after 2 minutes with no one waiting.',
+  joined: 'Your client has joined, so checking for others has stopped.',
+}
 
 export default function LobbyRequests({
   sessionId,
@@ -42,32 +60,87 @@ export default function LobbyRequests({
   const [busy, setBusy] = useState<string | null>(null)
   // Client the therapist clicked Remove on, awaiting confirmation.
   const [confirmRemove, setConfirmRemove] = useState<Person | null>(null)
+  // Set while checking the waiting room is stopped (see StopReason).
+  const [stopReason, setStopReason] = useState<StopReason | null>(null)
+  const paused = stopReason !== null
+  const pausedRef = useRef(false)
+  pausedRef.current = paused
+  // Last time checking started or someone was waiting; the auto-stop clock.
+  const lastActiveAt = useRef(Date.now())
   const seenWaiting = useRef<Set<string>>(new Set())
+  // Clients already seen in the call: only a newly joined one stops checking,
+  // so Resume isn't undone by the client who is still there.
+  const seenInCall = useRef<Set<string>>(new Set())
 
+  const stop = (reason: StopReason) => {
+    pausedRef.current = true
+    setStopReason(reason)
+  }
+
+  // Resolves true when the lists were refreshed.
   const load = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/sessions/${sessionId}/lobby`)
       if (!res.ok) {
         setLoadError(true)
-        return
+        return false
       }
       const data = await res.json()
       const w: Person[] = Array.isArray(data.waiting) ? data.waiting : []
+      const c: Person[] = Array.isArray(data.inCall) ? data.inCall : []
       setWaiting(w)
-      setInCall(Array.isArray(data.inCall) ? data.inCall : [])
+      setInCall(c)
       setLoadError(false)
+      if (w.length) lastActiveAt.current = Date.now()
       // Someone new is knocking: open the panel so the therapist notices.
       if (w.some((p) => !seenWaiting.current.has(p.uid))) setOpen(true)
       seenWaiting.current = new Set(w.map((p) => p.uid))
+      if (c.some((p) => !seenInCall.current.has(p.uid))) stop('joined')
+      seenInCall.current = new Set(c.map((p) => p.uid))
+      return true
     } catch {
       // Keep the last list on a network blip.
+      return false
     }
   }, [sessionId])
 
+  const fast = useRef(false)
+  fast.current = open || waiting.length > 0
+
+  // Chained timeouts rather than setInterval, so a slow response never
+  // overlaps the next poll. Nothing is fetched while the tab is hidden; coming
+  // back fetches right away.
   useEffect(() => {
-    load()
-    const t = setInterval(load, POLL_MS)
-    return () => clearInterval(t)
+    let stopped = false
+    let inFlight = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const tick = async () => {
+      if (stopped || inFlight) return
+      inFlight = true
+      clearTimeout(timer)
+      try {
+        if (document.visibilityState === 'visible' && !pausedRef.current) {
+          // Only on a fresh list: a failed check can't tell that no one is waiting.
+          const fresh = await load()
+          if (fresh && !pausedRef.current && Date.now() - lastActiveAt.current >= AUTO_STOP_MS) stop('idle')
+        }
+      } finally {
+        inFlight = false
+        if (!stopped) timer = setTimeout(tick, fast.current ? POLL_MS : IDLE_POLL_MS)
+      }
+    }
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') tick()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    tick()
+    return () => {
+      stopped = true
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [load])
 
   useEffect(() => {
@@ -94,6 +167,11 @@ export default function LobbyRequests({
           const rest = c.filter((p) => p.uid !== person.uid)
           return action === 'admit' ? [...rest, person] : rest
         })
+        // Client let in: nothing more to look for (see StopReason).
+        if (action === 'admit') {
+          seenInCall.current.add(person.uid)
+          stop('joined')
+        }
         onDecided?.(
           action === 'admit' ? `${person.name} admitted`
           : action === 'deny' ? `${person.name} was not admitted`
@@ -167,7 +245,11 @@ export default function LobbyRequests({
     <div style={floating ? { position: 'fixed', bottom: 80, right: 16, zIndex: 70 } : { position: 'relative' }}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          // Opening: show fresh lists now rather than at the next idle poll.
+          if (!open && !paused) load()
+          setOpen(!open)
+        }}
         title={open ? 'Hide clients' : 'Waiting room and clients in the call'}
         aria-expanded={open}
         style={{
@@ -188,7 +270,10 @@ export default function LobbyRequests({
         }}
       >
         <Users size={14} />
-        <span style={{ whiteSpace: 'nowrap' }}>{waiting.length ? `${waiting.length} waiting` : 'Clients'}</span>
+        <span style={{ whiteSpace: 'nowrap' }}>
+          {waiting.length ? `${waiting.length} waiting` : 'Clients'}
+          {paused && <span style={{ fontWeight: 500, color: RC.inkMuted }}> · stopped</span>}
+        </span>
         {waiting.length > 0 && (
           <span style={{ position: 'absolute', top: -4, right: -4, width: 10, height: 10, borderRadius: '50%', background: RC.red, border: `2px solid ${RC.panel}` }} />
         )}
@@ -213,17 +298,57 @@ export default function LobbyRequests({
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 4px 0' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: RC.ink }}>Clients</span>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              title="Close"
-              style={{ border: 'none', background: 'transparent', color: RC.inkMuted, cursor: 'pointer', display: 'flex', padding: 2 }}
-            >
-              <X size={15} />
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (paused) {
+                    lastActiveAt.current = Date.now()
+                    pausedRef.current = false
+                    setStopReason(null)
+                    load()
+                  } else {
+                    stop('manual')
+                  }
+                }}
+                title={paused ? 'Start checking for clients again' : 'Stop checking for new clients'}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  height: 24,
+                  padding: '0 8px',
+                  borderRadius: 6,
+                  border: `1px solid ${paused ? RC.green : RC.border}`,
+                  background: paused ? RC.greenSoft : RC.tile,
+                  color: paused ? RC.greenDark : RC.ink,
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {paused ? <Play size={12} /> : <Pause size={12} />}
+                {paused ? 'Resume' : 'Stop'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                title="Close"
+                style={{ border: 'none', background: 'transparent', color: RC.inkMuted, cursor: 'pointer', display: 'flex', padding: 2 }}
+              >
+                <X size={15} />
+              </button>
+            </div>
           </div>
 
-          {loadError && (
+          {stopReason && (
+            <div style={{ fontSize: 12, color: RC.inkMuted, padding: '8px 4px 0' }}>
+              {STOP_MESSAGES[stopReason]}{' '}
+              New clients who open your invite link won&apos;t appear until you press Resume.
+            </div>
+          )}
+
+          {!paused && loadError && (
             <div style={{ fontSize: 12, color: RC.red, padding: '8px 4px 0' }}>Could not load the waiting room. Retrying…</div>
           )}
 

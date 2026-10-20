@@ -16,8 +16,13 @@ import WaitingLobby from './WaitingLobby'
 type GateStatus = 'checking' | 'waiting' | 'admitted' | 'denied' | 'removed' | 'invalid'
 
 const POLL_MS = 3000
-// Slower once in the call: only watching for being removed.
-const ADMITTED_POLL_MS = 5000
+// Much slower once in the call: this is only a heartbeat (keeps the guest under
+// "In the call", well inside the backend's 75s STALE_MS) and a check for being
+// removed. Removal itself doesn't wait for it: the server cuts video and access
+// right away, this only swaps the room for the "removed" notice.
+const ADMITTED_POLL_MS = 15000
+// Focus and visibilitychange often fire together; one knock covers both.
+const MIN_REKNOCK_MS = 2000
 
 export default function GuestAdmissionGate({
   sessionId,
@@ -35,11 +40,13 @@ export default function GuestAdmissionGate({
     let stopped = false
     let inFlight = false
     let admitted = false
+    let lastKnockAt = 0
     let timer: ReturnType<typeof setTimeout> | undefined
 
     const knock = async () => {
       if (stopped || inFlight) return
       inFlight = true
+      lastKnockAt = Date.now()
       clearTimeout(timer)
       try {
         const res = await apiFetch(`/api/sessions/${sessionId}/lobby`, { method: 'POST' })
@@ -77,7 +84,7 @@ export default function GuestAdmissionGate({
 
     // Background tabs throttle timers, so knock right away when the guest comes back.
     const onVisible = () => {
-      if (document.visibilityState === 'visible') knock()
+      if (document.visibilityState === 'visible' && Date.now() - lastKnockAt >= MIN_REKNOCK_MS) knock()
     }
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('focus', onVisible)
