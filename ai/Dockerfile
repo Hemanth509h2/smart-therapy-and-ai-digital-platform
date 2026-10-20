@@ -17,8 +17,9 @@
 #   --env-file .env  gives the container your settings
 #
 # Where the settings come from:
-#   SARVAM_API_KEY, STT_TOKEN_SECRET (same value as in backend/.env) and
-#   ALLOWED_ORIGINS are read when the container starts.
+#   SARVAM_API_KEY, OPENROUTER_API_KEY, DATABASE_URL, NVIDIA_API_KEY,
+#   STT_TOKEN_SECRET (same value as in backend/.env) and ALLOWED_ORIGINS are
+#   read when the container starts.
 #   WEB_CONCURRENCY sets how many worker processes run (default 1).
 #
 # Safety:
@@ -50,7 +51,7 @@ ENV GUNICORN_CMD_ARGS="--control-socket /tmp/gunicorn.ctl"
 # are reinstalled only when requirements.txt changes.
 COPY requirements.txt ./
 
-# Install websockets and gunicorn.
+# Install websockets, gunicorn, pypdf and psycopg.
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the service code:
@@ -58,8 +59,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 #   worker.py         lets gunicorn run the WebSocket server
 #   gunicorn.conf.py  port, worker type and logging
 #   stt/              the speech-to-text relay
+#   call_plan/        the call-plan AI agent
 COPY server.py worker.py gunicorn.conf.py ./
 COPY stt ./stt
+COPY call_plan ./call_plan
 
 # Create a normal user and stop running as root.
 RUN useradd --system --uid 10001 app

@@ -19,10 +19,19 @@ export interface TranscriptLine {
   sessionMinute?: number
 }
 
+// The call plan the AI agent (ai/call_plan) made from the client's previous
+// notes, with the therapist's ticks. Written by the AI Notes popup.
+export interface CallPlan {
+  focus?: string
+  modules?: { id: string; name: string; reason?: string }[]
+  tasks?: { id: string; text: string; done?: boolean }[]
+}
+
 export interface ReportInputs {
   transcript: TranscriptLine[]
   moduleEvents: ModuleEvent[]
   therapistNotes: SessionNote[]
+  callPlan?: CallPlan | null
 }
 
 /**
@@ -53,8 +62,8 @@ export async function getReportStats(sessionId: string): Promise<unknown | null>
 }
 
 // Everything the report needs lives on the single persistent `sessions/{id}`
-// Firestore doc: the (English) transcript, the in-module activity timeline, and
-// the therapist's in-call notes.
+// Firestore doc: the (English) transcript, the in-module activity timeline, the
+// therapist's in-call notes, and the AI call plan.
 export async function getReportInputs(sessionId: string): Promise<ReportInputs> {
   const snap = await adminDb().collection('sessions').doc(sessionId).get()
   const d = snap.exists ? snap.data() ?? {} : {}
@@ -62,5 +71,6 @@ export async function getReportInputs(sessionId: string): Promise<ReportInputs> 
     transcript: Array.isArray(d.transcript) ? (d.transcript as TranscriptLine[]) : [],
     moduleEvents: Array.isArray(d.moduleEvents) ? (d.moduleEvents as ModuleEvent[]) : [],
     therapistNotes: Array.isArray(d.therapistNotes) ? (d.therapistNotes as SessionNote[]) : [],
+    callPlan: d.callPlan && typeof d.callPlan === 'object' ? (d.callPlan as CallPlan) : null,
   }
 }

@@ -74,6 +74,19 @@ function formatInputs(inputs: ReportInputs, client: ReportClient): string {
     }
   }
 
+  // Only when the therapist used the Call Plan tab this session.
+  const plan = inputs.callPlan
+  if (plan && Array.isArray(plan.tasks) && plan.tasks.length > 0) {
+    lines.push('\nPLAN FOR THIS CALL (AI-suggested from previous notes; [x] = done):')
+    if (plan.focus) lines.push(`Focus: ${plan.focus}`)
+    if (Array.isArray(plan.modules) && plan.modules.length > 0) {
+      lines.push(`Recommended modules: ${plan.modules.map((m) => m.name).join(', ')}`)
+    }
+    for (const t of plan.tasks) {
+      lines.push(`- [${t.done ? 'x' : ' '}] ${t.text}`)
+    }
+  }
+
   lines.push('\nWrite the full session report now, following the required structure.')
   return lines.join('\n')
 }

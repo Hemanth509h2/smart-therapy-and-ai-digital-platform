@@ -7,10 +7,20 @@ One Python server (`server.py`, port 4100) with a package per AI feature:
   and sends transcripts back (WebSocket `/sarvam-stream`, also `/api/sarvam-stream`).
   Sarvam needs its API key in a WebSocket *header*, which browsers can't set, so
   the browser connects here and this service adds the key.
+- `call_plan/`: the call-plan AI agent behind the "Call Plan" tab of the AI Notes
+  popup (WebSocket `/call-plan`). The therapist uploads or pastes the client's
+  previous notes; the agent reads them, searches the STAAD module reports
+  (`module_report_chunks` in the backend's Postgres, filled by
+  `backend/scripts/maintenance/ingest-module-reports.ts`), and returns
+  recommended modules and a task list for the call. Later in the call it marks
+  tasks covered from the live transcript. The token comes from the backend's
+  `/api/call-plan-token`, which checks session ownership, plan and AI consent.
+  Files are read in memory and never stored; nothing is logged but errors.
 
-The backend still issues the STT token at `/api/stt-token`. `stt` only checks
-it, using the same `STT_TOKEN_SECRET`, so this service needs no database or
-Firebase access.
+The backend issues the tokens (`/api/stt-token`, `/api/call-plan-token`); this
+service only checks them, using the same `STT_TOKEN_SECRET`. It needs no
+Firebase access. `call_plan` reads the module reports from the backend's
+database (`DATABASE_URL`, read-only use) and calls OpenRouter and NVIDIA.
 
 ## Run locally (port 4100)
 
@@ -20,7 +30,9 @@ python -m venv .venv
 .venv\Scripts\activate            # macOS/Linux: source .venv/bin/activate
 pip install -r requirements-dev.txt
 cp .env.example .env              # SARVAM_API_KEY + same STT_TOKEN_SECRET as backend/.env
+                                  # call_plan: OPENROUTER_API_KEY, DATABASE_URL, NVIDIA_API_KEY
 python server.py
+python -m pytest tests            # call_plan tests (the AI model is faked)
 ```
 
 Point the frontend at it with `NEXT_PUBLIC_STT_RELAY_URL=http://localhost:4100`

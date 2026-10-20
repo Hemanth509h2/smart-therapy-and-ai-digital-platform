@@ -1342,6 +1342,15 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
             insight={aiInsight}
             initialPosition={{ x: 820, y: 140 }}
             onClose={() => setShowNotesPopup(false)}
+            planAgent={
+              isTherapist
+                ? {
+                    allowedModuleIds: resolveAllowedModuleIds(profile),
+                    clientName: Object.values(participants).find((p) => p.role === 'client')?.name,
+                    onLaunchModule: handleLaunchModule,
+                  }
+                : undefined
+            }
           />
         )}
 

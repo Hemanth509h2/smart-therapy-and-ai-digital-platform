@@ -11,8 +11,10 @@ import {
 import type { AIInsight } from '@/lib/rag/types'
 import { GLASS } from './roomTheme'
 import { moduleName } from '@/lib/modules'
+import type { CallPlan } from '@/lib/callPlan'
+import CallPlanTab from './CallPlanTab'
 
-type Tab = 'notes' | 'suggested' | 'observations'
+type Tab = 'notes' | 'plan' | 'suggested' | 'observations'
 
 interface TranscriptEntry {
   text: string
@@ -61,6 +63,12 @@ interface AINotesPopupProps {
   insight: AIInsight | null
   onClose: () => void
   initialPosition?: { x: number; y: number }
+  /** Therapist only: turns on the Call Plan tab (AI agent over the previous notes). */
+  planAgent?: {
+    allowedModuleIds: string[]
+    clientName?: string
+    onLaunchModule: (moduleId: string) => void
+  }
 }
 
 export default function AINotesPopup({
@@ -69,12 +77,14 @@ export default function AINotesPopup({
   insight,
   onClose,
   initialPosition = { x: 420, y: 140 },
+  planAgent,
 }: AINotesPopupProps) {
   const [tab, setTab] = useState<Tab>('notes')
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([])
   const [moduleEvents, setModuleEvents] = useState<ModuleEventEntry[]>([])
   const [savedNotes, setSavedNotes] = useState<SavedNote[]>([])
   const [highlights, setHighlights] = useState<TimelineEntry[]>([])
+  const [callPlan, setCallPlan] = useState<CallPlan | null>(null)
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
@@ -149,6 +159,7 @@ export default function AINotesPopup({
       if (Array.isArray(d.transcript)) setTranscript(d.transcript as TranscriptEntry[])
       if (Array.isArray(d.moduleEvents)) setModuleEvents(d.moduleEvents as ModuleEventEntry[])
       if (Array.isArray(d.therapistNotes)) setSavedNotes(d.therapistNotes as SavedNote[])
+      setCallPlan(d.callPlan && Array.isArray(d.callPlan.tasks) ? (d.callPlan as CallPlan) : null)
     })
     return () => unsub()
   }, [sessionId])
@@ -241,6 +252,7 @@ export default function AINotesPopup({
 
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: 'notes', label: 'Session Notes' },
+    ...(planAgent ? [{ id: 'plan' as const, label: 'Call Plan' }] : []),
     { id: 'suggested', label: 'AI Suggested Notes' },
     { id: 'observations', label: 'Important Observations' },
   ]
@@ -548,6 +560,17 @@ export default function AINotesPopup({
               )}
             </div>
           </>
+        )}
+
+        {tab === 'plan' && planAgent && (
+          <CallPlanTab
+            sessionId={sessionId}
+            plan={callPlan}
+            transcript={transcript}
+            allowedModuleIds={planAgent.allowedModuleIds}
+            clientName={planAgent.clientName}
+            onLaunchModule={planAgent.onLaunchModule}
+          />
         )}
 
         {tab === 'suggested' && (

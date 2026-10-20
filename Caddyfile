@@ -32,6 +32,7 @@
 # One domain for everything the browser uses, so the browser only talks to its
 # own origin (no CORS problems, one certificate):
 #   /sarvam-stream, /api/sarvam-stream   speech-to-text WebSocket  -> ai
+#   /call-plan                           call-plan agent WebSocket -> ai
 #   /api/...                             backend API               -> backend
 #   everything else                      website                   -> frontend
 # -----------------------------------------------------------------------------
@@ -42,6 +43,10 @@
 		reverse_proxy ai:4100
 	}
 	handle /api/sarvam-stream* {
+		reverse_proxy ai:4100
+	}
+	# Call-plan AI agent WebSocket (AI Notes popup).
+	handle /call-plan* {
 		reverse_proxy ai:4100
 	}
 

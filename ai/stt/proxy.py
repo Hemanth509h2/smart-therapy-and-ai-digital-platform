@@ -57,9 +57,11 @@ def _b64url_decode(text):
     return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
 
 
-def verify_stt_token(token, sid, secret, now_ms=None):
+def verify_stt_token(token, sid, secret, now_ms=None, scope=None):
     """Token format from backend/src/lib/sessions/stt-token.ts:
-    base64url(payload).base64url(hmac-sha256), payload = {"sid", "exp" (seconds)}."""
+    base64url(payload).base64url(hmac-sha256), payload = {"sid", "exp" (seconds), "scope"?}.
+    `scope` must match the token's: STT tokens have none, so a token minted for
+    another feature (e.g. "call-plan") can't open an STT stream, and vice versa."""
     if not isinstance(token, str) or not sid:
         return False
     parts = token.split(".")
@@ -79,7 +81,7 @@ def verify_stt_token(token, sid, secret, now_ms=None):
     if isinstance(exp, bool) or not isinstance(exp, (int, float)):
         return False
     now_ms = time.time() * 1000 if now_ms is None else now_ms
-    return payload.get("sid") == sid and exp * 1000 > now_ms
+    return payload.get("sid") == sid and payload.get("scope") == scope and exp * 1000 > now_ms
 
 
 def authorize(query, env=os.environ):

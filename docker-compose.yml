@@ -118,8 +118,8 @@ services:
     logging: *logging
 
   # ---------------------------------------------------------------------------
-  # AI service: speech-to-text relay (Python + gunicorn).
-  # Reached at wss://APP_DOMAIN/sarvam-stream
+  # AI service: speech-to-text relay and the call-plan AI agent (Python + gunicorn).
+  # Reached at wss://APP_DOMAIN/sarvam-stream and wss://APP_DOMAIN/call-plan
   # ---------------------------------------------------------------------------
   ai:
     build: ./ai
