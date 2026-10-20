@@ -16,7 +16,7 @@ interface CaptionsPopupProps {
   live: boolean
   translation: TranslationSettings
   onTranslationChange: (patch: Partial<TranslationSettings>) => void
-  /** Also show the subtitle bar at the bottom of the video, like the client sees. */
+  /** Subtitle bar at the bottom of the video, on both the therapist's and the client's screen. */
   liveOnVideo: boolean
   onLiveOnVideoChange: (on: boolean) => void
   onClose: () => void
@@ -225,7 +225,7 @@ export default function CaptionsPopup({
           <Subtitles size={14} color={liveOnVideo ? '#4caf86' : GLASS.accent} />
           <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: GLASS.ink }}>Live captions on video</span>
-            <span style={{ fontSize: 10, color: GLASS.inkFaint }}>Subtitles at the bottom of the call, as the client sees them</span>
+            <span style={{ fontSize: 10, color: GLASS.inkFaint }}>Subtitles at the bottom of the call, for you and the client</span>
           </span>
           <OnOffButton on={liveOnVideo} onChange={onLiveOnVideoChange} label="Live captions on video" />
         </div>

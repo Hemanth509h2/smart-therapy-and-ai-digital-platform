@@ -29,6 +29,7 @@ import type { SidebarPanel } from '@/components/session/sessionPanels';
 import CaptionOverlay from '@/components/session/CaptionOverlay';
 import TranslationSync from '@/components/session/TranslationSync';
 import { useTranslationSettings, pairForRole, writeTranslationSettings } from '@/lib/translation';
+import { useCaptionsOnVideo, writeCaptionsOnVideo } from '@/lib/captions';
 import SessionTopBar from '@/components/session/SessionTopBar';
 import SessionBottomBar from '@/components/session/SessionBottomBar';
 import AIAssistantPopup from '@/components/session/AIAssistantPopup';
@@ -149,20 +150,10 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
   const [showAssistantPopup, setShowAssistantPopup] = useState(false);
   const [showNotesPopup, setShowNotesPopup] = useState(false);
   const [showCaptionsPopup, setShowCaptionsPopup] = useState(false);
-  // Therapist opt-in: also show the client-style subtitle bar on the video.
-  // Remembered per browser; storage can be unavailable (private mode).
-  const [captionsOnVideo, setCaptionsOnVideo] = useState(false);
-  useEffect(() => {
-    try {
-      setCaptionsOnVideo(localStorage.getItem('staad.captionsOnVideo') === '1');
-    } catch {}
-  }, []);
-  const changeCaptionsOnVideo = (on: boolean) => {
-    setCaptionsOnVideo(on);
-    try {
-      localStorage.setItem('staad.captionsOnVideo', on ? '1' : '0');
-    } catch {}
-  };
+  // Subtitle bar on the video, for both people: one switch the therapist sets
+  // in the Captions popup (lib/captions.ts). Transcription runs either way.
+  const captionsOnVideo = useCaptionsOnVideo(sessionId);
+  const changeCaptionsOnVideo = (on: boolean) => writeCaptionsOnVideo(sessionId, on);
   const [screenSharing, setScreenSharing] = useState(false);
   const [shareWhiteboardAsk, setShareWhiteboardAsk] = useState(false);
   const whiteboardPromptedRef = useRef(false);
@@ -1013,9 +1004,9 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
         enabled={transcriptionEnabled || translationSettings.enabled}
         sessionId={sessionId}
         store={isTherapist}
-        // The therapist reads captions in the Captions popup, unless they
-        // switched on "Live captions on video" there.
-        visible={!isTherapist || captionsOnVideo}
+        // "Live captions on video" in the therapist's Captions popup, for both
+        // screens. Hidden captions are still stored for the Captions popup.
+        visible={captionsOnVideo}
         viewerRole={userRole}
       />
       {/* Applies caption-language changes to the room without reconnecting. */}
