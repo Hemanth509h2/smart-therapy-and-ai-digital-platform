@@ -38,7 +38,7 @@ cp .env.example .env
 | `STT_TOKEN_SECRET` | **Yes** | Must be the **same** as `STT_TOKEN_SECRET` in `backend/.env` |
 | `DATABASE_URL` | Recommended | Same as `backend/.env`. Without it the agent plans from the module list only (no module-report search). |
 | `NVIDIA_API_KEY` | Recommended | Same as `backend/.env`. Without it the report search is by keyword instead of by meaning. |
-| `OPENROUTER_AGENT_MODEL` | Optional | Model override. Default: `nvidia/nemotron-3-super-120b-a12b:free` |
+| `OPENROUTER_AGENT_MODEL` | Optional | Model override. Default: `nvidia/nemotron-3-ultra-550b-a55b:free` |
 | `SARVAM_API_KEY` | Only for live speech-to-text | Not needed for Call Plan itself |
 | `PORT` | Optional | Default `4100` |
 

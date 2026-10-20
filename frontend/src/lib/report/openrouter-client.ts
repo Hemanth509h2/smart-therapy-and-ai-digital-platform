@@ -4,7 +4,7 @@ import OpenAI from 'openai'
 // to a stronger paid model or Claude) without touching code. The report runs
 // once after the session — speed is irrelevant, so a larger free model is fine.
 export const REPORT_MODEL =
-  process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3-super-120b-a12b:free'
+  process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free'
 
 // Lazily constructed so a missing key never breaks builds/imports — it only
 // throws when a report is actually generated.
@@ -45,8 +45,11 @@ export async function generateReportText(
 // Live copilot model — separate from the report so it can be swapped/tuned for
 // latency without affecting the (latency-insensitive) end-of-session report.
 // gpt-oss-120b was the only probed free model that reliably surfaced safety cues.
+// Default is nemotron-3-ultra (free, ~30s a call): the free endpoint of
+// nemotron-3-super started returning 404 in Oct 2026. For faster replies set
+// OPENROUTER_COPILOT_MODEL=nvidia/nemotron-3-super-120b-a12b (paid, ~3s).
 export const COPILOT_MODEL =
-  process.env.OPENROUTER_COPILOT_MODEL || 'nvidia/nemotron-3-super-120b-a12b:free'
+  process.env.OPENROUTER_COPILOT_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free'
 
 // Low-temperature chat for the copilot's structured (JSON) passes. We deliberately
 // do NOT set response_format: json_object — gpt-oss models mangle their output under
