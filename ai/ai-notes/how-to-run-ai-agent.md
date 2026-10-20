@@ -18,6 +18,16 @@ browser (Call Plan tab)
 ai/call_plan → OpenRouter (LLM) + NVIDIA (embeddings) + Postgres (module reports)
 ```
 
+The same service also does **AI insights** ("Analyse") and **session reports**. For those the browser talks
+only to the backend, which checks the request and calls the AI service's private `/internal` endpoint:
+
+```
+browser → backend /api/ai-insight, /api/session-report   (checks, reads session data, saves result)
+            │ WebSocket /internal?token  (scope "internal", same STT_TOKEN_SECRET)
+            ▼
+          ai/copilot, ai/report → OpenRouter (+ NVIDIA + Postgres for study material)
+```
+
 ---
 
 ## 1. One-time setup
@@ -34,11 +44,13 @@ cp .env.example .env
 
 | Variable | Needed? | Value |
 |---|---|---|
-| `OPENROUTER_API_KEY` | **Yes**: without it the agent is off | Same key as `backend/.env` |
+| `OPENROUTER_API_KEY` | **Yes**: without it Call Plan, AI insights and reports are off | Your OpenRouter key (the backend no longer needs it) |
 | `STT_TOKEN_SECRET` | **Yes** | Must be the **same** as `STT_TOKEN_SECRET` in `backend/.env` |
-| `DATABASE_URL` | Recommended | Same as `backend/.env`. Without it the agent plans from the module list only (no module-report search). |
-| `NVIDIA_API_KEY` | Recommended | Same as `backend/.env`. Without it the report search is by keyword instead of by meaning. |
-| `OPENROUTER_AGENT_MODEL` | Optional | Model override. Default: `nvidia/nemotron-3-ultra-550b-a55b:free` |
+| `DATABASE_URL` | Recommended | Same as `backend/.env`. Without it the agent plans from the module list only (no module-report search), and insights skip study material. |
+| `NVIDIA_API_KEY` | Recommended | Without it the module-report search is by keyword instead of by meaning, and insights skip study material. |
+| `OPENROUTER_AGENT_MODEL` | Optional | Call Plan model. Default: `nvidia/nemotron-3-ultra-550b-a55b:free` |
+| `OPENROUTER_COPILOT_MODEL` | Optional | AI insights + safety scan model. Same default |
+| `OPENROUTER_MODEL` | Optional | Session report model. Same default |
 | `SARVAM_API_KEY` | Only for live speech-to-text | Not needed for Call Plan itself |
 | `PORT` | Optional | Default `4100` |
 
@@ -73,7 +85,9 @@ curl http://localhost:4100/health
 
 - **`frontend/.env`**: `NEXT_PUBLIC_STT_RELAY_URL=http://localhost:4100`, then restart the frontend.
   If this isn't set, the frontend uses `http://localhost:4100` anyway.
-- **`backend/.env`**: `STT_TOKEN_SECRET` (same value as in `ai/.env`).
+- **`backend/.env`**: `STT_TOKEN_SECRET` (same value as in `ai/.env`) and `STT_RELAY_URL=http://localhost:4100`
+  (where the backend sends AI insight and report requests). On Render, set `STT_RELAY_URL` on the backend to
+  the AI service's URL.
 - **Admin settings**: the **AI insights** feature must be switched on. Otherwise the token request fails with
   "AI insights are turned off by an admin."
 
@@ -81,12 +95,14 @@ Then run the backend (`npm run dev` in `backend/`) and the frontend (`npm run de
 
 ## 5. Load the module reports (once, or when reports change)
 
-The agent searches the STAAD module reports stored in the `module_report_chunks` table. Load them from the backend:
+The agent searches the STAAD module reports stored in the `module_report_chunks` table. Load them with the
+AI service's script:
 
 ```bash
-cd backend
-npm run ingest:module-reports -- "<folder with the .docx reports>" --dry-run   # check first
-npm run ingest:module-reports -- "<folder with the .docx reports>"
+cd ai
+source .venv/bin/activate
+python scripts/ingest_module_reports.py "<folder with the .docx reports>" --dry-run   # check first
+python scripts/ingest_module_reports.py "<folder with the .docx reports>"
 ```
 
 The folder needs one sub-folder per category (`adhd`, `sld`, `cbt, act`, `anxiety and depression`, `id`,

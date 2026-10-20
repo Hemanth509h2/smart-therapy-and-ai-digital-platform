@@ -3,7 +3,7 @@ import { prisma } from '@/lib/core/db';
 import { requireTherapist } from '@/lib/http/progressAuth';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { mintSttToken } from '@/lib/sessions/stt-token';
-import { checkAIConsent } from '@/lib/ai/rag/transcript-store';
+import { checkAIConsent } from '@/lib/sessions/transcript-store';
 import { getSetting } from '@/lib/core/settings';
 import { errorResponse } from '@/lib/http/apiError';
 

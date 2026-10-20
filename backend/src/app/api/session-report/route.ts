@@ -4,8 +4,8 @@ import { prisma } from '@/lib/core/db'
 import { requireActivePlan } from '@/lib/billing/subscriptions'
 import { requireAuth } from '@/lib/http/apiAuth'
 import { requireTherapist } from '@/lib/http/progressAuth'
-import { generateSessionReport } from '@/lib/ai/report/generate'
-import { getReportStats } from '@/lib/ai/report/session-data'
+import { generateSessionReport } from '@/lib/reports/generate'
+import { getReportStats } from '@/lib/reports/session-data'
 import { errorResponse } from '@/lib/http/apiError'
 
 function ageFrom(dob: Date | null | undefined): number | undefined {

@@ -8,13 +8,19 @@ stt/  Sarvam speech-to-text relay. Sarvam's streaming STT WebSocket only accepts
 
 call_plan/  AI agent for the AI Notes popup. Reads a client's previous notes
       (uploaded file or pasted text) and recommends modules and a task list for
-      the call, then marks tasks covered from the live transcript. Calls
-      OpenRouter with OPENROUTER_API_KEY.
+      the call, then marks tasks covered from the live transcript.
 
-Auth: the backend's /api/stt-token and /api/call-plan-token mint short-lived
-HMAC tokens bound to the session id (and, for call_plan, a scope); each package
-verifies them with the same STT_TOKEN_SECRET. This service needs no database or
-Firebase access.
+copilot/, report/  The AI insight ("Analyse") and the end-of-session report.
+      Not for browsers: the backend calls them through internal.py (/internal),
+      after its own auth, plan and consent checks, and saves the results.
+
+openrouter.py and rag.py are shared: OpenRouter chat (OPENROUTER_API_KEY), and
+Postgres + NVIDIA embeddings for searching module reports and study material.
+
+Auth: the backend mints short-lived HMAC tokens bound to the session id and a
+scope (none for stt, "call-plan", "internal"); each package verifies them with
+the same STT_TOKEN_SECRET. This service needs no Firebase access; app data
+reaches it only in the backend's requests.
 """
 
 import asyncio
@@ -29,6 +35,7 @@ from urllib.parse import parse_qsl, urlsplit
 from websockets.asyncio.server import ServerConnection, serve
 
 import call_plan
+import internal
 import stt
 
 log = logging.getLogger("ai")
@@ -70,8 +77,11 @@ def first_values(query_string):
 def allowed_origins(env=os.environ):
     # Optional comma-separated allow-list, e.g. "https://app.staad.in". Unset = any
     # origin (local dev); the HMAC token is still required when the secret is set.
+    # None (no Origin header) is always allowed: the backend's calls to /internal
+    # come from Node, which sends none. Only browsers send Origin, and anything
+    # else can set it to whatever it likes, so the token is what protects us.
     origins = [o.strip() for o in env.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
-    return origins or None
+    return [*origins, None] if origins else None
 
 
 class HandshakeFailureFilter(logging.Filter):
@@ -176,7 +186,7 @@ def process_request(connection, request):
         del response.headers["Content-Type"]  # Headers is a multidict; replace, don't append
         response.headers["Content-Type"] = "application/json"
         return response
-    if path not in stt.STREAM_PATHS and path not in call_plan.PATHS:
+    if path not in stt.STREAM_PATHS and path not in call_plan.PATHS and path not in internal.PATHS:
         return connection.respond(HTTPStatus.FORBIDDEN, "Forbidden\n")
     return None  # continue with the WebSocket handshake
 
@@ -198,6 +208,8 @@ async def handler(ws):
     try:
         if path in call_plan.PATHS:
             await call_plan.handle_connection(ws, query)
+        elif path in internal.PATHS:
+            await internal.handle_connection(ws, query)
         else:
             await stt.handle_proxy_connection(ws, query)
     finally:
@@ -217,9 +229,9 @@ def make_server(port=None, host=None, sock=None):
 
 def warn_if_misconfigured():
     if os.environ.get("NODE_ENV") == "production" and not os.environ.get("STT_TOKEN_SECRET"):
-        log.warning("[ai] STT_TOKEN_SECRET is not set - every STT and call-plan connection will be refused.")
+        log.warning("[ai] STT_TOKEN_SECRET is not set - every STT, call-plan and internal connection will be refused.")
     if not call_plan.is_configured():
-        log.warning("[ai] OPENROUTER_API_KEY is not set - the call-plan agent is off.")
+        log.warning("[ai] OPENROUTER_API_KEY is not set - the call-plan agent, AI insights and reports are off.")
 
 
 async def main():

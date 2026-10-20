@@ -1,25 +1,18 @@
 import { FieldValue } from 'firebase-admin/firestore'
-import type { TranscriptChunk } from './types'
 import { adminDb } from '@/lib/core/firebaseAdmin'
 
-export async function appendTranscriptChunk(
-  sessionId: string,
-  chunk: TranscriptChunk
-): Promise<void> {
-  const ref = adminDb().collection('sessions').doc(sessionId)
+// Session data on the persistent `sessions/{id}` Firestore doc that the AI
+// features read (the AI work itself runs in the Python AI service, see
+// lib/ai-service.ts): the live transcript, consent, module activity and in-call
+// notes, plus the copilot's audit trail.
 
-  await ref.set(
-    {
-      transcript: FieldValue.arrayUnion({
-        text: chunk.text,
-        speaker: chunk.speaker,
-        timestamp: chunk.timestamp,
-        sessionMinute: chunk.sessionMinute,
-      }),
-      transcriptLastUpdated: FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  )
+// One transcript line, as written by the therapist's browser
+// (frontend/src/hooks/useSessionTranscription.ts).
+export interface TranscriptChunk {
+  text: string
+  speaker: 'therapist' | 'client' | 'unknown'
+  timestamp: number
+  sessionMinute: number
 }
 
 export async function getSessionTranscript(
@@ -29,18 +22,6 @@ export async function getSessionTranscript(
   const doc = await ref.get()
   if (!doc.exists) return []
   return (doc.data()?.transcript ?? []) as TranscriptChunk[]
-}
-
-export async function deleteSessionTranscript(
-  sessionId: string
-): Promise<void> {
-  const ref = adminDb().collection('sessions').doc(sessionId)
-  const doc = await ref.get()
-  if (!doc.exists) return
-  await ref.update({
-    transcript: FieldValue.delete(),
-    transcriptLastUpdated: FieldValue.delete(),
-  })
 }
 
 export async function checkAIConsent(

@@ -1,6 +1,8 @@
 # AI service (Python)
 
-One Python server (`server.py`, port 4100) with a package per AI feature:
+All of STAAD's AI work runs here: one Python server (`server.py`, port 4100)
+with a package per AI feature. The backend keeps login, plan and consent checks
+and all app data; it sends this service only what each AI task needs.
 
 - `server.py`: HTTP `/health`, and routes WebSocket connections to the feature packages
 - `stt/`: live speech-to-text. Relays session audio from the browser to Sarvam
@@ -16,11 +18,26 @@ One Python server (`server.py`, port 4100) with a package per AI feature:
   tasks covered from the live transcript. The token comes from the backend's
   `/api/call-plan-token`, which checks session ownership, plan and AI consent.
   Files are read in memory and never stored; nothing is logged but errors.
+- `copilot/`: AI insights, the "Analyse" button. Reads the last few minutes of
+  the transcript with the session's module activity, in-call notes, previous
+  notes and the therapist's study material (`document_chunks`), and returns
+  emotions, a summary, next steps and a module. A separate safety scan runs in
+  parallel and decides the risk level.
+- `report/`: the end-of-session report, written from the whole transcript,
+  activity log, notes and call plan.
+- `internal.py`: the endpoint the backend calls for `copilot` and `report`
+  (WebSocket `/internal`, not for browsers). The backend's `/api/ai-insight` and
+  `/api/session-report` do their checks, send the session data, and save the
+  result (`backend/src/lib/ai-service.ts`).
+- `openrouter.py`, `rag.py`: shared OpenRouter chat, and Postgres + NVIDIA
+  embeddings for the searches.
+- `scripts/`: fill the search tables, run by hand (see below).
 
-The backend issues the tokens (`/api/stt-token`, `/api/call-plan-token`); this
-service only checks them, using the same `STT_TOKEN_SECRET`. It needs no
-Firebase access. `call_plan` reads the module reports from the backend's
-database (`DATABASE_URL`, read-only use) and calls OpenRouter and NVIDIA.
+The backend issues the tokens (`/api/stt-token`, `/api/call-plan-token`, and
+its own for `/internal`), each with a scope so one feature's token can't open
+another; this service only checks them, using the same `STT_TOKEN_SECRET`. It
+needs no Firebase access. It reads `module_report_chunks` and `document_chunks`
+in the backend's database (`DATABASE_URL`) and calls OpenRouter and NVIDIA.
 
 ## Run locally (port 4100)
 
@@ -30,18 +47,39 @@ python -m venv .venv
 .venv\Scripts\activate            # macOS/Linux: source .venv/bin/activate
 pip install -r requirements-dev.txt
 cp .env.example .env              # SARVAM_API_KEY + same STT_TOKEN_SECRET as backend/.env
-                                  # call_plan: OPENROUTER_API_KEY, DATABASE_URL, NVIDIA_API_KEY
+                                  # AI: OPENROUTER_API_KEY, DATABASE_URL, NVIDIA_API_KEY
 python server.py
-python -m pytest tests            # call_plan tests (the AI model is faked)
+python -m pytest tests            # the AI model is faked
 ```
 
 Point the frontend at it with `NEXT_PUBLIC_STT_RELAY_URL=http://localhost:4100`
-in `frontend/.env`, then restart the frontend.
+in `frontend/.env`, and the backend with `STT_RELAY_URL=http://localhost:4100`
+in `backend/.env`, then restart them.
+
+## Search tables (scripts/)
+
+Run from `ai/` with the virtual environment active; they read `ai/.env`.
+
+```bash
+# STAAD module reports (.docx, one sub-folder per category) -> module_report_chunks
+python scripts/ingest_module_reports.py "<folder>" --dry-run   # check first
+python scripts/ingest_module_reports.py "<folder>"
+
+# A therapist's study material (PDF) -> document_chunks, keyed by Firebase uid
+python scripts/study_material.py setup                        # once
+python scripts/study_material.py ingest <therapistUid> notes.pdf
+python scripts/study_material.py list <therapistUid>
+python scripts/study_material.py delete <therapistUid> notes.pdf
+```
+
+Both embed with `rag.EMBEDDING_MODEL`; changing it means re-running both.
 
 ## Deploy
 
-`docker build -t staad-ai .` then run with `SARVAM_API_KEY`,
-`STT_TOKEN_SECRET` and `ALLOWED_ORIGINS` set. The image runs under gunicorn
+`docker build -t staad-ai .` then run with `SARVAM_API_KEY`, `STT_TOKEN_SECRET`,
+`ALLOWED_ORIGINS`, and for the AI features `OPENROUTER_API_KEY`, `DATABASE_URL`
+and `NVIDIA_API_KEY` set (plus any `OPENROUTER_*_MODEL`). The backend needs
+`STT_RELAY_URL` set to this service's address. The image runs under gunicorn
 (`gunicorn.conf.py`, binds `0.0.0.0:$PORT`, default 4100). `server.py` is a
 plain `websockets` server, not WSGI, so `worker.py` provides a gunicorn worker
 that serves it. Set `WEB_CONCURRENCY` for more worker processes (default 1).

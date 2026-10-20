@@ -2,10 +2,13 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/core/db'
 import { requireActivePlan } from '@/lib/billing/subscriptions'
 import { requireTherapist } from '@/lib/http/progressAuth'
-import { runAnalysis } from '@/lib/ai/rag/analysis'
-import { checkAIConsent, getSessionTranscript, appendCopilotEvent } from '@/lib/ai/rag/transcript-store'
-import type { ClientProfile } from '@/lib/ai/rag/retrieval'
-import type { AIInsight } from '@/lib/ai/rag/types'
+import { callAIService } from '@/lib/ai-service'
+import {
+  appendCopilotEvent,
+  checkAIConsent,
+  getSessionActivity,
+  getSessionTranscript,
+} from '@/lib/sessions/transcript-store'
 import { getSetting } from '@/lib/core/settings'
 import { errorResponse, logError } from '@/lib/http/apiError'
 import { firebasePrivateKey } from '@/lib/core/firebaseKey'
@@ -72,16 +75,14 @@ export async function POST(request: Request) {
     }
 
     // name/age/conditions are the owning therapist's descriptive input for the
-    // prompt only — not identity. clientId and therapistId are verified values.
-    const profile: ClientProfile = {
-      clientId: session.clientId,
+    // prompt only — not identity.
+    const client = {
       name: String(clientProfile.name ?? 'Unknown'),
       age: Number(clientProfile.age ?? 0),
       conditions: Array.isArray(clientProfile.conditions)
         ? clientProfile.conditions.map(String)
         : [],
       sessionNumber: Number(clientProfile.sessionNumber ?? 1),
-      therapistId,
     }
 
     // Dev test mode bypasses the both-consent gate so the copilot can be verified
@@ -113,11 +114,31 @@ export async function POST(request: Request) {
       )
     }
 
-    const insight: AIInsight = await runAnalysis({
-      sessionId,
-      therapistId,
-      clientProfile: profile,
-      transcriptWindowMinutes: transcriptWindowMinutes ?? 5,
+    // Everything the AI service needs comes from here (it has no Firebase
+    // access): this session's activity and notes, and this therapist's last
+    // notes on this client, newest first.
+    const [activity, previousNotes] = await Promise.all([
+      getSessionActivity(sessionId),
+      prisma.therapistNote.findMany({
+        where: { session: { therapistId: auth.therapist.id, clientId: session.clientId } },
+        orderBy: { createdAt: 'desc' },
+        take: 3,
+        select: { content: true, createdAt: true },
+      }),
+    ])
+    const { insight } = await callAIService('insight', sessionId, {
+      // The study material (document_chunks) is keyed by the Firebase uid.
+      therapistUid: therapistId,
+      client,
+      windowMinutes: Number(transcriptWindowMinutes) || 5,
+      transcript: existingTranscript,
+      moduleEvents: activity.moduleEvents,
+      inCallNotes: activity.inCallNotes,
+      previousNotes: previousNotes.map((n, i) => ({
+        content: n.content,
+        createdAt: n.createdAt.toISOString(),
+        sessionNumber: i + 1,
+      })),
     })
 
     const { getFirestore } = await import('firebase-admin/firestore')

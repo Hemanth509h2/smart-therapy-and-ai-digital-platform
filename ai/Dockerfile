@@ -58,11 +58,19 @@ RUN pip install --no-cache-dir -r requirements.txt
 #   server.py         the WebSocket server and /health
 #   worker.py         lets gunicorn run the WebSocket server
 #   gunicorn.conf.py  port, worker type and logging
+#   internal.py       the endpoint the backend calls for insights and reports
+#   openrouter.py     OpenRouter chat, shared by the AI features
+#   rag.py            Postgres + NVIDIA embeddings, shared by the searches
 #   stt/              the speech-to-text relay
 #   call_plan/        the call-plan AI agent
-COPY server.py worker.py gunicorn.conf.py ./
+#   copilot/          AI insights ("Analyse") and the safety scan
+#   report/           the end-of-session report
+# scripts/ (filling the search tables) is run by hand, not in the image.
+COPY server.py worker.py gunicorn.conf.py internal.py openrouter.py rag.py ./
 COPY stt ./stt
 COPY call_plan ./call_plan
+COPY copilot ./copilot
+COPY report ./report
 
 # Create a normal user and stop running as root.
 RUN useradd --system --uid 10001 app

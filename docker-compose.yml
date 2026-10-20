@@ -93,7 +93,9 @@ services:
       APP_URL: https://${APP_DOMAIN}
       # The website's address, allowed to call the API.
       ALLOWED_ORIGINS: https://${APP_DOMAIN}
-      # The admin health check reaches the AI service by its service name.
+      # The backend reaches the AI service by its service name: AI insights,
+      # session reports (its /internal endpoint, not exposed by Caddy) and the
+      # admin health check.
       STT_RELAY_URL: http://ai:4100
     restart: unless-stopped
     logging: *logging
@@ -118,8 +120,10 @@ services:
     logging: *logging
 
   # ---------------------------------------------------------------------------
-  # AI service: speech-to-text relay and the call-plan AI agent (Python + gunicorn).
-  # Reached at wss://APP_DOMAIN/sarvam-stream and wss://APP_DOMAIN/call-plan
+  # AI service: all AI work (Python + gunicorn): speech-to-text relay, call-plan
+  # agent, AI insights and session reports. Browsers reach it at
+  # wss://APP_DOMAIN/sarvam-stream and wss://APP_DOMAIN/call-plan; the backend
+  # at http://ai:4100.
   # ---------------------------------------------------------------------------
   ai:
     build: ./ai
