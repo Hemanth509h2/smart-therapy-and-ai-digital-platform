@@ -26,7 +26,7 @@ from http import HTTPStatus
 from pathlib import Path
 from urllib.parse import parse_qsl, urlsplit
 
-from websockets.asyncio.server import serve
+from websockets.asyncio.server import ServerConnection, serve
 
 import call_plan
 import stt
@@ -76,14 +76,16 @@ def allowed_origins(env=os.environ):
 
 class HandshakeFailureFilter(logging.Filter):
     """websockets logs a full traceback for every failed handshake. A request
-    that was parsed is already in the access log; for one that never parsed
-    (port scanners, dropped connections) keep a single line instead."""
+    that was parsed is already in the access log; probes answered by
+    ProbeAnsweringConnection and bare TCP checks (connect, send nothing, close)
+    are dropped. For anything else that never parsed, keep a single line."""
 
     def filter(self, record):
         if record.getMessage() != "opening handshake failed" or not record.exc_info:
             return True
         ws = getattr(record, "websocket", None)  # set by websockets' LoggerAdapter
-        if ws is not None and ws.request is not None:
+        if ws is not None and (ws.request is not None or getattr(ws, "probe_answered", False)
+                               or not getattr(ws, "received_bytes", True)):
             return False
         exc = record.exc_info[1]
         record.msg, record.args, record.exc_info = "%s bad request (%s)", (client_ip(ws), type(exc).__name__), None
@@ -110,16 +112,67 @@ def client_ip(connection, request=None):
         return "-"
 
 
+HEALTH_PATHS = ("/health", "/")
+
+
+def health_body():
+    return json.dumps({
+        "ok": True,
+        "sarvamConfigured": bool(os.environ.get("SARVAM_API_KEY")),
+        "callPlanConfigured": call_plan.is_configured(),
+    })
+
+
+class ProbeAnsweringConnection(ServerConnection):
+    """Answers plain HTTP requests that the WebSocket handshake can't parse.
+
+    websockets only accepts `GET ... HTTP/1.1` and drops anything else without a
+    reply. Hosting platforms probe with other requests (Render's port scanner and
+    health checks), get nothing back, and decide no HTTP server is listening
+    ("No open HTTP ports detected"). Those requests get a minimal response here:
+    200 with the health status for / and /health, 400 otherwise.
+    """
+
+    received_bytes = False
+    probe_answered = False
+    _sniffed = False
+    _head = b""
+
+    def data_received(self, data):
+        if self._sniffed:
+            return super().data_received(data)
+        self.received_bytes = True
+        self._head += data
+        line_end = self._head.find(b"\r\n")
+        if line_end < 0 and len(self._head) < 8192:
+            return  # wait for the whole request line
+        self._sniffed = True
+        head, self._head = self._head, b""
+        parts = (head[:line_end] if line_end >= 0 else head).split(b" ")
+        if len(parts) == 3 and parts[0] == b"GET" and parts[2] == b"HTTP/1.1":
+            return super().data_received(head)
+        self.probe_answered = True
+        self.transport.write(probe_response(parts))
+        self.transport.close()
+
+
+def probe_response(parts):
+    method = parts[0] if parts else b""
+    path = urlsplit(parts[1].decode("latin-1")).path if len(parts) > 1 else ""
+    if method in (b"GET", b"HEAD") and path in HEALTH_PATHS:
+        status, body, ctype = "200 OK", health_body().encode(), "application/json"
+    else:
+        status, body, ctype = "400 Bad Request", b"Bad Request\n", "text/plain"
+    headers = f"HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {len(body)}\r\nConnection: close\r\n\r\n"
+    return headers.encode() + (b"" if method == b"HEAD" else body)
+
+
 def process_request(connection, request):
     connection.started_at = time.monotonic()
     # Never log request.path: the query string carries the STT token.
     path = urlsplit(request.path).path
-    if path in ("/health", "/"):
-        response = connection.respond(HTTPStatus.OK, json.dumps({
-            "ok": True,
-            "sarvamConfigured": bool(os.environ.get("SARVAM_API_KEY")),
-            "callPlanConfigured": call_plan.is_configured(),
-        }))
+    if path in HEALTH_PATHS:
+        response = connection.respond(HTTPStatus.OK, health_body())
         del response.headers["Content-Type"]  # Headers is a multidict; replace, don't append
         response.headers["Content-Type"] = "application/json"
         return response
@@ -158,7 +211,8 @@ def make_server(port=None, host=None, sock=None):
     """Returns the websockets server (use with `async with`). host=None = all interfaces.
     Pass `sock` instead of port/host to serve on an already-bound socket (gunicorn)."""
     return serve(handler, host, port, sock=sock, process_request=process_request,
-                 process_response=process_response, origins=allowed_origins(), max_size=MAX_MESSAGE_BYTES)
+                 process_response=process_response, origins=allowed_origins(), max_size=MAX_MESSAGE_BYTES,
+                 create_connection=ProbeAnsweringConnection)
 
 
 def warn_if_misconfigured():

@@ -45,13 +45,23 @@ def _post(messages, max_tokens, env):
         with urllib.request.urlopen(req, timeout=TIMEOUT_SECONDS) as res:
             data = json.loads(res.read())
     except urllib.error.HTTPError as e:
-        raise LLMError(f"OpenRouter returned {e.code}") from e
+        raise LLMError(f"OpenRouter returned {e.code} for model {model_name(env)}: {_error_message(e)}") from e
     except (urllib.error.URLError, TimeoutError, ValueError) as e:
         raise LLMError(f"OpenRouter request failed: {type(e).__name__}") from e
     try:
         return data["choices"][0]["message"]["content"] or ""
     except (KeyError, IndexError, TypeError) as e:
         raise LLMError("OpenRouter reply had no message") from e
+
+
+def _error_message(e):
+    """OpenRouter's own reason, e.g. a 404 "No endpoints found matching your data
+    policy" for free models when the account blocks them. Never includes the prompt."""
+    try:
+        body = json.loads(e.read())
+        return str(body["error"]["message"])[:300]
+    except Exception:
+        return "no details"
 
 
 async def chat(messages, max_tokens=1500, env=os.environ):

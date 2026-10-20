@@ -97,7 +97,7 @@ async def handle_connection(ws, query, env=os.environ):
         except (ExtractError, ValueError) as e:
             await _send(ws, {"type": "error", "error": str(e)})
         except llm.LLMError as e:
-            log.error("[call-plan] %s", e)  # status/exception type only, never content
+            log.error("[call-plan] %s", e)  # status and OpenRouter's reason only, never content
             await _send(ws, {"type": "error", "error": "The AI agent could not finish. Try again in a minute."})
         except asyncio.TimeoutError:
             await _send(ws, {"type": "error", "error": "The upload timed out. Try again."})
