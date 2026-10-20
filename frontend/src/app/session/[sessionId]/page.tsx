@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { useRouter } from 'next/navigation';
@@ -33,6 +33,8 @@ import { useCaptionsOnVideo, writeCaptionsOnVideo } from '@/lib/captions';
 import SessionTopBar from '@/components/session/SessionTopBar';
 import SessionBottomBar from '@/components/session/SessionBottomBar';
 import AIAssistantPopup from '@/components/session/AIAssistantPopup';
+import AISuggestionToast from '@/components/session/AISuggestionToast';
+import type { AIInsight } from '@/lib/rag/types';
 import AINotesPopup from '@/components/session/AINotesPopup';
 import CaptionsPopup from '@/components/session/CaptionsPopup';
 import WaitingLobby from '@/components/session/WaitingLobby';
@@ -45,6 +47,12 @@ import ModuleStage from '@/components/session/ModuleStage';
 import { ModuleContent } from '@/components/GlassModulePanel';
 import { apiFetch } from '@/lib/api';
 import ErrorScreen from '@/components/ErrorScreen';
+
+// Automatic AI suggestions: how often the copilot re-checks the call (when
+// something new was said), and how often that condition is looked at. The
+// default model takes ~20-30s a run, so much shorter intervals would overlap.
+const AUTO_SUGGEST_MS = 3 * 60_000;
+const AUTO_SUGGEST_CHECK_MS = 30_000;
 
 interface SessionState {
   sessionId: string;
@@ -231,7 +239,30 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
 
   const [aiInsight, setAiInsight] = useState<any>(null);
   const [analyseLoading, setAnalyseLoading] = useState(false);
+  const analyseLoadingRef = useRef(false);
   const [analyseCooldown, setAnalyseCooldown] = useState(false);
+  // Newest insight not yet dismissed, shown as a toast over the video.
+  const [suggestion, setSuggestion] = useState<AIInsight | null>(null);
+  const dismissSuggestion = useCallback(() => setSuggestion(null), []);
+  // generatedAt of the insight last seen on the session doc (undefined until
+  // the first snapshot), so only insights made after the room opened toast.
+  const insightSeenAt = useRef<number | undefined>(undefined);
+  // Automatic copilot check (therapist's choice, remembered per browser): runs
+  // every AUTO_SUGGEST_MS while there is new speech since the last run.
+  const [autoSuggest, setAutoSuggest] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('staad.autoSuggest') === '0') setAutoSuggest(false);
+    } catch {}
+  }, []);
+  const changeAutoSuggest = (on: boolean) => {
+    setAutoSuggest(on);
+    try {
+      localStorage.setItem('staad.autoSuggest', on ? '1' : '0');
+    } catch {}
+  };
+  // Starts at room open, so the first automatic check waits a full interval.
+  const copilotLastRun = useRef({ at: Date.now(), chunks: 0 });
   const [showConsentBanner, setShowConsentBanner] = useState(true);
   const [consentStatus, setConsentStatus] = useState<{ therapist: boolean; client: boolean } | null>(null);
   const [myConsent, setMyConsent] = useState<boolean | null>(null);
@@ -605,13 +636,16 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
           setShowConsentBanner(false);
         }
 
-        if (isTherapist && data?.aiInsight) {
-          setAiInsight(data.aiInsight);
-          // The floating insight bar used to pop itself open here; the AI
-          // Assistant panel now takes that role. Only surface it when nothing
-          // else is occupying the sidebar so it can't yank the therapist out of
-          // an open module or the whiteboard.
-          setActivePanel((current) => (current === null ? 'assistant' : current));
+        if (isTherapist) {
+          if (data?.aiInsight) setAiInsight(data.aiInsight);
+          // Each new insight (Analyse or the automatic check) shows as a
+          // suggestion toast, but not one that was already there when the
+          // room opened.
+          const at = data?.aiInsight?.generatedAt ?? 0;
+          if (insightSeenAt.current !== undefined && at && at !== insightSeenAt.current) {
+            setSuggestion(data.aiInsight);
+          }
+          insightSeenAt.current = at;
         }
       }
     });
@@ -643,8 +677,13 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
     }).catch(() => {});
   };
 
-  const handleAnalyse = async () => {
-    if (analyseLoading || analyseCooldown) return;
+  // The copilot, from the Analyse button or the automatic check (`auto`: no
+  // toasts or cooldown, and it never overlaps a run in progress). The result
+  // arrives through the sessions/{id} listener above, which shows it.
+  const runCopilot = async (auto = false) => {
+    if (analyseLoadingRef.current || (!auto && analyseCooldown)) return;
+    analyseLoadingRef.current = true;
+    copilotLastRun.current = { at: Date.now(), chunks: transcription.chunkCount };
     setAnalyseLoading(true);
     const clientParticipant = Object.values(participants).find((p) => p.role === 'client');
     try {
@@ -670,16 +709,22 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Analysis failed');
       }
-      setAnalyseCooldown(true);
-      setTimeout(() => setAnalyseCooldown(false), 30000);
-      showToast('Analysis complete');
+      if (!auto) {
+        setAnalyseCooldown(true);
+        setTimeout(() => setAnalyseCooldown(false), 30000);
+      }
     } catch (e) {
       console.error('Analyse error:', e);
-      showToast('Analysis failed. Try again.');
+      // A failed automatic check just waits for the next one.
+      if (!auto) showToast('Analysis failed. Try again.');
     } finally {
+      analyseLoadingRef.current = false;
       setAnalyseLoading(false);
     }
   };
+  const handleAnalyse = () => runCopilot();
+  const runCopilotRef = useRef(runCopilot);
+  runCopilotRef.current = runCopilot;
 
   const handleLaunchModule = (moduleSlug: string) => {
     handleModuleSwitch(moduleSlug);
@@ -811,6 +856,21 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
     isRecording: false,
     chunkCount: 0,
   });
+  // Automatic copilot check: while transcription runs, every AUTO_SUGGEST_MS
+  // if anything new was said since the last run (automatic or Analyse), and
+  // only while the therapist has the call in view. Results show as toasts.
+  const transcriptChunks = useRef(0);
+  transcriptChunks.current = transcription.chunkCount;
+  useEffect(() => {
+    if (!isTherapist || !autoSuggest || !transcriptionEnabled) return;
+    const t = setInterval(() => {
+      const last = copilotLastRun.current;
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - last.at < AUTO_SUGGEST_MS || transcriptChunks.current <= last.chunks) return;
+      runCopilotRef.current(true);
+    }, AUTO_SUGGEST_CHECK_MS);
+    return () => clearInterval(t);
+  }, [isTherapist, autoSuggest, transcriptionEnabled]);
   // Attention scoring shares the transcription consent gate. NOTE: it does NOT
   // honour sttTestMode — that escape hatch bypasses client consent, and running
   // face tracking on someone who hasn't consented is not an acceptable
@@ -1273,6 +1333,17 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
 
               <ReactionOverlay sessionId={sessionId} open={reactionBarOpen} onOpenChange={setReactionBarOpen} />
 
+              {/* AI suggestion: each new copilot insight */}
+              {isTherapist && suggestion && (
+                <AISuggestionToast
+                  key={suggestion.generatedAt}
+                  insight={suggestion}
+                  onLaunchModule={handleLaunchModule}
+                  onOpenDetails={() => setShowAssistantPopup(true)}
+                  onDismiss={dismissSuggestion}
+                />
+              )}
+
               {/* Toast notification */}
               {toast && (
                 <div
@@ -1319,6 +1390,8 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
               analyseLoading={analyseLoading}
               analyseDisabled={!bothConsented || analyseCooldown || analyseLoading}
               onAnalyse={handleAnalyse}
+              autoSuggest={autoSuggest}
+              onAutoSuggestChange={changeAutoSuggest}
               onLaunchModule={handleLaunchModule}
               onClose={() => setShowAssistantPopup(false)}
             />

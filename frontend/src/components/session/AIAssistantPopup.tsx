@@ -4,6 +4,7 @@ import { Activity, Gauge, AudioLines, Sparkles, Lock, AlertTriangle, X, GripHori
 import type { AIInsight } from '@/lib/rag/types'
 import { GLASS } from './roomTheme'
 import { moduleName } from '@/lib/modules'
+import { OnOffButton } from '@/components/ui/on-off-button'
 import { useState, useRef, useEffect } from 'react'
 
 interface AIAssistantPopupProps {
@@ -12,6 +13,9 @@ interface AIAssistantPopupProps {
   analyseLoading: boolean
   analyseDisabled: boolean
   onAnalyse: () => void
+  /** Automatic check every few minutes, results shown as toasts over the video. */
+  autoSuggest: boolean
+  onAutoSuggestChange: (on: boolean) => void
   onLaunchModule: (moduleSlug: string) => void
   onClose: () => void
   initialPosition?: { x: number; y: number }
@@ -23,6 +27,8 @@ export default function AIAssistantPopup({
   analyseLoading,
   analyseDisabled,
   onAnalyse,
+  autoSuggest,
+  onAutoSuggestChange,
   onLaunchModule,
   onClose,
   initialPosition = { x: 400, y: 120 },
@@ -299,6 +305,15 @@ export default function AIAssistantPopup({
             )}
           </div>
         )}
+
+        {/* Automatic suggestions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: GLASS.ink }}>Auto suggestions</span>
+            <span style={{ fontSize: 10, color: GLASS.inkFaint }}>Checks the call every few minutes and shows tips</span>
+          </span>
+          <OnOffButton on={autoSuggest} onChange={onAutoSuggestChange} label="Auto suggestions" />
+        </div>
 
         {/* Analyse trigger */}
         <button
