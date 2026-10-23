@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules/modules';
 import { daysAgo } from '@/lib/admin/adminList';
@@ -26,14 +26,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     if (!auth.ok) return auth.response;
     const { id } = params;
 
-    const therapist = await prisma.profileTherapist.findUnique({
-      where: { id },
-      include: {
-        user: {
-          select: { email: true, createdAt: true, status: true, suspendedAt: true, suspendReason: true, lastSeenAt: true },
-        },
-      },
-    });
+    const therapist = await appDb.profileTherapist.findUnique({ where: { id } });
 
     if (!therapist) {
       return NextResponse.json({ error: 'Therapist not found' }, { status: 404 });
@@ -42,7 +35,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const since = daysAgo(USAGE_DAYS - 1);
     since.setHours(0, 0, 0, 0);
 
-    const [sessions, invites, docCount, usage, moduleUsage, subscriptions, pendingRequest, recentUsage] = await Promise.all([
+    const [user, sessions, invites, docCount, usage, moduleUsage, subscriptions, pendingRequest, recentUsage] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: therapist.userId },
+        select: { email: true, createdAt: true, status: true, suspendedAt: true, suspendReason: true, lastSeenAt: true },
+      }),
       prisma.session.findMany({
         where: { therapistId: id },
         include: { client: { select: { id: true, firstName: true, lastName: true } } },
@@ -53,23 +50,23 @@ export async function GET(request: Request, { params }: { params: { id: string }
         orderBy: { createdAt: 'desc' },
       }),
       prisma.documentChunk.count({ where: { therapistId: id } }),
-      prisma.usageEvent.groupBy({ by: ['type'], where: { therapistId: id }, _sum: { count: true } }),
-      prisma.usageEvent.groupBy({
+      appDb.usageEvent.groupBy({ by: ['type'], where: { therapistId: id }, _sum: { count: true } }),
+      appDb.usageEvent.groupBy({
         by: ['label'],
         where: { therapistId: id, type: 'MODULE_LAUNCH' },
         _sum: { count: true },
       }),
-      prisma.subscription.findMany({
+      appDb.subscription.findMany({
         where: { therapistId: id },
         include: { plan: true },
         orderBy: { startedAt: 'desc' },
       }),
-      prisma.subscriptionRequest.findFirst({
+      appDb.subscriptionRequest.findFirst({
         where: { therapistId: id, status: 'PENDING' },
         include: { plan: { select: { id: true, name: true, toolQuota: true } } },
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.usageEvent.findMany({
+      appDb.usageEvent.findMany({
         where: { therapistId: id, type: { in: [...USAGE_TYPES] }, createdAt: { gte: since } },
         select: { type: true, count: true, createdAt: true },
       }),
@@ -146,16 +143,16 @@ export async function GET(request: Request, { params }: { params: { id: string }
         id: therapist.id,
         userId: therapist.userId,
         name: `${therapist.firstName} ${therapist.lastName}`.trim(),
-        email: therapist.user?.email ?? '',
+        email: user?.email ?? '',
         specialty: therapist.specialty,
         qualification: therapist.qualification,
         experience: therapist.experience,
         bio: therapist.bio,
-        joinedAt: therapist.user?.createdAt ?? therapist.createdAt,
-        status: therapist.user?.status ?? 'ACTIVE',
-        suspendedAt: therapist.user?.suspendedAt ?? null,
-        suspendReason: therapist.user?.suspendReason ?? null,
-        lastSeenAt: therapist.user?.lastSeenAt ?? null,
+        joinedAt: user?.createdAt ?? therapist.createdAt,
+        status: user?.status ?? 'ACTIVE',
+        suspendedAt: user?.suspendedAt ?? null,
+        suspendReason: user?.suspendReason ?? null,
+        lastSeenAt: user?.lastSeenAt ?? null,
         access: {
           allModulesAllowed: therapist.allModulesAllowed,
           moduleAccess: therapist.moduleAccess,

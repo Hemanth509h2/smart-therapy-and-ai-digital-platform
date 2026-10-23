@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { ALL_MODULE_IDS } from '@/lib/modules/modules';
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       if (unknown.length) return NextResponse.json({ error: `Unknown module ids: ${unknown.join(', ')}` }, { status: 400 });
     }
 
-    const therapists = await prisma.profileTherapist.findMany({
+    const therapists = await appDb.profileTherapist.findMany({
       where: { id: { in: therapistIds } },
       select: { id: true, allModulesAllowed: true, moduleAccess: true },
     });
@@ -65,8 +65,8 @@ export async function POST(request: Request) {
     });
 
     const toUpdate = changes.filter((c) => c.changed);
-    await prisma.$transaction(
-      toUpdate.map((c) => prisma.profileTherapist.update({ where: { id: c.id }, data: c.after, select: { id: true } }))
+    await appDb.$transaction(
+      toUpdate.map((c) => appDb.profileTherapist.update({ where: { id: c.id }, data: c.after, select: { id: true } }))
     );
     await Promise.all(
       toUpdate.map((c) =>

@@ -1,7 +1,7 @@
 // What each admin role may do. Every /api/admin/* handler passes the
 // permission it needs to requireAdmin(); the frontend mirrors this map in
 // frontend/src/lib/adminRoles.ts to hide what a role can't use.
-import type { AdminRole } from '@prisma/client';
+import type { AdminRole } from '.prisma/app-client';
 
 export type AdminPermission =
   | 'people.read' // therapists, clients, sessions, usage

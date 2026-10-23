@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { prisma } from '@/lib/core/db';
+import { therapistForUser } from '@/lib/core/links';
 
 /**
  * Verifies the caller's identity (Firebase ID token, or the AUTH_DISABLED
@@ -17,12 +18,12 @@ export async function requireTherapist(request: Request) {
   const auth = await requireAuth(request);
   if (!auth.ok) return auth;
 
-  const user = await prisma.user.findUnique({
-    where: { id: auth.uid },
-    include: { therapist: true },
-  });
+  const [user, therapist] = await Promise.all([
+    prisma.user.findUnique({ where: { id: auth.uid }, select: { role: true } }),
+    therapistForUser(auth.uid),
+  ]);
 
-  if (!user || user.role !== 'THERAPIST' || !user.therapist) {
+  if (!user || user.role !== 'THERAPIST' || !therapist) {
     return {
       ok: false as const,
       response: NextResponse.json(
@@ -35,6 +36,6 @@ export async function requireTherapist(request: Request) {
   return {
     ok: true as const,
     uid: auth.uid,
-    therapist: user.therapist,
+    therapist,
   };
 }

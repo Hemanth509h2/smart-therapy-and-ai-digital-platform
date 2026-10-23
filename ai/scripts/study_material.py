@@ -8,7 +8,7 @@ searches during "Analyse" (copilot/study_material.py).
     python scripts/study_material.py delete <therapistUid> <fileName>
 
 <therapistUid> is the therapist's Firebase uid (the copilot searches by it).
-Ingesting a file again replaces its chunks. Needs DATABASE_URL and
+Ingesting a file again replaces its chunks. Needs DATABASE_URL_2 (the HIPAA database) and
 NVIDIA_API_KEY (from ai/.env).
 """
 
@@ -130,14 +130,14 @@ def delete(conn, therapist_uid, file_name):
 
 def main(argv):
     server.load_env_file(AI_DIR / ".env")
-    if not (rag.is_configured() and rag.can_embed()):
-        sys.exit("DATABASE_URL and NVIDIA_API_KEY must be set (ai/.env).")
+    if not (rag.is_configured(rag.HIPAA_DB) and rag.can_embed()):
+        sys.exit("DATABASE_URL_2 and NVIDIA_API_KEY must be set (ai/.env).")
     command, args = (argv[0] if argv else ""), argv[1:]
     session = None
     if "--session" in args:
         i = args.index("--session")
         session, args = (args[i + 1] if i + 1 < len(args) else None), args[:i] + args[i + 2:]
-    with rag.connect() as conn:
+    with rag.connect(rag.HIPAA_DB) as conn:
         if command == "setup" and not args:
             setup(conn)
         elif command == "ingest" and len(args) == 2:

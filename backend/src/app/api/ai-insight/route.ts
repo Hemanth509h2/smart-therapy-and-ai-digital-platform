@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/core/db'
+import { prisma, appDb } from '@/lib/core/db'
 import { requireActivePlan } from '@/lib/billing/subscriptions'
 import { requireTherapist } from '@/lib/http/progressAuth'
 import { callAIService } from '@/lib/ai-service'
@@ -179,10 +179,10 @@ export async function POST(request: Request) {
     // is the Firebase uid; resolve to the therapist profile). Never block on this.
     let therapistProfileId: string | null = null
     try {
-      const t = await prisma.profileTherapist.findUnique({ where: { userId: therapistId }, select: { id: true } })
+      const t = await appDb.profileTherapist.findUnique({ where: { userId: therapistId }, select: { id: true } })
       therapistProfileId = t?.id ?? null
       if (t) {
-        await prisma.usageEvent.create({ data: { therapistId: t.id, sessionId, type: 'AI_ANALYSIS' } })
+        await appDb.usageEvent.create({ data: { therapistId: t.id, sessionId, type: 'AI_ANALYSIS' } })
       }
     } catch (e) {
       logError('ai-insight usage event', e)

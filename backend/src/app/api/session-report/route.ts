@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/core/db'
+import { therapistIdForUser } from '@/lib/core/links'
 import { requireActivePlan } from '@/lib/billing/subscriptions'
 import { requireAuth } from '@/lib/http/apiAuth'
 import { requireTherapist } from '@/lib/http/progressAuth'
@@ -30,14 +31,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'sessionId is required' }, { status: 400 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: auth.uid },
-      select: { role: true, therapist: { select: { id: true } }, client: { select: { id: true } } },
-    })
+    const [user, therapistId] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: auth.uid },
+        select: { role: true, client: { select: { id: true } } },
+      }),
+      therapistIdForUser(auth.uid),
+    ])
 
     let where: Prisma.SessionReportWhereInput
-    if (user?.role === 'THERAPIST' && user.therapist) {
-      where = { sessionId, session: { therapistId: user.therapist.id } }
+    if (user?.role === 'THERAPIST' && therapistId) {
+      where = { sessionId, session: { therapistId } }
     } else if (user?.role === 'CLIENT' && user.client) {
       where = { sessionId, visibleToClient: true, session: { clientId: user.client.id } }
     } else {

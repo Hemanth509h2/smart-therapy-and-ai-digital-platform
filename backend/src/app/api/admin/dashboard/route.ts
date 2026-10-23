@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { can } from '@/lib/admin/adminRoles';
 import { daysAgo, startOfDay, startOfMonth } from '@/lib/admin/adminList';
@@ -29,15 +29,8 @@ export async function GET(request: Request) {
     if (people) {
       const [therapists, activeTherapists, clients, sessionsToday, sessionsMonth, signups, sessionsDaily, risk] =
         await Promise.all([
-          prisma.profileTherapist.count(),
-          prisma.profileTherapist.count({
-            where: {
-              OR: [
-                { user: { lastSeenAt: { gte: weekAgo } } },
-                { sessions: { some: { OR: [{ startedAt: { gte: weekAgo } }, { scheduledAt: { gte: weekAgo, lte: now } }] } } },
-              ],
-            },
-          }),
+          appDb.profileTherapist.count(),
+          countActiveTherapists(weekAgo, now),
           prisma.profileClient.count(),
           prisma.session.count({ where: { scheduledAt: { gte: today }, status: { not: 'CANCELLED' } } }),
           prisma.session.count({ where: { scheduledAt: { gte: monthStart }, status: { not: 'CANCELLED' } } }),
@@ -72,8 +65,8 @@ export async function GET(request: Request) {
 
     if (billing) {
       const [subs, expiring] = await Promise.all([
-        prisma.subscription.findMany({ where: { status: 'ACTIVE', currentPeriodEnd: { gt: now } }, include: { plan: true } }),
-        prisma.subscription.findMany({
+        appDb.subscription.findMany({ where: { status: 'ACTIVE', currentPeriodEnd: { gt: now } }, include: { plan: true } }),
+        appDb.subscription.findMany({
           where: { status: 'ACTIVE', currentPeriodEnd: { gt: now, lte: in7Days } },
           include: { plan: { select: { name: true } }, therapist: { select: { id: true, firstName: true, lastName: true } } },
           orderBy: { currentPeriodEnd: 'asc' },
@@ -91,7 +84,7 @@ export async function GET(request: Request) {
         subscribed: current.length,
         // Listed price of every current paid term, per month (no payments on this branch).
         listMrr: current.reduce((sum, s) => sum + s.plan.priceMonthly, 0),
-        pendingRequests: await prisma.subscriptionRequest.count({ where: { status: 'PENDING' } }),
+        pendingRequests: await appDb.subscriptionRequest.count({ where: { status: 'PENDING' } }),
       };
       result.planMix = Array.from(planMix, ([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
       result.expiring = expiring.map((s) => ({
@@ -116,6 +109,24 @@ export async function GET(request: Request) {
     console.error('Admin dashboard error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
+
+// Therapists seen in the app or with a session since `since`. Users and
+// sessions live in the HIPAA database, profiles in the app database.
+async function countActiveTherapists(since: Date, now: Date) {
+  const [seen, withSessions] = await Promise.all([
+    prisma.user.findMany({ where: { lastSeenAt: { gte: since } }, select: { id: true } }),
+    prisma.session.findMany({
+      where: { OR: [{ startedAt: { gte: since } }, { scheduledAt: { gte: since, lte: now } }] },
+      distinct: ['therapistId'],
+      select: { therapistId: true },
+    }),
+  ]);
+  return appDb.profileTherapist.count({
+    where: {
+      OR: [{ userId: { in: seen.map((u) => u.id) } }, { id: { in: withSessions.map((s) => s.therapistId) } }],
+    },
+  });
 }
 
 // Turn sparse date_trunc buckets into a continuous series (missing = 0).

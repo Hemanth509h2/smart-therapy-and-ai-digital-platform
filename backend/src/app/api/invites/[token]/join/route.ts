@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { prisma } from '@/lib/core/db';
+import { appDb, prisma } from '@/lib/core/db';
 import { adminAuth } from '@/lib/core/firebaseAdmin';
 import { provisionSessionDocs } from '@/lib/sessions/session-provisioning';
 import { createLobbyEntry } from '@/lib/sessions/lobby';
@@ -30,7 +30,6 @@ export async function POST(request: Request, { params }: { params: { token: stri
 
     const invite = await prisma.invite.findUnique({
       where: { token: params.token },
-      include: { therapist: { select: { id: true, userId: true, firstName: true, lastName: true } } },
     });
 
     if (!invite) {
@@ -117,11 +116,15 @@ export async function POST(request: Request, { params }: { params: { token: stri
     // therapist can never admit them.
     const clientName = `${invite.firstName} ${invite.lastName}`.trim() || 'Guest';
     await createLobbyEntry(sessionId, guestUid, clientName);
+    const therapist = await appDb.profileTherapist.findUnique({
+      where: { id: invite.therapistId },
+      select: { firstName: true, lastName: true },
+    });
 
     return NextResponse.json({
       sessionId,
       clientName,
-      therapistName: `${invite.therapist.firstName} ${invite.therapist.lastName}`.trim(),
+      therapistName: therapist ? `${therapist.firstName} ${therapist.lastName}`.trim() : '',
       guestUid,
       // Custom token lets the patient sign in with signInWithCustomToken —
       // no Anonymous auth provider needed in the Firebase console.

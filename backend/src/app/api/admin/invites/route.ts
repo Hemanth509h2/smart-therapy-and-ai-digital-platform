@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
 import nodemailer from 'nodemailer';
-import type { AdminRole } from '@prisma/client';
-import { prisma } from '@/lib/core/db';
+import type { AdminRole } from '.prisma/app-client';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin, requireRecentLogin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { appUrl } from '@/lib/core/app-url';
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     }
 
     const token = randomBytes(32).toString('hex');
-    const invite = await prisma.$transaction(async (tx) => {
+    const invite = await appDb.$transaction(async (tx) => {
       await tx.adminInvite.updateMany({
         where: { email, acceptedAt: null, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -99,13 +99,13 @@ export async function DELETE(request: Request) {
     const id = new URL(request.url).searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
-    const invite = await prisma.adminInvite.findUnique({ where: { id } });
+    const invite = await appDb.adminInvite.findUnique({ where: { id } });
     if (!invite) return NextResponse.json({ error: 'Invite not found' }, { status: 404 });
     if (invite.acceptedAt) {
       return NextResponse.json({ error: 'This invite was already accepted.' }, { status: 409 });
     }
     if (!invite.revokedAt) {
-      await prisma.adminInvite.update({ where: { id }, data: { revokedAt: new Date() } });
+      await appDb.adminInvite.update({ where: { id }, data: { revokedAt: new Date() } });
       await audit(request, auth, 'admin_invite.revoke', { type: 'AdminInvite', id }, {
         before: { email: invite.email, adminRole: invite.adminRole },
       });

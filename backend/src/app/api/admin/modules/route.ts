@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { daysAgo } from '@/lib/admin/adminList';
@@ -16,13 +16,13 @@ export async function GET(request: Request) {
     if (!auth.ok) return auth.response;
 
     const [overrides, recent, allTime] = await Promise.all([
-      prisma.moduleSetting.findMany(),
-      prisma.usageEvent.groupBy({
+      appDb.moduleSetting.findMany(),
+      appDb.usageEvent.groupBy({
         by: ['label'],
         where: { type: 'MODULE_LAUNCH', label: { not: null }, createdAt: { gte: daysAgo(30) } },
         _sum: { count: true },
       }),
-      prisma.usageEvent.groupBy({ by: ['label'], where: { type: 'MODULE_LAUNCH', label: { not: null } }, _sum: { count: true } }),
+      appDb.usageEvent.groupBy({ by: ['label'], where: { type: 'MODULE_LAUNCH', label: { not: null } }, _sum: { count: true } }),
     ]);
     const setting = new Map(overrides.map((o) => [o.moduleId, o]));
     const recentBy = new Map(recent.map((r) => [r.label!, r._sum.count ?? 0]));
@@ -75,10 +75,10 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Nothing to change: send enabled and/or featured.' }, { status: 400 });
     }
 
-    const existing = await prisma.moduleSetting.findUnique({ where: { moduleId } });
+    const existing = await appDb.moduleSetting.findUnique({ where: { moduleId } });
     const before = { enabled: existing?.enabled ?? true, featured: existing?.featured ?? false };
     const updatedBy = auth.email || auth.uid;
-    const saved = await prisma.moduleSetting.upsert({
+    const saved = await appDb.moduleSetting.upsert({
       where: { moduleId },
       create: { moduleId, ...change, updatedBy },
       update: { ...change, updatedBy },

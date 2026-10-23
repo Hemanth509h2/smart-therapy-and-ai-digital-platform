@@ -4,7 +4,7 @@ The reports were chunked and embedded by scripts/ingest_module_reports.py: one
 row per report section (1. Module overview ... 13. Advantages), embedded with
 rag.EMBEDDING_MODEL. Queries use the same model, with input_type "query".
 
-Needs DATABASE_URL (the backend's Postgres). With NVIDIA_API_KEY it searches by
+Needs DATABASE_URL (the backend's app database). With NVIDIA_API_KEY it searches by
 meaning (embeddings); without it, or when NVIDIA doesn't answer, it falls back to
 Postgres keyword search over the same chunks. If the database can't be reached,
 the agent plans from the module catalogue alone.
@@ -16,7 +16,7 @@ import os
 import re
 
 import rag
-from rag import is_configured, libpq_url  # noqa: F401  (re-exported)
+from rag import libpq_url  # noqa: F401  (re-exported)
 
 log = logging.getLogger("call-plan")
 
@@ -72,7 +72,7 @@ def _query(embedding, query_text, name_keys, env):
         sql, params["q"] = _BY_KEYWORDS, keyword_query(query_text)
         if not params["q"]:
             return [], []
-    with rag.connect(env) as conn:
+    with rag.connect(rag.APP_DB, env) as conn:
         top = conn.execute(sql, params).fetchall()
 
         # The modules that matched best: add how to choose them and when not to.
@@ -103,7 +103,7 @@ async def search(query_text, catalogue, env=os.environ):
     reports of modules in `catalogue` ({id: {name, ...}}), best match first, then
     the selection and safety sections of the top modules. Returns [] when search
     is off or fails; it never raises."""
-    if not is_configured(env) or not query_text.strip():
+    if not rag.is_configured(rag.APP_DB, env) or not query_text.strip():
         return []
     ids_by_name = {name_key(m["name"]): mid for mid, m in catalogue.items()}
     embedding = None

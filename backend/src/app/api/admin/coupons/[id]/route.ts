@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { checkCoupon, parseCouponBody } from '@/lib/billing/coupons';
@@ -16,12 +16,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const data = parseCouponBody(await request.json(), true);
     if (typeof data === 'string') return NextResponse.json({ error: data }, { status: 400 });
 
-    const before = await prisma.coupon.findUnique({ where: { id: params.id } });
+    const before = await appDb.coupon.findUnique({ where: { id: params.id } });
     if (!before) return NextResponse.json({ error: 'Coupon not found' }, { status: 404 });
     const invalid = checkCoupon({ ...before, ...data } as any);
     if (invalid) return NextResponse.json({ error: invalid }, { status: 400 });
 
-    const coupon = await prisma.coupon.update({ where: { id: params.id }, data });
+    const coupon = await appDb.coupon.update({ where: { id: params.id }, data });
 
     const keys = Object.keys(data);
     const action =
@@ -46,10 +46,10 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     const auth = await requireAdmin(request, 'billing.write');
     if (!auth.ok) return auth.response;
 
-    const coupon = await prisma.coupon.findUnique({ where: { id: params.id } });
+    const coupon = await appDb.coupon.findUnique({ where: { id: params.id } });
     if (!coupon) return NextResponse.json({ error: 'Coupon not found' }, { status: 404 });
 
-    const used = await prisma.payment.count({ where: { couponId: params.id } });
+    const used = await appDb.payment.count({ where: { couponId: params.id } });
     if (used > 0) {
       return NextResponse.json(
         {
@@ -60,7 +60,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       );
     }
 
-    await prisma.coupon.delete({ where: { id: params.id } });
+    await appDb.coupon.delete({ where: { id: params.id } });
     await audit(request, auth, 'coupon.delete', { type: 'Coupon', id: coupon.id }, { before: coupon });
     return NextResponse.json({ success: true });
   } catch (error: any) {

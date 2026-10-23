@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/core/db'
+import { appDb } from '@/lib/core/db'
 import { errorResponse } from '@/lib/http/apiError'
 import { rejectUnlessAutomation } from '@/lib/automation/auth'
 import { dailyScheduleMessage } from '@/lib/automation/messages'
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     }
     const doctorId = params.get('doctorId') ?? undefined
 
-    const doctors = await prisma.profileTherapist.findMany({
+    const doctors = await appDb.profileTherapist.findMany({
       where: doctorId ? { id: doctorId } : undefined,
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
       select: {

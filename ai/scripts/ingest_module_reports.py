@@ -185,9 +185,9 @@ def main(argv):
         print(all_chunks[0]["chunk_text"])
         return
 
-    if not (rag.is_configured() and rag.can_embed()):
+    if not (rag.is_configured(rag.APP_DB) and rag.can_embed()):
         sys.exit("DATABASE_URL and NVIDIA_API_KEY must be set (ai/.env).")
-    with rag.connect() as conn:
+    with rag.connect(rag.APP_DB) as conn:
         for statement in SETUP_SQL:
             conn.execute(statement)
         conn.commit()

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { firebasePrivateKey } from '@/lib/core/firebaseKey'
 
@@ -23,14 +23,14 @@ export async function GET(request: Request) {
     const auth = await requireAdmin(request, 'settings');
     if (!auth.ok) return auth.response;
 
-    const checks = await Promise.all([checkDb(), checkLiveKit(), checkSttRelay(), checkWhatsAppBot(), checkSmtp(), checkFirebase()]);
+    const checks = await Promise.all([checkDb(), checkAppDb(), checkLiveKit(), checkSttRelay(), checkWhatsAppBot(), checkSmtp(), checkFirebase()]);
 
-    const jobs = await prisma.cronRun.findMany({ distinct: ['job'], select: { job: true } });
+    const jobs = await appDb.cronRun.findMany({ distinct: ['job'], select: { job: true } });
     const names = Array.from(new Set(['cleanup-transcripts', ...jobs.map((j) => j.job)]));
     const cron = await Promise.all(
       names.map(async (job) => ({
         job,
-        runs: await prisma.cronRun.findMany({ where: { job }, orderBy: { startedAt: 'desc' }, take: 10 }),
+        runs: await appDb.cronRun.findMany({ where: { job }, orderBy: { startedAt: 'desc' }, take: 10 }),
       }))
     );
 
@@ -50,10 +50,17 @@ async function timed<T>(fn: () => Promise<T>) {
 const isTimeout = (e: any) => e?.name === 'TimeoutError' || e?.name === 'AbortError' || /timed? ?out/i.test(e?.message || '');
 
 async function checkDb(): Promise<Check> {
-  const base = { id: 'db', label: 'Database' };
+  return checkDatabase({ id: 'db', label: 'Database (HIPAA)' }, () => prisma.$queryRaw`SELECT 1`);
+}
+
+async function checkAppDb(): Promise<Check> {
+  return checkDatabase({ id: 'app-db', label: 'Database (app)' }, () => appDb.$queryRaw`SELECT 1`);
+}
+
+async function checkDatabase(base: { id: string; label: string }, ping: () => Promise<unknown>): Promise<Check> {
   try {
     const { ms } = await timed(() =>
-      Promise.race([prisma.$queryRaw`SELECT 1`, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))])
+      Promise.race([ping(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))])
     );
     return { ...base, status: ms > 1000 ? 'warn' : 'ok', latencyMs: ms, message: ms > 1000 ? 'Responding slowly.' : 'Connected.' };
   } catch (e: any) {

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { can } from '@/lib/admin/adminRoles';
+import { therapistsById, usersById } from '@/lib/core/links';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,11 +27,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
       where: { id: params.id },
       include: {
         user: { select: { email: true, status: true, suspendedAt: true, lastSeenAt: true } },
-        therapist: { select: { id: true, firstName: true, lastName: true, user: { select: { email: true } } } },
-        sessions: {
-          orderBy: { scheduledAt: 'desc' },
-          include: { therapist: { select: { id: true, firstName: true, lastName: true } } },
-        },
+        sessions: { orderBy: { scheduledAt: 'desc' } },
         claimedInvites: { select: { id: true, status: true, createdAt: true, therapistId: true } },
         _count: { select: { progressMetrics: true, progressReports: true, progressNotes: true, bookings: true } },
       },
@@ -41,7 +38,12 @@ export async function GET(request: Request, { params }: { params: { id: string }
       await audit(request, auth, 'phi.reveal', { type: 'ProfileClient', id: client.id }, { after: { scope: 'client.detail' } });
     }
 
-    const finalReports = await prisma.progressReport.count({ where: { clientId: client.id, status: 'FINAL' } });
+    const [finalReports, therapists] = await Promise.all([
+      prisma.progressReport.count({ where: { clientId: client.id, status: 'FINAL' } }),
+      therapistsById([client.therapistId, ...client.sessions.map((s) => s.therapistId)], { id: true, userId: true, firstName: true, lastName: true }),
+    ]);
+    const therapist = (client.therapistId && therapists.get(client.therapistId)) || null;
+    const therapistUser = therapist ? (await usersById([therapist.userId], { email: true })).get(therapist.userId) : null;
     const statusCounts: Record<string, number> = {};
     let totalMinutes = 0;
     for (const s of client.sessions) {
@@ -75,8 +77,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
             }
           : {}),
       },
-      therapist: client.therapist
-        ? { id: client.therapist.id, name: therapistName(client.therapist), email: client.therapist.user?.email ?? '' }
+      therapist: therapist
+        ? { id: therapist.id, name: therapistName(therapist), email: therapistUser?.email ?? '' }
         : null,
       stats: {
         sessions: client.sessions.length,
@@ -98,7 +100,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
         startedAt: s.startedAt,
         endedAt: s.endedAt,
         durationMinutes: s.startedAt && s.endedAt ? Math.round((s.endedAt.getTime() - s.startedAt.getTime()) / 60000) : null,
-        therapist: { id: s.therapist.id, name: therapistName(s.therapist) },
+        therapist: { id: s.therapistId, name: therapists.has(s.therapistId) ? therapistName(therapists.get(s.therapistId)!) : '' },
       })),
     });
   } catch (error: any) {
@@ -123,7 +125,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (client.therapistId === therapistId) {
       return NextResponse.json({ error: 'The client is already assigned to this therapist.' }, { status: 400 });
     }
-    const target = await prisma.profileTherapist.findUnique({ where: { id: therapistId }, select: { id: true, firstName: true, lastName: true } });
+    const target = await appDb.profileTherapist.findUnique({ where: { id: therapistId }, select: { id: true, firstName: true, lastName: true } });
     if (!target) return NextResponse.json({ error: 'Target therapist not found' }, { status: 404 });
 
     await prisma.profileClient.update({ where: { id: client.id }, data: { therapistId: target.id } });

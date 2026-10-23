@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Timestamp } from 'firebase-admin/firestore'
-import { prisma } from '@/lib/core/db'
+import { appDb } from '@/lib/core/db'
 import { getSetting } from '@/lib/core/settings'
 import { adminDb } from '@/lib/core/firebaseAdmin'
 
@@ -22,10 +22,10 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  const run = await prisma.cronRun.create({ data: { job: JOB, ok: false } }).catch(() => null)
+  const run = await appDb.cronRun.create({ data: { job: JOB, ok: false } }).catch(() => null)
   const finish = (ok: boolean, detail: Record<string, unknown>) =>
     run
-      ? prisma.cronRun
+      ? appDb.cronRun
           .update({ where: { id: run.id }, data: { ok, detail: detail as any, finishedAt: new Date() } })
           .catch((e) => console.error('[cleanup-transcripts] could not record run:', e?.message))
       : Promise.resolve()

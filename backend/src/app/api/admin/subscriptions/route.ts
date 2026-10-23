@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import type { Prisma } from '@prisma/client';
-import { prisma } from '@/lib/core/db';
+import type { Prisma } from '.prisma/app-client';
+import { appDb, prisma } from '@/lib/core/db';
+import { usersById } from '@/lib/core/links';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { listParams } from '@/lib/admin/adminList';
 import { daysUntil, resolveCurrent, serializeSubscription, subscriptionState } from '@/lib/billing/subscriptions';
@@ -24,31 +25,35 @@ export async function GET(request: Request) {
     const planId = sp.get('planId') || '';
     const paginate = sp.has('page');
 
+    // Emails live in the HIPAA database: match them there, then filter by userId.
+    const emailMatches = q
+      ? await prisma.user.findMany({ where: { email: { contains: q, mode: 'insensitive' } }, select: { id: true } })
+      : [];
     const where: Prisma.ProfileTherapistWhereInput = q
       ? {
           OR: [
             { firstName: { contains: q, mode: 'insensitive' } },
             { lastName: { contains: q, mode: 'insensitive' } },
-            { user: { email: { contains: q, mode: 'insensitive' } } },
+            { userId: { in: emailMatches.map((u) => u.id) } },
           ],
         }
       : {};
 
     const [therapists, requests] = await Promise.all([
-      prisma.profileTherapist.findMany({
+      appDb.profileTherapist.findMany({
         where,
         include: {
-          user: { select: { email: true } },
           subscriptions: { include: { plan: true }, orderBy: { startedAt: 'desc' } },
         },
         orderBy: { createdAt: 'asc' },
       }),
-      prisma.subscriptionRequest.findMany({
+      appDb.subscriptionRequest.findMany({
         where: { status: 'PENDING' },
-        include: { plan: true, therapist: { include: { user: { select: { email: true } } } } },
+        include: { plan: true, therapist: true },
         orderBy: { createdAt: 'asc' },
       }),
     ]);
+    const users = await usersById([...therapists, ...requests.map((r) => r.therapist)].map((t) => t.userId), { email: true });
 
     const now = new Date();
     let professionals = therapists.map((t) => {
@@ -59,7 +64,7 @@ export async function GET(request: Request) {
       return {
         therapistId: t.id,
         name: `${t.firstName} ${t.lastName}`.trim(),
-        email: t.user?.email ?? '',
+        email: users.get(t.userId)?.email ?? '',
         allModulesAllowed: t.allModulesAllowed,
         moduleAccessCount: t.moduleAccess.length,
         current: serializeSubscription(current),
@@ -101,7 +106,7 @@ export async function GET(request: Request) {
       id: r.id,
       therapistId: r.therapistId,
       therapistName: `${r.therapist.firstName} ${r.therapist.lastName}`.trim(),
-      email: r.therapist.user?.email ?? '',
+      email: users.get(r.therapist.userId)?.email ?? '',
       planId: r.planId,
       planName: r.plan.name,
       toolQuota: r.plan.toolQuota,

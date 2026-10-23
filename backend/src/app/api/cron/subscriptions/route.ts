@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
 import { audit } from '@/lib/admin/audit';
 import { FREE_TIER_ACCESS, daysUntil, resolveCurrent } from '@/lib/billing/subscriptions';
+import { usersById } from '@/lib/core/links';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,19 +26,19 @@ export async function GET(request: Request) {
   }
 
   const dryRun = new URL(request.url).searchParams.get('dryRun') === '1';
-  const run = dryRun ? null : await prisma.cronRun.create({ data: { job: 'subscriptions', ok: false } });
+  const run = dryRun ? null : await appDb.cronRun.create({ data: { job: 'subscriptions', ok: false } });
   const now = new Date();
 
   try {
     // ── 1. Expire ended terms ────────────────────────────────────────────────
-    const ended = await prisma.subscription.findMany({
+    const ended = await appDb.subscription.findMany({
       where: { status: 'ACTIVE', currentPeriodEnd: { lte: now } },
       select: { id: true, therapistId: true, currentPeriodEnd: true, plan: { select: { name: true } } },
     });
     const therapistIds = Array.from(new Set(ended.map((s) => s.therapistId)));
 
     // Who still has another current term once these are gone?
-    const stillActive = await prisma.subscription.findMany({
+    const stillActive = await appDb.subscription.findMany({
       where: { therapistId: { in: therapistIds }, status: 'ACTIVE', currentPeriodEnd: { gt: now } },
       select: { therapistId: true },
     });
@@ -45,9 +46,9 @@ export async function GET(request: Request) {
     const revert = therapistIds.filter((id) => !covered.has(id));
 
     if (!dryRun && ended.length) {
-      await prisma.$transaction([
-        prisma.subscription.updateMany({ where: { id: { in: ended.map((s) => s.id) }, status: 'ACTIVE' }, data: { status: 'EXPIRED' } }),
-        prisma.profileTherapist.updateMany({ where: { id: { in: revert } }, data: FREE_TIER_ACCESS }),
+      await appDb.$transaction([
+        appDb.subscription.updateMany({ where: { id: { in: ended.map((s) => s.id) }, status: 'ACTIVE' }, data: { status: 'EXPIRED' } }),
+        appDb.profileTherapist.updateMany({ where: { id: { in: revert } }, data: FREE_TIER_ACCESS }),
       ]);
       for (const s of ended) {
         await audit(request, SYSTEM, 'subscription.expire', { type: 'Subscription', id: s.id }, {
@@ -59,11 +60,11 @@ export async function GET(request: Request) {
 
     // ── 2. Renewal reminders ─────────────────────────────────────────────────
     const horizon = new Date(now.getTime() + (Math.max(...REMINDER_DAYS) + 2) * 864e5);
-    const upcoming = await prisma.subscription.findMany({
+    const upcoming = await appDb.subscription.findMany({
       where: { status: 'ACTIVE', currentPeriodEnd: { gt: now, lte: horizon } },
       include: {
         plan: true,
-        therapist: { select: { id: true, firstName: true, user: { select: { email: true } } } },
+        therapist: { select: { id: true, firstName: true, userId: true } },
       },
     });
     const byTherapist = new Map<string, typeof upcoming>();
@@ -108,8 +109,9 @@ export async function GET(request: Request) {
       });
       // No APP_URL ⇒ no link (the cron has no request origin to fall back on).
       const plansUrl = process.env.APP_URL ? `${process.env.APP_URL.replace(/\/$/, '')}/plans` : null;
+      const emails = await usersById(due.map(({ sub }) => sub.therapist.userId), { email: true });
       for (const { sub, kind, days } of due) {
-        const to = sub.therapist.user?.email;
+        const to = emails.get(sub.therapist.userId)?.email;
         if (!to) { skipped.push(sub.id); continue; }
         try {
           await transporter.sendMail({
@@ -147,13 +149,13 @@ export async function GET(request: Request) {
     };
 
     if (run) {
-      await prisma.cronRun.update({ where: { id: run.id }, data: { ok: failed.length === 0, detail, finishedAt: new Date() } });
+      await appDb.cronRun.update({ where: { id: run.id }, data: { ok: failed.length === 0, detail, finishedAt: new Date() } });
     }
     return NextResponse.json({ ok: true, ...detail });
   } catch (error: any) {
     console.error('Cron subscriptions error:', error);
     if (run) {
-      await prisma.cronRun
+      await appDb.cronRun
         .update({ where: { id: run.id }, data: { ok: false, detail: { error: error.message }, finishedAt: new Date() } })
         .catch(() => {});
     }

@@ -1,3 +1,9 @@
+// HIPAA database (paid Neon account, DATABASE_URL_2): patient data and
+// anything that may contain it. Therapist, admin, billing and settings tables
+// live in the app database (prisma/app/schema.prisma). Links between the two
+// are plain id columns (therapistId, userId) with no foreign key, so look the
+// other side up with the other client.
+
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
@@ -5,7 +11,7 @@ generator client {
 
 datasource db {
   provider   = "postgresql"
-  url        = env("DATABASE_URL")
+  url        = env("DATABASE_URL_2")
   extensions = [vector]
 }
 
@@ -13,6 +19,11 @@ enum Role {
   THERAPIST
   CLIENT
   ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
 }
 
 enum SessionStatus {
@@ -26,18 +37,6 @@ enum InviteStatus {
   PENDING
   CLAIMED
   EXPIRED
-}
-
-enum SubscriptionStatus {
-  ACTIVE
-  EXPIRED
-  CANCELLED
-}
-
-enum SubRequestStatus {
-  PENDING
-  APPROVED
-  REJECTED
 }
 
 enum WhatsAppMessageStatus {
@@ -56,6 +55,12 @@ enum WhatsAppMessageType {
   SESSION_STARTED
 }
 
+enum TicketStatus {
+  OPEN
+  PENDING // waiting on the user
+  RESOLVED
+}
+
 model User {
   id            String     @id // Firebase Auth UID
   email         String     @unique
@@ -68,54 +73,7 @@ model User {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
-  therapist ProfileTherapist?
   client    ProfileClient?
-  admin     ProfileAdmin?
-}
-
-model ProfileAdmin {
-  id        String    @id @default(uuid())
-  userId    String    @unique
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  firstName String    @default("Admin")
-  lastName  String    @default("")
-  // What this admin may do; see ADMIN_PERMISSIONS in lib/adminRoles.ts.
-  adminRole AdminRole @default(SUPER_ADMIN)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-}
-
-model ProfileTherapist {
-  id                String   @id @default(uuid())
-  userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  firstName         String
-  lastName          String
-  specialty         String[] // SLD, ADHD, Anxiety, Depression, ID, Dyslexia, Autism etc.
-  qualification     String?
-  experience        String?
-  bio               String?
-  phoneNumber       String?  @unique // E.164 format; used for WhatsApp notifications
-  // Per-therapist module/tool access. When allModulesAllowed is true the
-  // therapist may launch any module; otherwise only those listed in moduleAccess.
-  allModulesAllowed Boolean  @default(true)
-  moduleAccess      String[] @default([])
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  sessions             Session[]
-  notes                TherapistNote[]
-  bookings             Booking[]
-  invites              Invite[]
-  clients              ProfileClient[]
-  usageEvents          UsageEvent[]
-  subscriptions        Subscription[]
-  subscriptionRequests SubscriptionRequest[]
-
-  progressMetrics  ProgressMetric[]
-  progressReports  ProgressReport[]
-  progressNotes    ProgressNote[]
-  whatsAppMessages WhatsAppMessage[]
 }
 
 model ProfileClient {
@@ -130,7 +88,6 @@ model ProfileClient {
   parentEmail      String?
   phoneNumber      String? // E.164; used as the patient's WhatsApp recipient
   therapistId      String? // set when the therapist adds the client directly
-  therapist        ProfileTherapist? @relation(fields: [therapistId], references: [id])
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   bookings         Booking[]
@@ -145,49 +102,29 @@ model ProfileClient {
   @@index([therapistId])
 }
 
-model DocumentChunk {
-  id          String                       @id @default(uuid())
-  therapistId String                       @map("therapist_id")
-  sessionId   String?                      @map("session_id")
-  fileName    String                       @map("file_name")
-  chunkIndex  Int                          @map("chunk_index")
-  chunkText   String                       @map("chunk_text")
-  embedding   Unsupported("vector(1024)")?
-  createdAt   DateTime                     @default(now()) @map("created_at")
-  metadata    Json                         @default("{}")
+model Invite {
+  id               String            @id @default(uuid())
+  token            String            @unique
+  therapistId      String
+  firstName        String
+  lastName         String
+  diagnosis        String[]
+  phoneNumber      String? // E.164; retained after claim for delivery audit
+  scheduledAt      DateTime          @default(now())
+  status           InviteStatus      @default(PENDING)
+  claimedClientId  String?
+  createdAt        DateTime          @default(now())
+  expiresAt        DateTime?
+  claimedClient    ProfileClient?    @relation("ClaimedInvite", fields: [claimedClientId], references: [id])
+  whatsAppMessages WhatsAppMessage[]
 
   @@index([therapistId])
-  @@map("document_chunks")
-}
-
-// STAAD therapy-module reports for RAG, one row per report section. Filled by
-// scripts/ingest-module-reports.ts. Embeddings are
-// nvidia/llama-nemotron-embed-vl-1b-v2 at 1024 dimensions (not document_chunks'
-// retired nv-embedqa-e5-v5), so queries must use that model too. The HNSW index
-// on embedding is created by the script; Prisma can't declare it.
-model ModuleReportChunk {
-  id            String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  moduleName    String                      @map("module_name")
-  category      String
-  fileName      String                      @map("file_name")
-  sectionNumber Int                         @map("section_number")
-  sectionTitle  String                      @map("section_title")
-  chunkIndex    Int                         @map("chunk_index")
-  chunkText     String                      @map("chunk_text")
-  embedding     Unsupported("vector(1024)")
-  metadata      Json                        @default("{}")
-  createdAt     DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  @@unique([fileName, chunkIndex], map: "module_report_chunks_file_chunk_key")
-  @@index([category], map: "module_report_chunks_category_idx")
-  @@index([moduleName], map: "module_report_chunks_module_name_idx")
-  @@map("module_report_chunks")
+  @@index([claimedClientId])
 }
 
 model Booking {
   id          String           @id @default(uuid())
   therapistId String
-  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id])
   clientId    String
   client      ProfileClient    @relation(fields: [clientId], references: [id])
   dateTime    DateTime
@@ -203,7 +140,6 @@ model Booking {
 model Session {
   id                 String           @id @default(uuid())
   therapistId        String
-  therapist          ProfileTherapist @relation(fields: [therapistId], references: [id])
   clientId           String
   client             ProfileClient    @relation(fields: [clientId], references: [id])
   status             SessionStatus    @default(SCHEDULED)
@@ -246,25 +182,111 @@ model SessionReport {
   @@index([clientId])
 }
 
-model Invite {
-  id               String            @id @default(uuid())
-  token            String            @unique
-  therapistId      String
-  therapist        ProfileTherapist  @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  firstName        String
-  lastName         String
-  diagnosis        String[]
-  phoneNumber      String? // E.164; retained after claim for delivery audit
-  scheduledAt      DateTime          @default(now())
-  status           InviteStatus      @default(PENDING)
-  claimedClientId  String?
-  createdAt        DateTime          @default(now())
-  expiresAt        DateTime?
-  claimedClient    ProfileClient?    @relation("ClaimedInvite", fields: [claimedClientId], references: [id])
-  whatsAppMessages WhatsAppMessage[]
+model TherapistNote {
+  id          String           @id @default(uuid())
+  sessionId   String
+  session     Session          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  therapistId String
+  content     String // Calming notes, clinical progress logs
+  isPrivate   Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+// A single quantitative data point tracked for a client over time
+// (e.g. mood score, anxiety level, focus score, engagement %). Can
+// optionally be tied to the session it was recorded during.
+model ProgressMetric {
+  id          String           @id @default(uuid())
+  clientId    String
+  client      ProfileClient    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  therapistId String
+  sessionId   String? // optional link to the Session this was recorded in (no FK, mirrors UsageEvent)
+  metricType  String // e.g. MOOD_SCORE, ANXIETY_LEVEL, FOCUS_SCORE, ENGAGEMENT
+  value       Float
+  unit        String? // e.g. "scale_1_10", "%"
+  notes       String?
+  recordedAt  DateTime         @default(now())
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([clientId])
+  @@index([therapistId])
+  @@index([metricType])
+}
+
+// A periodic, therapist-authored progress report for a client, built from
+// a summary plus a snapshot of the metrics over the reporting period.
+model ProgressReport {
+  id              String           @id @default(uuid())
+  clientId        String
+  client          ProfileClient    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  therapistId     String
+  title           String           @default("Progress Report")
+  periodStart     DateTime
+  periodEnd       DateTime
+  summary         String // narrative summary written/edited by the therapist
+  metricsSnapshot Json             @default("{}") // aggregated metric values captured at generation time
+  status          String           @default("DRAFT") // DRAFT | FINAL
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  progressNotes ProgressNote[]
+
+  @@index([clientId])
+  @@index([therapistId])
+}
+
+// Free-text therapist notes about a client's progress. Independent of
+// TherapistNote (which is scoped to a single session) — these are scoped to
+// the client's overall progress tracking and can optionally attach to a
+// specific ProgressReport.
+model ProgressNote {
+  id          String           @id @default(uuid())
+  reportId    String?
+  report      ProgressReport?  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  clientId    String
+  client      ProfileClient    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  therapistId String
+  content     String
+  isPrivate   Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([clientId])
+  @@index([reportId])
+}
+
+// AI risk flags (self-harm / violence) raised during a session, persisted so
+// an admin can confirm someone followed up.
+model RiskFlag {
+  id             String    @id @default(uuid())
+  sessionId      String
+  therapistId    String? // ProfileTherapist.id
+  level          String // watch | urgent
+  detail         String?
+  raisedAt       DateTime  @default(now())
+  acknowledgedAt DateTime?
+  acknowledgedBy String? // admin uid
+  note           String?
+
+  @@index([acknowledgedAt])
+  @@index([sessionId])
+}
+
+model DocumentChunk {
+  id          String                       @id @default(uuid())
+  therapistId String                       @map("therapist_id")
+  sessionId   String?                      @map("session_id")
+  fileName    String                       @map("file_name")
+  chunkIndex  Int                          @map("chunk_index")
+  chunkText   String                       @map("chunk_text")
+  embedding   Unsupported("vector(1024)")?
+  createdAt   DateTime                     @default(now()) @map("created_at")
+  metadata    Json                         @default("{}")
 
   @@index([therapistId])
-  @@index([claimedClientId])
+  @@map("document_chunks")
 }
 
 model WhatsAppMessage {
@@ -292,7 +314,6 @@ model WhatsAppMessage {
   invite            Invite?               @relation(fields: [inviteId], references: [id], onDelete: Cascade)
   session           Session?              @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   client            ProfileClient?        @relation(fields: [clientId], references: [id])
-  therapist         ProfileTherapist?     @relation(fields: [therapistId], references: [id], onDelete: Cascade)
 
   // Nullable columns don't collide under Postgres uniqueness (NULL != NULL),
   // so CLIENT_INVITE rows (inviteId set, sessionId null) and
@@ -303,292 +324,6 @@ model WhatsAppMessage {
   @@index([clientId])
   @@index([therapistId])
   @@index([status, nextAttemptAt])
-}
-
-// Lightweight resource-usage log for the admin dashboard.
-// type: AI_ANALYSIS | TRANSCRIPTION | MODULE_LAUNCH
-model UsageEvent {
-  id          String           @id @default(uuid())
-  therapistId String
-  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  sessionId   String?
-  type        String
-  label       String?
-  count       Int              @default(1)
-  createdAt   DateTime         @default(now())
-
-  @@index([therapistId])
-  @@index([type])
-}
-
-// Subscription plan catalog. Admin-managed. Payments are out of scope, so
-// priceMonthly is display-only. `toolQuota` caps how many therapy tools a plan
-// grants (null = all tools / unlimited).
-model Plan {
-  id                   String   @id @default(uuid())
-  name                 String   @unique
-  description          String?
-  priceMonthly         Int      @default(0) // INR per month; charged via Cashfree (0 = free, request-only)
-  durationMonths       Int      @default(1) // suggested default term length
-  toolQuota            Int? // null = unlimited (all tools); else max tools allowed
-  isActive             Boolean  @default(true)
-  sortOrder            Int      @default(0)
-  // Bullet points shown on the therapist /plans card (empty = built-in list).
-  features             String[] @default([])
-  // Usage limits per plan; null = unlimited. Documented in docx/PLANS.md.
-  maxClients           Int? // active clients at once
-  maxSessionsPerMonth  Int? // video sessions per calendar month
-  maxAiReportsPerMonth Int? // AI session analyses per calendar month
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-
-  subscriptions Subscription[]
-  requests      SubscriptionRequest[]
-}
-
-// A therapist's active/historical subscription term. The current subscription is
-// the most recent ACTIVE row whose currentPeriodEnd is in the future; absence of
-// one means the therapist is on the free tier.
-model Subscription {
-  id               String             @id @default(uuid())
-  therapistId      String
-  therapist        ProfileTherapist   @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  planId           String
-  plan             Plan               @relation(fields: [planId], references: [id])
-  status           SubscriptionStatus @default(ACTIVE)
-  months           Int                @default(1)
-  startedAt        DateTime           @default(now())
-  currentPeriodEnd DateTime
-  renewedAt        DateTime?
-  renewalCount     Int                @default(0)
-  // Set when the therapist cancels. Status stays ACTIVE and access continues
-  // until currentPeriodEnd (already paid for); the term just won't be renewed.
-  cancelledAt      DateTime?
-  moduleAccess     String[]           @default([]) // tools granted by this term
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-
-  @@index([therapistId])
-  @@index([status])
-}
-
-// A therapist's request to take/upgrade a plan, pending admin approval. Carries
-// the chosen plan, desired term length, and the specific tools requested (capped
-// by the plan's toolQuota). Approval creates a Subscription and applies access.
-model SubscriptionRequest {
-  id          String           @id @default(uuid())
-  therapistId String
-  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  planId      String
-  plan        Plan             @relation(fields: [planId], references: [id])
-  months      Int              @default(1)
-  modules     String[]         @default([])
-  status      SubRequestStatus @default(PENDING)
-  note        String?
-  reviewedAt  DateTime?
-  createdAt   DateTime         @default(now())
-
-  @@index([therapistId])
-  @@index([status])
-}
-
-// A single quantitative data point tracked for a client over time
-// (e.g. mood score, anxiety level, focus score, engagement %). Can
-// optionally be tied to the session it was recorded during.
-model ProgressMetric {
-  id          String           @id @default(uuid())
-  clientId    String
-  client      ProfileClient    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  therapistId String
-  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  sessionId   String? // optional link to the Session this was recorded in (no FK, mirrors UsageEvent)
-  metricType  String // e.g. MOOD_SCORE, ANXIETY_LEVEL, FOCUS_SCORE, ENGAGEMENT
-  value       Float
-  unit        String? // e.g. "scale_1_10", "%"
-  notes       String?
-  recordedAt  DateTime         @default(now())
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-
-  @@index([clientId])
-  @@index([therapistId])
-  @@index([metricType])
-}
-
-// A periodic, therapist-authored progress report for a client, built from
-// a summary plus a snapshot of the metrics over the reporting period.
-model ProgressReport {
-  id              String           @id @default(uuid())
-  clientId        String
-  client          ProfileClient    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  therapistId     String
-  therapist       ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  title           String           @default("Progress Report")
-  periodStart     DateTime
-  periodEnd       DateTime
-  summary         String // narrative summary written/edited by the therapist
-  metricsSnapshot Json             @default("{}") // aggregated metric values captured at generation time
-  status          String           @default("DRAFT") // DRAFT | FINAL
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-
-  progressNotes ProgressNote[]
-
-  @@index([clientId])
-  @@index([therapistId])
-}
-
-// Free-text therapist notes about a client's progress. Independent of
-// TherapistNote (which is scoped to a single session) — these are scoped to
-// the client's overall progress tracking and can optionally attach to a
-// specific ProgressReport.
-model ProgressNote {
-  id          String           @id @default(uuid())
-  reportId    String?
-  report      ProgressReport?  @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  clientId    String
-  client      ProfileClient    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  therapistId String
-  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  content     String
-  isPrivate   Boolean          @default(true)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-
-  @@index([clientId])
-  @@index([reportId])
-}
-
-model TherapistNote {
-  id          String           @id @default(uuid())
-  sessionId   String
-  session     Session          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  therapistId String
-  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  content     String // Calming notes, clinical progress logs
-  isPrivate   Boolean          @default(true)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-}
-
-// One row per Cashfree order. `orderStatus` mirrors Cashfree's order_status
-// (ACTIVE, PAID, EXPIRED, TERMINATED, ...) and is only ever written from a
-// server-side Get Order call, never from what the browser reports.
-model Payment {
-  id             String    @id // Cashfree order_id
-  userId         String // Firebase Auth UID of the payer
-  amount         Decimal   @db.Decimal(12, 2)
-  currency       String    @default("INR")
-  orderStatus    String    @default("ACTIVE")
-  environment    String // sandbox | production
-  cfPaymentId    String?
-  paymentStatus  String? // SUCCESS | FAILED | USER_DROPPED | ... (latest attempt)
-  paymentMethod  String?
-  paymentMessage String?
-  paidAt         DateTime?
-  lastWebhookAt  DateTime?
-  // What the payment buys: a plan for a therapist. Null for /payment-test orders.
-  planId         String?
-  therapistId    String?
-  months         Int?
-  modules        String[]  @default([])
-  // Set when the paid plan is activated; the unique claim on this column is
-  // what stops duplicate webhooks from activating the same payment twice.
-  subscriptionId String?   @unique
-  // Coupon applied at checkout; `amount` is already net of `discount`.
-  couponId       String?
-  coupon         Coupon?   @relation(fields: [couponId], references: [id], onDelete: SetNull)
-  couponCode     String?
-  discount       Decimal?  @db.Decimal(12, 2)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  @@index([userId])
-  @@index([orderStatus])
-  @@index([therapistId])
-  @@index([couponId])
-}
-
-enum CouponType {
-  PERCENT // discountValue is a percentage (1-99)
-  FLAT // discountValue is rupees off the whole order
-}
-
-// Discount codes for paid plan checkout. Admin-managed. A redemption is a
-// PAID Payment carrying the coupon; limits count those, never pending orders.
-model Coupon {
-  id               String     @id @default(uuid())
-  code             String     @unique // stored upper-case
-  description      String?
-  type             CouponType @default(PERCENT)
-  discountValue    Int
-  planIds          String[]   @default([]) // empty = every paid plan
-  minMonths        Int        @default(1) // shortest term the code works for
-  maxRedemptions   Int? // null = unlimited
-  oncePerTherapist Boolean    @default(true)
-  startsAt         DateTime?
-  expiresAt        DateTime?
-  isActive         Boolean    @default(true)
-  createdBy        String? // admin uid
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
-
-  payments Payment[]
-
-  @@index([isActive])
-}
-
-// ─── Admin portal ────────────────────────────────────────────────────────────
-
-enum UserStatus {
-  ACTIVE
-  SUSPENDED
-}
-
-enum AdminRole {
-  SUPER_ADMIN // everything, including managing admins
-  BILLING // plans and subscriptions (payments live on the payment branch)
-  SUPPORT // read-only on people + support inbox + messages
-  CONTENT // module library + settings
-}
-
-// Append-only record of every admin mutation and PHI reveal. Never updated
-// or deleted by the app.
-model AuditLog {
-  id         String   @id @default(uuid())
-  actorUid   String
-  actorEmail String?
-  action     String // e.g. 'plan.update', 'user.suspend', 'phi.reveal'
-  targetType String // e.g. 'Plan', 'User', 'Subscription'
-  targetId   String?
-  before     Json?
-  after      Json?
-  ip         String?
-  createdAt  DateTime @default(now())
-
-  @@index([createdAt])
-  @@index([actorUid])
-  @@index([targetType, targetId])
-}
-
-model AdminInvite {
-  id         String    @id @default(uuid())
-  email      String
-  adminRole  AdminRole @default(SUPPORT)
-  token      String    @unique
-  invitedBy  String // admin uid
-  expiresAt  DateTime
-  acceptedAt DateTime?
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
-
-  @@index([email])
-}
-
-enum TicketStatus {
-  OPEN
-  PENDING // waiting on the user
-  RESOLVED
 }
 
 model SupportTicket {
@@ -625,48 +360,21 @@ model SupportReply {
   @@index([ticketId])
 }
 
-// AI risk flags (self-harm / violence) raised during a session, persisted so
-// an admin can confirm someone followed up.
-model RiskFlag {
-  id             String    @id @default(uuid())
-  sessionId      String
-  therapistId    String? // ProfileTherapist.id
-  level          String // watch | urgent
-  detail         String?
-  raisedAt       DateTime  @default(now())
-  acknowledgedAt DateTime?
-  acknowledgedBy String? // admin uid
-  note           String?
+// Append-only record of every admin mutation and PHI reveal. Never updated
+// or deleted by the app.
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorUid   String
+  actorEmail String?
+  action     String // e.g. 'plan.update', 'user.suspend', 'phi.reveal'
+  targetType String // e.g. 'Plan', 'User', 'Subscription'
+  targetId   String?
+  before     Json?
+  after      Json?
+  ip         String?
+  createdAt  DateTime @default(now())
 
-  @@index([acknowledgedAt])
-  @@index([sessionId])
-}
-
-// Admin-editable app settings (feature flags, retention, contact details).
-model Setting {
-  key       String   @id
-  value     Json
-  updatedBy String?
-  updatedAt DateTime @updatedAt
-}
-
-// Per-module overrides for the built-in library in lib/modules.ts.
-model ModuleSetting {
-  moduleId  String   @id
-  enabled   Boolean  @default(true)
-  featured  Boolean  @default(false)
-  updatedBy String?
-  updatedAt DateTime @updatedAt
-}
-
-// Result of each scheduled job run, shown on the System health page.
-model CronRun {
-  id         String    @id @default(uuid())
-  job        String
-  ok         Boolean
-  detail     Json?
-  startedAt  DateTime  @default(now())
-  finishedAt DateTime?
-
-  @@index([job, startedAt])
+  @@index([createdAt])
+  @@index([actorUid])
+  @@index([targetType, targetId])
 }

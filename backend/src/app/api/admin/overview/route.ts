@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules/modules';
 import { normalizePhoneNumber } from '@/lib/core/phone';
 import { errorResponse } from '@/lib/http/apiError';
+import { usersById } from '@/lib/core/links';
 
 // A malformed stored number must not break the whole overview.
 function toE164(raw: string | null): string | null {
@@ -20,10 +21,10 @@ export async function GET(request: Request) {
   try {
     const auth = await requireAdmin(request, 'people.read');
     if (!auth.ok) return auth.response;
-    const therapists = await prisma.profileTherapist.findMany({
-      include: { user: { select: { email: true } } },
+    const therapists = await appDb.profileTherapist.findMany({
       orderBy: { createdAt: 'asc' },
     });
+    const users = await usersById(therapists.map((t) => t.userId), { email: true });
 
     const rows = await Promise.all(
       therapists.map(async (t) => {
@@ -39,8 +40,8 @@ export async function GET(request: Request) {
           }),
           prisma.invite.groupBy({ by: ['status'], where: { therapistId: t.id }, _count: true }),
           prisma.documentChunk.count({ where: { therapistId: t.id } }),
-          prisma.usageEvent.groupBy({ by: ['type'], where: { therapistId: t.id }, _sum: { count: true } }),
-          prisma.usageEvent.groupBy({
+          appDb.usageEvent.groupBy({ by: ['type'], where: { therapistId: t.id }, _sum: { count: true } }),
+          appDb.usageEvent.groupBy({
             by: ['label'],
             where: { therapistId: t.id, type: 'MODULE_LAUNCH' },
             _sum: { count: true },
@@ -79,7 +80,7 @@ export async function GET(request: Request) {
           firstName: t.firstName,
           lastName: t.lastName,
           phoneNumber: toE164(t.phoneNumber),
-          email: t.user?.email ?? '',
+          email: users.get(t.userId)?.email ?? '',
           specialty: t.specialty,
           clients: clientGroups.length,
           sessions: { total, active, completed, scheduled },

@@ -1,7 +1,7 @@
 // Shared subscription helpers used by the therapist, admin and payment routes.
 import { NextResponse } from 'next/server';
-import type { Prisma, Subscription, Plan } from '@prisma/client';
-import { prisma } from '@/lib/core/db';
+import type { Prisma, Subscription, Plan } from '.prisma/app-client';
+import { appDb } from '@/lib/core/db';
 import { ALL_MODULE_IDS } from '@/lib/modules/modules';
 
 // Add whole months to a date (term length math). June 15 + 1mo -> July 15.
@@ -81,7 +81,7 @@ export function resolveCurrent(
 // True when the therapist (ProfileTherapist.id) has a term that is ACTIVE and
 // not past its end date — the same rule as resolveCurrent.
 export async function hasActivePlan(therapistId: string): Promise<boolean> {
-  const sub = await prisma.subscription.findFirst({
+  const sub = await appDb.subscription.findFirst({
     where: { therapistId, status: 'ACTIVE', currentPeriodEnd: { gt: new Date() } },
     select: { id: true },
   });
@@ -100,7 +100,7 @@ export async function requireActivePlan(
   if ('therapistId' in who) {
     therapistId = who.therapistId;
   } else {
-    const t = await prisma.profileTherapist.findUnique({ where: { userId: who.userId }, select: { id: true } });
+    const t = await appDb.profileTherapist.findUnique({ where: { userId: who.userId }, select: { id: true } });
     if (!t) return null;
     therapistId = t.id;
   }

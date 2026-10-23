@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
+import { withTherapists } from '@/lib/core/links';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { errorResponse } from '@/lib/http/apiError';
@@ -8,7 +9,7 @@ import { errorResponse } from '@/lib/http/apiError';
 async function mayAccess(uid: string, ref: { therapistId?: string | null; clientId?: string | null }) {
   const [therapist, client, user] = await Promise.all([
     ref.therapistId
-      ? prisma.profileTherapist.findUnique({ where: { id: ref.therapistId }, select: { userId: true } })
+      ? appDb.profileTherapist.findUnique({ where: { id: ref.therapistId }, select: { userId: true } })
       : null,
     ref.clientId
       ? prisma.profileClient.findUnique({ where: { id: ref.clientId }, select: { userId: true } })
@@ -47,12 +48,9 @@ export async function GET(request: Request) {
     if (clientId) {
       const bookings = await prisma.booking.findMany({
         where: { clientId },
-        include: {
-          therapist: true,
-        },
         orderBy: { dateTime: 'asc' },
       });
-      return NextResponse.json({ bookings });
+      return NextResponse.json({ bookings: await withTherapists(bookings) });
     }
 
     return NextResponse.json({ error: 'Missing filter parameter' }, { status: 400 });

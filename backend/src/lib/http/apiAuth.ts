@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import type { AdminRole, UserStatus } from '@prisma/client';
+import type { UserStatus } from '@prisma/client';
+import type { AdminRole } from '.prisma/app-client';
 import { adminAuth } from '@/lib/core/firebaseAdmin';
-import { prisma } from '@/lib/core/db';
+import { appDb, prisma } from '@/lib/core/db';
 import { can, type AdminPermission } from '@/lib/admin/adminRoles';
 
 /**
@@ -161,10 +162,7 @@ export async function requireAdmin(request: Request, permission?: AdminPermissio
     };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: auth.uid },
-    select: { role: true, admin: { select: { adminRole: true } } },
-  });
+  const user = await prisma.user.findUnique({ where: { id: auth.uid }, select: { role: true } });
   if (user?.role !== 'ADMIN') {
     console.warn(`[auth] 403 ${request.url} — uid ${auth.uid} is not an ADMIN`);
     return {
@@ -177,7 +175,8 @@ export async function requireAdmin(request: Request, permission?: AdminPermissio
   }
   // Admins created before roles existed have no ProfileAdmin row: treat as
   // SUPER_ADMIN, matching the column default.
-  const adminRole: AdminRole = user.admin?.adminRole ?? 'SUPER_ADMIN';
+  const admin = await appDb.profileAdmin.findUnique({ where: { userId: auth.uid }, select: { adminRole: true } });
+  const adminRole: AdminRole = admin?.adminRole ?? 'SUPER_ADMIN';
   if (permission && !can(adminRole, permission)) {
     return {
       ok: false as const,

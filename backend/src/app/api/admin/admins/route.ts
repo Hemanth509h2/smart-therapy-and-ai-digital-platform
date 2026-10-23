@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import type { AdminRole } from '@prisma/client';
-import { prisma } from '@/lib/core/db';
+import type { AdminRole } from '.prisma/app-client';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin, requireRecentLogin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { adminAuth } from '@/lib/core/firebaseAdmin';
@@ -21,27 +21,32 @@ export async function GET(request: Request) {
     const [users, invites] = await Promise.all([
       prisma.user.findMany({
         where: { role: 'ADMIN' },
-        include: { admin: true },
         orderBy: { createdAt: 'asc' },
       }),
-      prisma.adminInvite.findMany({
+      appDb.adminInvite.findMany({
         where: { acceptedAt: null, revokedAt: null },
         orderBy: { createdAt: 'desc' },
       }),
     ]);
 
+    const profiles = await appDb.profileAdmin.findMany({ where: { userId: { in: users.map((u) => u.id) } } });
+    const adminOf = new Map(profiles.map((p) => [p.userId, p]));
+
     const now = Date.now();
     return NextResponse.json({
-      admins: users.map((u) => ({
-        id: u.admin?.id ?? null,
-        userId: u.id,
-        name: u.admin ? `${u.admin.firstName} ${u.admin.lastName}`.trim() : '',
-        email: u.email,
-        adminRole: u.admin?.adminRole ?? 'SUPER_ADMIN',
-        status: u.status,
-        lastSeenAt: u.lastSeenAt,
-        createdAt: u.admin?.createdAt ?? u.createdAt,
-      })),
+      admins: users.map((u) => {
+        const admin = adminOf.get(u.id);
+        return {
+          id: admin?.id ?? null,
+          userId: u.id,
+          name: admin ? `${admin.firstName} ${admin.lastName}`.trim() : '',
+          email: u.email,
+          adminRole: admin?.adminRole ?? 'SUPER_ADMIN',
+          status: u.status,
+          lastSeenAt: u.lastSeenAt,
+          createdAt: admin?.createdAt ?? u.createdAt,
+        };
+      }),
       invites: invites.map((i) => ({
         id: i.id,
         email: i.email,
@@ -103,19 +108,15 @@ export async function POST(request: Request) {
       createdFirebaseUser = true;
     }
 
-    const before = await prisma.user.findUnique({
-      where: { id: uid },
-      select: { role: true, admin: { select: { adminRole: true } } },
-    });
+    const [before, beforeAdmin] = await Promise.all([
+      prisma.user.findUnique({ where: { id: uid }, select: { role: true } }),
+      appDb.profileAdmin.findUnique({ where: { userId: uid }, select: { adminRole: true } }),
+    ]);
 
-    // Upsert the DB user as ADMIN + ensure an admin profile exists.
-    await prisma.user.upsert({
-      where: { id: uid },
-      update: { role: 'ADMIN', email },
-      create: { id: uid, email, role: 'ADMIN' },
-    });
-
-    const profile = await prisma.profileAdmin.upsert({
+    // Ensure an admin profile exists, then upsert the DB user as ADMIN. Not
+    // atomic across the two databases: the profile goes first because an ADMIN
+    // with no profile row counts as SUPER_ADMIN.
+    const profile = await appDb.profileAdmin.upsert({
       where: { userId: uid },
       update: {
         ...(firstName !== undefined && { firstName }),
@@ -130,6 +131,12 @@ export async function POST(request: Request) {
       },
     });
 
+    await prisma.user.upsert({
+      where: { id: uid },
+      update: { role: 'ADMIN', email },
+      create: { id: uid, email, role: 'ADMIN' },
+    });
+
     await setRoleClaim(uid, 'ADMIN');
 
     await audit(
@@ -138,7 +145,7 @@ export async function POST(request: Request) {
       createdFirebaseUser || !before ? 'admin.create' : 'admin.promote',
       { type: 'User', id: uid },
       {
-        before: before ? { role: before.role, adminRole: before.admin?.adminRole ?? null } : null,
+        before: before ? { role: before.role, adminRole: beforeAdmin?.adminRole ?? null } : null,
         after: { role: 'ADMIN', adminRole: profile.adminRole, email, passwordSet: !!password },
       }
     );

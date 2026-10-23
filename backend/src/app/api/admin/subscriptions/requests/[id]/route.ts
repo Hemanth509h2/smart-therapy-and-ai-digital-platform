@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { ALL_MODULE_IDS } from '@/lib/modules/modules';
@@ -19,7 +19,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (!auth.ok) return auth.response;
     const { action, modules, months } = await request.json();
 
-    const req = await prisma.subscriptionRequest.findUnique({
+    const req = await appDb.subscriptionRequest.findUnique({
       where: { id: params.id },
       include: { plan: true },
     });
@@ -31,7 +31,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
 
     if (action === 'reject') {
-      const updated = await prisma.subscriptionRequest.update({
+      const updated = await appDb.subscriptionRequest.update({
         where: { id: req.id },
         data: { status: 'REJECTED', reviewedAt: new Date() },
       });
@@ -66,7 +66,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     const months_ = Math.max(1, Math.min(36, Number(months) || req.months || 1));
 
-    const created = await prisma.$transaction(async (tx) => {
+    const created = await appDb.$transaction(async (tx) => {
       // Recorded for the audit log; activatePlan supersedes them.
       const superseded = await tx.subscription.findMany({
         where: { therapistId: req.therapistId, status: 'ACTIVE' },

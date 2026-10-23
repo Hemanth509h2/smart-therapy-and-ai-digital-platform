@@ -1,6 +1,7 @@
 import { AccessToken } from 'livekit-server-sdk'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/core/db'
+import { therapistIdForUser } from '@/lib/core/links'
 import { requireAuth } from '@/lib/http/apiAuth'
 import { getLobbyEntry } from '@/lib/sessions/lobby'
 import { isTranslationLanguage } from '@/lib/sessions/translationLanguages'
@@ -36,14 +37,14 @@ export async function GET(req: NextRequest) {
   // request: the session's own therapist is 'therapist'; anyone else must be a
   // guest the therapist admitted from the waiting room, and is 'client'.
   // Everyone else gets no token at all.
-  const session = await prisma.session.findUnique({
-    where: { id: roomName },
-    select: { therapist: { select: { userId: true } } },
-  })
+  const [session, therapistId] = await Promise.all([
+    prisma.session.findUnique({ where: { id: roomName }, select: { therapistId: true } }),
+    therapistIdForUser(auth.uid),
+  ])
   if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
 
   let claimedRole: 'therapist' | 'client'
-  if (session.therapist.userId === auth.uid) {
+  if (session.therapistId === therapistId) {
     claimedRole = 'therapist'
   } else {
     // Waiting room: no token until the therapist admits this guest. The

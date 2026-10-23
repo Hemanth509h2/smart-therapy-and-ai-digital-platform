@@ -26,20 +26,20 @@ _SEARCH = """
 
 
 def _has_material(therapist_uid, env):
-    with rag.connect(env) as conn:
+    with rag.connect(rag.HIPAA_DB, env) as conn:
         return conn.execute("SELECT EXISTS (SELECT 1 FROM document_chunks WHERE therapist_id = %s)",
                             (therapist_uid,)).fetchone()[0]
 
 
 def _query(embedding, therapist_uid, env):
-    with rag.connect(env) as conn:
+    with rag.connect(rag.HIPAA_DB, env) as conn:
         return conn.execute(_SEARCH, {"v": rag.vector_literal(embedding), "tid": therapist_uid,
                                       "min": MIN_SIMILARITY, "k": TOP_K}).fetchall()
 
 
 async def search(therapist_uid, query_text, env=os.environ):
     """[{text, fileName, chunkIndex, similarity}], best match first."""
-    if not (rag.is_configured(env) and rag.can_embed(env) and therapist_uid and query_text.strip()):
+    if not (rag.is_configured(rag.HIPAA_DB, env) and rag.can_embed(env) and therapist_uid and query_text.strip()):
         return []
     try:
         # Most therapists have none: skip the embedding call then.

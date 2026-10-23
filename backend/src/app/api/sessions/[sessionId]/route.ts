@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/core/db';
+import { withTherapists } from '@/lib/core/links';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { provisionSessionDocs } from '@/lib/sessions/session-provisioning';
 import { markSessionEnded } from '@/lib/sessions/session-provisioning';
@@ -12,13 +13,14 @@ export async function GET(
   { params }: { params: { sessionId: string } }
 ) {
   try {
-    const session = await prisma.session.findUnique({
+    const found = await prisma.session.findUnique({
       where: { id: params.sessionId },
-      include: { client: true, therapist: true },
+      include: { client: true },
     });
-    if (!session) {
+    if (!found) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
+    const [session] = await withTherapists([found]);
     return NextResponse.json({ session });
   } catch (error: any) {
     return errorResponse(error, 'Session GET error');
@@ -81,14 +83,15 @@ export async function PATCH(
           return NextResponse.json({ error: 'A valid scheduledAt is required' }, { status: 400 });
         }
       }
-      const session = await prisma.session.update({
+      const updated = await prisma.session.update({
         where: { id: params.sessionId },
         data:
           finalAction === 'cancel'
             ? { status: 'CANCELLED' }
             : { status: 'SCHEDULED', scheduledAt: new Date(finalScheduledAt) },
-        include: { client: true, therapist: true },
+        include: { client: true },
       });
+      const [session] = await withTherapists([updated]);
       return NextResponse.json({ session });
     }
 
@@ -143,11 +146,13 @@ export async function PATCH(
       return NextResponse.json({ session: existing });
     }
 
-    const session = await prisma.session.update({
-      where: { id: params.sessionId },
-      data,
-      include: { client: true, therapist: true },
-    });
+    const [session] = await withTherapists([
+      await prisma.session.update({
+        where: { id: params.sessionId },
+        data,
+        include: { client: true },
+      }),
+    ]);
 
     // Send the patient join link when the session starts. Skipped if the
     // "Start a new session" dialog already sent it for this session.

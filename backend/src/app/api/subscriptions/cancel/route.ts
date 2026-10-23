@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/http/apiAuth';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { resolveCurrent, serializeSubscription } from '@/lib/billing/subscriptions';
 
 export const dynamic = 'force-dynamic';
@@ -18,12 +18,12 @@ export async function POST(request: Request) {
 
     const { undo } = await request.json().catch(() => ({}));
 
-    const therapist = await prisma.profileTherapist.findUnique({ where: { userId: auth.uid } });
+    const therapist = await appDb.profileTherapist.findUnique({ where: { userId: auth.uid } });
     if (!therapist) {
       return NextResponse.json({ error: 'Only therapists have plans.' }, { status: 403 });
     }
 
-    const subs = await prisma.subscription.findMany({
+    const subs = await appDb.subscription.findMany({
       where: { therapistId: therapist.id },
       include: { plan: true },
     });
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'You have no active plan to cancel.' }, { status: 404 });
     }
 
-    const updated = await prisma.subscription.update({
+    const updated = await appDb.subscription.update({
       where: { id: current.id },
       data: { cancelledAt: undo ? null : current.cancelledAt ?? new Date() },
       include: { plan: true },

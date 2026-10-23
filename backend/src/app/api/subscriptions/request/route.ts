@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules/modules';
 import { errorResponse } from '@/lib/http/apiError';
@@ -7,7 +7,7 @@ import { errorResponse } from '@/lib/http/apiError';
 // The caller must own the therapist profile or be an ADMIN.
 async function mayAccessTherapist(uid: string, therapistId: string) {
   const [therapist, user] = await Promise.all([
-    prisma.profileTherapist.findUnique({ where: { id: therapistId }, select: { userId: true } }),
+    appDb.profileTherapist.findUnique({ where: { id: therapistId }, select: { userId: true } }),
     prisma.user.findUnique({ where: { id: uid }, select: { role: true } }),
   ]);
   return therapist?.userId === uid || user?.role === 'ADMIN';
@@ -32,9 +32,9 @@ export async function POST(request: Request) {
     }
 
     const [therapist, plan, existingPending] = await Promise.all([
-      prisma.profileTherapist.findUnique({ where: { id: therapistId } }),
-      prisma.plan.findUnique({ where: { id: planId } }),
-      prisma.subscriptionRequest.findFirst({ where: { therapistId, status: 'PENDING' } }),
+      appDb.profileTherapist.findUnique({ where: { id: therapistId } }),
+      appDb.plan.findUnique({ where: { id: planId } }),
+      appDb.subscriptionRequest.findFirst({ where: { therapistId, status: 'PENDING' } }),
     ]);
 
     if (!therapist) return NextResponse.json({ error: 'Therapist not found' }, { status: 404 });
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
     const months_ = Math.max(1, Math.min(36, Number(months) || plan.durationMonths || 1));
 
-    const created = await prisma.subscriptionRequest.create({
+    const created = await appDb.subscriptionRequest.create({
       data: {
         therapistId,
         planId,

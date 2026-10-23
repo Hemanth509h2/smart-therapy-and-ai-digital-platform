@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/http/apiAuth';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { cashfreeConfigured, syncCashfreeOrder } from '@/lib/billing/cashfree';
 
 export const dynamic = 'force-dynamic';
@@ -17,13 +17,13 @@ export async function GET(request: Request, { params }: { params: { orderId: str
       return NextResponse.json({ error: 'Cashfree is not configured' }, { status: 503 });
     }
 
-    const payment = await prisma.payment.findUnique({ where: { id: params.orderId } });
+    const payment = await appDb.payment.findUnique({ where: { id: params.orderId } });
     if (!payment || payment.userId !== auth.uid) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
     const { order, payments } = await syncCashfreeOrder(params.orderId);
-    const saved = await prisma.payment.findUnique({ where: { id: params.orderId } });
+    const saved = await appDb.payment.findUnique({ where: { id: params.orderId } });
 
     return NextResponse.json({
       orderId: order.order_id,

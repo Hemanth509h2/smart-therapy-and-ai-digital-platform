@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 
@@ -13,7 +13,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     if (!auth.ok) return auth.response;
     const { id } = params;
 
-    const therapist = await prisma.profileTherapist.findUnique({ where: { id }, select: { id: true } });
+    const therapist = await appDb.profileTherapist.findUnique({ where: { id }, select: { id: true } });
     if (!therapist) return NextResponse.json({ error: 'Therapist not found' }, { status: 404 });
 
     // Same population as the detail view: linked clients + anyone they've had a session with.

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { requireTherapist } from '@/lib/http/progressAuth';
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Enter a valid date of birth' }, { status: 400 });
     }
 
-    const therapist = await prisma.profileTherapist.findUnique({
+    const therapist = await appDb.profileTherapist.findUnique({
       where: { id: therapistId },
       select: { userId: true },
     });

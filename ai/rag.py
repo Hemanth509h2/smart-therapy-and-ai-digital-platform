@@ -3,7 +3,9 @@ the module reports (call_plan/module_reports.py, module_report_chunks), the
 therapist's study material (copilot/study_material.py, document_chunks), and the
 scripts that fill those tables (scripts/).
 
-Needs DATABASE_URL (the backend's Postgres, with pgvector) and NVIDIA_API_KEY.
+Needs the backend's two Postgres databases (both with pgvector) and NVIDIA_API_KEY:
+module_report_chunks is in the app database (DATABASE_URL) and document_chunks,
+the therapist's uploads, in the HIPAA database (DATABASE_URL_2).
 Both tables are embedded with EMBEDDING_MODEL at EMBEDDING_DIMENSIONS: stored
 text with input_type "passage", searches with "query". Mixing models makes the
 similarity scores meaningless, so change them only together with a re-ingest.
@@ -24,13 +26,17 @@ CONNECT_TIMEOUT_SECONDS = 20
 EMBED_TIMEOUT_SECONDS = 6
 EMBED_ATTEMPTS = 3
 
-# Prisma-only options in the backend's DATABASE_URL that libpq rejects.
+# Which env var holds each database's URL. Pass one to is_configured/connect.
+APP_DB = "DATABASE_URL"
+HIPAA_DB = "DATABASE_URL_2"
+
+# Prisma-only options in the backend's database URLs that libpq rejects.
 _PRISMA_PARAMS = {"pool_timeout", "connection_limit", "pgbouncer", "schema", "socket_timeout",
                   "connect_timeout", "statement_cache_size"}
 
 
-def is_configured(env=os.environ):
-    return bool(env.get("DATABASE_URL"))
+def is_configured(db, env=os.environ):
+    return bool(env.get(db))
 
 
 def can_embed(env=os.environ):
@@ -43,10 +49,10 @@ def libpq_url(url):
     return urlunsplit(parts._replace(query=urlencode(query)))
 
 
-def connect(env=os.environ):
+def connect(db, env=os.environ):
     import psycopg  # imported here so the service starts without it when search is off
 
-    return psycopg.connect(libpq_url(env["DATABASE_URL"]), connect_timeout=CONNECT_TIMEOUT_SECONDS)
+    return psycopg.connect(libpq_url(env[db]), connect_timeout=CONNECT_TIMEOUT_SECONDS)
 
 
 def vector_literal(embedding):

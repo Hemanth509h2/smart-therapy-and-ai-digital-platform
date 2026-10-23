@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { requireAdmin, requireRecentLogin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { parseFeatures, parsePlanLimits } from '@/lib/billing/subscriptions';
@@ -36,10 +36,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (typeof limits === 'string') return NextResponse.json({ error: limits }, { status: 400 });
     Object.assign(data, limits);
 
-    const before = await prisma.plan.findUnique({ where: { id: params.id } });
+    const before = await appDb.plan.findUnique({ where: { id: params.id } });
     if (!before) return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
 
-    const plan = await prisma.plan.update({ where: { id: params.id }, data });
+    const plan = await appDb.plan.update({ where: { id: params.id }, data });
 
     const keys = Object.keys(data);
     const action =
@@ -69,12 +69,12 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     const stepUp = requireRecentLogin(auth);
     if (stepUp) return stepUp;
 
-    const plan = await prisma.plan.findUnique({ where: { id: params.id } });
+    const plan = await appDb.plan.findUnique({ where: { id: params.id } });
     if (!plan) return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
 
     const [subs, reqs] = await Promise.all([
-      prisma.subscription.count({ where: { planId: params.id } }),
-      prisma.subscriptionRequest.count({ where: { planId: params.id } }),
+      appDb.subscription.count({ where: { planId: params.id } }),
+      appDb.subscriptionRequest.count({ where: { planId: params.id } }),
     ]);
     if (subs > 0 || reqs > 0) {
       const parts = [subs && `${subs} subscription${subs === 1 ? '' : 's'}`, reqs && `${reqs} request${reqs === 1 ? '' : 's'}`].filter(Boolean);
@@ -89,7 +89,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       );
     }
 
-    await prisma.plan.delete({ where: { id: params.id } });
+    await appDb.plan.delete({ where: { id: params.id } });
     await audit(request, auth, 'plan.delete', { type: 'Plan', id: plan.id }, { before: plan });
     return NextResponse.json({ success: true });
   } catch (error: any) {

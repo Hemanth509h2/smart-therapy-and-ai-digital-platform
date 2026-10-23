@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { listParams } from '@/lib/admin/adminList';
 
@@ -13,7 +13,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     if (!auth.ok) return auth.response;
     const { skip, take } = listParams(request, { sortable: ['createdAt'], defaultSort: 'createdAt' });
 
-    const therapist = await prisma.profileTherapist.findUnique({ where: { id: params.id }, select: { id: true, userId: true } });
+    const therapist = await appDb.profileTherapist.findUnique({ where: { id: params.id }, select: { id: true, userId: true } });
     if (!therapist) return NextResponse.json({ error: 'Therapist not found' }, { status: 404 });
 
     const where = {

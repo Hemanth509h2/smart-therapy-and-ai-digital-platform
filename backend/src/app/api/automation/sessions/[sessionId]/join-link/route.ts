@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/core/db'
+import { appDb, prisma } from '@/lib/core/db'
 import { appUrl } from '@/lib/core/app-url'
 import { errorResponse } from '@/lib/http/apiError'
 import { rejectUnlessAutomation } from '@/lib/automation/auth'
@@ -19,7 +19,7 @@ export async function POST(request: Request, { params }: { params: { sessionId: 
 
     const session = await prisma.session.findUnique({
       where: { id: params.sessionId },
-      include: { client: true, therapist: true },
+      include: { client: true },
     })
     if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     if (session.status === 'CANCELLED' || session.status === 'COMPLETED') {
@@ -28,7 +28,11 @@ export async function POST(request: Request, { params }: { params: { sessionId: 
 
     const invite = await getOrCreateGuestInvite(session)
     const link = `${appUrl(request)}/join/${invite.token}`
-    const doctorName = `${session.therapist.firstName} ${session.therapist.lastName}`.trim()
+    const therapist = await appDb.profileTherapist.findUnique({
+      where: { id: session.therapistId },
+      select: { firstName: true, lastName: true },
+    })
+    const doctorName = therapist ? `${therapist.firstName} ${therapist.lastName}`.trim() : ''
 
     return NextResponse.json({
       sessionId: session.id,

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { checkCoupon, parseCouponBody } from '@/lib/billing/coupons';
@@ -14,8 +14,8 @@ export async function GET(request: Request) {
     const auth = await requireAdmin(request, 'billing.read');
     if (!auth.ok) return auth.response;
     const [coupons, used] = await Promise.all([
-      prisma.coupon.findMany({ orderBy: { createdAt: 'desc' } }),
-      prisma.payment.groupBy({
+      appDb.coupon.findMany({ orderBy: { createdAt: 'desc' } }),
+      appDb.payment.groupBy({
         by: ['couponId'],
         where: { couponId: { not: null }, orderStatus: 'PAID' },
         _count: { _all: true },
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     const invalid = checkCoupon({ startsAt: null, expiresAt: null, ...data } as any);
     if (invalid) return NextResponse.json({ error: invalid }, { status: 400 });
 
-    const coupon = await prisma.coupon.create({ data: { ...(data as any), createdBy: auth.uid } });
+    const coupon = await appDb.coupon.create({ data: { ...(data as any), createdBy: auth.uid } });
     await audit(request, auth, 'coupon.create', { type: 'Coupon', id: coupon.id }, { after: coupon });
     return NextResponse.json({ coupon });
   } catch (error: any) {

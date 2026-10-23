@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { adminAuth } from '@/lib/core/firebaseAdmin';
+import { therapistForUser } from '@/lib/core/links';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ function inviteState(invite: { acceptedAt: Date | null; revokedAt: Date | null; 
 // GET /api/admin-invites/[token] — what the invite page shows. No sign-in needed.
 export async function GET(_request: Request, { params }: { params: { token: string } }) {
   try {
-    const invite = await prisma.adminInvite.findUnique({ where: { token: params.token } });
+    const invite = await appDb.adminInvite.findUnique({ where: { token: params.token } });
     if (!invite) return NextResponse.json({ error: 'Invite not found' }, { status: 404 });
     const state = inviteState(invite);
     return NextResponse.json({
@@ -49,7 +50,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
       return NextResponse.json({ error: 'Sign in with your own account to accept.' }, { status: 403 });
     }
 
-    const invite = await prisma.adminInvite.findUnique({ where: { token: params.token } });
+    const invite = await appDb.adminInvite.findUnique({ where: { token: params.token } });
     if (!invite) return NextResponse.json({ error: 'Invite not found' }, { status: 404 });
     const state = inviteState(invite);
     if (state !== 'valid') {
@@ -65,31 +66,26 @@ export async function POST(request: Request, { params }: { params: { token: stri
       );
     }
 
-    const existing = await prisma.user.findUnique({
-      where: { id: uid },
-      include: { admin: true, therapist: true, client: true },
-    });
+    const [existing, therapist] = await Promise.all([
+      prisma.user.findUnique({ where: { id: uid }, include: { client: true } }),
+      therapistForUser(uid),
+    ]);
     if (existing?.role === 'ADMIN') {
       return NextResponse.json({ error: 'You are already an admin.', code: 'ALREADY_ADMIN' }, { status: 409 });
     }
 
     const body = await request.json().catch(() => ({}));
-    const named = existing?.therapist ?? existing?.client;
+    const named = (existing && therapist) ?? existing?.client;
     const firstName = String(body.firstName || named?.firstName || 'Admin').trim().slice(0, 80);
     const lastName = String(body.lastName ?? named?.lastName ?? '').trim().slice(0, 80);
 
-    const accepted = await prisma.$transaction(async (tx) => {
+    const accepted = await appDb.$transaction(async (tx) => {
       // Claim the invite first so two concurrent accepts can't both succeed.
       const claimed = await tx.adminInvite.updateMany({
         where: { id: invite.id, acceptedAt: null, revokedAt: null, expiresAt: { gt: new Date() } },
         data: { acceptedAt: new Date() },
       });
       if (claimed.count !== 1) return false;
-      await tx.user.upsert({
-        where: { id: uid },
-        update: { role: 'ADMIN' },
-        create: { id: uid, email, role: 'ADMIN' },
-      });
       await tx.profileAdmin.upsert({
         where: { userId: uid },
         update: { adminRole: invite.adminRole },
@@ -100,6 +96,12 @@ export async function POST(request: Request, { params }: { params: { token: stri
     if (!accepted) {
       return NextResponse.json({ error: 'This invite is no longer valid.' }, { status: 410 });
     }
+    // Not atomic with the profile above; the ADMIN role, which grants access, goes last.
+    await prisma.user.upsert({
+      where: { id: uid },
+      update: { role: 'ADMIN' },
+      create: { id: uid, email, role: 'ADMIN' },
+    });
 
     // Mirror the role onto the Firebase custom claim, as the other role
     // writes do. Non-fatal (scripts/backfill-role-claims.mjs repairs it).

@@ -7,7 +7,7 @@
 // short-lived payment_session_id, which it hands to Cashfree's JS checkout.
 
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { activatePlan } from '@/lib/billing/subscriptions';
 
 const API_VERSION = '2026-01-01';
@@ -73,7 +73,7 @@ export async function createCashfreeOrder(opts: {
   const orderId = `${opts.prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const amount = Math.round(opts.amount * 100) / 100;
 
-  await prisma.payment.create({
+  await appDb.payment.create({
     data: {
       id: orderId,
       userId: opts.uid,
@@ -110,7 +110,7 @@ export async function createCashfreeOrder(opts: {
       }),
     });
   } catch (err) {
-    await prisma.payment.delete({ where: { id: orderId } }).catch(() => {});
+    await appDb.payment.delete({ where: { id: orderId } }).catch(() => {});
     throw err;
   }
 
@@ -155,10 +155,10 @@ export async function syncCashfreeOrder(orderId: string, opts: { fromWebhook?: b
   );
   const latest = sorted.find((p) => p.payment_status === 'SUCCESS') || sorted[0];
 
-  const existing = await prisma.payment.findUnique({ where: { id: orderId } });
+  const existing = await appDb.payment.findUnique({ where: { id: orderId } });
   if (existing) {
     const orderStatus = existing.orderStatus === 'PAID' ? 'PAID' : order.order_status;
-    await prisma.payment.update({
+    await appDb.payment.update({
       where: { id: orderId },
       data: {
         orderStatus,
@@ -188,7 +188,7 @@ export async function syncCashfreeOrder(orderId: string, opts: { fromWebhook?: b
  * webhook retry or status check tries again.
  */
 async function activatePaidPlan(orderId: string) {
-  await prisma.$transaction(async (tx) => {
+  await appDb.$transaction(async (tx) => {
     const payment = await tx.payment.findUnique({ where: { id: orderId } });
     if (!payment?.planId || !payment.therapistId || !payment.months || payment.subscriptionId) return;
 

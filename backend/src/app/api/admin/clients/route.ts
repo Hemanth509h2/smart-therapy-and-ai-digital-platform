@@ -5,6 +5,7 @@ import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { can } from '@/lib/admin/adminRoles';
 import { listParams } from '@/lib/admin/adminList';
+import { therapistsById } from '@/lib/core/links';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
           firstName: true,
           lastName: true,
           createdAt: true,
-          therapist: { select: { id: true, firstName: true, lastName: true } },
+          therapistId: true,
           user: { select: { status: true } },
           _count: { select: { sessions: true, claimedInvites: true } },
         },
@@ -77,10 +78,17 @@ export async function GET(request: Request) {
     ]);
 
     const ids = rows.map((r) => r.id);
-    const last = ids.length
-      ? await prisma.session.groupBy({ by: ['clientId'], where: { clientId: { in: ids } }, _max: { scheduledAt: true } })
-      : [];
+    const [last, therapists] = await Promise.all([
+      ids.length
+        ? prisma.session.groupBy({ by: ['clientId'], where: { clientId: { in: ids } }, _max: { scheduledAt: true } })
+        : [],
+      therapistsById(rows.map((r) => r.therapistId), { id: true, firstName: true, lastName: true }),
+    ]);
     const lastBy = new Map(last.map((l) => [l.clientId, l._max.scheduledAt]));
+    const therapistOf = (id: string | null) => {
+      const t = id ? therapists.get(id) : undefined;
+      return t ? { id: t.id, name: `${t.firstName} ${t.lastName}`.trim() } : null;
+    };
 
     if (reveal && ids.length) {
       await audit(request, auth, 'phi.reveal', { type: 'ProfileClient' }, { after: { scope: 'clients.list', clientIds: ids } });
@@ -91,7 +99,7 @@ export async function GET(request: Request) {
         id: r.id,
         name: reveal ? `${r.firstName} ${r.lastName}`.trim() : maskName(r.firstName, r.lastName),
         masked: !reveal,
-        therapist: r.therapist ? { id: r.therapist.id, name: `${r.therapist.firstName} ${r.therapist.lastName}`.trim() } : null,
+        therapist: therapistOf(r.therapistId),
         sessions: r._count.sessions,
         lastSession: lastBy.get(r.id) ?? null,
         inviteStatus: r._count.claimedInvites > 0 ? 'CLAIMED' : 'DIRECT',

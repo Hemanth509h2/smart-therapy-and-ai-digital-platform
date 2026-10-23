@@ -5,8 +5,8 @@
 // don't count, so two therapists paying at the same moment can both get the
 // last redemption of a limited code — acceptable for discount codes, and it
 // means an abandoned checkout never burns a use.
-import type { Coupon, CouponType, Plan } from '@prisma/client';
-import { prisma } from '@/lib/core/db';
+import type { Coupon, CouponType, Plan } from '.prisma/app-client';
+import { appDb } from '@/lib/core/db';
 
 export const MAX_CODE_LENGTH = 32;
 
@@ -36,7 +36,7 @@ export async function applyCoupon(
   const normalized = normalizeCode(code);
   if (!normalized) return { ok: false, error: 'Enter a coupon code.' };
 
-  const coupon = await prisma.coupon.findUnique({ where: { code: normalized } });
+  const coupon = await appDb.coupon.findUnique({ where: { code: normalized } });
   const now = new Date();
   if (!coupon || !coupon.isActive || (coupon.startsAt && coupon.startsAt > now)) {
     return { ok: false, error: 'That coupon code is not valid.' };
@@ -53,10 +53,10 @@ export async function applyCoupon(
 
   const [used, usedByTherapist] = await Promise.all([
     coupon.maxRedemptions != null
-      ? prisma.payment.count({ where: { couponId: coupon.id, orderStatus: 'PAID' } })
+      ? appDb.payment.count({ where: { couponId: coupon.id, orderStatus: 'PAID' } })
       : Promise.resolve(0),
     coupon.oncePerTherapist
-      ? prisma.payment.count({
+      ? appDb.payment.count({
           where: { couponId: coupon.id, orderStatus: 'PAID', therapistId: opts.therapistId },
         })
       : Promise.resolve(0),

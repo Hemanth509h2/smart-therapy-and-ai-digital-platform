@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { parseFeatures, parsePlanLimits } from '@/lib/billing/subscriptions';
@@ -16,14 +16,14 @@ export async function GET(request: Request) {
     if (!auth.ok) return auth.response;
     const now = new Date();
     const [plans, subs, reqs, pending] = await Promise.all([
-      prisma.plan.findMany({ orderBy: [{ sortOrder: 'asc' }, { priceMonthly: 'asc' }] }),
-      prisma.subscription.groupBy({
+      appDb.plan.findMany({ orderBy: [{ sortOrder: 'asc' }, { priceMonthly: 'asc' }] }),
+      appDb.subscription.groupBy({
         by: ['planId'],
         where: { status: 'ACTIVE', currentPeriodEnd: { gt: now } },
         _count: { _all: true },
       }),
-      prisma.subscriptionRequest.groupBy({ by: ['planId'], _count: { _all: true } }),
-      prisma.subscriptionRequest.groupBy({ by: ['planId'], where: { status: 'PENDING' }, _count: { _all: true } }),
+      appDb.subscriptionRequest.groupBy({ by: ['planId'], _count: { _all: true } }),
+      appDb.subscriptionRequest.groupBy({ by: ['planId'], where: { status: 'PENDING' }, _count: { _all: true } }),
     ]);
     const count = (rows: { planId: string; _count: { _all: number } }[], id: string) =>
       rows.find((r) => r.planId === id)?._count._all ?? 0;
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
         ? null
         : Math.max(1, Number(quotaRaw));
 
-    const plan = await prisma.plan.create({
+    const plan = await appDb.plan.create({
       data: {
         name,
         description: body.description?.trim() || null,

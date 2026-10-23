@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/core/db'
+import { appDb } from '@/lib/core/db'
 import { normalizeWhatsAppNumber } from '@/lib/messaging/whatsapp-cloud-api'
 import { PublicError } from '@/lib/http/apiError'
 import { rejectUnlessAutomation } from './auth'
@@ -60,7 +60,7 @@ export async function requireDoctorByPhone(request: Request) {
     return { ok: false as const, response: NextResponse.json({ error: 'phone is not a valid number' }, { status }) }
   }
 
-  const doctor = await prisma.profileTherapist.findUnique({ where: { phoneNumber: normalized }, select: doctorSelect })
+  const doctor = await appDb.profileTherapist.findUnique({ where: { phoneNumber: normalized }, select: doctorSelect })
   if (!doctor) {
     return {
       ok: false as const,

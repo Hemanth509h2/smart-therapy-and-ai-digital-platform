@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { requireAuth } from '@/lib/http/apiAuth';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     const auth = await requireAuth(request);
     if (!auth.ok) return auth.response;
 
-    const rows = await prisma.moduleSetting.findMany({
+    const rows = await appDb.moduleSetting.findMany({
       where: { OR: [{ enabled: false }, { featured: true }] },
       select: { moduleId: true, enabled: true, featured: true },
     });

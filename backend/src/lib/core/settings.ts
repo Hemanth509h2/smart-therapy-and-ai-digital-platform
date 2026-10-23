@@ -1,6 +1,6 @@
 // Admin-editable app settings, stored in the Setting table. Every key has a
 // default here, so code can read a setting before any admin has saved it.
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 
 export const SETTING_DEFAULTS = {
   'features.aiInsights': true,
@@ -22,14 +22,14 @@ export function isSettingKey(key: string): key is SettingKey {
 }
 
 export async function getSettings(): Promise<Settings> {
-  const rows = await prisma.setting.findMany();
+  const rows = await appDb.setting.findMany();
   const out: Record<string, unknown> = { ...SETTING_DEFAULTS };
   for (const r of rows) if (isSettingKey(r.key)) out[r.key] = r.value;
   return out as Settings;
 }
 
 export async function getSetting<K extends SettingKey>(key: K): Promise<Settings[K]> {
-  const row = await prisma.setting.findUnique({ where: { key } }).catch(() => null);
+  const row = await appDb.setting.findUnique({ where: { key } }).catch(() => null);
   return (row?.value ?? SETTING_DEFAULTS[key]) as Settings[K];
 }
 

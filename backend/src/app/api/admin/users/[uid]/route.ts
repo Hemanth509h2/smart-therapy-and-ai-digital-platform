@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
+import { therapistForUser } from '@/lib/core/links';
 import { requireAdmin, requireRecentLogin, invalidateAccountStatus } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { adminAuth, adminDb } from '@/lib/core/firebaseAdmin';
@@ -13,9 +14,10 @@ export const dynamic = 'force-dynamic';
 // Removes, in this order:
 //   1. the Firebase sign-in account (so they can't sign in mid-way)
 //   2. Firestore session data: sessions/{id} (transcript + rawSessionLog) and liveSessions/{id}
-//   3. Postgres, in one transaction: risk flags, bookings, sessions (cascades reports, notes,
-//      session messages), unlinks their clients, uploaded document chunks, then the user
-//      (cascades the therapist profile, invites, subscriptions, usage, progress records)
+//   3. HIPAA database, in one transaction: risk flags, bookings, sessions (cascades reports,
+//      notes, session messages), invites, messages, notes, progress records, unlinks their
+//      clients, uploaded document chunks, then the user
+//   4. App database: the therapist profile (cascades subscriptions, requests, usage)
 // Client accounts are kept; they are only unlinked from this therapist.
 export async function DELETE(request: Request, { params }: { params: { uid: string } }) {
   try {
@@ -27,23 +29,20 @@ export async function DELETE(request: Request, { params }: { params: { uid: stri
     const body = await request.json().catch(() => ({}));
     const confirmEmail = typeof body?.confirmEmail === 'string' ? body.confirmEmail.trim().toLowerCase() : '';
 
-    const user = await prisma.user.findUnique({
-      where: { id: params.uid },
-      select: {
-        id: true, email: true, role: true,
-        therapist: { select: { id: true, firstName: true, lastName: true } },
-      },
-    });
+    const [user, therapist] = await Promise.all([
+      prisma.user.findUnique({ where: { id: params.uid }, select: { id: true, email: true, role: true } }),
+      therapistForUser(params.uid, { id: true, firstName: true, lastName: true }),
+    ]);
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
     if (user.id === auth.uid) return NextResponse.json({ error: "You can't remove your own account." }, { status: 400 });
-    if (user.role !== 'THERAPIST' || !user.therapist) {
+    if (user.role !== 'THERAPIST' || !therapist) {
       return NextResponse.json({ error: 'Only professional (therapist) accounts can be removed here.' }, { status: 400 });
     }
     if (!confirmEmail || confirmEmail !== (user.email ?? '').toLowerCase()) {
       return NextResponse.json({ error: "The email you typed doesn't match this account." }, { status: 400 });
     }
 
-    const therapistId = user.therapist.id;
+    const therapistId = therapist.id;
     const sessions = await prisma.session.findMany({ where: { therapistId }, select: { id: true } });
     const sessionIds = sessions.map((s) => s.id);
     const counts = {
@@ -75,11 +74,18 @@ export async function DELETE(request: Request, { params }: { params: { uid: stri
       }
     }
 
-    // 3. Postgres
+    // 3. HIPAA database. The rows that used to cascade from the therapist
+    // profile are deleted explicitly.
     await prisma.$transaction(async (tx) => {
       await tx.riskFlag.deleteMany({ where: { OR: [{ therapistId }, { sessionId: { in: sessionIds } }] } });
       await tx.booking.deleteMany({ where: { therapistId } });
       await tx.session.deleteMany({ where: { therapistId } });
+      await tx.whatsAppMessage.deleteMany({ where: { therapistId } });
+      await tx.invite.deleteMany({ where: { therapistId } });
+      await tx.therapistNote.deleteMany({ where: { therapistId } });
+      await tx.progressNote.deleteMany({ where: { therapistId } });
+      await tx.progressReport.deleteMany({ where: { therapistId } });
+      await tx.progressMetric.deleteMany({ where: { therapistId } });
       await tx.profileClient.updateMany({ where: { therapistId }, data: { therapistId: null } });
       await tx.supportTicket.updateMany({ where: { userId: user.id }, data: { userId: null } });
       // Uploaded documents for AI search (pgvector). The table may not exist in every environment.
@@ -89,12 +95,17 @@ export async function DELETE(request: Request, { params }: { params: { uid: stri
       }
       await tx.user.delete({ where: { id: user.id } });
     }, { timeout: 30_000 });
+    // 4. App database. Not atomic with step 3; patient data is gone first.
+    await appDb.$transaction([
+      appDb.profileTherapist.deleteMany({ where: { userId: user.id } }),
+      appDb.profileAdmin.deleteMany({ where: { userId: user.id } }),
+    ]);
     invalidateAccountStatus(user.id);
 
     await audit(request, auth, 'user.delete', { type: 'User', id: user.id }, {
       before: {
         email: user.email,
-        name: `${user.therapist.firstName} ${user.therapist.lastName}`.trim(),
+        name: `${therapist.firstName} ${therapist.lastName}`.trim(),
         role: user.role,
         ...counts,
       },

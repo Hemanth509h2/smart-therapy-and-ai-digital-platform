@@ -21,7 +21,9 @@
 #   into the image, so the same image works with any .env.
 #
 # Database schema changes:
-#   Run `npx prisma db push` from your own machine, inside backend/.
+#   Run `npx prisma db push` (HIPAA database) and
+#   `npx prisma db push --schema prisma/app/schema.prisma` (app database)
+#   from your own machine, inside backend/.
 #   The final image does not contain the Prisma command-line tool.
 #
 # The build has two stages:

@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { can } from '@/lib/admin/adminRoles';
 import { dateRange, listParams } from '@/lib/admin/adminList';
 import { moduleName } from '@/lib/modules/modules';
 import { resolveCurrent } from '@/lib/billing/subscriptions';
+import { therapistsById, usersById } from '@/lib/core/links';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,27 +29,33 @@ export async function GET(request: Request) {
     const range = dateRange(from, to);
 
     if (type === 'therapists') {
-      const list = await prisma.profileTherapist.findMany({
+      const list = await appDb.profileTherapist.findMany({
         where: range ? { createdAt: range } : {},
         orderBy: { createdAt: 'desc' },
         take: MAX_ROWS,
         include: {
-          user: { select: { email: true, status: true, lastSeenAt: true } },
-          _count: { select: { clients: true, sessions: true } },
           ...(billing ? { subscriptions: { include: { plan: { select: { name: true } } } } } : {}),
         },
       });
+      const ids = list.map((t) => t.id);
+      const [users, clientCounts, sessionCounts] = await Promise.all([
+        usersById(list.map((t) => t.userId), { email: true, status: true, lastSeenAt: true }),
+        prisma.profileClient.groupBy({ by: ['therapistId'], _count: true, where: { therapistId: { in: ids } } }),
+        prisma.session.groupBy({ by: ['therapistId'], _count: true, where: { therapistId: { in: ids } } }),
+      ]);
+      const clientsOf = new Map(clientCounts.map((g) => [g.therapistId, g._count]));
+      const sessionsOf = new Map(sessionCounts.map((g) => [g.therapistId, g._count]));
       const rows = list.map((t: any) => ({
         id: t.id,
         name: `${t.firstName} ${t.lastName}`.trim(),
-        email: t.user.email,
-        status: t.user.status,
+        email: users.get(t.userId)?.email ?? '',
+        status: users.get(t.userId)?.status ?? '',
         specialty: t.specialty.join('; '),
-        clients: t._count.clients,
-        sessions: t._count.sessions,
+        clients: clientsOf.get(t.id) ?? 0,
+        sessions: sessionsOf.get(t.id) ?? 0,
         ...(billing ? { plan: resolveCurrent(t.subscriptions ?? [])?.plan.name ?? '' } : {}),
         joinedAt: t.createdAt,
-        lastSeenAt: t.user.lastSeenAt,
+        lastSeenAt: users.get(t.userId)?.lastSeenAt ?? null,
       }));
       return NextResponse.json({ rows });
     }
@@ -63,15 +70,16 @@ export async function GET(request: Request) {
           firstName: true,
           lastName: true,
           createdAt: true,
-          therapist: { select: { firstName: true, lastName: true } },
+          therapistId: true,
           user: { select: { status: true } },
           _count: { select: { sessions: true } },
         },
       });
+      const therapists = await therapistsById(list.map((c) => c.therapistId), { firstName: true, lastName: true });
       const rows = list.map((c) => ({
         id: c.id,
         name: maskName(c.firstName, c.lastName),
-        therapist: c.therapist ? `${c.therapist.firstName} ${c.therapist.lastName}`.trim() : '',
+        therapist: therapistName(therapists.get(c.therapistId ?? '')),
         status: c.user.status,
         sessions: c._count.sessions,
         joinedAt: c.createdAt,
@@ -90,13 +98,14 @@ export async function GET(request: Request) {
           scheduledAt: true,
           startedAt: true,
           endedAt: true,
-          therapist: { select: { firstName: true, lastName: true } },
+          therapistId: true,
           client: { select: { firstName: true, lastName: true } },
         },
       });
+      const therapists = await therapistsById(list.map((s) => s.therapistId), { firstName: true, lastName: true });
       const rows = list.map((s) => ({
         id: s.id,
-        therapist: `${s.therapist.firstName} ${s.therapist.lastName}`.trim(),
+        therapist: therapistName(therapists.get(s.therapistId)),
         client: maskName(s.client.firstName, s.client.lastName),
         status: s.status,
         scheduledAt: s.scheduledAt,
@@ -108,7 +117,7 @@ export async function GET(request: Request) {
     }
 
     if (type === 'usage') {
-      const list = await prisma.usageEvent.findMany({
+      const list = await appDb.usageEvent.findMany({
         where: range ? { createdAt: range } : {},
         orderBy: { createdAt: 'desc' },
         take: MAX_ROWS,
@@ -148,6 +157,9 @@ export async function GET(request: Request) {
   }
 }
 
+const therapistName = (t: { firstName: string; lastName: string } | undefined) =>
+  t ? `${t.firstName} ${t.lastName}`.trim() : '';
+
 // "Riya Sharma" -> "R*** S."
 function maskName(first: string, last: string) {
   const f = (first || '').trim();
@@ -164,8 +176,8 @@ async function monthly(month: string | null, billing: boolean) {
   const inMonth = { gte: start, lt: end };
 
   const [therapists, newTherapists, clients, newClients, sessionsByStatus, completed, activeTherapists, usage, modules] = await Promise.all([
-    prisma.profileTherapist.count({ where: { createdAt: { lt: end } } }),
-    prisma.profileTherapist.count({ where: { createdAt: inMonth } }),
+    appDb.profileTherapist.count({ where: { createdAt: { lt: end } } }),
+    appDb.profileTherapist.count({ where: { createdAt: inMonth } }),
     prisma.profileClient.count({ where: { createdAt: { lt: end } } }),
     prisma.profileClient.count({ where: { createdAt: inMonth } }),
     prisma.session.groupBy({ by: ['status'], where: { scheduledAt: inMonth }, _count: true }),
@@ -174,8 +186,8 @@ async function monthly(month: string | null, billing: boolean) {
       select: { startedAt: true, endedAt: true },
     }),
     prisma.session.findMany({ where: { scheduledAt: inMonth, status: { not: 'CANCELLED' } }, distinct: ['therapistId'], select: { therapistId: true } }),
-    prisma.usageEvent.groupBy({ by: ['type'], where: { createdAt: inMonth }, _sum: { count: true } }),
-    prisma.usageEvent.groupBy({
+    appDb.usageEvent.groupBy({ by: ['type'], where: { createdAt: inMonth }, _sum: { count: true } }),
+    appDb.usageEvent.groupBy({
       by: ['label'],
       where: { type: 'MODULE_LAUNCH', label: { not: null }, createdAt: inMonth },
       _sum: { count: true },
@@ -218,11 +230,11 @@ async function monthly(month: string | null, billing: boolean) {
 
   if (billing) {
     // Terms that were running at the end of the month.
-    const subs = await prisma.subscription.findMany({
+    const subs = await appDb.subscription.findMany({
       where: { startedAt: { lt: end }, currentPeriodEnd: { gte: end }, status: { not: 'CANCELLED' } },
       include: { plan: { select: { name: true, priceMonthly: true } } },
     });
-    const newSubs = await prisma.subscription.count({ where: { createdAt: inMonth } });
+    const newSubs = await appDb.subscription.count({ where: { createdAt: inMonth } });
     const byTherapist = new Map<string, typeof subs>();
     for (const s of subs) byTherapist.set(s.therapistId, [...(byTherapist.get(s.therapistId) ?? []), s]);
     const current = Array.from(byTherapist.values()).map((l) => l.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())[0]);

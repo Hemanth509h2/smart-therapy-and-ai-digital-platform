@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { Session } from '@prisma/client';
-import { prisma } from '@/lib/core/db';
+import { appDb, prisma } from '@/lib/core/db';
 import { appUrl } from '@/lib/core/app-url';
 import { getSetting } from '@/lib/core/settings';
 import { sendSessionScheduledMessage, sendWhatsAppInvite } from '@/lib/messaging/whatsapp-bot';
@@ -78,6 +78,13 @@ type MessageType = 'SESSION_SCHEDULED' | 'SESSION_STARTED';
 
 export const WHATSAPP_OFF = 'WhatsApp messaging is turned off by an admin.';
 
+const fullName = (p?: { firstName: string; lastName: string } | null) => (p ? `${p.firstName} ${p.lastName}`.trim() : undefined);
+
+async function therapistName(therapistId: string | null | undefined) {
+  if (!therapistId) return undefined;
+  return fullName(await appDb.profileTherapist.findUnique({ where: { id: therapistId }, select: { firstName: true, lastName: true } }));
+}
+
 // Records the attempt in whatsAppMessage, sends, and marks SENT/FAILED.
 // Best-effort: never throws, so a WhatsApp failure can't break the caller.
 async function deliver(
@@ -150,17 +157,18 @@ async function deliver(
 export async function sendSessionBookedWhatsApp(sessionId: string) {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
-    include: { client: true, therapist: true },
+    include: { client: true },
   });
   const phone = session?.client.phoneNumber;
   if (!session || !phone) return;
+  const therapist = await therapistName(session.therapistId);
 
   await deliver(session.id, session.clientId, phone, 'SESSION_SCHEDULED', '', () =>
     sendSessionScheduledMessage({
       to: phone,
       patientName: session.client.firstName,
       scheduledAt: session.scheduledAt,
-      therapistName: `${session.therapist.firstName} ${session.therapist.lastName}`.trim(),
+      therapistName: therapist,
     })
   );
 }
@@ -169,7 +177,7 @@ export async function sendSessionBookedWhatsApp(sessionId: string) {
 export async function sendSessionLinkWhatsApp(sessionId: string, request: Request) {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
-    include: { client: true, therapist: true },
+    include: { client: true },
   });
   const phone = session?.client.phoneNumber;
   if (!session || !phone) return;
@@ -183,7 +191,7 @@ export async function sendSessionLinkWhatsApp(sessionId: string, request: Reques
   const invite = await getOrCreateGuestInvite(session);
   const link = `${appUrl(request)}/join/${invite.token}`;
 
-  const therapistName = `${session.therapist.firstName} ${session.therapist.lastName}`.trim();
+  const therapist = await therapistName(session.therapistId);
 
   await deliver(session.id, session.clientId, phone, 'SESSION_STARTED', link, async () => {
     // Webhook first; only if it fails do we send via the WhatsApp Cloud API.
@@ -194,7 +202,7 @@ export async function sendSessionLinkWhatsApp(sessionId: string, request: Reques
           sessionId: session.id,
           phoneNumber: phone,
           patientName: session.client.firstName,
-          therapistName,
+          therapistName: therapist ?? '',
           link,
         });
       } catch (error: any) {
@@ -205,7 +213,7 @@ export async function sendSessionLinkWhatsApp(sessionId: string, request: Reques
       to: phone,
       patientName: session.client.firstName,
       inviteLink: link,
-      therapistName,
+      therapistName: therapist,
     });
   });
 }
@@ -216,11 +224,10 @@ export async function retryWhatsAppMessage(id: string) {
   const msg = await prisma.whatsAppMessage.findUniqueOrThrow({
     where: { id },
     include: {
-      invite: { include: { therapist: true } },
-      session: { include: { client: true, therapist: true } },
+      invite: true,
+      session: { include: { client: true } },
     },
   });
-  const fullName = (p?: { firstName: string; lastName: string } | null) => (p ? `${p.firstName} ${p.lastName}`.trim() : undefined);
 
   let phone = msg.phoneNumber;
   let send: () => Promise<{ id: string }>;
@@ -228,15 +235,17 @@ export async function retryWhatsAppMessage(id: string) {
     if (!msg.invite) throw new Error('The invite for this message no longer exists.');
     const invite = msg.invite;
     phone = invite.phoneNumber || phone;
-    send = () => sendWhatsAppInvite({ to: phone, patientName: invite.firstName, inviteLink: msg.generatedLink, therapistName: fullName(invite.therapist) });
+    const therapist = await therapistName(invite.therapistId);
+    send = () => sendWhatsAppInvite({ to: phone, patientName: invite.firstName, inviteLink: msg.generatedLink, therapistName: therapist });
   } else {
     if (!msg.session) throw new Error('The session for this message no longer exists.');
     const session = msg.session;
     phone = session.client.phoneNumber || phone;
+    const therapist = await therapistName(session.therapistId);
     send =
       msg.messageType === 'SESSION_SCHEDULED'
-        ? () => sendSessionScheduledMessage({ to: phone, patientName: session.client.firstName, scheduledAt: session.scheduledAt, therapistName: fullName(session.therapist) })
-        : () => sendWhatsAppInvite({ to: phone, patientName: session.client.firstName, inviteLink: msg.generatedLink, therapistName: fullName(session.therapist) });
+        ? () => sendSessionScheduledMessage({ to: phone, patientName: session.client.firstName, scheduledAt: session.scheduledAt, therapistName: therapist })
+        : () => sendWhatsAppInvite({ to: phone, patientName: session.client.firstName, inviteLink: msg.generatedLink, therapistName: therapist });
   }
 
   const now = new Date();

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { appDb, prisma } from '@/lib/core/db';
 import { errorResponse } from '@/lib/http/apiError';
 
 // GET /api/invites/[token] — fetch invite details for the signup banner + onboarding prefill.
@@ -9,14 +9,15 @@ export async function GET(request: Request, { params }: { params: { token: strin
 
     const invite = await prisma.invite.findUnique({
       where: { token },
-      include: {
-        therapist: { select: { firstName: true, lastName: true } },
-      },
     });
 
     if (!invite) {
       return NextResponse.json({ error: 'Invite not found' }, { status: 404 });
     }
+    const therapist = await appDb.profileTherapist.findUnique({
+      where: { id: invite.therapistId },
+      select: { firstName: true, lastName: true },
+    });
 
     return NextResponse.json({
       invite: {
@@ -25,7 +26,7 @@ export async function GET(request: Request, { params }: { params: { token: strin
         lastName: invite.lastName,
         diagnosis: invite.diagnosis,
         status: invite.status,
-        therapistName: `${invite.therapist.firstName} ${invite.therapist.lastName}`.trim(),
+        therapistName: therapist ? `${therapist.firstName} ${therapist.lastName}`.trim() : '',
       },
     });
   } catch (error: any) {

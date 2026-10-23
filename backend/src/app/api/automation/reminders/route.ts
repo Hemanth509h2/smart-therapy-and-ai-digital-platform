@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/core/db'
+import { therapistsById } from '@/lib/core/links'
 import { errorResponse } from '@/lib/http/apiError'
 import { rejectUnlessAutomation } from '@/lib/automation/auth'
 import { reminderMessage } from '@/lib/automation/messages'
@@ -40,13 +41,15 @@ export async function GET(request: Request) {
       select: {
         id: true,
         scheduledAt: true,
+        therapistId: true,
         client: { select: { id: true, firstName: true, lastName: true, phoneNumber: true } },
-        therapist: { select: { firstName: true, lastName: true } },
       },
     })
+    const therapists = await therapistsById(sessions.map((s) => s.therapistId), { firstName: true, lastName: true })
 
     const items = sessions.map((s) => {
-      const doctorName = `${s.therapist.firstName} ${s.therapist.lastName}`.trim()
+      const t = therapists.get(s.therapistId)
+      const doctorName = t ? `${t.firstName} ${t.lastName}`.trim() : ''
       return {
         sessionId: s.id,
         scheduledAt: s.scheduledAt.toISOString(),

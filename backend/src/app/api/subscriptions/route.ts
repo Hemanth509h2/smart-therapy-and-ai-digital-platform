@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { resolveCurrent, serializeSubscription } from '@/lib/billing/subscriptions';
 import { errorResponse } from '@/lib/http/apiError';
@@ -7,7 +7,7 @@ import { errorResponse } from '@/lib/http/apiError';
 // The caller must own the therapist profile or be an ADMIN.
 async function mayAccessTherapist(uid: string, therapistId: string) {
   const [therapist, user] = await Promise.all([
-    prisma.profileTherapist.findUnique({ where: { id: therapistId }, select: { userId: true } }),
+    appDb.profileTherapist.findUnique({ where: { id: therapistId }, select: { userId: true } }),
     prisma.user.findUnique({ where: { id: uid }, select: { role: true } }),
   ]);
   return therapist?.userId === uid || user?.role === 'ADMIN';
@@ -32,12 +32,12 @@ export async function GET(request: Request) {
     }
 
     const [subs, pending] = await Promise.all([
-      prisma.subscription.findMany({
+      appDb.subscription.findMany({
         where: { therapistId },
         include: { plan: true },
         orderBy: { startedAt: 'desc' },
       }),
-      prisma.subscriptionRequest.findFirst({
+      appDb.subscriptionRequest.findFirst({
         where: { therapistId, status: 'PENDING' },
         include: { plan: true },
         orderBy: { createdAt: 'desc' },

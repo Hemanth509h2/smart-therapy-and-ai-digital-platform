@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import type { AdminRole, Role } from '@prisma/client';
-import { prisma } from '@/lib/core/db';
+import type { Role } from '@prisma/client';
+import type { AdminRole } from '.prisma/app-client';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin, requireRecentLogin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { adminAuth } from '@/lib/core/firebaseAdmin';
@@ -10,22 +11,22 @@ export const dynamic = 'force-dynamic';
 const ADMIN_ROLES: AdminRole[] = ['SUPER_ADMIN', 'BILLING', 'SUPPORT', 'CONTENT'];
 
 // Admins with no ProfileAdmin row predate roles and count as SUPER_ADMIN.
-const SUPER_ADMIN_WHERE = {
-  role: 'ADMIN' as const,
-  OR: [{ admin: { is: null } }, { admin: { is: { adminRole: 'SUPER_ADMIN' as const } } }],
-};
+async function countSuperAdmins() {
+  const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } });
+  const demoted = await appDb.profileAdmin.count({
+    where: { userId: { in: admins.map((a) => a.id) }, adminRole: { not: 'SUPER_ADMIN' } },
+  });
+  return admins.length - demoted;
+}
 
 async function loadAdmin(uid: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: uid },
-    include: {
-      admin: true,
-      therapist: { select: { id: true } },
-      client: { select: { id: true } },
-    },
-  });
+  const [user, admin, therapist] = await Promise.all([
+    prisma.user.findUnique({ where: { id: uid }, include: { client: { select: { id: true } } } }),
+    appDb.profileAdmin.findUnique({ where: { userId: uid } }),
+    appDb.profileTherapist.findUnique({ where: { userId: uid }, select: { id: true } }),
+  ]);
   if (!user || user.role !== 'ADMIN') return null;
-  return { ...user, adminRole: (user.admin?.adminRole ?? 'SUPER_ADMIN') as AdminRole };
+  return { ...user, admin, therapist, adminRole: (admin?.adminRole ?? 'SUPER_ADMIN') as AdminRole };
 }
 
 // PATCH /api/admin/admins/[uid] — change an admin's role. Body: { adminRole }
@@ -50,11 +51,11 @@ export async function PATCH(request: Request, { params }: { params: { uid: strin
     if (target.adminRole === adminRole) {
       return NextResponse.json({ success: true, admin: { userId: target.id, adminRole } });
     }
-    if (target.adminRole === 'SUPER_ADMIN' && (await prisma.user.count({ where: SUPER_ADMIN_WHERE })) <= 1) {
+    if (target.adminRole === 'SUPER_ADMIN' && (await countSuperAdmins()) <= 1) {
       return NextResponse.json({ error: "You can't demote the last super admin." }, { status: 409 });
     }
 
-    await prisma.profileAdmin.upsert({
+    await appDb.profileAdmin.upsert({
       where: { userId: target.id },
       update: { adminRole },
       create: { userId: target.id, adminRole },
@@ -88,15 +89,15 @@ export async function DELETE(request: Request, { params }: { params: { uid: stri
 
     const target = await loadAdmin(params.uid);
     if (!target) return NextResponse.json({ error: 'Admin not found' }, { status: 404 });
-    if (target.adminRole === 'SUPER_ADMIN' && (await prisma.user.count({ where: SUPER_ADMIN_WHERE })) <= 1) {
+    if (target.adminRole === 'SUPER_ADMIN' && (await countSuperAdmins()) <= 1) {
       return NextResponse.json({ error: "You can't remove the last super admin." }, { status: 409 });
     }
 
     const newRole: Role = target.therapist ? 'THERAPIST' : 'CLIENT';
-    await prisma.$transaction([
-      prisma.profileAdmin.deleteMany({ where: { userId: target.id } }),
-      prisma.user.update({ where: { id: target.id }, data: { role: newRole } }),
-    ]);
+    // Not atomic across the two databases: drop the ADMIN role first, since an
+    // ADMIN with no profile row counts as SUPER_ADMIN.
+    await prisma.user.update({ where: { id: target.id }, data: { role: newRole } });
+    await appDb.profileAdmin.deleteMany({ where: { userId: target.id } });
 
     await setRoleClaim(target.id, newRole);
 

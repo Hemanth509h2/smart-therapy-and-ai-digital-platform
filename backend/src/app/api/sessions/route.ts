@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
+import { therapistIdForUser, withTherapists } from '@/lib/core/links';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { sendSessionBookedWhatsApp } from '@/lib/sessions/session-whatsapp';
@@ -9,7 +10,7 @@ import { errorResponse } from '@/lib/http/apiError';
 async function mayAccess(uid: string, ref: { therapistId?: string | null; clientId?: string | null }) {
   const [therapist, client, user] = await Promise.all([
     ref.therapistId
-      ? prisma.profileTherapist.findUnique({ where: { id: ref.therapistId }, select: { userId: true } })
+      ? appDb.profileTherapist.findUnique({ where: { id: ref.therapistId }, select: { userId: true } })
       : null,
     ref.clientId
       ? prisma.profileClient.findUnique({ where: { id: ref.clientId }, select: { userId: true } })
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
     const clientId = searchParams.get('clientId');
 
     if (therapistId) {
-      const owner = await prisma.profileTherapist.findUnique({ where: { id: therapistId }, select: { userId: true } });
+      const owner = await appDb.profileTherapist.findUnique({ where: { id: therapistId }, select: { userId: true } });
       if (!owner || owner.userId !== auth.uid) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
@@ -53,19 +54,20 @@ export async function GET(request: Request) {
     if (clientId) {
       const client = await prisma.profileClient.findUnique({
         where: { id: clientId },
-        select: { userId: true, therapist: { select: { userId: true } } },
+        select: { userId: true, therapistId: true },
       });
-      if (!client || (client.userId !== auth.uid && client.therapist?.userId !== auth.uid)) {
+      if (
+        !client ||
+        (client.userId !== auth.uid &&
+          (!client.therapistId || client.therapistId !== (await therapistIdForUser(auth.uid))))
+      ) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
       const sessions = await prisma.session.findMany({
         where: { clientId },
-        include: {
-          therapist: true,
-        },
         orderBy: { scheduledAt: 'desc' },
       });
-      return NextResponse.json({ sessions });
+      return NextResponse.json({ sessions: await withTherapists(sessions) });
     }
 
     return NextResponse.json({ error: 'Missing filter parameter' }, { status: 400 });
@@ -99,7 +101,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const session = await prisma.session.create({
+    const created = await prisma.session.create({
       data: {
         therapistId,
         clientId: finalClientId,
@@ -108,9 +110,9 @@ export async function POST(request: Request) {
       },
       include: {
         client: true,
-        therapist: true,
       },
     });
+    const [session] = await withTherapists([created]);
 
     // A booking gets a date/time confirmation (no link). Instant sessions get
     // nothing here — the join link is sent when the session is started.

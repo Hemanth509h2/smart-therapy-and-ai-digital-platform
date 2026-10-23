@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
+import { usersById } from '@/lib/core/links';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { daysAgo, startOfMonth } from '@/lib/admin/adminList';
 import { getSettings } from '@/lib/core/settings';
@@ -32,40 +32,45 @@ export async function GET(request: Request) {
     const since = daysAgo(days);
     const monthStart = startOfMonth();
 
-    const [settings, daily, totals, minutesRow, perTherapist, minutesByTherapist, modulesInRange, modulesAllTime, monthAnalyses] =
+    const [settings, daily, totals, transcribed, perTherapist, modulesInRange, modulesAllTime, monthAnalyses] =
       await Promise.all([
         getSettings(),
-        prisma.$queryRaw<{ bucket: Date; type: string; n: number }[]>(Prisma.sql`
+        appDb.$queryRaw<{ bucket: Date; type: string; n: number }[]>`
           SELECT date_trunc('day', "createdAt") AS bucket, type, sum(count)::int AS n
           FROM "UsageEvent" WHERE "createdAt" >= ${since}
-          GROUP BY 1, 2 ORDER BY 1`),
-        prisma.usageEvent.groupBy({ by: ['type'], where: { createdAt: { gte: since } }, _sum: { count: true } }),
-        prisma.$queryRaw<{ minutes: number | null }[]>(Prisma.sql`
-          SELECT sum(extract(epoch FROM (s."endedAt" - s."startedAt")) / 60)::float AS minutes
-          FROM "Session" s
-          WHERE s."startedAt" IS NOT NULL AND s."endedAt" IS NOT NULL AND s.id IN (
-            SELECT DISTINCT "sessionId" FROM "UsageEvent"
-            WHERE type = 'TRANSCRIPTION' AND "sessionId" IS NOT NULL AND "createdAt" >= ${since})`),
-        prisma.usageEvent.groupBy({ by: ['therapistId', 'type'], where: { createdAt: { gte: since } }, _sum: { count: true } }),
-        prisma.$queryRaw<{ therapistId: string; minutes: number | null }[]>(Prisma.sql`
-          SELECT s."therapistId", sum(extract(epoch FROM (s."endedAt" - s."startedAt")) / 60)::float AS minutes
-          FROM "Session" s
-          WHERE s."startedAt" IS NOT NULL AND s."endedAt" IS NOT NULL AND s.id IN (
-            SELECT DISTINCT "sessionId" FROM "UsageEvent"
-            WHERE type = 'TRANSCRIPTION' AND "sessionId" IS NOT NULL AND "createdAt" >= ${since})
-          GROUP BY 1`),
-        prisma.usageEvent.groupBy({
+          GROUP BY 1, 2 ORDER BY 1`,
+        appDb.usageEvent.groupBy({ by: ['type'], where: { createdAt: { gte: since } }, _sum: { count: true } }),
+        appDb.usageEvent.findMany({
+          where: { type: 'TRANSCRIPTION', sessionId: { not: null }, createdAt: { gte: since } },
+          distinct: ['sessionId'],
+          select: { sessionId: true },
+        }),
+        appDb.usageEvent.groupBy({ by: ['therapistId', 'type'], where: { createdAt: { gte: since } }, _sum: { count: true } }),
+        appDb.usageEvent.groupBy({
           by: ['label'],
           where: { type: 'MODULE_LAUNCH', createdAt: { gte: since }, label: { not: null } },
           _sum: { count: true },
         }),
-        prisma.usageEvent.groupBy({ by: ['label'], where: { type: 'MODULE_LAUNCH', label: { not: null } }, _sum: { count: true } }),
-        prisma.usageEvent.groupBy({
+        appDb.usageEvent.groupBy({ by: ['label'], where: { type: 'MODULE_LAUNCH', label: { not: null } }, _sum: { count: true } }),
+        appDb.usageEvent.groupBy({
           by: ['therapistId'],
           where: { type: 'AI_ANALYSIS', createdAt: { gte: monthStart } },
           _sum: { count: true },
         }),
       ]);
+
+    // Sessions live in the HIPAA database: sum their lengths here.
+    const transcribedSessions = await prisma.session.findMany({
+      where: { id: { in: transcribed.map((t) => t.sessionId!) }, startedAt: { not: null }, endedAt: { not: null } },
+      select: { therapistId: true, startedAt: true, endedAt: true },
+    });
+    let totalMinutes = 0;
+    const minutesOf = new Map<string, number>();
+    for (const s of transcribedSessions) {
+      const m = (s.endedAt!.getTime() - s.startedAt!.getTime()) / 60000;
+      totalMinutes += m;
+      minutesOf.set(s.therapistId, (minutesOf.get(s.therapistId) ?? 0) + m);
+    }
 
     const aiRate = settings['costs.aiAnalysisInr'];
     const minuteRate = settings['costs.transcriptionMinuteInr'];
@@ -87,7 +92,7 @@ export async function GET(request: Request) {
     );
 
     const sumOf = (type: string) => totals.find((t) => t.type === type)?._sum.count ?? 0;
-    const transcriptionMinutes = Math.round(minutesRow[0]?.minutes ?? 0);
+    const transcriptionMinutes = Math.round(totalMinutes);
     const aiAnalyses = sumOf('AI_ANALYSIS');
 
     // Per-therapist totals for the range.
@@ -103,15 +108,16 @@ export async function GET(request: Request) {
       else if (g.type === 'TRANSCRIPTION') r.transcriptSegments += n;
       else if (g.type === 'MODULE_LAUNCH') r.moduleLaunches += n;
     }
-    for (const m of minutesByTherapist) row(m.therapistId).transcriptionMinutes = Math.round(m.minutes ?? 0);
+    for (const [id, minutes] of minutesOf) row(id).transcriptionMinutes = Math.round(minutes);
 
     const overThreshold = monthAnalyses.filter((m) => (m._sum.count ?? 0) > threshold);
     const ids = Array.from(new Set([...byTherapist.keys(), ...overThreshold.map((m) => m.therapistId)]));
-    const therapists = await prisma.profileTherapist.findMany({
+    const therapists = await appDb.profileTherapist.findMany({
       where: { id: { in: ids } },
-      select: { id: true, firstName: true, lastName: true, user: { select: { email: true } } },
+      select: { id: true, firstName: true, lastName: true, userId: true },
     });
-    const who = new Map(therapists.map((t) => [t.id, { name: `${t.firstName} ${t.lastName}`.trim(), email: t.user.email }]));
+    const emails = await usersById(therapists.map((t) => t.userId), { email: true });
+    const who = new Map(therapists.map((t) => [t.id, { name: `${t.firstName} ${t.lastName}`.trim(), email: emails.get(t.userId)?.email ?? null }]));
 
     const topTherapists = Array.from(byTherapist, ([id, r]) => ({
       therapistId: id,

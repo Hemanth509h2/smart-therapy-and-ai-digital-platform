@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { ALL_MODULE_IDS } from '@/lib/modules/modules';
@@ -16,7 +16,7 @@ export async function PATCH(
     if (!auth.ok) return auth.response;
     const { allModulesAllowed, moduleAccess } = await request.json();
 
-    const therapist = await prisma.profileTherapist.findUnique({ where: { id: params.id } });
+    const therapist = await appDb.profileTherapist.findUnique({ where: { id: params.id } });
     if (!therapist) {
       return NextResponse.json({ error: 'Therapist not found' }, { status: 404 });
     }
@@ -26,7 +26,7 @@ export async function PATCH(
       ? moduleAccess.filter((m: string) => ALL_MODULE_IDS.includes(m))
       : [];
 
-    const updated = await prisma.profileTherapist.update({
+    const updated = await appDb.profileTherapist.update({
       where: { id: params.id },
       data: {
         allModulesAllowed: Boolean(allModulesAllowed),

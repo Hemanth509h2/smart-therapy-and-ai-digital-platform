@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { prisma } from '@/lib/core/db';
+import { therapistIdForUser } from '@/lib/core/links';
 import { mintSttToken } from '@/lib/sessions/stt-token';
 import { getSetting } from '@/lib/core/settings';
 
@@ -23,12 +24,12 @@ export async function GET(request: Request) {
     }
 
     // Verify therapist is part of the session
-    const session = await prisma.session.findUnique({
-      where: { id: sessionId },
-      include: { therapist: true },
-    });
+    const [session, therapistId] = await Promise.all([
+      prisma.session.findUnique({ where: { id: sessionId } }),
+      therapistIdForUser(auth.uid),
+    ]);
 
-    if (!session || session.therapist.userId !== auth.uid) {
+    if (!session || session.therapistId !== therapistId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

@@ -1,6 +1,6 @@
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { initializeApp, getApps, getApp, cert } from 'firebase-admin/app'
-import { prisma } from '@/lib/core/db'
+import { appDb, prisma } from '@/lib/core/db'
 import { firebasePrivateKey } from '@/lib/core/firebaseKey'
 
 /**
@@ -64,11 +64,15 @@ export async function provisionSessionDocs(
 ): Promise<ProvisionResult | null> {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
-    include: { therapist: true, client: true },
+    include: { client: true },
   })
   if (!session) return null
+  const therapist = await appDb.profileTherapist.findUnique({
+    where: { id: session.therapistId },
+    select: { userId: true },
+  })
 
-  const allowedUids = [session.therapist.userId, session.client.userId, ...(opts?.extraUids ?? [])].filter(
+  const allowedUids = [therapist?.userId, session.client.userId, ...(opts?.extraUids ?? [])].filter(
     (uid): uid is string => typeof uid === 'string' && uid.length > 0
   )
   if (allowedUids.length === 0) return null

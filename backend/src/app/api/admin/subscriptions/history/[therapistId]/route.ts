@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { appDb, prisma } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { resolveCurrent, serializeSubscription, subscriptionState } from '@/lib/billing/subscriptions';
 
@@ -12,7 +12,7 @@ export async function GET(request: Request, { params }: { params: { therapistId:
     const auth = await requireAdmin(request, 'billing.read');
     if (!auth.ok) return auth.response;
 
-    const therapist = await prisma.profileTherapist.findUnique({
+    const therapist = await appDb.profileTherapist.findUnique({
       where: { id: params.therapistId },
       select: {
         id: true,
@@ -20,12 +20,13 @@ export async function GET(request: Request, { params }: { params: { therapistId:
         lastName: true,
         allModulesAllowed: true,
         moduleAccess: true,
-        user: { select: { email: true } },
+        userId: true,
         subscriptions: { include: { plan: true }, orderBy: { startedAt: 'desc' } },
         subscriptionRequests: { include: { plan: { select: { name: true } } }, orderBy: { createdAt: 'desc' } },
       },
     });
     if (!therapist) return NextResponse.json({ error: 'Professional not found' }, { status: 404 });
+    const user = await prisma.user.findUnique({ where: { id: therapist.userId }, select: { email: true } });
 
     const now = new Date();
     const current = resolveCurrent(therapist.subscriptions, now);
@@ -72,7 +73,7 @@ export async function GET(request: Request, { params }: { params: { therapistId:
       therapist: {
         id: therapist.id,
         name: `${therapist.firstName} ${therapist.lastName}`.trim(),
-        email: therapist.user?.email ?? '',
+        email: user?.email ?? '',
         allModulesAllowed: therapist.allModulesAllowed,
         moduleAccess: therapist.moduleAccess,
         state: subscriptionState(current, therapist.subscriptions[0] ?? null, now),

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { errorResponse } from '@/lib/http/apiError';
 
 // GET /api/plans — list active subscription plans (therapist + admin facing),
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const includeInactive = searchParams.get('all') === '1';
 
-    const plans = await prisma.plan.findMany({
+    const plans = await appDb.plan.findMany({
       where: includeInactive ? {} : { isActive: true },
       orderBy: [{ sortOrder: 'asc' }, { priceMonthly: 'asc' }],
     });

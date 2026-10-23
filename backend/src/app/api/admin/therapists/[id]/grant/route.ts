@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { ALL_MODULE_IDS } from '@/lib/modules/modules';
@@ -19,13 +19,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (!auth.ok) return auth.response;
     const { planId, months, modules } = await request.json();
 
-    const therapist = await prisma.profileTherapist.findUnique({
+    const therapist = await appDb.profileTherapist.findUnique({
       where: { id: params.id },
       select: { id: true, allModulesAllowed: true, moduleAccess: true },
     });
     if (!therapist) return NextResponse.json({ error: 'Therapist not found' }, { status: 404 });
 
-    const plan = planId ? await prisma.plan.findUnique({ where: { id: String(planId) } }) : null;
+    const plan = planId ? await appDb.plan.findUnique({ where: { id: String(planId) } }) : null;
     if (!plan) return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
 
     const months_ = Number(months);
@@ -49,7 +49,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const now = new Date();
     const grantedModules = unlimited ? [] : cleaned;
 
-    const subscription = await prisma.$transaction(async (tx) => {
+    const subscription = await appDb.$transaction(async (tx) => {
       // Supersede any existing active terms.
       await tx.subscription.updateMany({
         where: { therapistId: therapist.id, status: 'ACTIVE' },

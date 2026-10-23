@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
 import { adminAuth } from '@/lib/core/firebaseAdmin';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { errorResponse } from '@/lib/http/apiError';
+import { therapistForUser } from '@/lib/core/links';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,13 +37,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'A valid phone number is required' }, { status: 400 });
       }
       therapistPhone = digits.length === 10 ? `91${digits}` : digits;
-      const taken = await prisma.profileTherapist.findUnique({ where: { phoneNumber: therapistPhone }, select: { id: true } });
+      const taken = await appDb.profileTherapist.findUnique({ where: { phoneNumber: therapistPhone }, select: { id: true } });
       if (taken) {
         return NextResponse.json({ error: 'This phone number is already registered' }, { status: 409 });
       }
     }
 
     // Create user and profile transactionally; claim invite if present.
+    // The therapist profile lives in the app database, so that path is not
+    // atomic: the User is removed again if the profile can't be created.
     const result = await prisma.$transaction(async (tx) => {
       const u = await tx.user.create({
         data: {
@@ -53,16 +56,7 @@ export async function POST(request: Request) {
       });
 
       if (roleEnum === 'THERAPIST') {
-        const profile = await tx.profileTherapist.create({
-          data: {
-            userId: uid,
-            firstName: firstName || 'Therapist',
-            lastName: lastName || '',
-            specialty: specialty || [],
-            phoneNumber: therapistPhone,
-          },
-        });
-        return { user: u, profile, session: null };
+        return { user: u, profile: null, session: null };
       }
 
       const invite = inviteToken
@@ -103,6 +97,24 @@ export async function POST(request: Request) {
       return { user: u, profile, session };
     });
 
+    const profile =
+      roleEnum === 'THERAPIST'
+        ? await appDb.profileTherapist
+            .create({
+              data: {
+                userId: uid,
+                firstName: firstName || 'Therapist',
+                lastName: lastName || '',
+                specialty: specialty || [],
+                phoneNumber: therapistPhone,
+              },
+            })
+            .catch(async (e) => {
+              await prisma.user.delete({ where: { id: uid } }).catch(() => {});
+              throw e;
+            })
+        : result.profile;
+
     // Mirror the role onto the Firebase ID token as a custom claim. Firestore
     // rules cannot read Postgres, so this is the only way `patients/{uid}` can
     // distinguish a therapist from any other signed-in account.
@@ -119,7 +131,7 @@ export async function POST(request: Request) {
       console.error('Failed to set role claim for', uid, e);
     }
 
-    return NextResponse.json({ success: true, user: result.user, profile: result.profile, session: result.session });
+    return NextResponse.json({ success: true, user: result.user, profile, session: result.session });
   } catch (error: any) {
     return errorResponse(error, 'Error creating user profile in PostgreSQL');
   }
@@ -149,7 +161,7 @@ export async function PUT(request: Request) {
           return NextResponse.json({ error: 'A valid phone number is required' }, { status: 400 });
         }
         therapistPhone = digits.length === 10 ? `91${digits}` : digits;
-        const taken = await prisma.profileTherapist.findFirst({
+        const taken = await appDb.profileTherapist.findFirst({
           where: { phoneNumber: therapistPhone, NOT: { userId: uid } },
           select: { id: true },
         });
@@ -158,7 +170,7 @@ export async function PUT(request: Request) {
         }
       }
 
-      const updated = await prisma.profileTherapist.update({
+      const updated = await appDb.profileTherapist.update({
         where: { userId: uid },
         data: {
           ...(firstName !== undefined && { firstName }),
@@ -197,7 +209,8 @@ export async function PUT(request: Request) {
 // DELETE /api/users/profile — permanently remove a user and all their data.
 // Sessions/bookings/notes/invites are not cascade-deleted from the profile, so
 // they are cleared explicitly inside a transaction before the user is removed
-// (deleting the User cascades to the therapist/client profile itself).
+// (deleting the User cascades to the client profile). Therapist/admin profiles
+// live in the app database and are deleted after, so this is not atomic.
 export async function DELETE(request: Request) {
   try {
     // Only the signed-in user may delete their own account. The uid comes
@@ -206,22 +219,31 @@ export async function DELETE(request: Request) {
     if (!auth.ok) return auth.response;
     const uid = auth.uid;
 
-    const user = await prisma.user.findUnique({
-      where: { id: uid },
-      include: { therapist: true, client: true },
-    });
+    const [user, therapist] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: uid },
+        include: { client: true },
+      }),
+      therapistForUser(uid, { id: true }),
+    ]);
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     await prisma.$transaction(async (tx) => {
-      if (user.therapist) {
-        const tId = user.therapist.id;
+      if (therapist) {
+        const tId = therapist.id;
         await tx.therapistNote.deleteMany({ where: { therapistId: tId } });
         await tx.session.deleteMany({ where: { therapistId: tId } });
         await tx.booking.deleteMany({ where: { therapistId: tId } });
         await tx.invite.deleteMany({ where: { therapistId: tId } });
         await tx.documentChunk.deleteMany({ where: { therapistId: tId } });
+        // Used to cascade (or set null) from ProfileTherapist.
+        await tx.whatsAppMessage.deleteMany({ where: { therapistId: tId } });
+        await tx.progressNote.deleteMany({ where: { therapistId: tId } });
+        await tx.progressReport.deleteMany({ where: { therapistId: tId } });
+        await tx.progressMetric.deleteMany({ where: { therapistId: tId } });
+        await tx.profileClient.updateMany({ where: { therapistId: tId }, data: { therapistId: null } });
       }
       if (user.client) {
         const cId = user.client.id;
@@ -229,9 +251,12 @@ export async function DELETE(request: Request) {
         await tx.booking.deleteMany({ where: { clientId: cId } });
         await tx.session.deleteMany({ where: { clientId: cId } });
       }
-      // Removes the User and cascades to the therapist/client profile.
+      // Removes the User and cascades to the client profile.
       await tx.user.delete({ where: { id: uid } });
     });
+    // Patient data is gone by now; the profiles cascade to their app-side rows.
+    await appDb.profileTherapist.deleteMany({ where: { userId: uid } });
+    await appDb.profileAdmin.deleteMany({ where: { userId: uid } });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -248,19 +273,22 @@ export async function GET(request: Request) {
   const uid = auth.uid;
 
   try {
-    const user = await prisma.user.findUnique({
+    const found = await prisma.user.findUnique({
       where: { id: uid },
       include: {
-        therapist: true,
         client: true,
-        admin: true,
       },
     });
 
-    if (!user) {
+    if (!found) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    const [therapist, admin] = await Promise.all([
+      appDb.profileTherapist.findUnique({ where: { userId: uid } }),
+      appDb.profileAdmin.findUnique({ where: { userId: uid } }),
+    ]);
+    const user = { ...found, therapist, admin };
     return NextResponse.json({ user });
   } catch (error: any) {
     return errorResponse(error, 'users/profile GET');

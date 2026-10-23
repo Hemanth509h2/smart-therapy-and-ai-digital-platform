@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { requireAuth } from '@/lib/http/apiAuth'
 import { requireActivePlan } from '@/lib/billing/subscriptions'
-import { prisma } from '@/lib/core/db'
+import { prisma, appDb } from '@/lib/core/db'
 import { sendWhatsAppInvite } from '@/lib/messaging/whatsapp-bot'
 import { errorResponse, logError } from '@/lib/http/apiError'
 
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const therapist = await prisma.profileTherapist.findUnique({
+    const therapist = await appDb.profileTherapist.findUnique({
       where: { id: String(therapistId) },
       select: { userId: true, firstName: true, lastName: true },
     })

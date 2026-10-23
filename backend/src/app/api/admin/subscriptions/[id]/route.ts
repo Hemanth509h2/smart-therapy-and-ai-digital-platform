@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { FREE_TIER_ACCESS, addMonths, resolveCurrent, termAccess } from '@/lib/billing/subscriptions';
@@ -25,12 +25,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (!auth.ok) return auth.response;
     const { action, months } = await request.json();
 
-    const sub = await prisma.subscription.findUnique({ where: { id: params.id }, include: { plan: true } });
+    const sub = await appDb.subscription.findUnique({ where: { id: params.id }, include: { plan: true } });
     if (!sub) return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });
     const target = { type: 'Subscription', id: sub.id };
 
     if (action === 'cancel') {
-      const updated = await prisma.$transaction(async (tx) => {
+      const updated = await appDb.$transaction(async (tx) => {
         const row = await tx.subscription.update({ where: { id: sub.id }, data: { status: 'CANCELLED' } });
         const others = await tx.subscription.findMany({ where: { therapistId: sub.therapistId, status: 'ACTIVE' }, include: { plan: true } });
         if (!resolveCurrent(others)) {
@@ -44,7 +44,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     // Only one term may be current: don't revive an old one alongside it.
     if (action === 'renew' || action === 'reactivate') {
-      const active = await prisma.subscription.findMany({ where: { therapistId: sub.therapistId, status: 'ACTIVE' }, include: { plan: true } });
+      const active = await appDb.subscription.findMany({ where: { therapistId: sub.therapistId, status: 'ACTIVE' }, include: { plan: true } });
       const current = resolveCurrent(active);
       if (current && current.id !== sub.id) {
         return NextResponse.json({ error: 'This professional already has a different current term.' }, { status: 409 });
@@ -56,7 +56,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       const now = new Date();
       // Extend from the later of now / current end so renewals don't lose time.
       const base = sub.currentPeriodEnd.getTime() > now.getTime() ? sub.currentPeriodEnd : now;
-      const updated = await prisma.$transaction(async (tx) => {
+      const updated = await appDb.$transaction(async (tx) => {
         const row = await tx.subscription.update({
           where: { id: sub.id },
           data: {
@@ -79,7 +79,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       if (sub.currentPeriodEnd.getTime() <= Date.now()) {
         return NextResponse.json({ error: 'This term has already ended — renew it instead.' }, { status: 400 });
       }
-      const updated = await prisma.$transaction(async (tx) => {
+      const updated = await appDb.$transaction(async (tx) => {
         const row = await tx.subscription.update({ where: { id: sub.id }, data: { status: 'ACTIVE', cancelledAt: null } });
         await tx.profileTherapist.update({ where: { id: sub.therapistId }, data: termAccess(sub.plan.toolQuota, sub.moduleAccess) });
         return row;

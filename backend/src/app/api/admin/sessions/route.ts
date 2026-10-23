@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { Prisma, type SessionStatus } from '@prisma/client';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { daysAgo, listParams } from '@/lib/admin/adminList';
+import { therapistsById } from '@/lib/core/links';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,15 +39,15 @@ export async function GET(request: Request) {
         orderBy: { startedAt: 'asc' },
         take: 200,
         include: {
-          therapist: { select: { id: true, firstName: true, lastName: true } },
           client: { select: { firstName: true, lastName: true } },
         },
       });
+      const liveTherapists = await therapistsById(live.map((s) => s.therapistId), { firstName: true, lastName: true });
       return NextResponse.json({
         sessions: live.map((s) => ({
           id: s.id,
-          therapistId: s.therapist.id,
-          therapist: therapistName(s.therapist),
+          therapistId: s.therapistId,
+          therapist: therapistName(liveTherapists.get(s.therapistId)),
           client: mask(s.client),
           scheduledAt: s.scheduledAt,
           startedAt: s.startedAt,
@@ -77,10 +78,11 @@ export async function GET(request: Request) {
       const [sessions, ackUsers] = await Promise.all([
         prisma.session.findMany({
           where: { id: { in: sessionIds } },
-          select: { id: true, scheduledAt: true, startedAt: true, therapist: { select: { id: true, firstName: true, lastName: true } } },
+          select: { id: true, scheduledAt: true, startedAt: true, therapistId: true },
         }),
         prisma.user.findMany({ where: { id: { in: ackUids } }, select: { id: true, email: true } }),
       ]);
+      const flagTherapists = await therapistsById(sessions.map((s) => s.therapistId), { firstName: true, lastName: true });
       const byId = new Map(sessions.map((s) => [s.id, s]));
       const emails = new Map(ackUsers.map((u) => [u.id, u.email]));
       return NextResponse.json({
@@ -89,8 +91,8 @@ export async function GET(request: Request) {
           return {
             ...f,
             sessionDate: s?.startedAt ?? s?.scheduledAt ?? null,
-            therapistId: s?.therapist.id ?? f.therapistId,
-            therapist: therapistName(s?.therapist),
+            therapistId: s?.therapistId ?? f.therapistId,
+            therapist: therapistName(s && flagTherapists.get(s.therapistId)),
             acknowledgedByEmail: f.acknowledgedBy ? emails.get(f.acknowledgedBy) ?? null : null,
           };
         }),
@@ -120,7 +122,6 @@ export async function GET(request: Request) {
     };
 
     const include = {
-      therapist: { select: { id: true, firstName: true, lastName: true } },
       client: { select: { firstName: true, lastName: true } },
     } as const;
 
@@ -146,7 +147,7 @@ export async function GET(request: Request) {
       ]);
     }
 
-    const [byStatus, noShow, avg, flagged, therapists] = await Promise.all([
+    const [byStatus, noShow, avg, flagged, therapists, rowTherapists] = await Promise.all([
       prisma.session.groupBy({ by: ['status'], where, _count: { _all: true } }),
       prisma.session.count({ where: { ...where, status: 'SCHEDULED', startedAt: null, scheduledAt: { gte: rangeFrom, lt: rangeTo < now ? rangeTo : now } } }),
       prisma.$queryRaw<{ avg: number | null }[]>(Prisma.sql`
@@ -157,7 +158,8 @@ export async function GET(request: Request) {
           ${therapistId ? Prisma.sql`AND "therapistId" = ${therapistId}` : Prisma.empty}`),
       prisma.riskFlag.findMany({ where: { sessionId: { in: rows.map((r) => r.id) } }, select: { sessionId: true } }),
       // Options for the therapist filter.
-      prisma.profileTherapist.findMany({ select: { id: true, firstName: true, lastName: true }, orderBy: { firstName: 'asc' }, take: 500 }),
+      appDb.profileTherapist.findMany({ select: { id: true, firstName: true, lastName: true }, orderBy: { firstName: 'asc' }, take: 500 }),
+      therapistsById(rows.map((r) => r.therapistId), { firstName: true, lastName: true }),
     ]);
     const count = (s: SessionStatus) => byStatus.find((b) => b.status === s)?._count._all ?? 0;
     const totalInRange = byStatus.reduce((n, b) => n + b._count._all, 0);
@@ -176,8 +178,8 @@ export async function GET(request: Request) {
         startedAt: s.startedAt,
         endedAt: s.endedAt,
         minutes: s.startedAt ? minutesBetween(s.startedAt, s.endedAt ?? (s.status === 'ACTIVE' ? now : s.startedAt)) : null,
-        therapistId: s.therapist.id,
-        therapist: therapistName(s.therapist),
+        therapistId: s.therapistId,
+        therapist: therapistName(rowTherapists.get(s.therapistId)),
         client: mask(s.client),
         riskFlag: flaggedIds.has(s.id),
       })),

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { appDb, prisma } from '@/lib/core/db';
+import { therapistIdForUser } from '@/lib/core/links';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { errorResponse } from '@/lib/http/apiError';
 import { provisionSessionDocs, revokeSessionUid } from '@/lib/sessions/session-provisioning';
@@ -26,7 +27,7 @@ export async function POST(request: Request, { params }: Params) {
 
     const session = await prisma.session.findUnique({
       where: { id: params.sessionId },
-      select: { status: true, therapist: { select: { firstName: true, lastName: true } } },
+      select: { status: true, therapistId: true },
     });
     if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
 
@@ -41,9 +42,13 @@ export async function POST(request: Request, { params }: Params) {
     // is what keeps them listed under "In the call" for the therapist.
     if (entry.status === 'waiting' || entry.status === 'admitted') await touchLobbyEntry(params.sessionId, entry);
 
+    const therapist = await appDb.profileTherapist.findUnique({
+      where: { id: session.therapistId },
+      select: { firstName: true, lastName: true },
+    });
     return NextResponse.json({
       status: entry.status,
-      therapistName: `${session.therapist.firstName} ${session.therapist.lastName}`.trim(),
+      therapistName: therapist ? `${therapist.firstName} ${therapist.lastName}`.trim() : '',
     });
   } catch (error) {
     return errorResponse(error, '[lobby knock]');
@@ -99,11 +104,11 @@ export async function PATCH(request: Request, { params }: Params) {
 async function requireSessionTherapist(request: Request, sessionId: string) {
   const auth = await requireAuth(request);
   if (!auth.ok) return auth;
-  const session = await prisma.session.findUnique({
-    where: { id: sessionId },
-    select: { therapist: { select: { userId: true } } },
-  });
-  if (!session || session.therapist.userId !== auth.uid) {
+  const [session, therapistId] = await Promise.all([
+    prisma.session.findUnique({ where: { id: sessionId }, select: { therapistId: true } }),
+    therapistIdForUser(auth.uid),
+  ]);
+  if (!session || session.therapistId !== therapistId) {
     return { ok: false as const, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
   return auth;

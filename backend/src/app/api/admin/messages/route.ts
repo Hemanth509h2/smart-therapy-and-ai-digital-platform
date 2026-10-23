@@ -3,6 +3,7 @@ import { Prisma, type WhatsAppMessageStatus, type WhatsAppMessageType } from '@p
 import { prisma } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { dateRange, daysAgo, listParams } from '@/lib/admin/adminList';
+import { therapistsById } from '@/lib/core/links';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,8 +44,8 @@ export async function GET(request: Request) {
         skip,
         take,
         include: {
-          session: { select: { scheduledAt: true, therapist: { select: { firstName: true, lastName: true } } } },
-          invite: { select: { therapist: { select: { firstName: true, lastName: true } } } },
+          session: { select: { scheduledAt: true, therapistId: true } },
+          invite: { select: { therapistId: true } },
         },
       }),
       prisma.whatsAppMessage.count({ where }),
@@ -68,11 +69,18 @@ export async function GET(request: Request) {
       return { label: d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }), value: dailyMap.get(d.toISOString().slice(0, 10)) ?? 0 };
     });
 
-    const name = (t?: { firstName: string; lastName: string } | null) => (t ? `${t.firstName} ${t.lastName}`.trim() : null);
+    const therapists = await therapistsById(
+      messages.flatMap((m) => [m.session?.therapistId, m.invite?.therapistId]),
+      { firstName: true, lastName: true }
+    );
+    const name = (id?: string | null) => {
+      const t = id ? therapists.get(id) : undefined;
+      return t ? `${t.firstName} ${t.lastName}`.trim() : null;
+    };
     return NextResponse.json({
       messages: messages.map(({ session, invite, ...m }) => ({
         ...m,
-        therapist: name(session?.therapist) ?? name(invite?.therapist),
+        therapist: name(session?.therapistId) ?? name(invite?.therapistId),
         sessionAt: session?.scheduledAt ?? null,
       })),
       total,

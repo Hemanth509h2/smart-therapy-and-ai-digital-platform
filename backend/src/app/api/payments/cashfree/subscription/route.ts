@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/http/apiAuth';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { cashfreeConfigured, createCashfreeOrder } from '@/lib/billing/cashfree';
 import { cleanPlanModules } from '@/lib/billing/subscriptions';
 import { applyCoupon } from '@/lib/billing/coupons';
@@ -25,13 +25,13 @@ export async function POST(request: Request) {
 
     const { planId, months, modules, customerPhone, returnUrl, couponCode } = await request.json();
 
-    const therapist = await prisma.profileTherapist.findUnique({ where: { userId: auth.uid } });
+    const therapist = await appDb.profileTherapist.findUnique({ where: { userId: auth.uid } });
     if (!therapist) {
       return NextResponse.json({ error: 'Only therapists can buy a plan.' }, { status: 403 });
     }
 
     // A pending admin request doesn't block paying; activation closes it.
-    const plan = planId ? await prisma.plan.findUnique({ where: { id: String(planId) } }) : null;
+    const plan = planId ? await appDb.plan.findUnique({ where: { id: String(planId) } }) : null;
     if (!plan || !plan.isActive) {
       return NextResponse.json({ error: 'Plan not available' }, { status: 404 });
     }

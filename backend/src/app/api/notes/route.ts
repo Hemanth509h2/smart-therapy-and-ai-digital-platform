@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/core/db';
+import { therapistIdForUser } from '@/lib/core/links';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { requireTherapist } from '@/lib/http/progressAuth';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
@@ -7,11 +8,12 @@ import { errorResponse } from '@/lib/http/apiError';
 
 // Session notes belong to the session's therapist; admins may read them too.
 async function mayAccessSession(uid: string, sessionId: string) {
-  const [session, user] = await Promise.all([
-    prisma.session.findUnique({ where: { id: sessionId }, select: { therapist: { select: { userId: true } } } }),
+  const [session, user, therapistId] = await Promise.all([
+    prisma.session.findUnique({ where: { id: sessionId }, select: { therapistId: true } }),
     prisma.user.findUnique({ where: { id: uid }, select: { role: true } }),
+    therapistIdForUser(uid),
   ]);
-  return session?.therapist.userId === uid || user?.role === 'ADMIN';
+  return (!!session && session.therapistId === therapistId) || user?.role === 'ADMIN';
 }
 
 export const dynamic = 'force-dynamic';
@@ -62,9 +64,9 @@ export async function POST(request: Request) {
     const { sessionId, therapistId, content, isPrivate } = await request.json();
     // Only the session's own therapist may write its notes.
     const session = sessionId
-      ? await prisma.session.findUnique({ where: { id: sessionId }, select: { therapistId: true, therapist: { select: { userId: true } } } })
+      ? await prisma.session.findUnique({ where: { id: sessionId }, select: { therapistId: true } })
       : null;
-    if (!session || session.therapistId !== therapistId || session.therapist.userId !== auth.uid) {
+    if (!session || session.therapistId !== therapistId || session.therapistId !== (await therapistIdForUser(auth.uid))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     if (typeof therapistId === 'string') {

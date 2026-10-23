@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { prisma, appDb } from '@/lib/core/db';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { errorResponse } from '@/lib/http/apiError';
 
 // The caller must own the therapist profile or be an ADMIN.
 async function mayAccessTherapist(uid: string, therapistId: string) {
   const [therapist, user] = await Promise.all([
-    prisma.profileTherapist.findUnique({ where: { id: therapistId }, select: { userId: true } }),
+    appDb.profileTherapist.findUnique({ where: { id: therapistId }, select: { userId: true } }),
     prisma.user.findUnique({ where: { id: uid }, select: { role: true } }),
   ]);
   return therapist?.userId === uid || user?.role === 'ADMIN';
@@ -31,13 +31,13 @@ export async function POST(request: Request) {
     }
 
     // Ignore unknown therapists rather than erroring (logging must never break UX).
-    const therapist = await prisma.profileTherapist.findUnique({ where: { id: therapistId }, select: { id: true } });
+    const therapist = await appDb.profileTherapist.findUnique({ where: { id: therapistId }, select: { id: true } });
     if (!therapist) {
       return NextResponse.json({ ok: false });
     }
 
     const n = Number(count);
-    await prisma.usageEvent.create({
+    await appDb.usageEvent.create({
       data: {
         therapistId,
         type,

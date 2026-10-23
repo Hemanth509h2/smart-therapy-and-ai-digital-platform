@@ -1,0 +1,289 @@
+// App database (free Neon account, DATABASE_URL): therapist, admin, billing,
+// settings and module data. No patient data may be stored here; patient tables
+// live in the HIPAA database (prisma/schema.prisma). Links to it are plain id
+// columns (userId, therapistId, sessionId) with no foreign key.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+  output          = "../../node_modules/.prisma/app-client"
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+enum AdminRole {
+  SUPER_ADMIN // everything, including managing admins
+  BILLING // plans and subscriptions (payments live on the payment branch)
+  SUPPORT // read-only on people + support inbox + messages
+  CONTENT // module library + settings
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum SubRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum CouponType {
+  PERCENT // discountValue is a percentage (1-99)
+  FLAT // discountValue is rupees off the whole order
+}
+
+model ProfileTherapist {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  firstName         String
+  lastName          String
+  specialty         String[] // SLD, ADHD, Anxiety, Depression, ID, Dyslexia, Autism etc.
+  qualification     String?
+  experience        String?
+  bio               String?
+  phoneNumber       String?  @unique // E.164 format; used for WhatsApp notifications
+  // Per-therapist module/tool access. When allModulesAllowed is true the
+  // therapist may launch any module; otherwise only those listed in moduleAccess.
+  allModulesAllowed Boolean  @default(true)
+  moduleAccess      String[] @default([])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  usageEvents          UsageEvent[]
+  subscriptions        Subscription[]
+  subscriptionRequests SubscriptionRequest[]
+}
+
+model ProfileAdmin {
+  id        String    @id @default(uuid())
+  userId    String    @unique
+  firstName String    @default("Admin")
+  lastName  String    @default("")
+  // What this admin may do; see ADMIN_PERMISSIONS in lib/adminRoles.ts.
+  adminRole AdminRole @default(SUPER_ADMIN)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// Subscription plan catalog. Admin-managed. Payments are out of scope, so
+// priceMonthly is display-only. `toolQuota` caps how many therapy tools a plan
+// grants (null = all tools / unlimited).
+model Plan {
+  id                   String   @id @default(uuid())
+  name                 String   @unique
+  description          String?
+  priceMonthly         Int      @default(0) // INR per month; charged via Cashfree (0 = free, request-only)
+  durationMonths       Int      @default(1) // suggested default term length
+  toolQuota            Int? // null = unlimited (all tools); else max tools allowed
+  isActive             Boolean  @default(true)
+  sortOrder            Int      @default(0)
+  // Bullet points shown on the therapist /plans card (empty = built-in list).
+  features             String[] @default([])
+  // Usage limits per plan; null = unlimited. Documented in docx/PLANS.md.
+  maxClients           Int? // active clients at once
+  maxSessionsPerMonth  Int? // video sessions per calendar month
+  maxAiReportsPerMonth Int? // AI session analyses per calendar month
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  subscriptions Subscription[]
+  requests      SubscriptionRequest[]
+}
+
+// A therapist's active/historical subscription term. The current subscription is
+// the most recent ACTIVE row whose currentPeriodEnd is in the future; absence of
+// one means the therapist is on the free tier.
+model Subscription {
+  id               String             @id @default(uuid())
+  therapistId      String
+  therapist        ProfileTherapist   @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  planId           String
+  plan             Plan               @relation(fields: [planId], references: [id])
+  status           SubscriptionStatus @default(ACTIVE)
+  months           Int                @default(1)
+  startedAt        DateTime           @default(now())
+  currentPeriodEnd DateTime
+  renewedAt        DateTime?
+  renewalCount     Int                @default(0)
+  // Set when the therapist cancels. Status stays ACTIVE and access continues
+  // until currentPeriodEnd (already paid for); the term just won't be renewed.
+  cancelledAt      DateTime?
+  moduleAccess     String[]           @default([]) // tools granted by this term
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([therapistId])
+  @@index([status])
+}
+
+// A therapist's request to take/upgrade a plan, pending admin approval. Carries
+// the chosen plan, desired term length, and the specific tools requested (capped
+// by the plan's toolQuota). Approval creates a Subscription and applies access.
+model SubscriptionRequest {
+  id          String           @id @default(uuid())
+  therapistId String
+  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  planId      String
+  plan        Plan             @relation(fields: [planId], references: [id])
+  months      Int              @default(1)
+  modules     String[]         @default([])
+  status      SubRequestStatus @default(PENDING)
+  note        String?
+  reviewedAt  DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@index([therapistId])
+  @@index([status])
+}
+
+// One row per Cashfree order. `orderStatus` mirrors Cashfree's order_status
+// (ACTIVE, PAID, EXPIRED, TERMINATED, ...) and is only ever written from a
+// server-side Get Order call, never from what the browser reports.
+model Payment {
+  id             String    @id // Cashfree order_id
+  userId         String // Firebase Auth UID of the payer
+  amount         Decimal   @db.Decimal(12, 2)
+  currency       String    @default("INR")
+  orderStatus    String    @default("ACTIVE")
+  environment    String // sandbox | production
+  cfPaymentId    String?
+  paymentStatus  String? // SUCCESS | FAILED | USER_DROPPED | ... (latest attempt)
+  paymentMethod  String?
+  paymentMessage String?
+  paidAt         DateTime?
+  lastWebhookAt  DateTime?
+  // What the payment buys: a plan for a therapist. Null for /payment-test orders.
+  planId         String?
+  therapistId    String?
+  months         Int?
+  modules        String[]  @default([])
+  // Set when the paid plan is activated; the unique claim on this column is
+  // what stops duplicate webhooks from activating the same payment twice.
+  subscriptionId String?   @unique
+  // Coupon applied at checkout; `amount` is already net of `discount`.
+  couponId       String?
+  coupon         Coupon?   @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  couponCode     String?
+  discount       Decimal?  @db.Decimal(12, 2)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([orderStatus])
+  @@index([therapistId])
+  @@index([couponId])
+}
+
+// Discount codes for paid plan checkout. Admin-managed. A redemption is a
+// PAID Payment carrying the coupon; limits count those, never pending orders.
+model Coupon {
+  id               String     @id @default(uuid())
+  code             String     @unique // stored upper-case
+  description      String?
+  type             CouponType @default(PERCENT)
+  discountValue    Int
+  planIds          String[]   @default([]) // empty = every paid plan
+  minMonths        Int        @default(1) // shortest term the code works for
+  maxRedemptions   Int? // null = unlimited
+  oncePerTherapist Boolean    @default(true)
+  startsAt         DateTime?
+  expiresAt        DateTime?
+  isActive         Boolean    @default(true)
+  createdBy        String? // admin uid
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  payments Payment[]
+
+  @@index([isActive])
+}
+
+// Lightweight resource-usage log for the admin dashboard.
+// type: AI_ANALYSIS | TRANSCRIPTION | MODULE_LAUNCH
+model UsageEvent {
+  id          String           @id @default(uuid())
+  therapistId String
+  therapist   ProfileTherapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  sessionId   String?
+  type        String
+  label       String?
+  count       Int              @default(1)
+  createdAt   DateTime         @default(now())
+
+  @@index([therapistId])
+  @@index([type])
+}
+
+// Admin-editable app settings (feature flags, retention, contact details).
+model Setting {
+  key       String   @id
+  value     Json
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+// Per-module overrides for the built-in library in lib/modules.ts.
+model ModuleSetting {
+  moduleId  String   @id
+  enabled   Boolean  @default(true)
+  featured  Boolean  @default(false)
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+// Result of each scheduled job run, shown on the System health page.
+model CronRun {
+  id         String    @id @default(uuid())
+  job        String
+  ok         Boolean
+  detail     Json?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([job, startedAt])
+}
+
+model AdminInvite {
+  id         String    @id @default(uuid())
+  email      String
+  adminRole  AdminRole @default(SUPPORT)
+  token      String    @unique
+  invitedBy  String // admin uid
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email])
+}
+
+// STAAD therapy-module reports for RAG, one row per report section. Filled by
+// scripts/ingest-module-reports.ts. Embeddings are
+// nvidia/llama-nemotron-embed-vl-1b-v2 at 1024 dimensions (not document_chunks'
+// retired nv-embedqa-e5-v5), so queries must use that model too. The HNSW index
+// on embedding is created by the script; Prisma can't declare it.
+model ModuleReportChunk {
+  id            String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  moduleName    String                      @map("module_name")
+  category      String
+  fileName      String                      @map("file_name")
+  sectionNumber Int                         @map("section_number")
+  sectionTitle  String                      @map("section_title")
+  chunkIndex    Int                         @map("chunk_index")
+  chunkText     String                      @map("chunk_text")
+  embedding     Unsupported("vector(1024)")
+  metadata      Json                        @default("{}")
+  createdAt     DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([fileName, chunkIndex], map: "module_report_chunks_file_chunk_key")
+  @@index([category], map: "module_report_chunks_category_idx")
+  @@index([moduleName], map: "module_report_chunks_module_name_idx")
+  @@map("module_report_chunks")
+}

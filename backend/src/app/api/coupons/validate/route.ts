@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/http/apiAuth';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { applyCoupon } from '@/lib/billing/coupons';
 import { errorResponse } from '@/lib/http/apiError';
 
@@ -15,9 +15,9 @@ export async function POST(request: Request) {
     if (!auth.ok) return auth.response;
     const { code, planId, months } = await request.json();
 
-    const therapist = await prisma.profileTherapist.findUnique({ where: { userId: auth.uid } });
+    const therapist = await appDb.profileTherapist.findUnique({ where: { userId: auth.uid } });
     if (!therapist) return NextResponse.json({ error: 'Only therapists can use coupons.' }, { status: 403 });
-    const plan = planId ? await prisma.plan.findUnique({ where: { id: String(planId) } }) : null;
+    const plan = planId ? await appDb.plan.findUnique({ where: { id: String(planId) } }) : null;
     if (!plan || !plan.isActive || plan.priceMonthly <= 0) {
       return NextResponse.json({ error: 'Coupons only apply to paid plans.' }, { status: 400 });
     }

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/core/db';
+import { appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { SETTING_DEFAULTS, coerceSetting, isSettingKey, type SettingKey } from '@/lib/core/settings';
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const auth = await requireAdmin(request, 'settings');
     if (!auth.ok) return auth.response;
 
-    const rows = await prisma.setting.findMany();
+    const rows = await appDb.setting.findMany();
     const byKey = new Map(rows.map((r) => [r.key, r]));
     const settings = (Object.keys(SETTING_DEFAULTS) as SettingKey[]).map((key) => {
       const row = byKey.get(key);
@@ -59,14 +59,14 @@ export async function PATCH(request: Request) {
     }
     if (!updates.length) return NextResponse.json({ error: 'Nothing to change.' }, { status: 400 });
 
-    const existing = await prisma.setting.findMany({ where: { key: { in: updates.map((u) => u.key) } } });
+    const existing = await appDb.setting.findMany({ where: { key: { in: updates.map((u) => u.key) } } });
     const before = new Map(existing.map((r) => [r.key, r.value]));
     const changed = updates.filter((u) => JSON.stringify(before.get(u.key) ?? SETTING_DEFAULTS[u.key]) !== JSON.stringify(u.value));
 
     const updatedBy = auth.email || auth.uid;
-    await prisma.$transaction(
+    await appDb.$transaction(
       changed.map((u) =>
-        prisma.setting.upsert({
+        appDb.setting.upsert({
           where: { key: u.key },
           create: { key: u.key, value: u.value, updatedBy },
           update: { value: u.value, updatedBy },
