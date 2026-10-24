@@ -12,17 +12,17 @@ export interface TranslationLanguage {
   code: string
   label: string
   native: string
-  /** False means IndicConformer cannot transcribe speech in this language. */
+  /** False means live STT (Sarvam saaras) cannot transcribe speech in this language. */
   sttSupported: boolean
 }
 
 /**
- * English is offered because it is a valid language to READ captions in.
- * Speaking it is the unreliable case: IndicConformer is trained on the 22
- * scheduled Indic languages and English is not one of them.
+ * Every language here can be spoken: live STT is Sarvam saaras (see
+ * frontend/src/lib/stt/sarvam.ts), which auto-detects English and the
+ * scheduled Indic languages.
  */
 export const TRANSLATION_LANGUAGES: TranslationLanguage[] = [
-  { code: 'en', label: 'English', native: 'English', sttSupported: false },
+  { code: 'en', label: 'English', native: 'English', sttSupported: true },
   { code: 'hi', label: 'Hindi', native: 'हिंदी', sttSupported: true },
   { code: 'ta', label: 'Tamil', native: 'தமிழ்', sttSupported: true },
   { code: 'te', label: 'Telugu', native: 'తెలుగు', sttSupported: true },

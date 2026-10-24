@@ -26,8 +26,7 @@ export default function TranslationControl({
   settings: TranslationSettings
   onChange: (patch: Partial<TranslationSettings>) => void
 }) {
-  // IndicConformer covers the 22 scheduled Indic languages; English is not one
-  // of them. Speaking English still produces captions, but unreliable ones.
+  // Flags a speaker set to a language live STT cannot transcribe (none today).
   const unsupportedSpeakers = [
     settings.therapist && !sttSupported(settings.therapist) ? 'You' : null,
     settings.client && !sttSupported(settings.client) ? 'Client' : null,
