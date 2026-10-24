@@ -29,13 +29,15 @@ enum SubscriptionStatus {
 }
 
 enum SubRequestStatus {
-  PENDING
-  APPROVED
+  PENDING // waiting for an admin
+  AWAITING_PAYMENT // approved by an admin; the plan starts once the therapist pays
+  APPROVED // plan started
   REJECTED
+  CANCELLED // withdrawn by the therapist
 }
 
 enum CouponType {
-  PERCENT // discountValue is a percentage (1-99)
+  PERCENT // discountValue is a percentage (1-100)
   FLAT // discountValue is rupees off the whole order
 }
 
@@ -136,11 +138,21 @@ model SubscriptionRequest {
   modules     String[]         @default([])
   status      SubRequestStatus @default(PENDING)
   note        String?
+  // Coupon entered with the request and the price in INR: set when requested,
+  // re-priced and fixed when an admin approves (what the therapist then pays).
+  // Null on requests made before coupons could be requested.
+  couponId    String?
+  coupon      Coupon?          @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  couponCode  String?
+  subtotal    Int?
+  discount    Int?
+  total       Int?
   reviewedAt  DateTime?
   createdAt   DateTime         @default(now())
 
   @@index([therapistId])
   @@index([status])
+  @@index([couponId])
 }
 
 // One row per Cashfree order. `orderStatus` mirrors Cashfree's order_status
@@ -164,6 +176,8 @@ model Payment {
   therapistId    String?
   months         Int?
   modules        String[]  @default([])
+  // The approved request this pays for (approval-before-payment flow).
+  requestId      String?
   // Set when the paid plan is activated; the unique claim on this column is
   // what stops duplicate webhooks from activating the same payment twice.
   subscriptionId String?   @unique
@@ -179,6 +193,7 @@ model Payment {
   @@index([orderStatus])
   @@index([therapistId])
   @@index([couponId])
+  @@index([requestId])
 }
 
 // Discount codes for paid plan checkout. Admin-managed. A redemption is a
@@ -201,6 +216,7 @@ model Coupon {
   updatedAt        DateTime   @updatedAt
 
   payments Payment[]
+  requests SubscriptionRequest[]
 
   @@index([isActive])
 }

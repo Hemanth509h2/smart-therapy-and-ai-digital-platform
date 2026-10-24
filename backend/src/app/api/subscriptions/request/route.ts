@@ -3,6 +3,7 @@ import { prisma, appDb } from '@/lib/core/db';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules/modules';
 import { errorResponse } from '@/lib/http/apiError';
+import { pricePurchase } from '@/lib/billing/purchase';
 
 // The caller must own the therapist profile or be an ADMIN.
 async function mayAccessTherapist(uid: string, therapistId: string) {
@@ -14,15 +15,16 @@ async function mayAccessTherapist(uid: string, therapistId: string) {
 }
 
 // POST /api/subscriptions/request — a therapist requests a plan (pending admin
-// approval). Body: { therapistId, planId, months?, modules?, note? }
+// approval). Body: { therapistId, planId, months?, modules?, note?, couponCode? }
 // `modules` are the specific tools the therapist wants; capped by the plan's
-// toolQuota (ignored for unlimited plans).
+// toolQuota (ignored for unlimited plans). The price (with any coupon) is
+// stored for the admin to see; approval re-prices it and fixes what is paid.
 export async function POST(request: Request) {
   try {
     const auth = await requireAuth(request);
     if (!auth.ok) return auth.response;
 
-    const { therapistId, planId, months, modules, note } = await request.json();
+    const { therapistId, planId, months, modules, note, couponCode } = await request.json();
 
     if (!therapistId || !planId) {
       return NextResponse.json({ error: 'therapistId and planId are required' }, { status: 400 });
@@ -34,7 +36,7 @@ export async function POST(request: Request) {
     const [therapist, plan, existingPending] = await Promise.all([
       appDb.profileTherapist.findUnique({ where: { id: therapistId } }),
       appDb.plan.findUnique({ where: { id: planId } }),
-      appDb.subscriptionRequest.findFirst({ where: { therapistId, status: 'PENDING' } }),
+      appDb.subscriptionRequest.findFirst({ where: { therapistId, status: { in: ['PENDING', 'AWAITING_PAYMENT'] } } }),
     ]);
 
     if (!therapist) return NextResponse.json({ error: 'Therapist not found' }, { status: 404 });
@@ -43,7 +45,12 @@ export async function POST(request: Request) {
     }
     if (existingPending) {
       return NextResponse.json(
-        { error: 'You already have a pending request awaiting admin approval.' },
+        {
+          error:
+            existingPending.status === 'AWAITING_PAYMENT'
+              ? 'You have an approved plan waiting for payment. Pay for it or withdraw it first.'
+              : 'You already have a pending request awaiting admin approval.',
+        },
         { status: 409 }
       );
     }
@@ -68,6 +75,10 @@ export async function POST(request: Request) {
 
     const months_ = Math.max(1, Math.min(36, Number(months) || plan.durationMonths || 1));
 
+    const price = await pricePurchase({ plan, months: months_, therapistId, couponCode });
+    if (!price.ok) return NextResponse.json({ error: price.error }, { status: 400 });
+    const { priced } = price;
+
     const created = await appDb.subscriptionRequest.create({
       data: {
         therapistId,
@@ -75,6 +86,11 @@ export async function POST(request: Request) {
         months: months_,
         modules: plan.toolQuota == null ? [] : cleaned,
         note: note?.trim() || null,
+        couponId: priced.coupon?.couponId ?? null,
+        couponCode: priced.coupon?.couponCode ?? null,
+        subtotal: priced.subtotal,
+        discount: priced.discount,
+        total: priced.total,
       },
     });
 

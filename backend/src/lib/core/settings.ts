@@ -6,6 +6,9 @@ export const SETTING_DEFAULTS = {
   'features.aiInsights': true,
   'features.transcription': true,
   'features.whatsapp': true,
+  // Therapists request a plan (with any coupon), an admin approves it, then
+  // they pay. Off: they pay at once. A ₹0 total never goes to Cashfree.
+  'billing.approvalBeforePayment': true,
   'retention.transcriptHours': 24,
   'support.email': 'om.cofounder@staad.in',
   // INR cost estimates for the Usage page.

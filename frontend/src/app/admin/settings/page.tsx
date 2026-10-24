@@ -36,6 +36,17 @@ const GROUPS: { title: string; description: string; fields: { key: string; label
     ],
   },
   {
+    title: 'Billing',
+    description: 'How professionals get a paid plan.',
+    fields: [
+      {
+        key: 'billing.approvalBeforePayment',
+        label: 'Admin approves plans before payment',
+        hint: 'On: professionals request a plan (with any coupon), you approve it on Subscriptions, then they pay. Off: they pay straight away. A ₹0 total never goes to Cashfree.',
+      },
+    ],
+  },
+  {
     title: 'Data retention',
     description: 'How long session data is kept.',
     fields: [{ key: 'retention.transcriptHours', label: 'Delete live transcripts after', unit: 'hours', hint: 'The cleanup job runs once a day, so data may live up to a day longer.' }],

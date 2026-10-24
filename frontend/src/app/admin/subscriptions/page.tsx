@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Check, Download, Inbox, RefreshCw, X } from 'lucide-react';
+import { Check, CreditCard, Download, Inbox, RefreshCw, X } from 'lucide-react';
 import {
-  AdminPage, Badge, Btn, Card, ConfirmDialog, DataTable, EmptyState, ErrorBanner, Field, Modal, Pagination,
+  AdminPage, Badge, Btn, Card, Checkbox, ConfirmDialog, DataTable, EmptyState, ErrorBanner, Field, Modal, Pagination,
   SearchInput, Section, Select, Spinner, Toolbar, useAdmin, useAdminQuery, useListState, type Column, type Tone,
 } from '@/components/admin/kit';
-import { adminFetch, downloadCsv, fetchAllPages, fmtDate, fmtDateTime } from '@/lib/adminApi';
+import { adminFetch, downloadCsv, fetchAllPages, fmtDate, fmtDateTime, inr } from '@/lib/adminApi';
 import { MODULE_CATEGORIES, moduleName } from '@/lib/modules';
 import { toast } from '@/components/practice/ui';
 
@@ -44,7 +44,14 @@ interface PlanRequest {
   months: number;
   modules: string[];
   note: string | null;
+  status: 'PENDING' | 'AWAITING_PAYMENT';
+  priceMonthly: number;
+  couponCode: string | null;
+  subtotal: number;
+  discount: number;
+  total: number;
   createdAt: string;
+  reviewedAt: string | null;
 }
 interface History {
   therapist: { name: string; email: string; state: State; allModulesAllowed: boolean; moduleAccess: string[] };
@@ -88,7 +95,8 @@ export default function AdminSubscriptionsPage() {
   const [busy, setBusy] = useState('');
   const [exporting, setExporting] = useState(false);
 
-  const requests = data?.requests ?? [];
+  const requests = (data?.requests ?? []).filter((r) => r.status === 'PENDING');
+  const awaitingPayment = (data?.requests ?? []).filter((r) => r.status === 'AWAITING_PAYMENT');
   const pros = data?.professionals ?? [];
 
   const reactivate = async (term: Term) => {
@@ -240,7 +248,7 @@ export default function AdminSubscriptionsPage() {
 
       <Section
         title={<span className="inline-flex items-center gap-2"><Inbox className="h-5 w-5" /> Pending requests {requests.length > 0 && <Badge tone="info">{requests.length}</Badge>}</span>}
-        description="Plans are requested by professionals and take effect when approved here."
+        description="Professionals request a plan, with any coupon. Approving a ₹0 total starts the plan; otherwise they pay, and it starts once paid."
       >
         {loading && !data ? (
           <div className="flex justify-center py-8"><Spinner /></div>
@@ -260,6 +268,7 @@ export default function AdminSubscriptionsPage() {
                 <p className="mt-3 text-xs" style={{ color: 'var(--ink-muted)' }}>
                   Tools: {r.toolQuota == null ? 'All (unlimited plan)' : r.modules.map(moduleName).join(', ') || '—'}
                 </p>
+                <RequestPrice r={r} />
                 {r.note && <p className="mt-1 text-xs italic" style={{ color: 'var(--ink-muted)' }}>&ldquo;{r.note}&rdquo;</p>}
                 <p className="mt-2 text-[11px]" style={{ color: 'var(--ink-muted)' }}>Requested {fmtDateTime(r.createdAt)}</p>
                 {canWrite && (
@@ -273,6 +282,36 @@ export default function AdminSubscriptionsPage() {
           </div>
         )}
       </Section>
+
+      {awaitingPayment.length > 0 && (
+        <Section
+          title={<span className="inline-flex items-center gap-2"><CreditCard className="h-5 w-5" /> Approved — waiting for payment <Badge tone="warn">{awaitingPayment.length}</Badge></span>}
+          description="The plan starts as soon as the professional pays. Revoke an approval to stop them paying."
+        >
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {awaitingPayment.map((r) => (
+              <Card key={r.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{r.therapistName || 'Unnamed'}</p>
+                    <p className="truncate text-xs" style={{ color: 'var(--ink-muted)' }}>{r.email}</p>
+                  </div>
+                  <Badge tone="warn">{r.planName} · {r.months} mo</Badge>
+                </div>
+                <RequestPrice r={r} />
+                <p className="mt-2 text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                  Requested {fmtDateTime(r.createdAt)} · approved {fmtDateTime(r.reviewedAt)}
+                </p>
+                {canWrite && (
+                  <div className="mt-4 flex justify-end">
+                    <Btn variant="danger" size="sm" icon={<X className="h-3.5 w-3.5" />} onClick={() => setRejecting(r)}>Revoke approval</Btn>
+                  </div>
+                )}
+              </Card>
+            ))}
+          </div>
+        </Section>
+      )}
 
       <Section title="Professionals" description="Click a row to see that professional's subscription history.">
         <Toolbar>
@@ -311,13 +350,19 @@ export default function AdminSubscriptionsPage() {
       <ConfirmDialog
         open={!!rejecting}
         onClose={() => setRejecting(null)}
-        title="Reject request?"
-        body={rejecting ? `${rejecting.therapistName || 'This professional'} asked for ${rejecting.planName} (${rejecting.months} mo). They can request again later.` : ''}
-        confirmLabel="Reject"
+        title={rejecting?.status === 'AWAITING_PAYMENT' ? 'Revoke approval?' : 'Reject request?'}
+        body={
+          rejecting
+            ? rejecting.status === 'AWAITING_PAYMENT'
+              ? `${rejecting.therapistName || 'This professional'} will no longer be able to pay for ${rejecting.planName} (${rejecting.months} mo, ${inr(rejecting.total)}). A payment they already started still activates the plan if it completes.`
+              : `${rejecting.therapistName || 'This professional'} asked for ${rejecting.planName} (${rejecting.months} mo). They can request again later.`
+            : ''
+        }
+        confirmLabel={rejecting?.status === 'AWAITING_PAYMENT' ? 'Revoke' : 'Reject'}
         danger
         onConfirm={async () => {
           await adminFetch(`/api/admin/subscriptions/requests/${rejecting!.id}`, { method: 'POST', json: { action: 'reject' } });
-          toast('Request rejected');
+          toast(rejecting!.status === 'AWAITING_PAYMENT' ? 'Approval revoked' : 'Request rejected');
           reload();
         }}
       />
@@ -343,11 +388,27 @@ export default function AdminSubscriptionsPage() {
   );
 }
 
+function RequestPrice({ r }: { r: PlanRequest }) {
+  return (
+    <p className="mt-1 text-xs" style={{ color: 'var(--ink)' }}>
+      {r.couponCode ? (
+        <>
+          <s style={{ color: 'var(--ink-muted)' }}>{inr(r.subtotal)}</s> <b>{r.total === 0 ? '₹0' : inr(r.total)}</b> with coupon <b>{r.couponCode}</b>
+        </>
+      ) : (
+        <b>{r.total === 0 ? 'Free' : inr(r.total)}</b>
+      )}
+      {r.total === 0 && <span style={{ color: 'var(--ink-muted)' }}> · no payment needed</span>}
+    </p>
+  );
+}
+
 // ─── Approve: confirm the term length and (for capped plans) the tools ───────
 
 function ApproveModal({ request, onClose, onDone }: { request: PlanRequest | null; onClose: () => void; onDone: () => void }) {
   const [months, setMonths] = useState('1');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [removeCoupon, setRemoveCoupon] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -355,8 +416,16 @@ function ApproveModal({ request, onClose, onDone }: { request: PlanRequest | nul
     if (!request) return;
     setMonths(String(request.months));
     setSelected(new Set(request.modules));
+    setRemoveCoupon(false);
     setError('');
   }, [request]);
+
+  // The requested price; the server re-prices on approval (a different term
+  // changes the coupon discount too).
+  const termChanged = !!request && Number(months) !== request.months;
+  const subtotal = request ? request.priceMonthly * Number(months) : 0;
+  const withCoupon = !!request?.couponCode && !removeCoupon;
+  const total = !request ? 0 : !withCoupon ? subtotal : termChanged ? null : request.total;
 
   const quota = request?.toolQuota ?? null;
   const toggle = (id: string) =>
@@ -373,11 +442,11 @@ function ApproveModal({ request, onClose, onDone }: { request: PlanRequest | nul
     setSaving(true);
     setError('');
     try {
-      await adminFetch(`/api/admin/subscriptions/requests/${request.id}`, {
+      const res = await adminFetch<{ status: string; total: number }>(`/api/admin/subscriptions/requests/${request.id}`, {
         method: 'POST',
-        json: { action: 'approve', months: Number(months), modules: Array.from(selected) },
+        json: { action: 'approve', months: Number(months), modules: Array.from(selected), removeCoupon },
       });
-      toast('Request approved');
+      toast(res.status === 'APPROVED' ? 'Approved — the plan is active (nothing to pay).' : `Approved — waiting for them to pay ${inr(res.total)}.`);
       onClose();
       onDone();
     } catch (e: any) {
@@ -395,17 +464,41 @@ function ApproveModal({ request, onClose, onDone }: { request: PlanRequest | nul
       onClose={onClose}
       wide
       title="Approve request"
-      description={request ? `${request.therapistName} · ${request.planName}. Confirm the term and the tools to grant — this sets their in-session access and replaces any current term.` : ''}
+      description={
+        request
+          ? `${request.therapistName} · ${request.planName}. Confirm the term and the tools. With nothing to pay the plan starts now and replaces any current term; otherwise it starts once they pay.`
+          : ''
+      }
       footer={
         <>
           <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
-          <Btn onClick={approve} loading={saving}>Approve &amp; grant</Btn>
+          <Btn onClick={approve} loading={saving}>
+            {total === 0 ? 'Approve & activate' : total == null ? 'Approve' : `Approve — they pay ${inr(total)}`}
+          </Btn>
         </>
       }
     >
       <Field label="Term">
         <Select ariaLabel="Term" value={months} onChange={setMonths} options={monthOptions} />
       </Field>
+      {request && (
+        <div className="space-y-2 rounded-lg p-3 text-sm" style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--ink)' }}>
+          <div className="flex justify-between"><span style={{ color: 'var(--ink-muted)' }}>{inr(request.priceMonthly)} × {months} mo</span><span>{inr(subtotal)}</span></div>
+          {request.couponCode && (
+            <>
+              <div className="flex justify-between" style={{ opacity: removeCoupon ? 0.45 : 1 }}>
+                <span style={{ color: 'var(--ink-muted)' }}>Coupon {request.couponCode}</span>
+                <span>{termChanged ? 'recalculated on approval' : `−${inr(request.discount)}`}</span>
+              </div>
+              <Checkbox checked={removeCoupon} onChange={setRemoveCoupon} label="Approve without the coupon" />
+            </>
+          )}
+          <div className="flex justify-between font-semibold">
+            <span>They pay</span>
+            <span>{total == null ? 'calculated on approval' : total === 0 ? '₹0 — no payment needed' : inr(total)}</span>
+          </div>
+        </div>
+      )}
       {quota == null ? (
         <p className="rounded-lg p-3 text-sm font-medium" style={{ background: 'var(--sage-light)', color: 'var(--ink)' }}>
           This is an unlimited plan — approving grants access to all tools.
@@ -510,6 +603,7 @@ const EVENT_TONE: Record<string, Tone> = {
   request: 'info',
   approved: 'good',
   rejected: 'bad',
+  withdrawn: 'neutral',
   term: 'good',
   renewed: 'good',
   cancelled: 'bad',
@@ -519,6 +613,7 @@ const EVENT_LABEL: Record<string, string> = {
   request: 'Request',
   approved: 'Approved',
   rejected: 'Rejected',
+  withdrawn: 'Withdrawn',
   term: 'Started',
   renewed: 'Renewed',
   cancelled: 'Cancelled',

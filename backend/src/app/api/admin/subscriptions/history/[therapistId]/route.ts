@@ -5,6 +5,15 @@ import { resolveCurrent, serializeSubscription, subscriptionState } from '@/lib/
 
 export const dynamic = 'force-dynamic';
 
+// How a closed request shows in the timeline. A paid request moves from
+// AWAITING_PAYMENT to APPROVED, so its approval time is when it was approved.
+const REVIEWED: Record<string, { kind: string; title: string }> = {
+  AWAITING_PAYMENT: { kind: 'approved', title: 'Request approved — waiting for payment' },
+  APPROVED: { kind: 'approved', title: 'Request approved' },
+  REJECTED: { kind: 'rejected', title: 'Request rejected' },
+  CANCELLED: { kind: 'withdrawn', title: 'Request withdrawn' },
+};
+
 // GET /api/admin/subscriptions/history/[therapistId] — every term and plan
 // request for one professional, plus a merged newest-first `events` timeline.
 export async function GET(request: Request, { params }: { params: { therapistId: string } }) {
@@ -47,9 +56,12 @@ export async function GET(request: Request, { params }: { params: { therapistId:
     type Event = { at: Date; kind: string; title: string; detail?: string; refId: string };
     const events: Event[] = [];
     for (const r of therapist.subscriptionRequests) {
-      events.push({ at: r.createdAt, kind: 'request', title: `Requested ${r.plan.name}`, detail: `${r.months} mo${r.note ? ` · “${r.note}”` : ''}`, refId: r.id });
+      const coupon = r.couponCode ? ` · coupon ${r.couponCode}` : '';
+      events.push({ at: r.createdAt, kind: 'request', title: `Requested ${r.plan.name}`, detail: `${r.months} mo${coupon}${r.note ? ` · “${r.note}”` : ''}`, refId: r.id });
       if (r.reviewedAt && r.status !== 'PENDING') {
-        events.push({ at: r.reviewedAt, kind: r.status === 'APPROVED' ? 'approved' : 'rejected', title: `Request ${r.status === 'APPROVED' ? 'approved' : 'rejected'}`, detail: r.plan.name, refId: r.id });
+        const reviewed = REVIEWED[r.status];
+        const price = r.total != null ? ` · ₹${r.total.toLocaleString('en-IN')}` : '';
+        events.push({ at: r.reviewedAt, kind: reviewed.kind, title: reviewed.title, detail: `${r.plan.name}${price}`, refId: r.id });
       }
     }
     for (const s of therapist.subscriptions) {

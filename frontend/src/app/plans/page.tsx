@@ -43,6 +43,11 @@ interface Pending {
   planName: string;
   months: number;
   modules: string[];
+  status: 'PENDING' | 'AWAITING_PAYMENT';
+  couponCode: string | null;
+  subtotal: number;
+  discount: number;
+  total: number;
 }
 
 interface AppliedCoupon {
@@ -81,6 +86,8 @@ export default function PlansPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [current, setCurrent] = useState<Current | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
+  // Paid plans are requested first and paid after an admin approves them.
+  const [approvalRequired, setApprovalRequired] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [term, setTerm] = useState<Term>(1);
@@ -97,6 +104,12 @@ export default function PlansPage() {
   const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
   const [couponBusy, setCouponBusy] = useState(false);
   const [couponError, setCouponError] = useState('');
+
+  // pay for an approved request / withdraw a request
+  const [payOpen, setPayOpen] = useState(false);
+  const [payBusy, setPayBusy] = useState(false);
+  const [payError, setPayError] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
 
   // cancel plan
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -116,6 +129,7 @@ export default function PlansPage() {
         const d = await sRes.json();
         setCurrent(d.current);
         setPending(d.pendingRequest);
+        setApprovalRequired(!!d.approvalRequired);
       }
       setLoadError(pRes.ok && sRes.ok ? '' : 'Some plan details could not be loaded.');
     } catch {
@@ -242,10 +256,13 @@ export default function PlansPage() {
           planId: reqPlan.id,
           months,
           modules: Array.from(selected),
+          couponCode: couponApplies ? coupon!.code : undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        // e.g. the coupon expired or ran out since it was applied
+        if (coupon) setCoupon(null);
         setError(data.error || 'Could not submit request.');
       } else {
         toast(`Request for ${reqPlan.name} sent — an admin will review it.`);
@@ -265,7 +282,7 @@ export default function PlansPage() {
       setError('Please select at least one tool.');
       return;
     }
-    if (phone.replace(/\D/g, '').length < 10) {
+    if (reqTotal > 0 && phone.replace(/\D/g, '').length < 10) {
       setError('Please enter a 10-digit phone number.');
       return;
     }
@@ -290,6 +307,14 @@ export default function PlansPage() {
         setError(order.error || 'Could not start payment.');
         return;
       }
+      if (order.activated) {
+        // ₹0 total: started without Cashfree.
+        toast(`${reqPlan.name} is active.`);
+        setReqPlan(null);
+        clearApiCache();
+        await Promise.all([load(), refreshProfile()]);
+        return;
+      }
 
       const result = await openCashfreeCheckout(order);
       if (result.redirected) return; // finishes on return via ?order_id=
@@ -301,6 +326,63 @@ export default function PlansPage() {
       setError(e?.message || 'Network error. Please try again.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Pay for a request an admin approved. Its price was fixed at approval.
+  const payApproved = async () => {
+    if (!pending) return;
+    setPayError('');
+    if (pending.total > 0 && phone.replace(/\D/g, '').length < 10) {
+      setPayError('Please enter a 10-digit phone number.');
+      return;
+    }
+    setPayBusy(true);
+    try {
+      const res = await apiFetch('/api/payments/cashfree/subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: pending.id, customerPhone: phone, returnUrl: `${window.location.origin}/plans` }),
+      });
+      const order = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPayError(order.error || 'Could not start payment.');
+        if (res.status === 409) load();
+        return;
+      }
+      if (order.activated) {
+        toast(`${pending.planName} is active.`);
+        setPayOpen(false);
+        clearApiCache();
+        await Promise.all([load(), refreshProfile()]);
+        return;
+      }
+      const result = await openCashfreeCheckout(order);
+      if (result.redirected) return; // finishes on return via ?order_id=
+      const paid = await confirmPayment(order.orderId);
+      if (paid) setPayOpen(false);
+      else setPayError(result.closedMessage ? 'Payment was cancelled. You have not been charged.' : 'Payment was not completed. Please try again.');
+    } catch (e: any) {
+      setPayError(e?.message || 'Network error. Please try again.');
+    } finally {
+      setPayBusy(false);
+    }
+  };
+
+  const withdraw = async () => {
+    if (!pending) return;
+    setWithdrawing(true);
+    try {
+      const res = await apiFetch(`/api/subscriptions/request/${pending.id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) toast(data.error || 'Could not withdraw the request.');
+      else toast('Request withdrawn.');
+      setPayOpen(false);
+      load();
+    } catch {
+      toast('Network error. Please try again.');
+    } finally {
+      setWithdrawing(false);
     }
   };
 
@@ -337,6 +419,8 @@ export default function PlansPage() {
   const couponApplies = !!coupon && coupon.months === months;
   const reqTotal = couponApplies ? coupon!.total : reqSubtotal;
   const reqIsPaid = !!reqPlan && reqPlan.priceMonthly > 0;
+  // Pay straight away only while admins don't approve plans first.
+  const payNow = reqIsPaid && !approvalRequired;
   // "Manage Plan" opens this same dialog for the plan they're already on.
   const managing = !!reqPlan && current?.planName === reqPlan.name;
 
@@ -364,11 +448,31 @@ export default function PlansPage() {
       {loadError && <InlineError message={loadError} onRetry={load} />}
 
       {pending && (
-        <div className="inline-err" style={{ background: 'var(--ok-soft)', color: 'var(--ok)' }} role="status">
-          <span style={{ flex: 1 }}>
-            Your request for <b>{pending.planName}</b> ({pending.months} month{pending.months === 1 ? '' : 's'}) is with
-            an admin for approval.
+        <div className="inline-err" style={{ background: 'var(--ok-soft)', color: 'var(--ok)', flexWrap: 'wrap', gap: 10 }} role="status">
+          <span style={{ flex: 1, minWidth: 220 }}>
+            {pending.status === 'AWAITING_PAYMENT' ? (
+              <>
+                Your request for <b>{pending.planName}</b> ({pending.months} month{pending.months === 1 ? '' : 's'}) was approved.
+                Pay <b>{inr(pending.total)}</b>
+                {pending.couponCode ? ` (coupon ${pending.couponCode} applied)` : ''} to start it.
+              </>
+            ) : (
+              <>
+                Your request for <b>{pending.planName}</b> ({pending.months} month{pending.months === 1 ? '' : 's'}
+                {pending.total > 0 ? `, ${inr(pending.total)}` : ''}
+                {pending.couponCode ? ` with coupon ${pending.couponCode}` : ''}) is with an admin for approval.
+                {pending.total > 0 ? ' You can pay once it is approved.' : ''}
+              </>
+            )}
           </span>
+          {pending.status === 'AWAITING_PAYMENT' && (
+            <Btn variant="primary" sm onClick={() => { setPayError(''); setPayOpen(true); }}>
+              Pay {inr(pending.total)}
+            </Btn>
+          )}
+          <Btn variant="ghost" sm onClick={withdraw} disabled={withdrawing}>
+            {withdrawing ? 'Withdrawing…' : 'Withdraw'}
+          </Btn>
         </div>
       )}
 
@@ -439,7 +543,7 @@ export default function PlansPage() {
                     onClick={() => openRequest(p)}
                     style={{ width: '100%', justifyContent: 'center' }}
                   >
-                    {isCurrent ? 'Manage Plan' : p.priceMonthly > 0 ? `Get ${p.name}` : `Request ${p.name}`}
+                    {isCurrent ? 'Manage Plan' : p.priceMonthly > 0 && !approvalRequired ? `Get ${p.name}` : `Request ${p.name}`}
                   </Btn>
                 </div>
               </article>
@@ -555,13 +659,15 @@ export default function PlansPage() {
       <DsDialog
         open={!!reqPlan}
         onOpenChange={(o) => !o && setReqPlan(null)}
-        title={reqPlan ? `${managing ? 'Manage' : reqIsPaid ? 'Get' : 'Request'} ${reqPlan.name}` : ''}
+        title={reqPlan ? `${managing ? 'Manage' : payNow ? 'Get' : 'Request'} ${reqPlan.name}` : ''}
         description={
           managing && current?.cancelledAt
             ? `Cancelled — you keep this plan until ${fmtDate(current.currentPeriodEnd)}. Undo below to keep it going.`
-            : reqIsPaid
+            : payNow
               ? 'Pay securely with Cashfree (UPI, cards, netbanking). Your plan starts as soon as payment is confirmed.'
-              : 'An admin reviews every plan change before it takes effect.'
+              : reqIsPaid
+                ? 'Send a request with any coupon. Once an admin approves it you can pay here (UPI, cards, netbanking); if the total is ₹0 it starts right away.'
+                : 'An admin reviews every plan change before it takes effect.'
         }
         footer={
           <>
@@ -589,9 +695,9 @@ export default function PlansPage() {
             <button className="ds-btn ds-btn-ghost" onClick={() => setReqPlan(null)}>
               {managing ? 'Close' : 'Cancel'}
             </button>
-            {reqIsPaid ? (
+            {payNow ? (
               <button className="ds-btn ds-btn-clay" onClick={pay} disabled={submitting}>
-                {submitting ? 'Processing…' : `Pay ${inr(reqTotal)}`}
+                {submitting ? 'Processing…' : reqTotal === 0 ? 'Activate for free' : `Pay ${inr(reqTotal)}`}
               </button>
             ) : (
               <button className="ds-btn ds-btn-clay" onClick={submit} disabled={submitting}>
@@ -646,21 +752,25 @@ export default function PlansPage() {
 
             {reqIsPaid && (
               <div>
-                <div className="eyebrow" style={{ marginBottom: 8 }}>
-                  Phone number (for the payment receipt)
-                </div>
-                <input
-                  className="ds-input"
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="tel-national"
-                  placeholder="10-digit mobile number"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  style={{ width: '100%' }}
-                />
+                {payNow && reqTotal > 0 && (
+                  <>
+                    <div className="eyebrow" style={{ marginBottom: 8 }}>
+                      Phone number (for the payment receipt)
+                    </div>
+                    <input
+                      className="ds-input"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      placeholder="10-digit mobile number"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      style={{ width: '100%', marginBottom: 16 }}
+                    />
+                  </>
+                )}
 
-                <div className="eyebrow" style={{ margin: '16px 0 8px' }}>
+                <div className="eyebrow" style={{ marginBottom: 8 }}>
                   Coupon code
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -710,11 +820,60 @@ export default function PlansPage() {
                   Total:{' '}
                   {couponApplies && <s style={{ marginRight: 6 }}>{inr(reqSubtotal)}</s>}
                   <b>{inr(reqTotal)}</b> for {months} month{months === 1 ? '' : 's'}
+                  {reqTotal === 0 && ' — nothing to pay'}
+                  {!payNow && reqTotal > 0 && ' — you pay after approval'}
                 </p>
               </div>
             )}
 
             {error && <InlineError message={error} />}
+          </div>
+        )}
+      </DsDialog>
+
+      {/* pay for an approved request */}
+      <DsDialog
+        open={payOpen && !!pending}
+        onOpenChange={(o) => !o && setPayOpen(false)}
+        title={pending ? `Pay for ${pending.planName}` : ''}
+        description="Pay securely with Cashfree (UPI, cards, netbanking). Your plan starts as soon as payment is confirmed."
+        footer={
+          <>
+            <button className="ds-btn ds-btn-ghost" onClick={() => setPayOpen(false)}>
+              Cancel
+            </button>
+            <button className="ds-btn ds-btn-clay" onClick={payApproved} disabled={payBusy}>
+              {payBusy ? 'Processing…' : pending && pending.total > 0 ? `Pay ${inr(pending.total)}` : 'Activate'}
+            </button>
+          </>
+        }
+      >
+        {pending && (
+          <div className="space-y-4">
+            <p className="lsub">
+              {pending.months} month{pending.months === 1 ? '' : 's'} ·{' '}
+              {pending.couponCode && <s style={{ marginRight: 6 }}>{inr(pending.subtotal)}</s>}
+              <b>{inr(pending.total)}</b>
+              {pending.couponCode ? ` with coupon ${pending.couponCode}` : ''}
+            </p>
+            {pending.total > 0 && (
+              <div>
+                <div className="eyebrow" style={{ marginBottom: 8 }}>
+                  Phone number (for the payment receipt)
+                </div>
+                <input
+                  className="ds-input"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
+                  placeholder="10-digit mobile number"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  style={{ width: '100%' }}
+                />
+              </div>
+            )}
+            {payError && <InlineError message={payError} />}
           </div>
         )}
       </DsDialog>

@@ -9,6 +9,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { appDb } from '@/lib/core/db';
 import { activatePlan } from '@/lib/billing/subscriptions';
+import { closeOpenRequests } from '@/lib/billing/purchase';
 
 const API_VERSION = '2026-01-01';
 
@@ -65,7 +66,7 @@ export async function createCashfreeOrder(opts: {
   customerEmail?: string | null;
   returnUrl?: string;
   note?: string;
-  plan?: { planId: string; therapistId: string; months: number; modules: string[] };
+  plan?: { planId: string; therapistId: string; months: number; modules: string[]; requestId?: string };
   coupon?: { couponId: string; couponCode: string; discount: number };
 }) {
   // customer_id: 3-50 alphanumerics. order_id: 3-45 of [A-Za-z0-9_-].
@@ -211,12 +212,15 @@ async function activatePaidPlan(orderId: string) {
       subscriptionId,
     });
 
-    // Close any request still waiting for an admin, so approving it later
-    // can't replace the plan that was just paid for.
-    await tx.subscriptionRequest.updateMany({
-      where: { therapistId: payment.therapistId, status: 'PENDING' },
-      data: { status: 'REJECTED', reviewedAt: new Date() },
-    });
+    // The approved request this paid for is done; close any other open one,
+    // so approving it later can't replace the plan that was just paid for.
+    if (payment.requestId) {
+      await tx.subscriptionRequest.updateMany({
+        where: { id: payment.requestId },
+        data: { status: 'APPROVED', modules: payment.modules },
+      });
+    }
+    await closeOpenRequests(tx, payment.therapistId, payment.requestId);
     console.log(`[cashfree] order ${orderId} paid — activated ${plan.name} for therapist ${payment.therapistId}`);
   });
 }

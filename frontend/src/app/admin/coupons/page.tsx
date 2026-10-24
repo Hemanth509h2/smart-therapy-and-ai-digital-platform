@@ -248,7 +248,7 @@ function CouponModal({ coupon, plans, onClose, onSaved }: { coupon: Coupon | 'ne
     const value = Number(form.discountValue);
     if (!/^[A-Za-z0-9_-]{3,32}$/.test(form.code.trim())) { setError('Code must be 3–32 letters, numbers, - or _.'); return; }
     if (!Number.isInteger(value) || value < 1) { setError('Enter a whole-number discount of at least 1.'); return; }
-    if (form.type === 'PERCENT' && value > 99) { setError('A percentage discount must be 1–99%.'); return; }
+    if (form.type === 'PERCENT' && value > 100) { setError('A percentage discount must be 1–100%.'); return; }
     if (form.maxRedemptions.trim() && !(Number.isInteger(Number(form.maxRedemptions)) && Number(form.maxRedemptions) >= 1)) {
       setError('Usage limit must be a whole number of at least 1, or blank for unlimited.');
       return;
@@ -310,7 +310,7 @@ function CouponModal({ coupon, plans, onClose, onSaved }: { coupon: Coupon | 'ne
           />
         </Field>
         <Field label={form.type === 'PERCENT' ? 'Percent off' : 'Rupees off'}>
-          <Input type="number" min={1} max={form.type === 'PERCENT' ? 99 : undefined} value={form.discountValue} onChange={(e) => set('discountValue', e.target.value)} />
+          <Input type="number" min={1} max={form.type === 'PERCENT' ? 100 : undefined} value={form.discountValue} onChange={(e) => set('discountValue', e.target.value)} />
         </Field>
         <Field label="Minimum term">
           <Select

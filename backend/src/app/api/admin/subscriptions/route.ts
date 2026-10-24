@@ -48,7 +48,7 @@ export async function GET(request: Request) {
         orderBy: { createdAt: 'asc' },
       }),
       appDb.subscriptionRequest.findMany({
-        where: { status: 'PENDING' },
+        where: { status: { in: ['PENDING', 'AWAITING_PAYMENT'] } },
         include: { plan: true, therapist: true },
         orderBy: { createdAt: 'asc' },
       }),
@@ -113,7 +113,14 @@ export async function GET(request: Request) {
       months: r.months,
       modules: r.modules,
       note: r.note,
+      status: r.status,
+      priceMonthly: r.plan.priceMonthly,
+      couponCode: r.couponCode,
+      subtotal: r.subtotal ?? r.plan.priceMonthly * r.months,
+      discount: r.discount ?? 0,
+      total: r.total ?? r.plan.priceMonthly * r.months,
       createdAt: r.createdAt,
+      reviewedAt: r.reviewedAt,
     }));
 
     return NextResponse.json({ professionals, total, requests: pending });

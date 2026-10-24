@@ -3,6 +3,7 @@ import { prisma, appDb } from '@/lib/core/db';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { resolveCurrent, serializeSubscription } from '@/lib/billing/subscriptions';
 import { errorResponse } from '@/lib/http/apiError';
+import { getSetting } from '@/lib/core/settings';
 
 // The caller must own the therapist profile or be an ADMIN.
 async function mayAccessTherapist(uid: string, therapistId: string) {
@@ -14,7 +15,9 @@ async function mayAccessTherapist(uid: string, therapistId: string) {
 }
 
 // GET /api/subscriptions?therapistId= — a therapist's current plan (or null for
-// free tier), any pending request, and their term history.
+// free tier), any open request (waiting for an admin, or approved and waiting
+// for payment, with its price), whether plans need approval before payment,
+// and their term history.
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
@@ -31,17 +34,18 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const [subs, pending] = await Promise.all([
+    const [subs, pending, approvalRequired] = await Promise.all([
       appDb.subscription.findMany({
         where: { therapistId },
         include: { plan: true },
         orderBy: { startedAt: 'desc' },
       }),
       appDb.subscriptionRequest.findFirst({
-        where: { therapistId, status: 'PENDING' },
+        where: { therapistId, status: { in: ['PENDING', 'AWAITING_PAYMENT'] } },
         include: { plan: true },
         orderBy: { createdAt: 'desc' },
       }),
+      getSetting('billing.approvalBeforePayment'),
     ]);
 
     const current = resolveCurrent(subs);
@@ -56,9 +60,15 @@ export async function GET(request: Request) {
             months: pending.months,
             modules: pending.modules,
             status: pending.status,
+            couponCode: pending.couponCode,
+            subtotal: pending.subtotal ?? pending.plan.priceMonthly * pending.months,
+            discount: pending.discount ?? 0,
+            total: pending.total ?? pending.plan.priceMonthly * pending.months,
             createdAt: pending.createdAt,
+            reviewedAt: pending.reviewedAt,
           }
         : null,
+      approvalRequired,
       history: subs.map((s) => serializeSubscription({ ...s })),
     });
   } catch (error: any) {
