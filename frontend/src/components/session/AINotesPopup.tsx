@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import type { AIInsight } from '@/lib/rag/types'
 import { GLASS } from './roomTheme'
+import { toast } from '@/components/practice/ui'
 import { moduleName } from '@/lib/modules'
 import type { CallPlan } from '@/lib/callPlan'
 import CallPlanTab from './CallPlanTab'
@@ -202,7 +203,10 @@ export default function AINotesPopup({
       })
       setSavedAt(Date.now())
       setText('')
-    } catch {}
+      toast('Note saved', 'success')
+    } catch {
+      toast('Could not save the note. Try again.', 'error')
+    }
     setSaving(false)
   }
 
@@ -217,6 +221,7 @@ export default function AINotesPopup({
         desc: 'Marked by therapist during the session.',
       },
     ])
+    toast('Moment highlighted. See it under Observations.', 'success', { duration: 2500 })
   }
 
   const wrap = (before: string, after = before) => {

@@ -1,5 +1,6 @@
 // Coupon (discount code) rules for paid plan checkout. Admins manage coupons
 // at /admin/coupons; therapists enter a code in the plan checkout dialog.
+// A coupon with a therapistId is personal: only that therapist can redeem it.
 //
 // A redemption is a PAID Payment with the coupon attached (a ₹0 purchase gets
 // a PAID ₹0 Payment too). A request an admin approved but that isn't paid yet
@@ -44,7 +45,9 @@ export async function applyCoupon(
 
   const coupon = await appDb.coupon.findUnique({ where: { code: normalized } });
   const now = new Date();
-  if (!coupon || !coupon.isActive || (coupon.startsAt && coupon.startsAt > now)) {
+  // Someone else's personal code reads as unknown, so its existence isn't revealed.
+  const notYours = !!coupon?.therapistId && coupon.therapistId !== opts.therapistId;
+  if (!coupon || notYours || !coupon.isActive || (coupon.startsAt && coupon.startsAt > now)) {
     return { ok: false, error: 'That coupon code is not valid.' };
   }
   if (coupon.expiresAt && coupon.expiresAt <= now) {
@@ -130,6 +133,7 @@ export function parseCouponBody(body: any, partial = false): Record<string, any>
     else data.maxRedemptions = Number(v);
   }
   if (has('oncePerTherapist')) data.oncePerTherapist = Boolean(body.oncePerTherapist);
+  if (has('therapistId')) data.therapistId = body.therapistId ? String(body.therapistId) : null;
   if (has('isActive')) data.isActive = Boolean(body.isActive);
   for (const k of ['startsAt', 'expiresAt'] as const) {
     if (!has(k)) continue;

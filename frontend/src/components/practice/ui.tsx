@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { create } from 'zustand';
-import { AlertCircle, CheckCircle2, Info, Loader2, MoreVertical, Search, X } from 'lucide-react';
+import { sileo, Toaster as SileoToaster } from 'sileo';
+import { useTheme } from '@/components/ThemeProvider';
+import { Loader2, MoreVertical, Search, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { STATE_META, TONES, avatarColor, initials, tagTone, type SessionState, type Tone } from '@/lib/practice';
 
@@ -312,22 +313,17 @@ export function EmptyState({
   );
 }
 
+// Errors are shown as Sileo toasts, not inline. Kept as a component so any
+// remaining `<ErrorBanner message onRetry />` still surfaces its message: it
+// toasts once per new message (with Retry as the toast button) and renders nothing.
 export function ErrorBanner({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  return (
-    <div
-      className="flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3 text-[13.5px]"
-      style={{ background: 'var(--ds-red-soft)', color: 'var(--ds-red)' }}
-      role="alert"
-    >
-      <AlertCircle className="h-4 w-4 shrink-0" />
-      <span className="flex-1">{message}</span>
-      {onRetry && (
-        <button className="ds-btn ds-btn-sm ds-btn-outline" onClick={onRetry}>
-          Try again
-        </button>
-      )}
-    </div>
-  );
+  const retry = useRef(onRetry);
+  retry.current = onRetry;
+  useEffect(() => {
+    if (!message) return;
+    toast(message, 'error', retry.current ? { button: { title: 'Try again', onClick: () => retry.current?.() } } : {});
+  }, [message]);
+  return null;
 }
 
 /* ─────────────────────────── inputs ─────────────────────────── */
@@ -577,52 +573,31 @@ export function Drawer({
 
 /* ─────────────────────────── toasts ─────────────────────────── */
 
-type ToastTone = 'success' | 'error' | 'info';
-interface ToastItem {
-  id: number;
-  message: string;
-  tone: ToastTone;
-}
+// Every app notification goes through Sileo. `toast(message, tone)` is the one
+// call sites use; the message becomes the toast's description under a short
+// tone title, so long server errors still fit.
+type ToastTone = 'success' | 'error' | 'info' | 'warning';
+const TOAST_TITLES: Record<ToastTone, string> = {
+  success: 'Done',
+  error: 'Something went wrong',
+  info: 'Heads up',
+  warning: 'Please note',
+};
 
-const useToastStore = create<{ items: ToastItem[]; push: (m: string, t: ToastTone) => void; dismiss: (id: number) => void }>(
-  (set) => ({
-    items: [],
-    push: (message, tone) => {
-      const id = Date.now() + Math.random();
-      set((s) => ({ items: [...s.items, { id, message, tone }] }));
-      setTimeout(() => set((s) => ({ items: s.items.filter((i) => i.id !== id) })), 3500);
-    },
-    dismiss: (id) => set((s) => ({ items: s.items.filter((i) => i.id !== id) })),
-  })
-);
+export const toast = (
+  message: string,
+  tone: ToastTone = 'success',
+  opts: { title?: string; button?: { title: string; onClick: () => void }; duration?: number } = {}
+) =>
+  sileo[tone]({
+    title: opts.title ?? TOAST_TITLES[tone],
+    description: message,
+    button: opts.button,
+    duration: opts.duration ?? (tone === 'error' ? 7000 : undefined),
+  });
 
-export const toast = (message: string, tone: ToastTone = 'success') => useToastStore.getState().push(message, tone);
-
+/** Mounted once in the root layout; follows the app's light/dark theme. */
 export function Toaster() {
-  const { items, dismiss } = useToastStore();
-  const icons: Record<ToastTone, Icon> = { success: CheckCircle2, error: AlertCircle, info: Info };
-  const colors: Record<ToastTone, string> = { success: 'var(--ds-green)', error: 'var(--ds-red)', info: 'var(--ds-clay)' };
-  return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[70] flex w-[min(92vw,360px)] flex-col gap-2" aria-live="polite">
-      {items.map((t) => {
-        const IconCmp = icons[t.tone];
-        return (
-          <div
-            key={t.id}
-            className="ds-card animate-fade-up pointer-events-auto flex items-start gap-3 px-4 py-3"
-            style={{ boxShadow: 'var(--ds-shadow-lg)' }}
-            role="status"
-          >
-            <IconCmp className="mt-0.5 h-[18px] w-[18px] shrink-0" style={{ color: colors[t.tone] }} />
-            <p className="flex-1 text-[13.5px]" style={{ color: 'var(--ds-ink)' }}>
-              {t.message}
-            </p>
-            <button className="ds-faint" onClick={() => dismiss(t.id)} aria-label="Dismiss">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        );
-      })}
-    </div>
-  );
+  const { theme } = useTheme();
+  return <SileoToaster position="top-right" theme={theme} />;
 }

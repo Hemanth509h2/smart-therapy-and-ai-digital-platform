@@ -34,6 +34,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: 'A coupon with that code already exists.' }, { status: 409 });
     }
     if (error.code === 'P2025') return NextResponse.json({ error: 'Coupon not found' }, { status: 404 });
+    if (error.code === 'P2003') return NextResponse.json({ error: 'That professional no longer exists.' }, { status: 400 });
     return errorResponse(error, 'Admin coupon PATCH error');
   }
 }

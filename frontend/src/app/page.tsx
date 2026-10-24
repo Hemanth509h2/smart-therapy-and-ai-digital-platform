@@ -10,7 +10,6 @@ import { SessionCard } from '@/components/staad/SessionCard';
 import {
   Btn,
   EmptyCard,
-  InlineError,
   Notch,
   NotchLink,
   Section,
@@ -44,6 +43,7 @@ import {
   type PracticeClient,
   type PracticeSession,
 } from '@/lib/practice';
+import { useErrorToast } from '@/components/practice/useErrorToast';
 
 /** Quick links into the module library. Labels are UI copy; every href is a real route. */
 const TOOLKIT = [
@@ -67,6 +67,7 @@ export default function DashboardPage() {
   const { profile } = useAuthStore();
   const now = useNow(30_000);
   const { sessions, bookings, clients, loading, error, refresh } = usePracticeData();
+  useErrorToast(error, refresh);
   const actions = useSessionActions(refresh);
 
   const [addOpen, setAddOpen] = useState(false);
@@ -180,8 +181,6 @@ export default function DashboardPage() {
           </Btn>
         </div>
       </div>
-
-      {error && <InlineError message={error} onRetry={refresh} />}
 
       <div className="stats">
         {loading ? (

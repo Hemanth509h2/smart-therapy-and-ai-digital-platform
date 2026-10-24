@@ -1,14 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Btn } from '@/components/staad/parts';
 import { IconArrowRightXs } from '@/components/staad/icons';
+import { toast } from '@/components/practice/ui';
 
 /**
  * Full-page error screen shared by app/error.tsx (runtime errors in any page),
  * app/not-found.tsx (404) and app/global-error.tsx (root layout failures).
  * Pages don't import this directly — Next.js renders those files automatically.
+ * Like every other message in the app, the error is also raised as a Sileo toast.
  */
 export default function ErrorScreen({
   code,
@@ -25,6 +27,15 @@ export default function ErrorScreen({
   onRetry?: () => void;
 }) {
   const router = useRouter();
+  const retry = useRef(onRetry);
+  retry.current = onRetry;
+
+  useEffect(() => {
+    toast(message, code === '404' ? 'warning' : 'error', {
+      title,
+      button: retry.current ? { title: 'Try again', onClick: () => retry.current?.() } : undefined,
+    });
+  }, [code, title, message]);
 
   return (
     <main

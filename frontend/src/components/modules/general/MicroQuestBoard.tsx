@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { toast } from '@/components/practice/ui'
 import { writeModuleState } from '@/lib/modules/writeModuleState'
 
 interface MicroQuestBoardProps {
@@ -173,6 +174,7 @@ export default function MicroQuestBoard({ sessionId, role }: MicroQuestBoardProp
       await setDoc(doc(db, 'patients', clientId), { quests: next }, { merge: true })
     } catch (err) {
       console.warn('[MicroQuestBoard] Could not save quests to the patient record', err)
+      toast("Could not save quests to your client's record. They'll still show in this session.", 'warning')
     }
   }, [sessionId, clientId])
 

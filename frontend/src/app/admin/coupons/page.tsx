@@ -19,6 +19,8 @@ interface Coupon {
   minMonths: number;
   maxRedemptions: number | null;
   oncePerTherapist: boolean;
+  therapistId: string | null;
+  therapistName: string | null;
   startsAt: string | null;
   expiresAt: string | null;
   isActive: boolean;
@@ -27,6 +29,7 @@ interface Coupon {
   discountTotal: number;
 }
 interface Plan { id: string; name: string; priceMonthly: number; isActive: boolean }
+interface Professional { id: string; name: string; email?: string }
 
 const MONTH_OPTIONS = [1, 3, 6, 12];
 
@@ -76,6 +79,9 @@ export default function AdminCouponsPage() {
         <div className="min-w-0">
           <p className="font-mono font-bold" style={{ color: 'var(--ink)' }}>{c.code}</p>
           {c.description && <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>{c.description}</p>}
+          {c.therapistId && (
+            <p className="mt-1"><Badge tone="info">Only {c.therapistName || 'one professional'}</Badge></p>
+          )}
         </div>
       ),
     },
@@ -196,6 +202,7 @@ const blankForm = {
   minMonths: '1',
   maxRedemptions: '',
   oncePerTherapist: true,
+  therapistId: '', // '' = anyone
   startsAt: '',
   expiresAt: '',
   isActive: true,
@@ -218,6 +225,7 @@ function toForm(c: Coupon | 'new' | null): Form {
     minMonths: String(c.minMonths),
     maxRedemptions: c.maxRedemptions == null ? '' : String(c.maxRedemptions),
     oncePerTherapist: c.oncePerTherapist,
+    therapistId: c.therapistId || '',
     startsAt: toDay(c.startsAt),
     expiresAt: toDay(c.expiresAt),
     isActive: c.isActive,
@@ -227,35 +235,46 @@ function toForm(c: Coupon | 'new' | null): Form {
 function CouponModal({ coupon, plans, onClose, onSaved }: { coupon: Coupon | 'new' | null; plans: Plan[]; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState<Form>(toForm(null));
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
   const [openedFor, setOpenedFor] = useState<Coupon | 'new' | null>(null);
+  const { can } = useAdmin();
+  const pros = useAdminQuery<{ professionals: Professional[] }>(
+    coupon && can('people.read') ? '/api/admin/professionals?pageSize=200&sort=name&dir=asc' : null
+  );
 
   // Reset the form each time the modal opens for a different coupon.
   if (coupon !== openedFor) {
     setOpenedFor(coupon);
-    if (coupon) {
-      setForm(toForm(coupon));
-      setError('');
-    }
+    if (coupon) setForm(toForm(coupon));
   }
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
   const togglePlan = (id: string) =>
     set('planIds', form.planIds.includes(id) ? form.planIds.filter((p) => p !== id) : [...form.planIds, id]);
   const isNew = coupon === 'new';
+  const editingCoupon = coupon && coupon !== 'new' ? coupon : null;
+  const proOptions = (pros.data?.professionals ?? []).map((p) => ({
+    value: p.id,
+    label: p.email ? `${p.name} (${p.email})` : p.name,
+  }));
+  // Keep the saved professional selectable even if they're outside the loaded list.
+  if (form.therapistId && !proOptions.some((o) => o.value === form.therapistId)) {
+    proOptions.unshift({
+      value: form.therapistId,
+      label: editingCoupon?.therapistId === form.therapistId ? editingCoupon.therapistName || 'Assigned professional' : 'Assigned professional',
+    });
+  }
 
   const save = async () => {
     const value = Number(form.discountValue);
-    if (!/^[A-Za-z0-9_-]{3,32}$/.test(form.code.trim())) { setError('Code must be 3–32 letters, numbers, - or _.'); return; }
-    if (!Number.isInteger(value) || value < 1) { setError('Enter a whole-number discount of at least 1.'); return; }
-    if (form.type === 'PERCENT' && value > 100) { setError('A percentage discount must be 1–100%.'); return; }
+    if (!/^[A-Za-z0-9_-]{3,32}$/.test(form.code.trim())) { toast('Code must be 3–32 letters, numbers, - or _.', 'error'); return; }
+    if (!Number.isInteger(value) || value < 1) { toast('Enter a whole-number discount of at least 1.', 'error'); return; }
+    if (form.type === 'PERCENT' && value > 100) { toast('A percentage discount must be 1–100%.', 'error'); return; }
     if (form.maxRedemptions.trim() && !(Number.isInteger(Number(form.maxRedemptions)) && Number(form.maxRedemptions) >= 1)) {
-      setError('Usage limit must be a whole number of at least 1, or blank for unlimited.');
+      toast('Usage limit must be a whole number of at least 1, or blank for unlimited.', 'error');
       return;
     }
-    if (form.startsAt && form.expiresAt && form.expiresAt < form.startsAt) { setError('Expiry must be on or after the start date.'); return; }
+    if (form.startsAt && form.expiresAt && form.expiresAt < form.startsAt) { toast('Expiry must be on or after the start date.', 'error'); return; }
     setSaving(true);
-    setError('');
     const json = {
       code: form.code.trim().toUpperCase(),
       description: form.description,
@@ -265,6 +284,7 @@ function CouponModal({ coupon, plans, onClose, onSaved }: { coupon: Coupon | 'ne
       minMonths: Number(form.minMonths) || 1,
       maxRedemptions: form.maxRedemptions.trim() ? Number(form.maxRedemptions) : null,
       oncePerTherapist: form.oncePerTherapist,
+      therapistId: form.therapistId || null,
       startsAt: startOfDay(form.startsAt),
       expiresAt: endOfDay(form.expiresAt),
       isActive: form.isActive,
@@ -276,7 +296,7 @@ function CouponModal({ coupon, plans, onClose, onSaved }: { coupon: Coupon | 'ne
       onClose();
       onSaved();
     } catch (e: any) {
-      setError(e.message || 'Could not save the coupon.');
+      toast(e.message || 'Could not save the coupon.', 'error');
     } finally {
       setSaving(false);
     }
@@ -330,6 +350,27 @@ function CouponModal({ coupon, plans, onClose, onSaved }: { coupon: Coupon | 'ne
           <Input type="date" value={form.expiresAt} onChange={(e) => set('expiresAt', e.target.value)} />
         </Field>
       </div>
+      <Field
+        label="Who can use it"
+        hint={form.therapistId ? 'Personal code: anyone else who enters it is told the code is not valid.' : 'Any professional who has the code.'}
+      >
+        {!can('people.read') ? (
+          <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
+            {form.therapistId ? `Only ${editingCoupon?.therapistName || 'one professional'}` : 'Any professional'}. You need people access to change this.
+          </p>
+        ) : (
+          <>
+            {pros.error && <ErrorBanner message="Could not load professionals." onRetry={pros.reload} />}
+            <Select
+              value={form.therapistId}
+              onChange={(v) => set('therapistId', v)}
+              options={[{ value: '', label: pros.loading && !pros.data ? 'Loading professionals…' : 'Any professional' }, ...proOptions]}
+              className="w-full"
+              ariaLabel="Who can use it"
+            />
+          </>
+        )}
+      </Field>
       <Field label="Plans" hint={form.planIds.length ? undefined : 'None ticked = every paid plan.'}>
         {plans.length === 0 ? (
           <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>No paid plans yet.</p>
@@ -350,7 +391,6 @@ function CouponModal({ coupon, plans, onClose, onSaved }: { coupon: Coupon | 'ne
         <Checkbox checked={form.oncePerTherapist} onChange={(v) => set('oncePerTherapist', v)} label="One use per professional" />
         <Checkbox checked={form.isActive} onChange={(v) => set('isActive', v)} label="Enabled" />
       </div>
-      {error && <ErrorBanner message={error} />}
     </Modal>
   );
 }

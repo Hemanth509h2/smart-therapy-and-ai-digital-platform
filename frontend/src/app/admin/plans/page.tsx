@@ -203,16 +203,12 @@ function toForm(p: Plan | 'new' | null): Form {
 function PlanModal({ plan, onClose, onSaved }: { plan: Plan | 'new' | null; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState<Form>(toForm(null));
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
   const [openedFor, setOpenedFor] = useState<Plan | 'new' | null>(null);
 
   // Reset the form each time the modal opens for a different plan.
   if (plan !== openedFor) {
     setOpenedFor(plan);
-    if (plan) {
-      setForm(toForm(plan));
-      setError('');
-    }
+    if (plan) setForm(toForm(plan));
   }
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -220,8 +216,8 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | 'new' | null; onCl
   const isNew = plan === 'new';
 
   const save = async () => {
-    if (!form.name.trim()) { setError('Name is required.'); return; }
-    if (!form.unlimited && !(Number(form.toolQuota) >= 1)) { setError('Enter a tool quota of at least 1, or tick Unlimited.'); return; }
+    if (!form.name.trim()) { toast('Name is required.', 'error'); return; }
+    if (!form.unlimited && !(Number(form.toolQuota) >= 1)) { toast('Enter a tool quota of at least 1, or tick Unlimited.', 'error'); return; }
     const limitFields = [
       ['maxClients', 'Client limit'],
       ['maxSessionsPerMonth', 'Sessions per month'],
@@ -230,14 +226,13 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | 'new' | null; onCl
     for (const [key, label] of limitFields) {
       const v = form[key].trim();
       if (v && !(Number.isInteger(Number(v)) && Number(v) >= 0)) {
-        setError(`${label} must be a whole number, or blank for unlimited.`);
+        toast(`${label} must be a whole number, or blank for unlimited.`, 'error');
         return;
       }
     }
     const features = form.features.map((f) => f.trim()).filter(Boolean);
-    if (features.some((f) => f.length > MAX_FEATURE_LENGTH)) { setError(`Each feature must be ${MAX_FEATURE_LENGTH} characters or fewer.`); return; }
+    if (features.some((f) => f.length > MAX_FEATURE_LENGTH)) { toast(`Each feature must be ${MAX_FEATURE_LENGTH} characters or fewer.`, 'error'); return; }
     setSaving(true);
-    setError('');
     const json = {
       name: form.name.trim(),
       description: form.description,
@@ -256,7 +251,7 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | 'new' | null; onCl
       onClose();
       onSaved();
     } catch (e: any) {
-      setError(e.message || 'Could not save the plan.');
+      toast(e.message || 'Could not save the plan.', 'error');
     } finally {
       setSaving(false);
     }
@@ -339,7 +334,6 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | 'new' | null; onCl
               </Btn>
             </div>
           </Field>
-          {error && <ErrorBanner message={error} />}
         </div>
 
         <div>

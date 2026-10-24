@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Btn, ErrorBanner, Field, Input, Modal } from '@/components/admin/kit';
+import { Btn, Field, Input, Modal } from '@/components/admin/kit';
 import { adminFetch } from '@/lib/adminApi';
 import { toast } from '@/components/practice/ui';
 
@@ -27,10 +27,9 @@ export function RemoveProfessionalDialog({
 }) {
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (target) { setTyped(''); setError(''); }
+    if (target) setTyped('');
   }, [target]);
 
   const matches = !!target && typed.trim().toLowerCase() === target.email.toLowerCase();
@@ -39,7 +38,6 @@ export function RemoveProfessionalDialog({
   const remove = async () => {
     if (!target || !matches) return;
     setBusy(true);
-    setError('');
     try {
       const r = await adminFetch<{ sessions: number; clients: number; warnings: string[] }>(`/api/admin/users/${target.userId}`, {
         method: 'DELETE',
@@ -50,7 +48,7 @@ export function RemoveProfessionalDialog({
       onClose();
       onRemoved();
     } catch (e: any) {
-      setError(e.message || 'Something went wrong.');
+      toast(e.message || 'Could not remove the professional.', 'error');
     } finally {
       setBusy(false);
     }
@@ -92,7 +90,6 @@ export function RemoveProfessionalDialog({
           onKeyDown={(e) => { if (e.key === 'Enter') remove(); }}
         />
       </Field>
-      {error && <ErrorBanner message={error} />}
     </Modal>
   );
 }

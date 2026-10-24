@@ -47,6 +47,7 @@ import ModuleStage from '@/components/session/ModuleStage';
 import { ModuleContent } from '@/components/GlassModulePanel';
 import { apiFetch } from '@/lib/api';
 import ErrorScreen from '@/components/ErrorScreen';
+import { toast } from '@/components/practice/ui';
 
 // Automatic AI suggestions: how often the copilot re-checks the call (when
 // something new was said), and how often that condition is looked at. The
@@ -186,7 +187,10 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
     updateDoc(doc(db, 'liveSessions', sessionId), {
       whiteboard: { active, shared },
       'timestamps.updatedAt': new Date().toISOString(),
-    }).catch(() => {});
+    }).catch(() => {
+      // Only sharing is worth a message; closing/hiding just mirrors state.
+      if (active && shared) toast('Could not share the whiteboard with your client. Check your connection.', 'error');
+    });
   };
 
   // Clicking the bar button for the open panel closes it; clicking a different
@@ -233,10 +237,6 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
     setActivePanel(null);
     publishWhiteboardState(false, whiteboardShared);
   };
-  const [toast, setToast] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>();
-
   const [aiInsight, setAiInsight] = useState<any>(null);
   const [analyseLoading, setAnalyseLoading] = useState(false);
   const analyseLoadingRef = useRef(false);
@@ -451,17 +451,11 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
     };
   }, []);
 
-  const showToast = (msg: string) => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast(msg);
-    toastTimer.current = setTimeout(() => setToast(null), 2200);
-  };
-
   const handleModuleLaunch = async (moduleId: string, moduleName: string) => {
-    await handleModuleSwitch(moduleId);
+    const synced = await handleModuleSwitch(moduleId);
     setShowModulesPopup(false);
     setActivePanel(null);
-    showToast(`${moduleName} launched`);
+    if (synced) toast(`${moduleName} launched`, 'success');
     // Log module usage for the admin dashboard (best-effort).
     if (isTherapist && profile?.id) {
       apiFetch('/api/usage', {
@@ -474,10 +468,14 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
 
   const handleModuleClose = async () => {
     if (!isTherapist) return;
-    await updateDoc(doc(db, 'liveSessions', sessionId), {
-      activeModuleId: null,
-      'timestamps.updatedAt': new Date().toISOString(),
-    });
+    try {
+      await updateDoc(doc(db, 'liveSessions', sessionId), {
+        activeModuleId: null,
+        'timestamps.updatedAt': new Date().toISOString(),
+      });
+    } catch {
+      toast('Could not close the module. Check your connection and try again.', 'error');
+    }
   };
 
   useEffect(() => {
@@ -592,12 +590,12 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
     if (!requested) return;
     autoLaunchedRef.current = true;
     if (!resolveAllowedModuleIds(profile).includes(requested)) {
-      showToast('That module is not included in your plan');
+      toast('That module is not included in your plan', 'warning');
       return;
     }
     // Modules an admin switched off globally can't be launched by link either.
     loadModuleSettings().then(({ disabled }) => {
-      if (disabled.has(requested)) showToast('That module is currently unavailable');
+      if (disabled.has(requested)) toast('That module is currently unavailable', 'warning');
       else handleModuleLaunch(requested, moduleDisplayName(requested));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -653,8 +651,10 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
     return () => unsub();
   }, [sessionId, uid, isTherapist]);
 
-  const handleModuleSwitch = async (moduleId: string) => {
-    if (!isTherapist) return;
+  // Resolves false when the switch could not reach the shared session (the
+  // module then opens on the therapist's screen only).
+  const handleModuleSwitch = async (moduleId: string): Promise<boolean> => {
+    if (!isTherapist) return false;
     try {
       await updateDoc(doc(db, 'liveSessions', sessionId), {
         activeModuleId: moduleId,
@@ -663,8 +663,11 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
         whiteboard: { active: false, shared: whiteboardShared },
         'timestamps.updatedAt': new Date().toISOString(),
       });
+      return true;
     } catch {
       setActiveModule(moduleId);
+      toast('Could not reach your client. The module opened on your screen only.', 'warning');
+      return false;
     }
   };
 
@@ -674,7 +677,10 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
     await updateDoc(doc(db, 'liveSessions', sessionId), {
       therapistControl: next,
       'timestamps.updatedAt': new Date().toISOString(),
-    }).catch(() => {});
+    }).catch(() => {
+      setIsLocked(!next);
+      toast(next ? 'Could not lock controls. Try again.' : 'Could not unlock controls. Try again.', 'error');
+    });
   };
 
   // The copilot, from the Analyse button or the automatic check (`auto`: no
@@ -716,7 +722,7 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
     } catch (e) {
       console.error('Analyse error:', e);
       // A failed automatic check just waits for the next one.
-      if (!auto) showToast('Analysis failed. Try again.');
+      if (!auto) toast('Analysis failed. Try again.', 'error');
     } finally {
       analyseLoadingRef.current = false;
       setAnalyseLoading(false);
@@ -726,11 +732,10 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
   const runCopilotRef = useRef(runCopilot);
   runCopilotRef.current = runCopilot;
 
-  const handleLaunchModule = (moduleSlug: string) => {
-    handleModuleSwitch(moduleSlug);
+  const handleLaunchModule = async (moduleSlug: string) => {
     setShowModulesPopup(false);
     setActivePanel(null);
-    showToast(`Launching ${moduleSlug}`);
+    if (await handleModuleSwitch(moduleSlug)) toast(`Launching ${moduleDisplayName(moduleSlug)}`, 'info');
   };
 
   const handleConsent = async (given: boolean) => {
@@ -742,6 +747,7 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
       });
     } catch (e) {
       console.error('Consent write failed:', e);
+      toast('Could not save your AI consent choice. Try again.', 'error');
     }
     setShowConsentBanner(false);
   };
@@ -1108,7 +1114,7 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
             />
           </SkillDevLayout>
           {/* No top bar in this layout: float the waiting-room control instead. */}
-          {isTherapist && <LobbyRequests sessionId={sessionId} onDecided={showToast} floating />}
+          {isTherapist && <LobbyRequests sessionId={sessionId} floating />}
           {showConfirm && (
             <ConfirmEndDialog
               onCancel={() => setShowConfirm(false)}
@@ -1134,7 +1140,7 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
             isTherapist={isTherapist}
             participantsPopupAvailable={participantsPopupAvailable}
             participantsCount={Object.keys(participants).length}
-            waitingRoom={isTherapist ? <LobbyRequests sessionId={sessionId} onDecided={showToast} /> : undefined}
+            waitingRoom={isTherapist ? <LobbyRequests sessionId={sessionId} /> : undefined}
           />
 
             {isTherapist && participantsPopupAvailable && showParticipants && participantsPos && (
@@ -1342,18 +1348,6 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
                   onOpenDetails={() => setShowAssistantPopup(true)}
                   onDismiss={dismissSuggestion}
                 />
-              )}
-
-              {/* Toast notification */}
-              {toast && (
-                <div
-                  key={toast}
-                  style={{ position: 'absolute', bottom: 84, left: '50%', zIndex: 50, pointerEvents: 'none', animation: 'toastInOut 2.2s ease forwards' }}
-                >
-                  <div style={{ background: RC.green, color: '#fff', padding: '7px 16px', borderRadius: 10, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', transform: 'translateX(-50%)', boxShadow: '0 6px 18px rgba(63,174,106,0.35)' }}>
-                    ✓ {toast}
-                  </div>
-                </div>
               )}
             </div>
 

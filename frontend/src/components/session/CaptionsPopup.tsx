@@ -9,6 +9,7 @@ import { GLASS } from './roomTheme'
 import { useCaptionLog, type StoredCaption } from '@/lib/captionLog'
 import TranslationControl from './TranslationControl'
 import { OnOffButton } from '@/components/ui/on-off-button'
+import { toast } from '@/components/practice/ui'
 import type { TranslationSettings } from '@/lib/translation'
 
 interface CaptionsPopupProps {
@@ -42,7 +43,6 @@ export default function CaptionsPopup({
 }: CaptionsPopupProps) {
   const { captions, error } = useCaptionLog(sessionId)
   const [showOriginal, setShowOriginal] = useState(false)
-  const [copied, setCopied] = useState(false)
 
   const [position, setPosition] = useState(initialPosition)
   const [isDragging, setIsDragging] = useState(false)
@@ -50,6 +50,10 @@ export default function CaptionsPopup({
   const [size, setSize] = useState({ width: 380, height: 520 })
   const [isResizing, setIsResizing] = useState(false)
   const resizeStart = useRef({ x: 0, y: 0, w: 380, h: 520 })
+
+  useEffect(() => {
+    if (error) toast(error, 'error')
+  }, [error])
 
   useEffect(() => {
     const handleMove = (e: MouseEvent) => {
@@ -102,10 +106,9 @@ export default function CaptionsPopup({
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(asText(captions))
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
+      toast('Captions copied', 'success', { duration: 1500 })
     } catch {
-      /* clipboard blocked */
+      toast('Could not copy captions. Your browser blocked the clipboard.', 'error')
     }
   }
 
@@ -242,7 +245,7 @@ export default function CaptionsPopup({
         style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}
       >
         {error ? (
-          <p style={{ fontSize: 11, color: '#E8897A', textAlign: 'center', marginTop: 24 }}>{error}</p>
+          <p style={{ fontSize: 11, color: GLASS.inkMuted, textAlign: 'center', marginTop: 24 }}>Captions are unavailable right now.</p>
         ) : captions.length === 0 ? (
           <p style={{ fontSize: 11, color: GLASS.inkMuted, textAlign: 'center', lineHeight: 1.6, marginTop: 24 }}>
             No captions yet. Captions appear here as people speak, once transcription or translated captions are on.
@@ -285,7 +288,7 @@ export default function CaptionsPopup({
         </button>
         <div style={{ flex: 1 }} />
         <button onClick={copy} disabled={!captions.length} style={toolButton}>
-          <Copy size={11} /> {copied ? 'Copied' : 'Copy'}
+          <Copy size={11} /> Copy
         </button>
         <button onClick={download} disabled={!captions.length} style={toolButton}>
           <Download size={11} /> Download

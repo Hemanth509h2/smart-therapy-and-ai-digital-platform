@@ -5,6 +5,7 @@ import { doc, onSnapshot, arrayUnion } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { writeModuleState } from '@/lib/modules/writeModuleState'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { toast } from '@/components/practice/ui'
 import { staadPraise, staadCancel } from '@/lib/voice/staadVoice'
 import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'
 
@@ -157,10 +158,8 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
      one they closed); only the therapist starts the next shop. */
   const [dismissedReceipt, setDismissedReceipt] = useState<number | null>(null)
   const [floaters, setFloaters] = useState<{ id: string; x: number; y: number }[]>([])
-  const [toast, setToast] = useState<{ msg: string } | null>(null)
 
   const cRef = useRef<HTMLDivElement>(null)
-  const toastT = useRef<ReturnType<typeof setTimeout>>()
   const pk = useRef(0)
 
   /* Through the shared helper so a rejected write is logged instead of
@@ -191,13 +190,8 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
     return () => unsub()
   }, [sessionId])
 
-  useEffect(() => () => { if (toastT.current) clearTimeout(toastT.current); staadCancel() }, [])
+  useEffect(() => () => { staadCancel() }, [])
 
-  const showToast = useCallback((msg: string) => {
-    setToast({ msg })
-    if (toastT.current) clearTimeout(toastT.current)
-    toastT.current = setTimeout(() => setToast(null), 2000)
-  }, [])
 
   const csym = CURRENCIES[currency] || '₹'
 
@@ -272,7 +266,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
     const item = ITEM_MAP.get(itemId)
     if (!item) return
     if (walletBalance < item.price) {
-      showToast(`Not enough money! Need ${fmtPrice(item.price - walletBalance, currency)} more`)
+      toast(`Not enough money! Need ${fmtPrice(item.price - walletBalance, currency)} more`, 'warning', { duration: 2000 })
       return
     }
     const k = ++pk.current
@@ -288,7 +282,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
     }
     const newBalance = walletBalance - item.price
     write({ 'moduleState.vsBasket': newBasket, 'moduleState.vsWalletBalance': newBalance })
-  }, [canInteract, completed, walletBalance, currency, basketMap, basket, write, showToast])
+  }, [canInteract, completed, walletBalance, currency, basketMap, basket, write])
 
   const removeFromBasket = useCallback((itemId: string) => {
     if (!canInteract || completed) return
@@ -308,7 +302,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
   const handlePay = useCallback(() => {
     if (!canInteract || completed || paying) return
     if (!canPay) {
-      if (payBlockedReason) showToast(payBlockedReason)
+      if (payBlockedReason) toast(payBlockedReason, 'warning', { duration: 2000 })
       return
     }
     const change = walletBalance
@@ -325,7 +319,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
       })
       setPaying(false)
       if (!ok) {
-        showToast('Payment did not go through — please try again')
+        toast('Payment did not go through. Please try again.', 'error')
         return
       }
       setReceipt(rc)
@@ -336,7 +330,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
       })
       staadPraise(voiceLangRef.current, 'Well done! You bought everything on your list!')
     }, 700)
-  }, [canInteract, completed, canPay, payBlockedReason, showToast, paying, walletBalance, basket, total, walletAmount, score, write, sessionId, itemCount, currency, difficulty, shoppingList.length])
+  }, [canInteract, completed, canPay, payBlockedReason, paying, walletBalance, basket, total, walletAmount, score, write, sessionId, itemCount, currency, difficulty, shoppingList.length])
 
   const resetShop = useCallback(() => {
     // The client closes the receipt on their own screen; the therapist decides
@@ -371,7 +365,6 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
     setEditList(false)
     setEditQty({})
     setFloaters([])
-    setToast(null)
     write({
       'moduleState.vsDifficulty': 'medium',
       'moduleState.vsCurrency': 'rupee',
@@ -556,7 +549,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
           <div style={{ flex: 1, background: 'rgba(255,255,255,0.82)', border: '1px solid rgba(0,0,0,0.10)', borderRadius: 14, padding: '14px 16px', minWidth: 0, boxShadow: '0 4px 14px rgba(20,30,40,0.06)' }}>
             <div style={{ fontSize: 17, color: '#48544D', marginBottom: 4 }}>Shopping List 📋</div>
             {shoppingList.length === 0 ? (
-              <div style={{ fontSize: 17, color: '#9AA3AC', fontStyle: 'italic' }}>
+              <div style={{ fontSize: 17, color: '#6B7280', fontStyle: 'italic' }}>
                 {isT ? 'Set shopping list above' : 'Waiting for shopping list...'}
               </div>
             ) : (
@@ -592,7 +585,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
           }}>
             {mathTerms.map((t, i) => (
               <span key={i}>
-                {i > 0 && <span style={{ color: '#9AA3AC', margin: '0 2px' }}>+</span>}
+                {i > 0 && <span style={{ color: '#6B7280', margin: '0 2px' }}>+</span>}
                 <span>{fmtPrice(t.price, currency)}</span>
               </span>
             ))}
@@ -679,7 +672,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
           {basketOpen && (
             <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.1)' }}>
               {basket.length === 0 ? (
-                <div style={{ fontSize: 17, color: '#9AA3AC', fontStyle: 'italic' }}>Basket is empty</div>
+                <div style={{ fontSize: 17, color: '#6B7280', fontStyle: 'italic' }}>Basket is empty</div>
               ) : (
                 <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 6, marginBottom: 6 }}>
                   {basket.map(b => {
@@ -818,17 +811,6 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
           </div>
         )}
       </div>
-
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', borderRadius: 10,
-          padding: '8px 16px', color: '#fff', fontSize: 19.5, zIndex: 100, pointerEvents: 'none',
-        }}>
-          {toast.msg}
-        </div>
-      )}
     </>
   )
 }

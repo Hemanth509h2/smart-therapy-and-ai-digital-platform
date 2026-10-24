@@ -8,17 +8,17 @@
 
 import type { CSSProperties } from 'react'
 
-/* ===== Room colour palette — unchanged, moved out of the page ===== */
+/* ===== Room colour palette (inkMuted/greenDark darkened for AA text contrast) ===== */
 export const RC = {
   pageBg: '#eef1f4',
   panel: '#ffffff',
   green: '#3fae6a',
-  greenDark: '#2f9457',
+  greenDark: '#237a49',
   greenSoft: 'rgba(63,174,106,0.12)',
   greenGlow: 'rgba(63,174,106,0.30)',
   border: '#e7eaef',
   ink: '#2b2f33',
-  inkMuted: '#9aa0a6',
+  inkMuted: '#636a71',
   tile: '#f3f5f8',
   tileActive: 'rgba(63,174,106,0.14)',
   red: '#ff5a5f',

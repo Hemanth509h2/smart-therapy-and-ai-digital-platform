@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Lock, Menu } from 'lucide-react';
 import Sidebar from './Sidebar';
-import { Toaster, cx, toast } from '@/components/practice/ui';
+import { cx, toast } from '@/components/practice/ui';
 import { apiFetch, PLAN_REQUIRED_EVENT } from '@/lib/api';
 
 interface DashboardLayoutProps {
@@ -133,7 +133,6 @@ export default function DashboardLayout({ children, role, profile }: DashboardLa
         </main>
       </div>
 
-      <Toaster />
     </div>
   );
 }

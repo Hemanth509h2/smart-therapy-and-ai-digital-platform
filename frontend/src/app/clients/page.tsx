@@ -9,7 +9,6 @@ import {
   Btn,
   Chips,
   EmptyCard,
-  InlineError,
   PageHead,
   SearchBox,
   SkeletonCard,
@@ -27,6 +26,7 @@ import {
   sessionState,
   type PracticeClient,
 } from '@/lib/practice';
+import { useErrorToast } from '@/components/practice/useErrorToast';
 
 type Tab = 'all' | 'active' | 'upcoming' | 'follow-up';
 
@@ -35,6 +35,7 @@ export default function ClientsPage() {
   const router = useRouter();
   const now = useNow(30_000);
   const { sessions, bookings, clients, loading, error, refresh } = usePracticeData();
+  useErrorToast(error, refresh);
 
   const [tab, setTab] = useState<Tab>('all');
   const [search, setSearch] = useState('');
@@ -88,8 +89,6 @@ export default function ClientsPage() {
           </Btn>
         }
       />
-
-      {error && <InlineError message={error} onRetry={refresh} />}
 
       <div className="toolbar">
         <SearchBox

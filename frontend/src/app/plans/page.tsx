@@ -5,9 +5,10 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { usePracticeData, useTherapistGuard } from '@/hooks/usePracticeData';
 import { StaadShell } from '@/components/staad/Shell';
 import { TopBar } from '@/components/staad/TopBar';
-import { Btn, Chips, InlineError, Notch, Section, SkeletonCard, cx } from '@/components/staad/parts';
+import { Btn, Chips, Notch, Section, SkeletonCard, cx } from '@/components/staad/parts';
 import { IconArrowRightXs, IconTick } from '@/components/staad/icons';
 import { DsDialog, toast } from '@/components/practice/ui';
+import { useErrorToast } from '@/components/practice/useErrorToast';
 import { ALL_MODULE_IDS, MODULE_CATEGORIES, resolveAllowedModuleIds } from '@/lib/modules';
 import { fmtDate } from '@/lib/practice';
 import { apiFetch, apiFetchCached, clearApiCache } from '@/lib/api';
@@ -97,24 +98,20 @@ export default function PlansPage() {
   const [months, setMonths] = useState<number>(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
   const [phone, setPhone] = useState('');
   // coupon: what's typed, and the server-priced result once applied
   const [couponInput, setCouponInput] = useState('');
   const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
   const [couponBusy, setCouponBusy] = useState(false);
-  const [couponError, setCouponError] = useState('');
 
   // pay for an approved request / withdraw a request
   const [payOpen, setPayOpen] = useState(false);
   const [payBusy, setPayBusy] = useState(false);
-  const [payError, setPayError] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
 
   // cancel plan
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
-  const [cancelError, setCancelError] = useState('');
 
   const load = useCallback(async () => {
     if (!profile?.id) return;
@@ -141,6 +138,8 @@ export default function PlansPage() {
   useEffect(() => {
     if (role === 'THERAPIST') load();
   }, [role, load]);
+
+  useErrorToast(loadError, load);
 
   // Tool access lives on the therapist profile in the auth store, so reload it
   // after a plan activates or the session-room gate would use the old tools.
@@ -184,25 +183,22 @@ export default function PlansPage() {
     if (!orderId) return;
     window.history.replaceState(null, '', window.location.pathname);
     confirmPayment(orderId)
-      .then((paid) => !paid && toast('Payment was not completed. You have not been charged.'))
-      .catch((e) => setLoadError(e.message));
+      .then((paid) => !paid && toast('Payment was not completed. You have not been charged.', 'warning'))
+      .catch((e) => toast(e.message, 'error'));
   }, [role, confirmPayment]);
 
   const openRequest = (p: Plan) => {
     setReqPlan(p);
     setMonths(term || p.durationMonths || 1);
     setSelected(new Set(current?.moduleAccess?.slice(0, p.toolQuota ?? undefined) ?? []));
-    setError('');
     setCouponInput('');
     setCoupon(null);
-    setCouponError('');
   };
 
   // Prices the order with the code; checkout checks it again server-side.
   const applyCoupon = async (term = months) => {
     if (!reqPlan || !couponInput.trim()) return;
     setCouponBusy(true);
-    setCouponError('');
     try {
       const res = await apiFetch('/api/coupons/validate', {
         method: 'POST',
@@ -212,12 +208,12 @@ export default function PlansPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setCoupon(null);
-        setCouponError(data.error || 'Could not apply that coupon.');
+        toast(data.error || 'Could not apply that coupon.', 'error');
       } else {
         setCoupon({ code: data.code, description: data.description, months: term, discount: data.discount, total: data.total });
       }
     } catch {
-      setCouponError('Network error. Please try again.');
+      toast('Network error. Please try again.', 'error');
     } finally {
       setCouponBusy(false);
     }
@@ -241,9 +237,8 @@ export default function PlansPage() {
 
   const submit = async () => {
     if (!reqPlan || !profile?.id) return;
-    setError('');
     if (reqPlan.toolQuota != null && selected.size === 0) {
-      setError('Please select at least one tool.');
+      toast('Please select at least one tool.', 'warning');
       return;
     }
     setSubmitting(true);
@@ -263,27 +258,26 @@ export default function PlansPage() {
       if (!res.ok) {
         // e.g. the coupon expired or ran out since it was applied
         if (coupon) setCoupon(null);
-        setError(data.error || 'Could not submit request.');
+        toast(data.error || 'Could not submit the request.', 'error');
       } else {
         toast(`Request for ${reqPlan.name} sent — an admin will review it.`);
         setReqPlan(null);
         load();
       }
     } catch {
-      setError('Network error. Please try again.');
+      toast('Network error. Please try again.', 'error');
     }
     setSubmitting(false);
   };
 
   const pay = async () => {
     if (!reqPlan) return;
-    setError('');
     if (reqPlan.toolQuota != null && selected.size === 0) {
-      setError('Please select at least one tool.');
+      toast('Please select at least one tool.', 'warning');
       return;
     }
     if (reqTotal > 0 && phone.replace(/\D/g, '').length < 10) {
-      setError('Please enter a 10-digit phone number.');
+      toast('Please enter a 10-digit phone number.', 'warning');
       return;
     }
     setSubmitting(true);
@@ -304,7 +298,7 @@ export default function PlansPage() {
       if (!res.ok) {
         // e.g. the coupon expired or ran out since it was applied
         if (coupon) setCoupon(null);
-        setError(order.error || 'Could not start payment.');
+        toast(order.error || 'Could not start the payment.', 'error');
         return;
       }
       if (order.activated) {
@@ -321,9 +315,9 @@ export default function PlansPage() {
 
       const paid = await confirmPayment(order.orderId);
       if (paid) setReqPlan(null);
-      else setError(result.closedMessage ? 'Payment was cancelled. You have not been charged.' : 'Payment was not completed. Please try again.');
+      else toast(result.closedMessage ? 'Payment was cancelled. You have not been charged.' : 'Payment was not completed. Please try again.', 'warning');
     } catch (e: any) {
-      setError(e?.message || 'Network error. Please try again.');
+      toast(e?.message || 'Network error. Please try again.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -332,9 +326,8 @@ export default function PlansPage() {
   // Pay for a request an admin approved. Its price was fixed at approval.
   const payApproved = async () => {
     if (!pending) return;
-    setPayError('');
     if (pending.total > 0 && phone.replace(/\D/g, '').length < 10) {
-      setPayError('Please enter a 10-digit phone number.');
+      toast('Please enter a 10-digit phone number.', 'warning');
       return;
     }
     setPayBusy(true);
@@ -346,7 +339,7 @@ export default function PlansPage() {
       });
       const order = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setPayError(order.error || 'Could not start payment.');
+        toast(order.error || 'Could not start the payment.', 'error');
         if (res.status === 409) load();
         return;
       }
@@ -361,9 +354,9 @@ export default function PlansPage() {
       if (result.redirected) return; // finishes on return via ?order_id=
       const paid = await confirmPayment(order.orderId);
       if (paid) setPayOpen(false);
-      else setPayError(result.closedMessage ? 'Payment was cancelled. You have not been charged.' : 'Payment was not completed. Please try again.');
+      else toast(result.closedMessage ? 'Payment was cancelled. You have not been charged.' : 'Payment was not completed. Please try again.', 'warning');
     } catch (e: any) {
-      setPayError(e?.message || 'Network error. Please try again.');
+      toast(e?.message || 'Network error. Please try again.', 'error');
     } finally {
       setPayBusy(false);
     }
@@ -375,12 +368,12 @@ export default function PlansPage() {
     try {
       const res = await apiFetch(`/api/subscriptions/request/${pending.id}`, { method: 'DELETE' });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) toast(data.error || 'Could not withdraw the request.');
+      if (!res.ok) toast(data.error || 'Could not withdraw the request.', 'error');
       else toast('Request withdrawn.');
       setPayOpen(false);
       load();
     } catch {
-      toast('Network error. Please try again.');
+      toast('Network error. Please try again.', 'error');
     } finally {
       setWithdrawing(false);
     }
@@ -389,7 +382,6 @@ export default function PlansPage() {
   // Cancelling keeps the plan until its end date; `undo` restores it.
   const setCancelled = async (undo: boolean) => {
     setCancelBusy(true);
-    setCancelError('');
     try {
       const res = await apiFetch('/api/subscriptions/cancel', {
         method: 'POST',
@@ -398,7 +390,7 @@ export default function PlansPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setCancelError(data.error || 'Could not update your plan.');
+        toast(data.error || 'Could not update your plan.', 'error');
         return;
       }
       setCurrent(data.current);
@@ -409,7 +401,7 @@ export default function PlansPage() {
           : `Plan cancelled. You keep access until ${fmtDate(data.current.currentPeriodEnd)}.`
       );
     } catch {
-      setCancelError('Network error. Please try again.');
+      toast('Network error. Please try again.', 'error');
     } finally {
       setCancelBusy(false);
     }
@@ -445,8 +437,6 @@ export default function PlansPage() {
         </div>
       </div>
 
-      {loadError && <InlineError message={loadError} onRetry={load} />}
-
       {pending && (
         <div className="inline-err" style={{ background: 'var(--ok-soft)', color: 'var(--ok)', flexWrap: 'wrap', gap: 10 }} role="status">
           <span style={{ flex: 1, minWidth: 220 }}>
@@ -466,7 +456,7 @@ export default function PlansPage() {
             )}
           </span>
           {pending.status === 'AWAITING_PAYMENT' && (
-            <Btn variant="primary" sm onClick={() => { setPayError(''); setPayOpen(true); }}>
+            <Btn variant="primary" sm onClick={() => setPayOpen(true)}>
               Pay {inr(pending.total)}
             </Btn>
           )}
@@ -590,11 +580,10 @@ export default function PlansPage() {
                         {cancelBusy ? 'Saving…' : 'Undo cancellation'}
                       </Btn>
                     ) : (
-                      <Btn variant="ghost" sm onClick={() => { setCancelError(''); setCancelOpen(true); }}>
+                      <Btn variant="ghost" sm onClick={() => setCancelOpen(true)}>
                         Cancel plan
                       </Btn>
                     )}
-                    {cancelError && !cancelOpen && <InlineError message={cancelError} />}
                   </div>
                 </div>
               ) : (
@@ -651,9 +640,7 @@ export default function PlansPage() {
             </button>
           </>
         }
-      >
-        {cancelError && <InlineError message={cancelError} />}
-      </DsDialog>
+      />
 
       {/* plan request */}
       <DsDialog
@@ -685,7 +672,6 @@ export default function PlansPage() {
                   className="ds-btn ds-btn-danger sm:mr-auto"
                   onClick={() => {
                     setReqPlan(null);
-                    setCancelError('');
                     setCancelOpen(true);
                   }}
                 >
@@ -779,10 +765,7 @@ export default function PlansPage() {
                     placeholder="Have a code?"
                     value={couponInput}
                     disabled={!!coupon || couponBusy}
-                    onChange={(e) => {
-                      setCouponInput(e.target.value.toUpperCase());
-                      setCouponError('');
-                    }}
+                    onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
                     onKeyDown={(e) => e.key === 'Enter' && applyCoupon()}
                     style={{ flex: 1, textTransform: 'uppercase' }}
                     aria-label="Coupon code"
@@ -809,7 +792,6 @@ export default function PlansPage() {
                     </button>
                   )}
                 </div>
-                {couponError && <InlineError message={couponError} />}
                 {couponApplies && (
                   <p className="lsub" style={{ marginTop: 8 }}>
                     <b>{coupon!.code}</b> applied{coupon!.description ? ` — ${coupon!.description}` : ''}: −{inr(coupon!.discount)}
@@ -826,7 +808,6 @@ export default function PlansPage() {
               </div>
             )}
 
-            {error && <InlineError message={error} />}
           </div>
         )}
       </DsDialog>
@@ -873,7 +854,6 @@ export default function PlansPage() {
                 />
               </div>
             )}
-            {payError && <InlineError message={payError} />}
           </div>
         )}
       </DsDialog>

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import type { AIInsight } from '@/lib/rag/types'
 import { GLASS } from './roomTheme'
+import { toast } from '@/components/practice/ui'
 import PanelShell from './PanelShell'
 import { moduleName } from '@/lib/modules'
 
@@ -136,7 +137,10 @@ export default function AINotesPanel({
       })
       setSavedAt(Date.now())
       setText('')
-    } catch {}
+      toast('Note saved', 'success')
+    } catch {
+      toast('Could not save the note. Try again.', 'error')
+    }
     setSaving(false)
   }
 
@@ -151,6 +155,7 @@ export default function AINotesPanel({
         desc: 'Marked by therapist during the session.',
       },
     ])
+    toast('Moment highlighted. See it under Observations.', 'success', { duration: 2500 })
   }
 
   // Rich-text toolbar: wraps the current textarea selection in markdown-ish

@@ -10,6 +10,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Camera, CameraOff } from 'lucide-react'
+import { toast } from '@/components/practice/ui'
 
 const TIPS = [
   'Find a quiet, private place for your session.',
@@ -32,7 +33,7 @@ export default function WaitingLobby({
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [cameraOn, setCameraOn] = useState(true)
-  const [cameraError, setCameraError] = useState('')
+  const [cameraError, setCameraError] = useState(false)
   const [waited, setWaited] = useState(0)
 
   useEffect(() => {
@@ -55,11 +56,13 @@ export default function WaitingLobby({
       .then((stream) => {
         if (cancelled) return stream.getTracks().forEach((t) => t.stop())
         streamRef.current = stream
-        setCameraError('')
+        setCameraError(false)
         if (videoRef.current) videoRef.current.srcObject = stream
       })
       .catch(() => {
-        if (!cancelled) setCameraError('Camera is blocked or unavailable. You can still join with audio.')
+        if (cancelled) return
+        setCameraError(true)
+        toast('Camera is blocked or unavailable. You can still join with audio.', 'warning')
       })
     return () => {
       cancelled = true
@@ -126,7 +129,7 @@ export default function WaitingLobby({
               }}
             >
               <CameraOff size={28} />
-              {cameraError || 'Camera is off'}
+              {cameraError ? 'Camera unavailable' : 'Camera is off'}
             </div>
           )}
           {selfName && (

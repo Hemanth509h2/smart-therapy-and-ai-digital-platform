@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { toast } from '@/components/practice/ui'
 import { staadCancel } from '@/lib/voice/staadVoice'
 
 /* ── Art assets ─────────────────────────────────────────────────────────────── */
@@ -267,14 +268,12 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
   const [livesAnim, setLivesAnim] = useState<Set<number>>(new Set())
   const [lastCmdIdx, setLastCmdIdx] = useState(-1)
   const [animateKey, setAnimateKey] = useState(0)
-  const [toast, setToast] = useState<{ msg: string } | null>(null)
 
   // Sound toggle
   const [muted, setMuted] = useState(false)
 
   const tmr = useRef<ReturnType<typeof setInterval>>()
   const stepTimeouts = useRef<ReturnType<typeof setTimeout>[]>([])
-  const toastT = useRef<ReturnType<typeof setTimeout>>()
   const fbT = useRef<ReturnType<typeof setTimeout>>()
 
   const write = useCallback(async (d: Record<string, unknown>) => {
@@ -325,7 +324,6 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
     if (tmr.current) clearInterval(tmr.current)
     stepTimeouts.current.forEach(t => clearTimeout(t))
     stepTimeouts.current = []
-    if (toastT.current) clearTimeout(toastT.current)
     if (fbT.current) clearTimeout(fbT.current)
     if (tapT.current) clearTimeout(tapT.current)
   }, [])
@@ -498,10 +496,9 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
     fbT.current = setTimeout(() => setFeedback(null), 1200)
   }, [])
 
-  const showToast = useCallback((msg: string) => {
-    setToast({ msg })
-    if (toastT.current) clearTimeout(toastT.current)
-    toastT.current = setTimeout(() => setToast(null), 200)
+  // Shown only on the screen of whoever tapped, as before.
+  const showToast = useCallback((msg: string, tone: 'success' | 'info' = 'success') => {
+    toast(msg, tone, { duration: 1500 })
   }, [])
 
   // --- Classic Mode Sequence Flow with Clear Pop-Up Gaps ---
@@ -580,7 +577,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
       setLivesAnim(prev => new Set(prev).add(livesRem - 1))
       setTimeout(() => setLivesAnim(prev => { const n = new Set(prev); n.delete(livesRem - 1); return n }), 450)
       showFeedback('wrong', 'Gentle try! Let\'s watch again 🌸')
-      showToast('Take a breath 💛')
+      showToast('Take a breath 💛', 'info')
       write({ 'moduleState.ssLivesRemaining': nl, 'moduleState.ssChildInput': next })
       if (nl <= 0) {
         clearAllTimeouts()
@@ -678,7 +675,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
       const msg = shouldDoIt ? 'Simon said to do it! 😊' : 'Simon didn\'t say! 🪤'
       if (!shouldDoIt) nth = trapsHit + 1
       showFeedback('wrong', msg)
-      showToast(msg)
+      showToast(msg, 'info')
       write({ 'moduleState.ssLivesRemaining': nl, 'moduleState.ssScore': score, 'moduleState.ssTrapsHit': nth, 'moduleState.ssTrapsAvoided': nta })
       if (nl <= 0) {
         clearAllTimeouts()
@@ -813,12 +810,6 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
           45% { transform: scale(1.14) translateY(-12px); }
           100% { transform: scale(1.10) translateY(-8px); }
         }
-        @keyframes toastFlash{
-          0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}
-          30%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}
-          70%{opacity:1;transform:translate(-50%,-50%) scale(1)}
-          100%{opacity:0;transform:translate(-50%,-50%) scale(.9)}
-        }
         @keyframes orbitSpin{
           from{transform:translate(-50%,-50%) rotate(0deg)}
           to{transform:translate(-50%,-50%) rotate(360deg)}
@@ -847,7 +838,6 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
         }
         .ci-a{animation:ci .3s ease}
         .ss-pop{animation:ssPop .3s cubic-bezier(0.34,1.56,0.64,1)}
-        .toast-flash{animation:toastFlash .22s ease forwards}
         .pad-elevated{
           animation: pad3DPop 0.26s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
@@ -1579,32 +1569,6 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* ── Toast — 200ms correct flash in centre of console ──────────────── */}
-      {toast && (
-        <div
-          className="toast-flash"
-          style={{
-            position: 'absolute',
-            top: '50%', left: '50%',
-            transform: 'translate(-50%,-50%)',
-            background: 'linear-gradient(135deg, #059669, #34d399)',
-            borderRadius: 999,
-            padding: '10px 22px',
-            color: '#ffffff',
-            fontSize: 17,
-            fontWeight: 900,
-            letterSpacing: 0.5,
-            zIndex: 200,
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap',
-            boxShadow: '0 0 30px rgba(52,211,153,0.7), 0 6px 20px rgba(5,150,105,0.5)',
-            border: '2px solid rgba(255,255,255,0.4)',
-          }}
-        >
-          {toast.msg}
         </div>
       )}
     </div>

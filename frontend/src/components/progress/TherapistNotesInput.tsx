@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { fetchClientNotes, createNote, type ProgressNote } from '@/lib/progressApi';
 import { OnOffButton } from '@/components/ui/on-off-button';
+import { toast } from '@/components/practice/ui';
 
 const CARD =
   'rounded-[14px] border-[0.5px] border-[var(--glass-border)] shadow-[var(--glass-shadow)] bg-[var(--glass-bg)] dark:bg-[#16221e]';
@@ -18,14 +19,13 @@ export default function TherapistNotesInput({ clientId, reportId }: Props) {
   const [isPrivate, setIsPrivate] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     fetchClientNotes(clientId)
       .then((n) => !cancelled && setNotes(n))
-      .catch((e) => !cancelled && setError(e.message))
+      .catch((e) => !cancelled && toast(e.message || 'Could not load the notes.', 'error'))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
@@ -36,13 +36,13 @@ export default function TherapistNotesInput({ clientId, reportId }: Props) {
     e.preventDefault();
     if (!content.trim()) return;
     setSaving(true);
-    setError(null);
     try {
       const note = await createNote({ clientId, content: content.trim(), reportId, isPrivate });
       setNotes((prev) => [note, ...prev]);
       setContent('');
+      toast('Note saved');
     } catch (e: any) {
-      setError(e.message);
+      toast(e.message || 'Could not save the note.', 'error');
     } finally {
       setSaving(false);
     }
@@ -83,7 +83,6 @@ export default function TherapistNotesInput({ clientId, reportId }: Props) {
             {saving ? 'Saving…' : 'Add Note'}
           </button>
         </div>
-        {error && <p className="text-xs text-red-500">{error}</p>}
       </form>
 
       {loading ? (

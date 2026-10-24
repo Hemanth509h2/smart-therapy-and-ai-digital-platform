@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { toast } from '@/components/practice/ui';
 import { useAuthStore } from '@/store/useAuthStore';
 import { initials, fullName } from '@/lib/practice';
 import { adminNavFor } from '@/lib/adminNav';
@@ -100,7 +101,9 @@ export function StaadShell({ children, className }: { children: React.ReactNode;
   const handleLogout = async () => {
     try {
       await signOut(auth);
-    } catch {}
+    } catch {
+      toast('Could not sign out. Please try again.', 'error');
+    }
     router.push('/auth');
   };
 

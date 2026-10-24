@@ -8,13 +8,17 @@ import { errorResponse } from '@/lib/http/apiError';
 export const dynamic = 'force-dynamic';
 
 // GET /api/admin/coupons — every coupon, newest first, with redemptionCount
-// (PAID orders) and discountTotal (₹ given away through it).
+// (PAID orders), discountTotal (₹ given away through it) and therapistName
+// (the professional a personal coupon belongs to, else null).
 export async function GET(request: Request) {
   try {
     const auth = await requireAdmin(request, 'billing.read');
     if (!auth.ok) return auth.response;
     const [coupons, used] = await Promise.all([
-      appDb.coupon.findMany({ orderBy: { createdAt: 'desc' } }),
+      appDb.coupon.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: { therapist: { select: { firstName: true, lastName: true } } },
+      }),
       appDb.payment.groupBy({
         by: ['couponId'],
         where: { couponId: { not: null }, orderStatus: 'PAID' },
@@ -25,7 +29,13 @@ export async function GET(request: Request) {
     return NextResponse.json({
       coupons: coupons.map((c) => {
         const u = used.find((r) => r.couponId === c.id);
-        return { ...c, redemptionCount: u?._count._all ?? 0, discountTotal: Number(u?._sum.discount ?? 0) };
+        const { therapist, ...rest } = c;
+        return {
+          ...rest,
+          therapistName: therapist ? `${therapist.firstName} ${therapist.lastName}`.trim() : null,
+          redemptionCount: u?._count._all ?? 0,
+          discountTotal: Number(u?._sum.discount ?? 0),
+        };
       }),
     });
   } catch (error: any) {
@@ -35,7 +45,7 @@ export async function GET(request: Request) {
 
 // POST /api/admin/coupons — create a coupon.
 // Body: { code, type: PERCENT|FLAT, discountValue, description?, planIds?, minMonths?,
-//         maxRedemptions?, oncePerTherapist?, startsAt?, expiresAt?, isActive? }
+//         maxRedemptions?, oncePerTherapist?, therapistId?, startsAt?, expiresAt?, isActive? }
 export async function POST(request: Request) {
   try {
     const auth = await requireAdmin(request, 'billing.write');
@@ -52,6 +62,7 @@ export async function POST(request: Request) {
     if (error.code === 'P2002') {
       return NextResponse.json({ error: 'A coupon with that code already exists.' }, { status: 409 });
     }
+    if (error.code === 'P2003') return NextResponse.json({ error: 'That professional no longer exists.' }, { status: 400 });
     return errorResponse(error, 'Admin coupons POST error');
   }
 }

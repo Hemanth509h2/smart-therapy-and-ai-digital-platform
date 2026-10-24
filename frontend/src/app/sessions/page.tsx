@@ -12,7 +12,6 @@ import {
   Btn,
   Chips,
   EmptyCard,
-  InlineError,
   SearchBox,
   Section,
   SkeletonCard,
@@ -29,6 +28,8 @@ import { useSessionActions } from '@/components/practice/useSessionActions';
 import SessionReportDrawer from '@/components/report/SessionReportDrawer';
 import { Sparkles } from 'lucide-react';
 import { SESSION_KIND, downloadFile, fmtListDate, fmtSessionNo, fmtTime, fullName, hasDocs, initials, sessionDuration, sessionNumbers, sessionState, toCsv, type PracticeSession } from '@/lib/practice';
+import { useErrorToast } from '@/components/practice/useErrorToast';
+import { toast } from '@/components/practice/ui';
 
 type Tab = 'all' | 'completed' | 'upcoming' | 'notes-pending';
 const GRID = '1.9fr 1fr 1fr 1.1fr 150px';
@@ -46,6 +47,7 @@ function SessionsInner() {
   const now = useNow(30_000);
   const params = useSearchParams();
   const { sessions, bookings, clients, loading, error, refresh } = usePracticeData();
+  useErrorToast(error, refresh);
   const actions = useSessionActions(refresh);
 
   const [tab, setTab] = useState<Tab>('all');
@@ -107,6 +109,7 @@ function SessionsInner() {
       r.filed ? 'Filed' : 'Pending',
     ]);
     downloadFile('staad-sessions.csv', toCsv([header, ...body]), 'text/csv');
+    toast('Sessions exported as CSV');
   };
 
   const monthLabel = now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -121,8 +124,6 @@ function SessionsInner() {
         onNew={() => setStartOpen(true)}
         canExport={filtered.length > 0}
       />
-
-      {error && <InlineError message={error} onRetry={refresh} />}
 
       <div className="toolbar">
         <Chips<Tab>

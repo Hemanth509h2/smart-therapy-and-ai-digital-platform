@@ -10,7 +10,6 @@ import {
   Badge,
   Btn,
   EmptyCard,
-  InlineError,
   SkeletonCard,
   cx,
 } from '@/components/staad/parts';
@@ -66,6 +65,7 @@ import {
   type PracticeClient,
   type PracticeSession,
 } from '@/lib/practice';
+import { useErrorToast } from '@/components/practice/useErrorToast';
 
 interface SessionNote {
   id: string;
@@ -144,6 +144,7 @@ export default function ClientProfilePage() {
   const clientId = params.clientId;
   const now = useNow(30_000);
   const { sessions, bookings, clients, loading, error, refresh } = usePracticeData();
+  useErrorToast(error, refresh);
   const actions = useSessionActions(refresh);
 
   const [tab, setTab] = useState<Tab>('overview');
@@ -176,6 +177,9 @@ export default function ClientProfilePage() {
         if (n.status === 'fulfilled') setNotes(n.value);
         if (r.status === 'fulfilled') setReports(r.value);
         if (sn.status === 'fulfilled') setSessionNotes(sn.value.notes ?? []);
+        if ([m, n, r, sn].some((x) => x.status === 'rejected')) {
+          toast('Some client details could not be loaded.', 'warning');
+        }
       })
       .finally(() => {
         if (!cancelled) setExtraLoading(false);
@@ -239,7 +243,7 @@ export default function ClientProfilePage() {
       window.location.href = `mailto:${email}`;
       return;
     }
-    toast('No phone or email on file for this client.');
+    toast('No phone or email on file for this client.', 'info');
   };
 
   const saveNote = async () => {
@@ -277,8 +281,6 @@ export default function ClientProfilePage() {
           </>
         )}
       </Link>
-
-      {error && <InlineError message={error} onRetry={refresh} />}
 
       {loading && !client ? (
         <SkeletonCard height={220} />

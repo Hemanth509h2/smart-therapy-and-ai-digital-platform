@@ -35,7 +35,10 @@ export default function SessionReportDrawer({
         setReport(d.report);
         setReportStats(d.stats);
       })
-      .catch(() => setReport(null))
+      .catch(() => {
+        setReport(null);
+        toast('Could not load the session report.', 'error');
+      })
       .finally(() => setReportLoading(false));
   }, [session]);
 

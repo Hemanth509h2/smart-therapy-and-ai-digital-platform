@@ -764,10 +764,10 @@
  * against the STAAD card surfaces (#fff light, #232323 dark). */
 :root:has(.admin-ui) {
   --ink: #0b0b0b;
-  --ink-muted: #85858a;
+  --ink-muted: #5c5c61;
   --glass-bg: #ffffff;
   --glass-strong: #ffffff;
-  --glass-border: rgba(11, 11, 11, 0.1);
+  --glass-border: rgba(11, 11, 11, 0.14);
   --glass-shadow: none;
   --sage: #0b0b0b;
   --sage-light: #f1f1ef;

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { toast } from '@/components/practice/ui'
 import { AnimatePresence, motion } from 'motion/react'
 import TreasureHunt3DScene, { type SceneHotspot } from './treasure-hunt/TreasureHunt3DScene'
 import TreasureHuntRadar from './treasure-hunt/TreasureHuntRadar'
@@ -1697,7 +1698,6 @@ export default function TreasureQuest({
   const [language, setLanguage] = useState<Lang>('both')
   const [completed, setCompleted] = useState(false)
   const [shakeId, setShakeId] = useState<string | null>(null)
-  const [missMsg, setMissMsg] = useState(false)
   const [fqOpen, setFqOpen] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(true)
 
@@ -1769,11 +1769,18 @@ export default function TreasureQuest({
     return () => unsub()
   }, [sessionId])
 
+  // Read through a ref so the LiveKit listener below isn't re-subscribed on a
+  // language change. Misses are relayed to the other side, so both show it.
+  const languageRef = useRef(language)
+  languageRef.current = language
   const showMiss = useCallback((id: string) => {
     setShakeId(id)
-    setMissMsg(true)
     if (shakeT.current) clearTimeout(shakeT.current)
-    shakeT.current = setTimeout(() => { setShakeId(null); setMissMsg(false) }, 1600)
+    shakeT.current = setTimeout(() => setShakeId(null), 1600)
+    const lang = languageRef.current
+    const en = 'Not this one — try talking about it again'
+    const hi = 'यह नहीं — फिर से बात करके देखो'
+    toast(lang === 'en' ? en : lang === 'hi' ? hi : `${en} · ${hi}`, 'info', { duration: 1600 })
   }, [])
 
   useEffect(() => {
@@ -2468,35 +2475,6 @@ export default function TreasureQuest({
                 )}
               </AnimatePresence>
 
-              {/* Soft Miss Nudge */}
-              <AnimatePresence>
-                {missMsg && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
-                    style={{
-                      position: 'absolute',
-                      bottom: 64,
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      zIndex: 35,
-                      background: 'rgba(250,240,220,0.95)',
-                      borderRadius: 999,
-                      padding: '6px 16px',
-                      fontSize: 13.5,
-                      fontWeight: 700,
-                      color: '#6b5030',
-                      whiteSpace: 'nowrap',
-                      boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
-                    }}
-                  >
-                    {showEn && 'Not this one — try talking about it again'}
-                    {language === 'both' && ' · '}
-                    {showHi && <span style={{ fontFamily: DEVANAGARI }}>यह नहीं — फिर से बात करके देखो</span>}
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </motion.div>
           )}
         </AnimatePresence>

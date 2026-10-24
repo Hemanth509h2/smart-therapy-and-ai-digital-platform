@@ -45,12 +45,6 @@ function defaultStart(day?: Date) {
   return t;
 }
 
-const ErrorText = ({ children }: { children: React.ReactNode }) => (
-  <p className="text-[13px] font-medium" style={{ color: 'var(--ds-red)' }} role="alert">
-    {children}
-  </p>
-);
-
 function NoClients({ onAddClient }: { onAddClient?: () => void }) {
   return (
     <div className="rounded-2xl p-4 text-[13.5px]" style={{ background: 'var(--ds-surface-2)', color: 'var(--ds-muted)' }}>
@@ -89,7 +83,6 @@ export function BookSessionDialog({
   const [time, setTime] = useState('');
   const [duration, setDuration] = useState(DEFAULT_DURATION);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -98,7 +91,6 @@ export function BookSessionDialog({
     setDate(toDateInput(start));
     setTime(toTimeInput(start));
     setDuration(DEFAULT_DURATION);
-    setError('');
     // Reset only when the dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -109,18 +101,17 @@ export function BookSessionDialog({
 
   const submit = async () => {
     if (!profile?.id) return;
-    if (!clientId) return setError('Choose a client.');
-    if (!when) return setError('Pick a date and time.');
-    if (when.getTime() < Date.now() - 60_000) return setError('Pick a time in the future.');
+    if (!clientId) return void toast('Choose a client.', 'warning');
+    if (!when) return void toast('Pick a date and time.', 'warning');
+    if (when.getTime() < Date.now() - 60_000) return void toast('Pick a time in the future.', 'warning');
     setSaving(true);
-    setError('');
     try {
       const session = await createSession(profile.id, clientId, when, duration, true);
       toast(`Session booked for ${fmtDayTime(when)}`);
       onOpenChange(false);
       onBooked?.(session);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not book the session.');
+      toast(e instanceof Error ? e.message : 'Could not book the session.', 'error');
     } finally {
       setSaving(false);
     }
@@ -181,7 +172,6 @@ export function BookSessionDialog({
               This is outside your working hours ({describeAvailability(availability)}). You can still book it.
             </p>
           )}
-          {error && <ErrorText>{error}</ErrorText>}
         </div>
       )}
     </DsDialog>
@@ -213,7 +203,6 @@ export function StartSessionDialog({
   const { profile } = useAuthStore();
   const [clientId, setClientId] = useState('');
   const [starting, setStarting] = useState(false);
-  const [error, setError] = useState('');
   const [patientLink, setPatientLink] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -228,7 +217,6 @@ export function StartSessionDialog({
     setClientId(defaultClientId ?? clients[0]?.id ?? '');
     setPickedModule(moduleId ?? '');
     setPickedSession('');
-    setError('');
     setStarting(false);
     setPatientLink(null);
     setSessionId(null);
@@ -258,9 +246,8 @@ export function StartSessionDialog({
     pickedSession === 'new' ? undefined : pickedSession ? clientSessions.find((s) => s.id === pickedSession) ?? due : due;
 
   const start = async () => {
-    if (!profile?.id || !clientId) return setError('Choose a client.');
+    if (!profile?.id || !clientId) return void toast('Choose a client.', 'warning');
     setStarting(true);
-    setError('');
     try {
       const id = existing?.id ?? (await createSession(profile.id, clientId, new Date())).id;
       // Get (or create) the patient join link for this session first.
@@ -271,7 +258,7 @@ export function StartSessionDialog({
       setPatientLink(`${window.location.origin}/join/${data.token}`);
       setStarting(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not start the session.');
+      toast(e instanceof Error ? e.message : 'Could not start the session.', 'error');
       setStarting(false);
     }
   };
@@ -287,7 +274,7 @@ export function StartSessionDialog({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      /* clipboard blocked — user can select the text manually */
+      toast('Could not copy — select the link and copy it manually.', 'error');
     }
   };
 
@@ -427,7 +414,6 @@ export function StartSessionDialog({
               — you&apos;ll join that room.
             </p>
           )}
-          {error && <ErrorText>{error}</ErrorText>}
         </div>
       )}
     </DsDialog>
@@ -456,7 +442,6 @@ export function AddClientDialog({
   const [link, setLink] = useState('');
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -469,15 +454,13 @@ export function AddClientDialog({
       setGender('');
       setLink('');
       setCopied(false);
-      setError('');
     }
   }, [open]);
 
   const submit = async () => {
     if (!profile?.id) return;
-    if (!firstName.trim()) return setError("Enter the client's first name.");
+    if (!firstName.trim()) return void toast("Enter the client's first name.", 'warning');
     setSaving(true);
-    setError('');
     try {
       const res = await apiFetch('/api/clients', {
         method: 'POST',
@@ -498,10 +481,11 @@ export function AddClientDialog({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not add the client.');
+      toast(`${firstName.trim()} added to your clients`);
       onCreated?.();
       onOpenChange(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not create the invite.');
+      toast(e instanceof Error ? e.message : 'Could not add the client.', 'error');
     } finally {
       setSaving(false);
     }
@@ -593,7 +577,6 @@ export function AddClientDialog({
               </select>
             </Field>
           </div>
-          {error && <ErrorText>{error}</ErrorText>}
         </div>
     </DsDialog>
   );
@@ -613,7 +596,6 @@ export function RescheduleDialog({
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!session) return;
@@ -621,23 +603,21 @@ export function RescheduleDialog({
     const start = current.getTime() > Date.now() ? current : defaultStart();
     setDate(toDateInput(start));
     setTime(toTimeInput(start));
-    setError('');
   }, [session]);
 
   const submit = async () => {
     if (!session) return;
     const when = fromInputs(date, time);
-    if (!when) return setError('Pick a date and time.');
-    if (when.getTime() < Date.now() - 60_000) return setError('Pick a time in the future.');
+    if (!when) return void toast('Pick a date and time.', 'warning');
+    if (when.getTime() < Date.now() - 60_000) return void toast('Pick a time in the future.', 'warning');
     setSaving(true);
-    setError('');
     try {
       await updateSchedule(session.id, 'reschedule', when);
       toast(`Session moved to ${fmtDayTime(when)}`);
       onClose();
       onDone?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not reschedule.');
+      toast(e instanceof Error ? e.message : 'Could not reschedule the session.', 'error');
     } finally {
       setSaving(false);
     }
@@ -670,7 +650,6 @@ export function RescheduleDialog({
             <input id="rs-time" type="time" className="ds-input" value={time} onChange={(e) => setTime(e.target.value)} />
           </Field>
         </div>
-        {error && <ErrorText>{error}</ErrorText>}
       </div>
     </DsDialog>
   );
@@ -763,12 +742,10 @@ export function CancelSessionDialog({
 export function AvailabilityDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { profile } = useAuthStore();
   const [av, setAv] = useState<Availability>(() => loadAvailability());
-  const [error, setError] = useState('');
 
   useEffect(() => {
     if (open) {
       setAv(loadAvailability(profile?.id));
-      setError('');
     }
   }, [open, profile?.id]);
 
@@ -776,7 +753,7 @@ export function AvailabilityDialog({ open, onOpenChange }: { open: boolean; onOp
     setAv((a) => ({ ...a, days: a.days.includes(d) ? a.days.filter((x) => x !== d) : [...a.days, d] }));
 
   const save = () => {
-    if (av.start >= av.end) return setError('End time must be after start time.');
+    if (av.start >= av.end) return void toast('End time must be after start time.', 'warning');
     saveAvailability(profile?.id, av);
     toast('Working hours saved');
     onOpenChange(false);
@@ -824,7 +801,6 @@ export function AvailabilityDialog({ open, onOpenChange }: { open: boolean; onOp
             <input id="av-end" type="time" className="ds-input" value={av.end} onChange={(e) => setAv({ ...av, end: e.target.value })} />
           </Field>
         </div>
-        {error && <ErrorText>{error}</ErrorText>}
       </div>
     </DsDialog>
   );
@@ -858,9 +834,15 @@ export function NotesDrawer({
     setDraft('');
     setLoading(true);
     apiFetch(`/api/notes?sessionId=${session.id}`)
-      .then((r) => (r.ok ? r.json() : { notes: [] }))
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
       .then((d) => setNotes(d.notes ?? []))
-      .catch(() => setNotes([]))
+      .catch(() => {
+        setNotes([]);
+        toast('Could not load the notes for this session.', 'error');
+      })
       .finally(() => setLoading(false));
   }, [session]);
 

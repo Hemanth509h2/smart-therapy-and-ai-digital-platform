@@ -131,6 +131,7 @@ export default function AdminSubscriptionsPage() {
         { header: 'Renewals', value: (r) => (r.current ?? r.latest)?.renewalCount ?? '' },
         { header: 'Terms on record', value: (r) => r.termCount },
       ]);
+      toast(`Exported ${rows.length} rows`);
     } catch (e: any) {
       toast(e.message || 'Export failed', 'error');
     } finally {
@@ -410,14 +411,12 @@ function ApproveModal({ request, onClose, onDone }: { request: PlanRequest | nul
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [removeCoupon, setRemoveCoupon] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!request) return;
     setMonths(String(request.months));
     setSelected(new Set(request.modules));
     setRemoveCoupon(false);
-    setError('');
   }, [request]);
 
   // The requested price; the server re-prices on approval (a different term
@@ -438,9 +437,8 @@ function ApproveModal({ request, onClose, onDone }: { request: PlanRequest | nul
 
   const approve = async () => {
     if (!request) return;
-    if (quota != null && selected.size === 0) { setError('Select at least one tool.'); return; }
+    if (quota != null && selected.size === 0) { toast('Select at least one tool.', 'error'); return; }
     setSaving(true);
-    setError('');
     try {
       const res = await adminFetch<{ status: string; total: number }>(`/api/admin/subscriptions/requests/${request.id}`, {
         method: 'POST',
@@ -450,7 +448,7 @@ function ApproveModal({ request, onClose, onDone }: { request: PlanRequest | nul
       onClose();
       onDone();
     } catch (e: any) {
-      setError(e.message || 'Could not approve.');
+      toast(e.message || 'Could not approve.', 'error');
     } finally {
       setSaving(false);
     }
@@ -534,7 +532,6 @@ function ApproveModal({ request, onClose, onDone }: { request: PlanRequest | nul
           </div>
         </div>
       )}
-      {error && <ErrorBanner message={error} />}
     </Modal>
   );
 }
@@ -544,25 +541,22 @@ function ApproveModal({ request, onClose, onDone }: { request: PlanRequest | nul
 function RenewModal({ target, onClose, onDone }: { target: { pro: Professional; term: Term } | null; onClose: () => void; onDone: () => void }) {
   const [months, setMonths] = useState('1');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!target) return;
     setMonths(MONTH_OPTIONS.some((o) => o.value === String(target.term.months)) ? String(target.term.months) : '1');
-    setError('');
   }, [target]);
 
   const renew = async () => {
     if (!target) return;
     setSaving(true);
-    setError('');
     try {
       await adminFetch(`/api/admin/subscriptions/${target.term.id}`, { method: 'PATCH', json: { action: 'renew', months: Number(months) } });
       toast('Term renewed');
       onClose();
       onDone();
     } catch (e: any) {
-      setError(e.message || 'Could not renew.');
+      toast(e.message || 'Could not renew.', 'error');
     } finally {
       setSaving(false);
     }
@@ -592,7 +586,6 @@ function RenewModal({ target, onClose, onDone }: { target: { pro: Professional; 
       <Field label="Add">
         <Select ariaLabel="Months to add" value={months} onChange={setMonths} options={MONTH_OPTIONS} />
       </Field>
-      {error && <ErrorBanner message={error} />}
     </Modal>
   );
 }
@@ -628,7 +621,7 @@ function HistoryModal({ pro, onClose }: { pro: Professional | null; onClose: () 
     <Modal open={!!pro} onClose={onClose} wide title={pro?.name || 'Subscription history'} description={pro?.email}>
       {error && <ErrorBanner message={error} onRetry={reload} />}
       {!ready ? (
-        <div className="flex justify-center py-8"><Spinner /></div>
+        error && !loading ? <EmptyState title="Nothing to show" /> : <div className="flex justify-center py-8"><Spinner /></div>
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2 text-sm" style={{ color: 'var(--ink-muted)' }}>

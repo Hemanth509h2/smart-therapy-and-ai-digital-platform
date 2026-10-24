@@ -18,12 +18,12 @@ import { Label } from '@/components/ui/label';
 import { Heart, Sparkles, Video, ShieldCheck, Mail, Clock } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { SUPPORT_EMAIL, SUPPORT_HOURS } from '@/content/help';
+import { toast } from '@/components/practice/ui';
 
 function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -63,7 +63,7 @@ function AuthForm() {
           // Patients no longer have accounts: they join through the link their therapist sends.
           await signOut(auth);
           redirecting.current = false;
-          setError('Client accounts are no longer supported. Please use the session link your therapist sent you.');
+          toast('Client accounts are no longer supported. Please use the session link your therapist sent you.', 'info');
           return;
         }
         if (user) {
@@ -78,6 +78,14 @@ function AuthForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
 
+  const noticeShown = useRef(false);
+  useEffect(() => {
+    if (clientsRemoved && !noticeShown.current) {
+      noticeShown.current = true;
+      toast('Client accounts are no longer supported. Please use the session link your therapist sent you.', 'info');
+    }
+  }, [clientsRemoved]);
+
   // Patients don't sign up any more: an old invite link goes to the guest join page.
   useEffect(() => {
     if (inviteToken) router.replace(`/join/${encodeURIComponent(inviteToken)}`);
@@ -85,7 +93,6 @@ function AuthForm() {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
 
     // Redirect happens in the uid effect above once Firebase reports the user.
@@ -96,21 +103,20 @@ function AuthForm() {
         await createUserWithEmailAndPassword(auth, email, password);
       }
     } catch (err: any) {
-      setError(err.message || 'Authentication failed. Please try again.');
+      toast(err.message || 'Authentication failed. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleAuth = async () => {
-    setError(null);
     setLoading(true);
     const provider = new GoogleAuthProvider();
     try {
       // Redirect (by role, or to onboarding) happens in the uid effect above.
       await signInWithPopup(auth, provider);
     } catch (err: any) {
-      setError(err.message || 'Google Auth failed');
+      toast(err.message || 'Google sign-in failed. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -197,11 +203,6 @@ function AuthForm() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {clientsRemoved && (
-            <div className="rounded-xl p-3 text-sm font-medium" style={{ background: 'var(--c-accent-bg)', color: 'var(--c-accent)', border: '1px solid var(--glass-border)' }}>
-              Client accounts are no longer supported. Please use the session link your therapist sent you.
-            </div>
-          )}
           <form onSubmit={handleAuth} className="space-y-4">
             <div className="space-y-1">
               <Label htmlFor="email" className="font-medium" style={{ color: 'var(--ink-muted)' }}>Email</Label>
@@ -229,9 +230,6 @@ function AuthForm() {
               />
             </div>
             
-            {error && (
-              <p className="text-sm text-red-600 font-medium text-center">{error}</p>
-            )}
 
             <Button 
               type="submit" 

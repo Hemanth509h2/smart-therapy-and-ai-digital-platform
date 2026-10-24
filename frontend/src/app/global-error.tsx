@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import ErrorScreen from '@/components/ErrorScreen';
+import { Toaster } from '@/components/practice/ui';
 import './globals.css';
 import './staad-design.css';
 import './staad-extras.css';
@@ -29,6 +30,8 @@ export default function GlobalError({
           detail={error.digest ? `Reference: ${error.digest}` : undefined}
           onRetry={reset}
         />
+        {/* The root layout (and its Toaster) is gone here, so mount one. */}
+        <Toaster />
       </body>
     </html>
   );

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { doc, updateDoc, arrayUnion, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { X } from 'lucide-react'
+import { toast } from '@/components/practice/ui'
 
 interface NotesPanelProps {
   open: boolean
@@ -18,7 +19,6 @@ interface SessionNote {
 export default function NotesPanel({ open, onClose, sessionId }: NotesPanelProps) {
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
   const [notes, setNotes] = useState<SessionNote[]>([])
 
   // Keep every note this session: append to the persistent `sessions` doc so
@@ -45,10 +45,11 @@ export default function NotesPanel({ open, onClose, sessionId }: NotesPanelProps
         }),
         therapistNotesLastUpdated: serverTimestamp(),
       })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      toast('Note saved', 'success')
       setText('')
-    } catch {}
+    } catch {
+      toast('Could not save the note. Try again.', 'error')
+    }
     setSaving(false)
   }
 
@@ -156,9 +157,6 @@ export default function NotesPanel({ open, onClose, sessionId }: NotesPanelProps
         >
           {saving ? 'Saving...' : 'Save note'}
         </button>
-        {saved && (
-          <span style={{ fontSize: 11, color: '#A8C9BE' }}>✓ Note saved</span>
-        )}
       </div>
     </div>
   )

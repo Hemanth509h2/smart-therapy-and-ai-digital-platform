@@ -61,6 +61,7 @@ model ProfileTherapist {
   usageEvents          UsageEvent[]
   subscriptions        Subscription[]
   subscriptionRequests SubscriptionRequest[]
+  coupons              Coupon[] // personal coupons only this therapist can redeem
 }
 
 model ProfileAdmin {
@@ -199,26 +200,30 @@ model Payment {
 // Discount codes for paid plan checkout. Admin-managed. A redemption is a
 // PAID Payment carrying the coupon; limits count those, never pending orders.
 model Coupon {
-  id               String     @id @default(uuid())
-  code             String     @unique // stored upper-case
+  id               String            @id @default(uuid())
+  code             String            @unique // stored upper-case
   description      String?
-  type             CouponType @default(PERCENT)
+  type             CouponType        @default(PERCENT)
   discountValue    Int
-  planIds          String[]   @default([]) // empty = every paid plan
-  minMonths        Int        @default(1) // shortest term the code works for
+  planIds          String[]          @default([]) // empty = every paid plan
+  minMonths        Int               @default(1) // shortest term the code works for
   maxRedemptions   Int? // null = unlimited
-  oncePerTherapist Boolean    @default(true)
+  oncePerTherapist Boolean           @default(true)
+  // Set = a personal code only this therapist can redeem; null = anyone.
+  therapistId      String?
+  therapist        ProfileTherapist? @relation(fields: [therapistId], references: [id], onDelete: Cascade)
   startsAt         DateTime?
   expiresAt        DateTime?
-  isActive         Boolean    @default(true)
+  isActive         Boolean           @default(true)
   createdBy        String? // admin uid
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   payments Payment[]
   requests SubscriptionRequest[]
 
   @@index([isActive])
+  @@index([therapistId])
 }
 
 // Lightweight resource-usage log for the admin dashboard.

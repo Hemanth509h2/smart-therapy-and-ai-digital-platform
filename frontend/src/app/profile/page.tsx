@@ -8,7 +8,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { usePracticeData } from '@/hooks/usePracticeData';
 import { StaadShell } from '@/components/staad/Shell';
 import { TopBar } from '@/components/staad/TopBar';
-import { Btn, InlineError, Section, SkeletonCard, cx } from '@/components/staad/parts';
+import { Btn, Section, SkeletonCard, cx } from '@/components/staad/parts';
 import { IconCheckSm, IconRowA, IconRowB, IconRowC } from '@/components/staad/icons';
 import { DsDialog, toast } from '@/components/practice/ui';
 import {
@@ -48,12 +48,10 @@ export default function ProfilePage() {
   const [availability, setAvailability] = useState<Availability>(DEFAULT_AVAILABILITY);
 
   const [saving, setSaving] = useState(false);
-  const [pwMessage, setPwMessage] = useState('');
   const [pwSending, setPwSending] = useState(false);
   const [dangerOpen, setDangerOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     if (!uid) router.push('/auth');
@@ -155,14 +153,12 @@ export default function ProfilePage() {
 
   const changePassword = async () => {
     if (!email) return;
-    setPwMessage('');
     setPwSending(true);
     try {
       await sendPasswordResetEmail(auth, email);
-      setPwMessage(`Reset link sent to ${email}`);
-      toast('Password reset email sent');
+      toast(`Reset link sent to ${email}`);
     } catch {
-      setPwMessage('Could not send reset email. Please try again.');
+      toast('Could not send the reset email. Please try again.', 'error');
     }
     setPwSending(false);
   };
@@ -181,7 +177,6 @@ export default function ProfilePage() {
 
   const deleteAccount = async () => {
     if (deleteConfirm !== 'DELETE' || !uid) return;
-    setDeleteError('');
     setDeleting(true);
     try {
       const currentUser = auth.currentUser;
@@ -191,12 +186,14 @@ export default function ProfilePage() {
       if (!res.ok) throw new Error('delete-failed');
       if (currentUser) await deleteUser(currentUser);
       clearAuth();
+      toast('Your account has been deleted.');
       router.push('/auth');
     } catch (err: any) {
-      setDeleteError(
+      toast(
         err?.code === 'auth/requires-recent-login'
           ? 'For security, please log out and log back in, then try again.'
-          : 'Could not delete account. Please try again.'
+          : 'Could not delete your account. Please try again.',
+        'error'
       );
     } finally {
       setDeleting(false);
@@ -382,7 +379,7 @@ export default function ProfilePage() {
                 <span>
                   <span className="switchrow__t">Password</span>
                   <span className="switchrow__s">
-                    {pwMessage || 'We email you a secure link instead of storing a password here.'}
+                    We email you a secure link instead of storing a password here.
                   </span>
                 </span>
                 <Btn sm onClick={changePassword} disabled={pwSending || !email}>
@@ -471,7 +468,6 @@ export default function ProfilePage() {
           setDangerOpen(o);
           if (!o) {
             setDeleteConfirm('');
-            setDeleteError('');
           }
         }}
         title="Delete your account"
@@ -501,7 +497,6 @@ export default function ProfilePage() {
             placeholder="DELETE"
           />
         </div>
-        {deleteError && <InlineError message={deleteError} />}
       </DsDialog>
     </StaadShell>
   );

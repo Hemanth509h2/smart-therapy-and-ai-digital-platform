@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { AlertTriangle, CheckCircle2, RefreshCw, XCircle } from 'lucide-react';
-import { AdminPage, Badge, Btn, Card, DataTable, ErrorBanner, Section, Spinner, useAdminQuery, type Tone } from '@/components/admin/kit';
+import { AdminPage, Badge, Btn, Card, DataTable, EmptyState, ErrorBanner, Section, Spinner, useAdminQuery, type Tone } from '@/components/admin/kit';
 import { fmtDateTime, timeAgo } from '@/lib/adminApi';
 
 type Status = 'ok' | 'warn' | 'down';
@@ -93,6 +93,8 @@ export default function AdminHealthPage() {
             </Section>
           ))}
         </>
+      ) : !loading ? (
+        <EmptyState title="Nothing to show" />
       ) : null}
     </AdminPage>
   );

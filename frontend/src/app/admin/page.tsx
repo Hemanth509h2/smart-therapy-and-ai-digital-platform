@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { AlertTriangle, CalendarClock, Inbox, MessageSquareWarning, Users, Video, CreditCard, UserCheck } from 'lucide-react';
-import { AdminPage, Badge, Card, ErrorBanner, Section, Spinner, StatCard, useAdminQuery } from '@/components/admin/kit';
+import { AdminPage, Badge, Card, EmptyState, ErrorBanner, Section, Spinner, StatCard, useAdminQuery } from '@/components/admin/kit';
 import { ChartCard, type Point } from '@/components/admin/charts';
 import { fmtDate, fmtDateTime, inr, num } from '@/lib/adminApi';
 
@@ -51,6 +51,8 @@ export default function AdminDashboardPage() {
             )}
           </div>
         </>
+      ) : !loading ? (
+        <EmptyState title="Nothing to show" />
       ) : null}
     </AdminPage>
   );

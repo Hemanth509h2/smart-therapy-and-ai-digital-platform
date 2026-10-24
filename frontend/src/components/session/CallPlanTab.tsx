@@ -5,6 +5,7 @@ import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { CheckCircle2, Circle, FileText, Play, RefreshCw, Sparkles, Upload } from 'lucide-react'
 import { GLASS } from './roomTheme'
+import { toast } from '@/components/practice/ui'
 import { useModuleSettings } from '@/hooks/useModuleSettings'
 import {
   AGENT_STEP_LABEL,
@@ -74,7 +75,6 @@ export default function CallPlanTab({
   const [pasted, setPasted] = useState('')
   const [step, setStep] = useState<AgentStep | null>(null)
   const [checking, setChecking] = useState(false)
-  const [error, setError] = useState('')
   const fileInput = useRef<HTMLInputElement>(null)
 
   // Modules an admin switched off are neither offered to the agent nor launchable.
@@ -89,7 +89,6 @@ export default function CallPlanTab({
 
   const handleMakePlan = async () => {
     if (busy) return
-    setError('')
     setStep('reading')
     try {
       const next = await makeCallPlan({
@@ -104,8 +103,9 @@ export default function CallPlanTab({
       setReplacing(false)
       setFile(null)
       setPasted('')
+      toast('Call plan ready', 'success')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'The AI agent failed.')
+      toast(e instanceof Error ? e.message : 'The AI agent failed.', 'error')
     } finally {
       setStep(null)
     }
@@ -113,7 +113,6 @@ export default function CallPlanTab({
 
   const handleCheckProgress = async () => {
     if (!plan || busy) return
-    setError('')
     setChecking(true)
     try {
       const { covered, next } = await checkCallPlanProgress({ sessionId, tasks: plan.tasks, transcript })
@@ -124,8 +123,9 @@ export default function CallPlanTab({
         next,
         checkedAt: Date.now(),
       })
+      toast(plan.tasks.some((t) => !t.done && done.has(t.id)) ? 'Progress updated' : 'No new tasks covered yet', 'info')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not check progress.')
+      toast(e instanceof Error ? e.message : 'Could not check progress.', 'error')
     } finally {
       setChecking(false)
     }
@@ -136,14 +136,13 @@ export default function CallPlanTab({
     const tasks = plan.tasks.map((t) =>
       t.id === task.id ? { ...t, done: !t.done, doneBy: 'therapist' as const } : t
     )
-    savePlan({ ...plan, tasks }).catch(() => setError('Could not save. Check your connection.'))
+    savePlan({ ...plan, tasks }).catch(() => toast('Could not save. Check your connection.', 'error'))
   }
 
   const pickFile = (f: File | undefined) => {
-    setError('')
     if (!f) return
     if (f.size > MAX_NOTES_FILE_BYTES) {
-      setError('The file is larger than 5 MB.')
+      toast('The file is larger than 5 MB.', 'warning')
       return
     }
     setFile(f)
@@ -235,7 +234,6 @@ export default function CallPlanTab({
             </button>
           )}
         </div>
-        {error && <div style={{ fontSize: 10, color: '#E8897A' }}>{error}</div>}
       </div>
     )
   }
@@ -347,8 +345,6 @@ export default function CallPlanTab({
           </div>
         )}
       </div>
-
-      {error && <div style={{ fontSize: 10, color: '#E8897A' }}>{error}</div>}
 
       <div style={{ fontSize: 9, color: GLASS.inkFaint, lineHeight: 1.45 }}>
         AI suggestions, not clinical advice: you decide what to do in the session.{' '}

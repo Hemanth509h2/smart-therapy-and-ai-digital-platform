@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { toast } from '@/components/practice/ui'
 import { staadSpeak, randomPraise } from '@/lib/voice/staadVoice'
 import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'
 import VoiceLanguageToggle from '@/components/modules/VoiceLanguageToggle'
@@ -346,7 +347,6 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
   const [flashWrong, setFlashWrong] = useState<Set<string>>(new Set())
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null)
   const [checkItems, setCheckItems] = useState<Set<string>>(new Set())
-  const [toast, setToast] = useState<{ msg: string } | null>(null)
   /* The last wrong drop, shared so BOTH screens show it. The shake and bin flash
      used to be local to whoever dropped, and lasted under half a second — the
      therapist watching never saw a miss at all, and the child barely did. */
@@ -362,7 +362,6 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
   const cRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
   const dragId = useRef<string | null>(null)
-  const toastT = useRef<ReturnType<typeof setTimeout>>()
   const ctr = useRef(0)
 
   const write = useCallback(async (d: Record<string, unknown>) => {
@@ -395,14 +394,6 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
     })
     return () => unsub()
   }, [sessionId])
-
-  useEffect(() => () => { if (toastT.current) clearTimeout(toastT.current) }, [])
-
-  const showToast = useCallback((msg: string) => {
-    setToast({ msg })
-    if (toastT.current) clearTimeout(toastT.current)
-    toastT.current = setTimeout(() => setToast(null), 2000)
-  }, [])
 
   const currentSet = SETS.find(s => s.id === setId) || SETS[0]
 
@@ -462,6 +453,18 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
     const t = setTimeout(() => setLastWrong(prev => (prev && prev.k === k ? null : prev)), 1800)
     return () => clearTimeout(t)
   }, [lastWrong])
+
+  /* Wrong-drop message: names the item and the bin it does NOT belong in.
+     The marker is synced, so both screens show it — once per miss. */
+  const toastedWrongK = useRef<number | null>(null)
+  useEffect(() => {
+    if (!lastWrong || toastedWrongK.current === lastWrong.k) return
+    const item = itemMap.get(lastWrong.itemId)
+    if (!item) return
+    toastedWrongK.current = lastWrong.k
+    const binLabel = usedBins.find(b => b.id === lastWrong.binId)?.label ?? 'that bin'
+    toast(`${item.label} doesn't go in ${binLabel}. Try again!`, 'warning', { duration: 1800 })
+  }, [lastWrong, itemMap, usedBins])
   const sortedEntries = Object.entries(sorted).filter(([id]) => itemMap.has(id))
 
   const handleDrop = useCallback((itemId: string, binId: string) => {
@@ -498,6 +501,9 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
   }, [canInteract, itemMap, sorted, write, correct, wrong, sortedCount, totalItems])
 
   const loggedDoneRef = useRef(false)
+  // Once per finished set: the global toasts stack, so a re-run of this effect
+  // must not show the same message twice.
+  const toastedDoneRef = useRef(false)
   useEffect(() => {
     if (allDone && completed) {
       if (isT && !loggedDoneRef.current) {
@@ -510,12 +516,18 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
       }
       const wc = wrong
       const star = wc === 0 ? '⭐⭐⭐ Perfect!' : wc <= 3 ? '⭐⭐ Great job!' : '⭐ Keep practising!'
-      showToast(`All sorted! ${star}`)
+      if (!toastedDoneRef.current) {
+        toastedDoneRef.current = true
+        toast(`All sorted! ${star}`, 'success', { duration: 2000 })
+      }
       // Appreciation voice — shared phrase bank, therapist's chosen language.
       staadSpeak({ text: randomPraise(voiceLangRef.current), language: voiceLangRef.current, type: 'praise' })
     }
-    if (!allDone) loggedDoneRef.current = false
-  }, [allDone, completed, wrong, correct, showToast, isT, sessionId, currentSet.name])
+    if (!allDone) {
+      loggedDoneRef.current = false
+      toastedDoneRef.current = false
+    }
+  }, [allDone, completed, wrong, correct, isT, sessionId, currentSet.name])
 
   const handleReset = useCallback(() => {
     write({ 'moduleState.ddSorted': {}, 'moduleState.ddCorrect': 0, 'moduleState.ddWrong': 0, 'moduleState.ddCompleted': false, 'moduleState.ddLastWrong': null })
@@ -745,18 +757,6 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
         }}
       >
 
-        {/* Wrong-drop message: names the item and the bin it does NOT belong in. */}
-        {lastWrong && itemMap.get(lastWrong.itemId) && (
-          <div key={lastWrong.k} role="status" aria-live="assertive" style={{
-            position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 20,
-            padding: '8px 18px', borderRadius: 999, background: DANGER, color: '#ffffff',
-            fontSize: 16, fontWeight: 800, whiteSpace: 'nowrap', pointerEvents: 'none',
-            boxShadow: '0 6px 18px rgba(180,67,44,0.38)', animation: 'fb .25s ease',
-          }}>
-            ✗ {itemMap.get(lastWrong.itemId)!.label} doesn&apos;t go in {usedBins.find(b => b.id === lastWrong.binId)?.label ?? 'that bin'} — try again!
-          </div>
-        )}
-
         {/* Item pool */}
         <div style={{
           background: 'rgba(255,255,255,0.78)', borderRadius: 14, padding: 16,
@@ -985,17 +985,6 @@ export default function DragDropSorting({ sessionId, role, isLocked }: DragDropS
               Waiting for your therapist to start the next set…
             </div>
           )}
-        </div>
-      )}
-
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', borderRadius: 10,
-          padding: '8px 16px', color: '#fff', fontSize: 16.5, zIndex: 100, pointerEvents: 'none',
-        }}>
-          {toast.msg}
         </div>
       )}
     </>

@@ -12,7 +12,7 @@ import { EmailAuthProvider, GoogleAuthProvider, reauthenticateWithCredential, re
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Loader2, Lock, Search, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { StaadShell } from '@/components/staad/Shell';
-import { Toaster } from '@/components/practice/ui';
+import { toast } from '@/components/practice/ui';
 import { useAuthStore } from '@/store/useAuthStore';
 import { auth } from '@/lib/firebase';
 import { adminFetch, registerReauthPrompt } from '@/lib/adminApi';
@@ -69,7 +69,6 @@ export function AdminPage({
   return (
     <StaadShell className="admin-ui">
       <ReauthPrompt />
-      <Toaster />
       {back && (
         <Link href={back.href} className="inline-flex items-center gap-1 text-sm font-semibold" style={{ color: 'var(--ink-muted)' }}>
           <ChevronLeft className="h-4 w-4" /> {back.label}
@@ -96,7 +95,6 @@ export function AdminPage({
 function ReauthPrompt() {
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const resolver = useRef<((ok: boolean) => void) | null>(null);
 
@@ -106,7 +104,6 @@ function ReauthPrompt() {
         new Promise<boolean>((resolve) => {
           resolver.current = resolve;
           setPassword('');
-          setError('');
           setOpen(true);
         })
     );
@@ -123,13 +120,12 @@ function ReauthPrompt() {
     const user = auth.currentUser;
     if (!user?.email) return;
     setBusy(true);
-    setError('');
     try {
       await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
       await user.getIdToken(true);
       finish(true);
     } catch {
-      setError('That password is not correct.');
+      toast('That password is not correct.', 'error');
     } finally {
       setBusy(false);
     }
@@ -139,13 +135,12 @@ function ReauthPrompt() {
     const user = auth.currentUser;
     if (!user) return;
     setBusy(true);
-    setError('');
     try {
       await reauthenticateWithPopup(user, new GoogleAuthProvider());
       await user.getIdToken(true);
       finish(true);
     } catch {
-      setError('Google sign-in did not complete.');
+      toast('Google sign-in did not complete.', 'error');
     } finally {
       setBusy(false);
     }
@@ -175,7 +170,6 @@ function ReauthPrompt() {
           <Input type="password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && password && withPassword()} />
         </Field>
       )}
-      {error && <ErrorBanner message={error} />}
     </Modal>
   );
 }
@@ -378,13 +372,17 @@ export function Spinner() {
   return <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--sage)] border-t-transparent" role="status" aria-label="Loading" />;
 }
 
+// Errors are shown as toasts, not inline. Kept as a component so a
+// `<ErrorBanner message onRetry />` still surfaces its message: it toasts once
+// per new message (with Retry as the toast button) and renders nothing.
 export function ErrorBanner({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  return (
-    <div role="alert" className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium" style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)' }}>
-      <span className="flex-1">{message}</span>
-      {onRetry && <Btn size="sm" variant="ghost" onClick={onRetry}>Retry</Btn>}
-    </div>
-  );
+  const retry = useRef(onRetry);
+  retry.current = onRetry;
+  useEffect(() => {
+    if (!message) return;
+    toast(message, 'error', retry.current ? { button: { title: 'Retry', onClick: () => retry.current?.() } } : {});
+  }, [message]);
+  return null;
 }
 
 export function EmptyState({ icon, title, body, action }: { icon?: React.ReactNode; title: string; body?: string; action?: React.ReactNode }) {
@@ -483,19 +481,17 @@ export function ConfirmDialog({
 }) {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
   useEffect(() => {
-    if (open) { setReason(''); setError(''); }
+    if (open) setReason('');
   }, [open]);
 
   const go = async () => {
     setBusy(true);
-    setError('');
     try {
       await onConfirm(reason.trim());
       onClose();
     } catch (e: any) {
-      setError(e.message || 'Something went wrong.');
+      toast(e.message || 'Something went wrong.', 'error');
     } finally {
       setBusy(false);
     }
@@ -519,7 +515,6 @@ export function ConfirmDialog({
           <Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
         </Field>
       )}
-      {error && <ErrorBanner message={error} />}
     </Modal>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { Brain, FileText, Heart, MessageCircle, SquarePen } from 'lucide-react'
 import { db } from '@/lib/firebase'
+import { toast } from '@/components/practice/ui'
 import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface FactsVsFeelingsProps {
@@ -54,7 +55,6 @@ export default function FactsVsFeelings({ sessionId, role, isLocked }: FactsVsFe
   const [cardInput, setCardInput] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragOverBin, setDragOverBin] = useState<Bin | null>(null)
-  const [bounceMsg, setBounceMsg] = useState<{ id: string; msg: string } | null>(null)
   const [overrideId, setOverrideId] = useState<Set<string>>(new Set())
 
   const write = useCallback(async (d: Record<string, unknown>) => {
@@ -93,8 +93,8 @@ export default function FactsVsFeelings({ sessionId, role, isLocked }: FactsVsFe
     if (bin === 'facts' && !isT && !overrideId.has(id)) {
       const msg = validateForFacts(card.text)
       if (msg) {
-        setBounceMsg({ id, msg })
-        setTimeout(() => setBounceMsg(null), 2200)
+        // Socratic nudge when a client's drop into Facts bounces back.
+        toast(msg, 'info', { duration: 2200 })
         return // bounce back — do not move
       }
     }
@@ -131,7 +131,6 @@ export default function FactsVsFeelings({ sessionId, role, isLocked }: FactsVsFe
       position: 'relative', fontFamily: '"DM Sans", sans-serif', color: INK,
     }}>
       <style>{`
-        @keyframes ff-rise { from { opacity: 0; transform: translate(-50%, 8px) } to { opacity: 1; transform: translate(-50%, 0) } }
         .ff-input::placeholder { color: #7c8698; }
         .ff-input:focus { border-color: ${GREEN}; box-shadow: 0 0 0 3px rgba(31,122,68,0.12); }
         .ff-scroll { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
@@ -334,19 +333,6 @@ export default function FactsVsFeelings({ sessionId, role, isLocked }: FactsVsFe
           </aside>
         )}
       </div>
-
-      {/* Socratic nudge when a client's drop into Facts bounces back. */}
-      {bounceMsg && (
-        <div role="status" style={{
-          position: 'absolute', left: '50%', bottom: 10, transform: 'translateX(-50%)',
-          background: '#FFF7ED', border: '1.5px solid #EA580C', borderRadius: 12,
-          padding: '9px 16px', fontSize: 16.5, fontWeight: 600, color: '#9A3412',
-          boxShadow: '0 6px 18px rgba(20,30,45,0.12)', animation: 'ff-rise .25s ease',
-          maxWidth: '80%', textAlign: 'center', zIndex: 5,
-        }}>
-          {bounceMsg.msg}
-        </div>
-      )}
     </div>
   )
 }

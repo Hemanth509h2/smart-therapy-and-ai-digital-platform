@@ -6,6 +6,7 @@ import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore'
 import { Clock, Target, Sparkles, Volume2, Send, Rocket, RotateCcw, Lightbulb } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { toast } from '@/components/practice/ui'
 
 interface BoxPoppingProps {
   sessionId: string
@@ -304,7 +305,6 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
   const [particles, setParticles] = useState<{ id: string; x: number; y: number; col: string; dx: string; dy: string }[]>([])
   const [confettis, setConfettis] = useState<{ id: string; x: number; y: number; col: string; dx: number; dy: number }[]>([])
   const [floaters, setFloaters] = useState<{ id: string; x: number; y: number; text: string }[]>([])
-  const [toast, setToast] = useState<{ msg: string } | null>(null)
 
   const cRef = useRef<HTMLDivElement>(null)
   const isDrag = useRef(false)
@@ -312,7 +312,6 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
   const seenMiles = useRef<Set<string>>(new Set())
   const prevPct = useRef(0)
   const init = useRef(false)
-  const toastT = useRef<ReturnType<typeof setTimeout>>()
   const pk = useRef(0)
 
   const write = useCallback(async (d: Record<string, unknown>) => {
@@ -354,7 +353,7 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
     return () => ro.disconnect()
   }, [])
 
-  useEffect(() => () => { isDrag.current = false; if (toastT.current) clearTimeout(toastT.current) }, [])
+  useEffect(() => () => { isDrag.current = false }, [])
 
   /* What the balloon board actually floats: the typed worries, or a set of
      blank balloons when none were named. */
@@ -391,9 +390,9 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
         seenMiles.current.add(`${m}`)
         if (m < 100) {
           const txt = { 25: 'Keep going! 💪', 50: 'Halfway there! ⭐', 75: 'Almost done! 🔥' }[m] || ''
-          setToast({ msg: txt })
-          if (toastT.current) clearTimeout(toastT.current)
-          toastT.current = setTimeout(() => setToast(null), 2000)
+          // Both screens derive the milestone from the synced pop count, so
+          // each side shows it.
+          if (txt) toast(txt, 'success', { duration: 2000 })
         }
         break
       }
@@ -1203,18 +1202,6 @@ export default function BoxPopping({ sessionId, role, isLocked }: BoxPoppingProp
               >Start again</button>
             )}
           </div>
-        </div>
-      )}
-
-      {/* ---- Milestone toast — white text only on a solid dark pill ---- */}
-      {toast && (
-        <div style={{
-          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-          background: 'rgba(17,24,39,0.9)', borderRadius: 12,
-          padding: '9px 18px', color: '#ffffff', fontSize: 16.5, fontWeight: 700, zIndex: 100, pointerEvents: 'none',
-          boxShadow: '0 10px 26px rgba(20,30,45,0.28)',
-        }}>
-          {toast.msg}
         </div>
       )}
     </div>

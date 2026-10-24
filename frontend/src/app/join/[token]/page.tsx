@@ -8,6 +8,7 @@ import { apiFetch } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Heart, Video, ShieldCheck, Loader2 } from 'lucide-react';
+import { toast } from '@/components/practice/ui';
 
 interface InviteInfo {
   firstName: string;
@@ -26,21 +27,23 @@ export default function GuestJoinPage({ params }: { params: { token: string } })
   const router = useRouter();
 
   const [invite, setInvite] = useState<InviteInfo | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     apiFetch(`/api/invites/${token}`)
       .then((res) => (res.ok ? res.json() : res.json().then((d) => Promise.reject(new Error(d.error || 'Invite not found')))))
-      .then((data) => setInvite(data.invite))
-      .catch((e) => setError(e.message || 'This invite link is not valid.'))
-      .finally(() => setLoading(false));
+      .then((data) => !cancelled && setInvite(data.invite))
+      .catch((e) => !cancelled && toast(e.message || 'This invite link is not valid.', 'error'))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   const join = async () => {
     setJoining(true);
-    setError(null);
     try {
       // Claim the invite first — the backend generates a guest identity and
       // mints a custom token for it (no anonymous sign-in provider needed).
@@ -56,11 +59,11 @@ export default function GuestJoinPage({ params }: { params: { token: string } })
       router.push(`/session/${data.sessionId}?guest=1`);
     } catch (e: any) {
       if (e?.code === 'auth/operation-not-allowed') {
-        setError('Guest access is not enabled yet. Please ask your therapist for an account link instead.');
+        toast('Guest access is not enabled yet. Please ask your therapist for an account link instead.', 'error');
       } else if (e?.code === 'auth/network-request-failed') {
-        setError('Network problem — please check your internet connection and try again.');
+        toast('Network problem — please check your internet connection and try again.', 'error');
       } else {
-        setError(e?.message || 'Could not join the session.');
+        toast(e?.message || 'Could not join the session.', 'error');
       }
       setJoining(false);
     }
@@ -117,8 +120,6 @@ export default function GuestJoinPage({ params }: { params: { token: string } })
                 </div>
               </div>
 
-              {error && <p className="text-sm text-red-600 font-medium text-center">{error}</p>}
-
               <Button
                 onClick={join}
                 disabled={joining}
@@ -137,8 +138,8 @@ export default function GuestJoinPage({ params }: { params: { token: string } })
           )}
 
           {!loading && !invite && (
-            <p className="py-4 text-center text-sm font-medium text-red-600">
-              {error || 'This invite link is not valid. Ask your therapist for a new one.'}
+            <p className="py-4 text-center text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>
+              This invite link is not valid. Ask your therapist for a new one.
             </p>
           )}
         </CardContent>

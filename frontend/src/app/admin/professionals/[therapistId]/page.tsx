@@ -185,7 +185,9 @@ export default function TherapistDetailPage() {
       ) : data && t ? (
         <>
           {suspended && (
-            <ErrorBanner message={`Suspended ${fmtDate(t.suspendedAt)}${t.suspendReason ? ` — ${t.suspendReason}` : ''}. They can't sign in.`} />
+            <div className="rounded-xl px-4 py-3 text-sm font-medium" style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)' }}>
+              Suspended {fmtDate(t.suspendedAt)}{t.suspendReason ? ` — ${t.suspendReason}` : ''}. They can&apos;t sign in.
+            </div>
           )}
           <Tabs<Tab>
             value={tab}
@@ -227,8 +229,8 @@ export default function TherapistDetailPage() {
             onRemoved={() => router.push('/admin/professionals')}
           />
         </>
-      ) : !loading && !error ? (
-        <EmptyState title="Professional not found" />
+      ) : !loading ? (
+        <EmptyState title={error ? 'Nothing to show' : 'Professional not found'} />
       ) : null}
     </AdminPage>
   );
@@ -294,7 +296,7 @@ function ClientsTab({ therapistId, clients }: { therapistId: string; clients: De
       const d = await adminFetch<{ clients: PhiClient[] }>(`/api/admin/therapists/${therapistId}/phi`);
       setPhi(new Map(d.clients.map((c) => [c.id, c])));
     } catch (e: any) {
-      toast(e.message, 'error');
+      toast(e.message || 'Could not reveal client details.', 'error');
     } finally {
       setRevealing(false);
     }
@@ -476,12 +478,11 @@ interface Plan {
 }
 
 function GrantModal({ open, onClose, therapistId, onGranted }: { open: boolean; onClose: () => void; therapistId: string; onGranted: () => void }) {
-  const { data, loading, error } = useAdminQuery<{ plans: Plan[] }>(open ? '/api/admin/plans' : null);
+  const { data, loading, error, reload } = useAdminQuery<{ plans: Plan[] }>(open ? '/api/admin/plans' : null);
   const [planId, setPlanId] = useState('');
   const [months, setMonths] = useState('1');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
 
   const plans = data?.plans ?? [];
   const plan = plans.find((p) => p.id === planId);
@@ -504,7 +505,6 @@ function GrantModal({ open, onClose, therapistId, onGranted }: { open: boolean; 
 
   const submit = async () => {
     setBusy(true);
-    setErr('');
     try {
       await adminFetch(`/api/admin/therapists/${therapistId}/grant`, {
         method: 'POST',
@@ -514,7 +514,7 @@ function GrantModal({ open, onClose, therapistId, onGranted }: { open: boolean; 
       onGranted();
       onClose();
     } catch (e: any) {
-      setErr(e.message);
+      toast(e.message || 'Could not grant the plan.', 'error');
     } finally {
       setBusy(false);
     }
@@ -537,7 +537,7 @@ function GrantModal({ open, onClose, therapistId, onGranted }: { open: boolean; 
         </>
       }
     >
-      {error && <ErrorBanner message={error} />}
+      {error && <ErrorBanner message={error} onRetry={reload} />}
       {loading && !data ? (
         <div className="flex justify-center py-6"><Spinner /></div>
       ) : (
@@ -597,7 +597,6 @@ function GrantModal({ open, onClose, therapistId, onGranted }: { open: boolean; 
           )}
         </>
       )}
-      {err && <ErrorBanner message={err} />}
     </Modal>
   );
 }
@@ -674,11 +673,9 @@ function EmailModal({ open, onClose, therapistId, email }: { open: boolean; onCl
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
 
   const send = async () => {
     setBusy(true);
-    setErr('');
     try {
       await adminFetch(`/api/admin/therapists/${therapistId}/message`, { method: 'POST', json: { subject, body } });
       toast('Email sent');
@@ -686,7 +683,7 @@ function EmailModal({ open, onClose, therapistId, email }: { open: boolean; onCl
       setBody('');
       onClose();
     } catch (e: any) {
-      setErr(e.message);
+      toast(e.message || 'Could not send the email.', 'error');
     } finally {
       setBusy(false);
     }
@@ -711,7 +708,6 @@ function EmailModal({ open, onClose, therapistId, email }: { open: boolean; onCl
       <Field label="Message">
         <Textarea rows={7} value={body} onChange={(e) => setBody(e.target.value)} />
       </Field>
-      {err && <ErrorBanner message={err} />}
     </Modal>
   );
 }

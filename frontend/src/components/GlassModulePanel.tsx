@@ -342,7 +342,7 @@ export default function GlassModulePanel({
               Modules
             </div>
             {activeModule && (
-              <div style={{ fontSize: 12, color: RC.green, fontWeight: 500 }}>
+              <div style={{ fontSize: 12, color: RC.greenDark, fontWeight: 500 }}>
                 Active: {MODULE_METADATA[activeModule]?.title || activeModule}
               </div>
             )}
@@ -355,7 +355,7 @@ export default function GlassModulePanel({
             style={{
               width: 32, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer',
               background: isLocked ? RC.greenSoft : RC.tile,
-              color: isLocked ? RC.green : RC.inkMuted,
+              color: isLocked ? RC.greenDark : RC.inkMuted,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 0.15s',
             }}

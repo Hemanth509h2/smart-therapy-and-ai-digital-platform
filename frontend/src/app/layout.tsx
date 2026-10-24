@@ -1,6 +1,7 @@
 import React from 'react';
 import AuthProvider from '@/components/AuthProvider';
 import ThemeProvider from '@/components/ThemeProvider';
+import { Toaster } from '@/components/practice/ui';
 import './globals.css';
 import './staad-design.css';
 import './staad-extras.css';
@@ -22,6 +23,7 @@ export default function RootLayout({
           <AuthProvider>
             {children}
           </AuthProvider>
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

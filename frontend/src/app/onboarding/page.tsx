@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { apiFetch } from '@/lib/api';
+import { toast } from '@/components/practice/ui';
 
 function OnboardingForm() {
   const { uid, setRoleAndProfile } = useAuthStore();
@@ -22,7 +23,6 @@ function OnboardingForm() {
   const [phone, setPhone] = useState('');
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Patients don't have accounts any more: an old invite link goes to the guest join page.
   useEffect(() => {
@@ -37,7 +37,6 @@ function OnboardingForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
 
     const specialty = specialtyInput.split(',').map(s => s.trim()).filter(s => s.length > 0);
@@ -58,15 +57,16 @@ function OnboardingForm() {
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Failed to save onboarding details');
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Could not save your profile details.');
       }
 
       const data = await response.json();
       setRoleAndProfile('THERAPIST', data.profile);
+      toast('Profile created — welcome to STAAD.');
       router.push('/');
     } catch (err: any) {
-      setError(err.message || 'Onboarding registration failed');
+      toast(err.message || 'Could not complete your profile. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -136,9 +136,6 @@ function OnboardingForm() {
               </div>
               </div>
 
-            {error && (
-              <p className="text-sm text-red-600 font-medium text-center">{error}</p>
-            )}
 
             <Button 
               type="submit" 

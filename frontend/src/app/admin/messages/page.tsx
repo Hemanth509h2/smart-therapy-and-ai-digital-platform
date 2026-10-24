@@ -216,7 +216,7 @@ function BotCard({ canManage }: { canManage: boolean }) {
   let body = '';
   if (error) {
     badge = <Badge tone="bad">Unavailable</Badge>;
-    body = error;
+    body = 'The bot status could not be checked.';
   } else if (data) {
     if (!data.reachable) {
       badge = <Badge tone="bad">Offline</Badge>;
@@ -270,22 +270,20 @@ function BroadcastModal({ open, onClose }: { open: boolean; onClose: () => void 
   const [body, setBody] = useState('');
   const [recipients, setRecipients] = useState<number | null>(null);
   const [busy, setBusy] = useState<'' | 'preview' | 'send'>('');
-  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (open) { setRecipients(null); setError(''); }
+    if (open) setRecipients(null);
   }, [open]);
   // The count is for one audience; changing it needs a fresh preview.
   useEffect(() => setRecipients(null), [audience]);
 
   const preview = async () => {
     setBusy('preview');
-    setError('');
     try {
       const res = await adminFetch<{ recipients: number }>('/api/admin/messages/broadcast', { method: 'POST', json: { audience, dryRun: true } });
       setRecipients(res.recipients);
     } catch (e: any) {
-      setError(e.message);
+      toast(e.message || 'Could not count recipients.', 'error');
     } finally {
       setBusy('');
     }
@@ -293,7 +291,6 @@ function BroadcastModal({ open, onClose }: { open: boolean; onClose: () => void 
 
   const send = async () => {
     setBusy('send');
-    setError('');
     try {
       const res = await adminFetch<{ ok: boolean; sent: number; recipients: number; failures: string[] }>('/api/admin/messages/broadcast', {
         method: 'POST',
@@ -305,10 +302,10 @@ function BroadcastModal({ open, onClose }: { open: boolean; onClose: () => void 
         setBody('');
         onClose();
       } else {
-        setError(`Sent to ${num(res.sent)} of ${num(res.recipients)}. Some batches failed: ${res.failures.join('; ')}`);
+        toast(`Sent to ${num(res.sent)} of ${num(res.recipients)}. Some batches failed: ${res.failures.join('; ')}`, 'warning');
       }
     } catch (e: any) {
-      setError(e.message);
+      toast(e.message || 'Could not send the announcement.', 'error');
     } finally {
       setBusy('');
     }
@@ -354,7 +351,6 @@ function BroadcastModal({ open, onClose }: { open: boolean; onClose: () => void 
       <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
         {recipients == null ? 'Preview recipients to see how many people will get this before sending.' : `${num(recipients)} people will receive this email.`}
       </p>
-      {error && <ErrorBanner message={error} />}
     </Modal>
   );
 }

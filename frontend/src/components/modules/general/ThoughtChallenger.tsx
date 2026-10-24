@@ -7,6 +7,7 @@ import { Plus, Search, Shield, Scale, ArrowDown, Lightbulb, Pencil, Check, Arrow
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { apiFetch } from '@/lib/api';
+import { toast } from '@/components/practice/ui'
 
 interface ThoughtChallengerProps {
   sessionId: string
@@ -99,7 +100,6 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
   const [dragOverBin, setDragOverBin] = useState<Bin | null>(null)
   const [shakeId, setShakeId] = useState<string | null>(null)
   const [bounceId, setBounceId] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
 
   /* Belief ratings and completion. The reframe used to be the end of the road:
      it appeared and nothing followed it, so the activity had no close. The
@@ -242,13 +242,15 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
   const saveNotes = useCallback(async () => {
     if (!isT) return
     try {
-      await apiFetch('/api/notes', {
+      const res = await apiFetch('/api/notes', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, type: 'thought-challenger', thought, reframe }),
       })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 1800)
-    } catch {}
+      if (!res.ok) throw new Error(`Save failed (${res.status})`)
+      toast('Saved to session notes', 'success')
+    } catch {
+      toast('Could not save notes. Try again.', 'error')
+    }
   }, [isT, sessionId, thought, reframe])
 
   const pool = cards.filter(c => c.bin === 'pool')
@@ -479,7 +481,7 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
                     Complete Activity
                   </button>
                   <button onClick={saveNotes} style={{ ...ghostBtn, borderColor: '#BBE8CC', color: GREEN }}>
-                    {saved ? 'Saved ✓' : 'Save to session notes'}
+                    Save to session notes
                   </button>
                 </div>
               )}

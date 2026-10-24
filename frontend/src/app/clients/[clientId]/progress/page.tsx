@@ -17,6 +17,8 @@ import {
   type ProgressNote,
 } from '@/lib/progressApi';
 import { apiFetchCached } from '@/lib/api';
+import { toast } from '@/components/practice/ui';
+import { useErrorToast } from '@/components/practice/useErrorToast';
 
 const CARD =
   'rounded-[14px] border-[0.5px] border-[var(--glass-border)] shadow-[var(--glass-shadow)] bg-[var(--glass-bg)] dark:bg-[#16221e]';
@@ -39,7 +41,7 @@ export default function ClientProgressPage() {
   const [notes, setNotes] = useState<ProgressNote[]>([]);
   const [clientName, setClientName] = useState('Client');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Quick-add metric form state
   const [metricType, setMetricType] = useState(METRIC_TYPES[0].value);
@@ -54,7 +56,6 @@ export default function ClientProgressPage() {
 
   const loadData = async () => {
     setLoading(true);
-    setError(null);
     try {
       const [m, r, n, clientRes] = await Promise.all([
         fetchClientMetrics(clientId),
@@ -67,26 +68,32 @@ export default function ClientProgressPage() {
       setNotes(n);
       const found = clientRes?.clients?.find((c: any) => c.id === clientId);
       if (found) setClientName(`${found.firstName} ${found.lastName}`);
+      setLoadError(null);
     } catch (e: any) {
-      setError(e.message);
+      setLoadError(e.message || 'Could not load progress data.');
     } finally {
       setLoading(false);
     }
   };
 
+  useErrorToast(loadError, loadData);
+
   const handleAddMetric = async (e: React.FormEvent) => {
     e.preventDefault();
     const numeric = parseFloat(value);
-    if (Number.isNaN(numeric)) return;
+    if (Number.isNaN(numeric)) {
+      toast('Enter a number for the metric value.', 'warning');
+      return;
+    }
     setAdding(true);
-    setError(null);
     try {
       const unit = METRIC_TYPES.find((m) => m.value === metricType)?.unit;
       const created = await createMetric({ clientId, metricType, value: numeric, unit });
       setMetrics((prev) => [...prev, created]);
       setValue('');
+      toast('Metric added');
     } catch (e: any) {
-      setError(e.message);
+      toast(e.message || 'Could not add the metric.', 'error');
     } finally {
       setAdding(false);
     }
@@ -103,10 +110,6 @@ export default function ClientProgressPage() {
             Track metrics, add notes, and export reports.
           </p>
         </div>
-
-        {error && (
-          <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-600">{error}</div>
-        )}
 
         {loading ? (
           <div className="flex justify-center py-20">

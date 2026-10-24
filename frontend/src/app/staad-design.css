@@ -9,11 +9,11 @@
 @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@300;400;500;600&display=swap");
 .staad-ui{
   --bg:#e6e6e4; --surface:#f1f1ef; --surface-2:#ffffff;
-  --ink:#0b0b0b; --muted:#85858a; --lime:#c6f43a;
-  --line:rgba(11,11,11,.08); --line-2:rgba(11,11,11,.18);
+  --ink:#0b0b0b; --muted:#5c5c61; --lime:#c6f43a;
+  --line:rgba(11,11,11,.12); --line-2:rgba(11,11,11,.3);
   --side:rgba(250,250,248,.82); --pill:#0b0b0b; --panel:#0b0b0b;
   --strong-bg:#0b0b0b; --strong-fg:#ffffff; --strong-ic-bg:#c6f43a; --strong-ic-fg:#0b0b0b;
-  --ok:#3d6a08; --ok-soft:#e2f6a0; --red:#dc3d28; --red-soft:#ffe2dc;
+  --ok:#3d6a08; --ok-soft:#e2f6a0; --red:#b3311f; --red-soft:#ffe2dc;
   --side-w:248px;
   --font-display:"Sora","Segoe UI",system-ui,sans-serif;
   --font-text:"Manrope","Segoe UI",system-ui,sans-serif;
@@ -149,7 +149,7 @@ html[data-theme="dark"] .staad-ui{
 
 .tl__name{display:block;font-size:12.5px;line-height:15px;font-weight:800;}
 
-.tl__type{font-size:11px;line-height:13px;font-weight:600;color:rgba(11,11,11,.62);}
+.tl__type{font-size:11px;line-height:13px;font-weight:600;color:rgba(11,11,11,.72);}
 
 .tl__chip{padding:4px 11px;border-radius:999px;background:rgba(11,11,11,.1);font-size:12px;line-height:17px;font-weight:800;}
 
@@ -369,7 +369,7 @@ html[data-theme="dark"] .staad-ui .hero__dot{background:transparent;border:2px s
 
 .stat__cap{font-size:12px;line-height:17px;font-weight:600;color:var(--muted);}
 
-.card--lime .stat__cap{color:rgba(11,11,11,.62);}
+.card--lime .stat__cap{color:rgba(11,11,11,.72);}
 
 /* ---------- Dashboard two-column ---------- */
 .cols{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:22px;align-items:stretch;}
@@ -394,7 +394,7 @@ html[data-theme="dark"] .staad-ui .hero__dot{background:transparent;border:2px s
 
 .sch__rule{width:1px;height:16px;background:rgba(11,11,11,.35);}
 
-.sch__meta{font-size:13px;line-height:19px;font-weight:700;color:rgba(11,11,11,.62);}
+.sch__meta{font-size:13px;line-height:19px;font-weight:700;color:rgba(11,11,11,.72);}
 
 .sch__timer{display:inline-flex;align-items:center;gap:10px;margin-top:10px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.55);}
 
@@ -528,7 +528,7 @@ html[data-theme="dark"] .staad-ui .hero__dot{background:transparent;border:2px s
 
 .lsub{font-size:12px;line-height:17px;font-weight:600;color:var(--muted);}
 
-.lrow--lime .lsub{color:rgba(11,11,11,.62);}
+.lrow--lime .lsub{color:rgba(11,11,11,.72);}
 
 .lval{font-size:13px;line-height:19px;font-weight:700;color:var(--ink);}
 
@@ -565,13 +565,13 @@ html[data-theme="dark"] .staad-ui .hero__dot{background:transparent;border:2px s
 
 .mod__p{margin:6px 0 0;font-size:13px;line-height:19px;font-weight:500;color:var(--muted);}
 
-.card--lime .mod__p{color:rgba(11,11,11,.62);}
+.card--lime .mod__p{color:rgba(11,11,11,.72);}
 
 .mod__foot{margin-top:auto;display:flex;flex-direction:column;gap:10px;}
 
 .mod__meta{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;font-weight:700;color:var(--muted);}
 
-.card--lime .mod__meta{color:rgba(11,11,11,.62);}
+.card--lime .mod__meta{color:rgba(11,11,11,.72);}
 
 /* ---------- Plans ---------- */
 .plan{display:flex;flex-direction:column;gap:20px;min-height:430px;}
@@ -582,7 +582,7 @@ html[data-theme="dark"] .staad-ui .hero__dot{background:transparent;border:2px s
 
 .plan__per{font-size:12.5px;font-weight:700;color:var(--muted);}
 
-.card--lime .plan__per{color:rgba(11,11,11,.62);}
+.card--lime .plan__per{color:rgba(11,11,11,.72);}
 
 .plan__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;}
 
@@ -653,7 +653,7 @@ html[data-theme="dark"] .staad-ui .hero__dot{background:transparent;border:2px s
 
 .wday.today .wday__n{color:#fff;}
 
-html[data-theme="dark"] .staad-ui .wday.today .wday__d{color:rgba(11,11,11,.62);}
+html[data-theme="dark"] .staad-ui .wday.today .wday__d{color:rgba(11,11,11,.72);}
 
 html[data-theme="dark"] .staad-ui .wday.today .wday__n{color:#0b0b0b;}
 
@@ -677,7 +677,7 @@ html[data-theme="dark"] .staad-ui .wday.today .wday__n{color:#0b0b0b;}
 
 .wev__s{font-size:11px;line-height:15px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
-.wev--lime .wev__s{color:rgba(11,11,11,.62);}
+.wev--lime .wev__s{color:rgba(11,11,11,.72);}
 
 /* ---------- Mini month ---------- */
 .mini{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}

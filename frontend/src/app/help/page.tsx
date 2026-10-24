@@ -6,7 +6,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { usePracticeData } from '@/hooks/usePracticeData';
 import { StaadShell } from '@/components/staad/Shell';
 import { TopBar } from '@/components/staad/TopBar';
-import { Btn, Chips, EmptyCard, InlineError, SearchBox, Section, cx } from '@/components/staad/parts';
+import { Btn, Chips, EmptyCard, SearchBox, Section, cx } from '@/components/staad/parts';
 import {
   IconArrowRightXs,
   IconChat,
@@ -38,7 +38,6 @@ export default function HelpPage() {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState('');
   const [sentRef, setSentRef] = useState('');
 
   const q = search.trim().toLowerCase();
@@ -52,9 +51,8 @@ export default function HelpPage() {
   }, {});
 
   const submit = async () => {
-    setError('');
     if (!subject.trim() || !message.trim()) {
-      setError('Please add a subject and describe your issue.');
+      toast('Please add a subject and describe your issue.', 'warning');
       return;
     }
     setSending(true);
@@ -73,7 +71,7 @@ export default function HelpPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || 'Something went wrong. Please try again.');
+        toast(data.error || 'Could not submit your ticket. Please try again.', 'error');
       } else {
         setSentRef(data.ref || 'Submitted');
         setSubject('');
@@ -82,7 +80,7 @@ export default function HelpPage() {
         toast('Ticket submitted');
       }
     } catch {
-      setError('Network error. Please try again.');
+      toast('Network error. Please try again.', 'error');
     } finally {
       setSending(false);
     }
@@ -263,7 +261,6 @@ export default function HelpPage() {
         onOpenChange={(o) => {
           setTicketOpen(o);
           if (!o) {
-            setError('');
             setSentRef('');
           }
         }}
@@ -321,7 +318,6 @@ export default function HelpPage() {
                 placeholder="Include anything that helps us reproduce it."
               />
             </div>
-            {error && <InlineError message={error} />}
           </div>
         )}
       </DsDialog>

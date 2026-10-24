@@ -5,7 +5,7 @@ import { useNow, usePracticeData, useTherapistGuard } from '@/hooks/usePracticeD
 import { useAuthStore } from '@/store/useAuthStore';
 import { StaadShell } from '@/components/staad/Shell';
 import { TopBar } from '@/components/staad/TopBar';
-import { Btn, InlineError, Section, SkeletonCard, cx } from '@/components/staad/parts';
+import { Btn, Section, SkeletonCard, cx } from '@/components/staad/parts';
 import {
   IconCalendarPlus,
   IconChevronLeft,
@@ -17,6 +17,7 @@ import {
 import { AddClientDialog, BookSessionDialog } from '@/components/practice/dialogs';
 import { useSessionActions } from '@/components/practice/useSessionActions';
 import { DAY_NAMES, addDays, describeAvailability, fmtTime, fullName, isSameDay, loadAvailability, sessionDuration, sessionState, startOfDay, startOfWeek } from '@/lib/practice';
+import { useErrorToast } from '@/components/practice/useErrorToast';
 
 /** Two-hour buckets, the same rhythm the artboard's week grid uses. */
 const BUCKET_HOURS = 2;
@@ -26,6 +27,7 @@ export default function SchedulePage() {
   const now = useNow(60_000);
   const { profile } = useAuthStore();
   const { sessions, bookings, clients, loading, error, refresh } = usePracticeData();
+  useErrorToast(error, refresh);
   const actions = useSessionActions(refresh);
 
   const [weekOffset, setWeekOffset] = useState(0);
@@ -111,8 +113,6 @@ export default function SchedulePage() {
           </button>
         </div>
       </div>
-
-      {error && <InlineError message={error} onRetry={refresh} />}
 
       <div className="cols">
         <div className="left">

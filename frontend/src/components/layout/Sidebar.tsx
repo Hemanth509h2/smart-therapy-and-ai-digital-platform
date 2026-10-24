@@ -7,7 +7,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { Home, Users, CalendarDays, Puzzle, User, ClipboardList, LifeBuoy, CreditCard, Moon, Sun, LogOut, ChevronsLeft, ChevronsRight } from 'lucide-react';
-import { cx } from '@/components/practice/ui';
+import { cx, toast } from '@/components/practice/ui';
 import { initials as toInitials } from '@/lib/practice';
 import { adminNavFor } from '@/lib/adminNav';
 
@@ -56,8 +56,12 @@ export default function Sidebar({
     href === '/' || href === '/admin' ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 
   const handleLogout = async () => {
-    await signOut(auth);
-    router.push('/auth');
+    try {
+      await signOut(auth);
+      router.push('/auth');
+    } catch {
+      toast('Could not sign out. Please try again.', 'error');
+    }
   };
 
   // Labels hide only at lg+ when collapsed; the mobile drawer is always full width.

@@ -9,6 +9,7 @@ import {
   Btn,
   Card,
   DataTable,
+  EmptyState,
   ErrorBanner,
   Pagination,
   SearchInput,
@@ -451,6 +452,8 @@ export default function AdminUsagePage() {
             </Section>
           </div>
         </>
+      ) : !loading ? (
+        <EmptyState title="Nothing to show" />
       ) : null}
     </AdminPage>
   );

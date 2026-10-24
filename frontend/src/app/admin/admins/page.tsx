@@ -202,26 +202,26 @@ function InviteModal({ open, onClose, onInvited }: { open: boolean; onClose: () 
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<AdminRole>('SUPPORT');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
   const [result, setResult] = useState<{ link: string; emailed: boolean; email: string } | null>(null);
 
   const close = () => {
     onClose();
-    setTimeout(() => { setEmail(''); setRole('SUPPORT'); setError(''); setResult(null); }, 200);
+    setTimeout(() => { setEmail(''); setRole('SUPPORT'); setResult(null); }, 200);
   };
 
   const send = async () => {
     setBusy(true);
-    setError('');
     try {
       const d = await adminFetch<{ link: string; emailed: boolean }>('/api/admin/invites', {
         method: 'POST',
         json: { email: email.trim(), adminRole: role },
       });
       setResult({ link: d.link, emailed: d.emailed, email: email.trim() });
+      if (d.emailed) toast(`Invite emailed to ${email.trim()}`);
+      else toast(`Email isn't set up on the server, so send this link to ${email.trim()} yourself.`, 'warning');
       onInvited();
     } catch (e: any) {
-      setError(e.message);
+      toast(e.message || 'Could not send the invite.', 'error');
     } finally {
       setBusy(false);
     }
@@ -244,9 +244,7 @@ function InviteModal({ open, onClose, onInvited }: { open: boolean; onClose: () 
       title={result ? 'Invite created' : 'Invite admin'}
       description={
         result
-          ? result.emailed
-            ? `We emailed the link to ${result.email}. You can also copy it below.`
-            : `Email isn't set up on the server, so send this link to ${result.email} yourself.`
+          ? `Invite link for ${result.email}.`
           : 'They get a link to accept. They must sign in (or sign up) with this email to accept it.'
       }
       footer={
@@ -290,7 +288,6 @@ function InviteModal({ open, onClose, onInvited }: { open: boolean; onClose: () 
               </label>
             ))}
           </fieldset>
-          {error && <ErrorBanner message={error} />}
         </>
       )}
     </Modal>

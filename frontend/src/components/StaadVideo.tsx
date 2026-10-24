@@ -4,6 +4,7 @@ import {
   RoomAudioRenderer,
 } from '@livekit/components-react'
 import { apiFetch } from '@/lib/api';
+import { toast } from '@/components/practice/ui';
 import '@livekit/components-styles'
 import { Room, RoomEvent, Track, VideoPresets, type LocalTrackPublication, type RoomOptions } from 'livekit-client'
 import { useEffect, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react'
@@ -149,13 +150,13 @@ export default function StaadVideo({
             done = true
             setWaiting(false)
             setToken(d.token)
-          } else setError('Could not get video token')
+          } else setError('Could not connect to the video call.')
         })
         .catch(() => {
           if (cancelled) return
           // While waiting, a failed poll is just retried.
           if (isWaiting) schedule(3000)
-          else setError('Video connection failed')
+          else setError('Video connection failed. Check your connection and rejoin.')
         })
         .finally(() => { polling = false })
     }
@@ -179,12 +180,16 @@ export default function StaadVideo({
     room.disconnect()
   }, [room])
 
+  useEffect(() => {
+    if (error) toast(error, 'error')
+  }, [error])
+
   const handleConnected = useCallback(() => setConnected(true), [])
   const handleDisconnected = useCallback(() => setConnected(false), [])
 
   if (error) return (
     <div className="h-full flex items-center justify-center" style={{ color: 'var(--ink-muted)', fontSize: 13 }}>
-      {error}
+      Video unavailable
     </div>
   )
 

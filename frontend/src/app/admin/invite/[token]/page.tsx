@@ -14,6 +14,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { ADMIN_ROLE_LABELS, type AdminRole } from '@/lib/adminRoles';
 import { fmtDate } from '@/lib/adminApi';
 import { Badge, Btn, ErrorBanner, Field, Input, Spinner } from '@/components/admin/kit';
+import { toast } from '@/components/practice/ui';
 
 const REDIRECT_KEY = 'staad-post-auth-redirect';
 
@@ -31,6 +32,12 @@ const STATE_TEXT: Record<Exclude<InviteInfo['state'], 'valid'>, string> = {
   expired: 'This invite has expired. Ask the admin who invited you for a new one.',
 };
 
+const STATE_BADGE: Record<Exclude<InviteInfo['state'], 'valid'>, string> = {
+  accepted: 'Already used',
+  revoked: 'Revoked',
+  expired: 'Expired',
+};
+
 export default function AdminInvitePage({ params }: { params: { token: string } }) {
   const { token } = params;
   const router = useRouter();
@@ -42,7 +49,6 @@ export default function AdminInvitePage({ params }: { params: { token: string } 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [accepting, setAccepting] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     apiFetch(`/api/admin-invites/${encodeURIComponent(token)}`)
@@ -58,6 +64,14 @@ export default function AdminInvitePage({ params }: { params: { token: string } 
   const isGuest = !!uid && (uid.startsWith('guest:') || uid.startsWith('client:'));
   const signedIn = !!uid && !isGuest;
   const emailMatches = signedIn && !!email && !!invite && email.toLowerCase() === invite.email.toLowerCase();
+  const wrongAccount = !!invite?.valid && signedIn && !emailMatches;
+
+  useEffect(() => {
+    if (invite && !invite.valid) toast(STATE_TEXT[invite.state as keyof typeof STATE_TEXT], 'warning');
+  }, [invite]);
+  useEffect(() => {
+    if (wrongAccount && invite) toast(`You're signed in as ${email || 'another account'}. This invite is for ${invite.email}.`, 'warning');
+  }, [wrongAccount, invite, email]);
 
   // Remember where to come back to, then go to sign-in / sign-up.
   const goToAuth = async () => {
@@ -70,7 +84,6 @@ export default function AdminInvitePage({ params }: { params: { token: string } 
 
   const accept = async () => {
     setAccepting(true);
-    setError('');
     try {
       const res = await apiFetch(`/api/admin-invites/${encodeURIComponent(token)}`, {
         method: 'POST',
@@ -85,9 +98,10 @@ export default function AdminInvitePage({ params }: { params: { token: string } 
         const { user } = await prof.json();
         if (user) setRoleAndProfile(user.role, user.role === 'ADMIN' ? user.admin : user.role === 'THERAPIST' ? user.therapist : user.client);
       }
+      toast('Invite accepted. Welcome to the admin portal.');
       router.replace('/admin');
     } catch (e: any) {
-      setError(e.message);
+      toast(e.message || 'Could not accept the invite.', 'error');
       setAccepting(false);
     }
   };
@@ -129,7 +143,9 @@ export default function AdminInvitePage({ params }: { params: { token: string } 
             </div>
 
             {!invite.valid ? (
-              <ErrorBanner message={STATE_TEXT[invite.state as keyof typeof STATE_TEXT]} />
+              <div className="flex justify-center">
+                <Badge tone="bad">{STATE_BADGE[invite.state as keyof typeof STATE_BADGE]}</Badge>
+              </div>
             ) : !signedIn ? (
               <div className="space-y-3">
                 <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
@@ -140,7 +156,6 @@ export default function AdminInvitePage({ params }: { params: { token: string } 
               </div>
             ) : !emailMatches ? (
               <div className="space-y-3">
-                <ErrorBanner message={`You're signed in as ${email || 'another account'}. This invite is for ${invite.email}.`} />
                 <Btn className="w-full" variant="ghost" onClick={goToAuth}>Sign out and use {invite.email}</Btn>
               </div>
             ) : (
@@ -156,7 +171,6 @@ export default function AdminInvitePage({ params }: { params: { token: string } 
                     <Input value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" />
                   </Field>
                 </div>
-                {error && <ErrorBanner message={error} />}
                 <Btn className="w-full" onClick={accept} loading={accepting}>Accept and open admin portal</Btn>
               </div>
             )}

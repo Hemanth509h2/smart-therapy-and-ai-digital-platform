@@ -26,6 +26,7 @@ import { Users, EyeOff } from 'lucide-react'
 import { db } from '@/lib/firebase'
 import WhiteboardStage from './WhiteboardStage'
 import { RC } from './roomTheme'
+import { toast } from '@/components/practice/ui'
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
 import '@excalidraw/excalidraw/index.css'
 
@@ -281,7 +282,7 @@ export default function StaadWhiteboard({
         whiteboardElements: '[]',
         whiteboardUpdatedBy: role,
         whiteboardUpdatedAt: new Date().toISOString(),
-      }).catch(() => {})
+      }).catch(() => toast('Could not clear the board on the other screen. Check your connection.', 'error'))
     } else {
       privateScenes.delete(sessionId)
     }

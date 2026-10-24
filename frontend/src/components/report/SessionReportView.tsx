@@ -3,6 +3,7 @@
 import { Printer } from 'lucide-react'
 import { reportStatsToHtml, REPORT_STATS_CSS } from './reportStatsHtml'
 import type { ReportStats } from '@/lib/report/stats'
+import { toast } from '@/components/practice/ui'
 
 // The session report is stored as a small, controlled Markdown subset produced
 // by the LLM (see src/lib/report/generate.ts): "## Section" headings, "-" /
@@ -223,7 +224,10 @@ export function printSessionReport(
 </body></html>`
 
   const w = window.open('', '_blank', 'width=820,height=1000')
-  if (!w) return
+  if (!w) {
+    toast('Allow pop-ups for this site to print the report.', 'warning')
+    return
+  }
   w.document.open()
   w.document.write(doc)
   w.document.close()

@@ -190,6 +190,7 @@ export default function AdminProfessionalsPage() {
         { header: 'Signed up', value: (r) => r.createdAt },
         { header: 'Suspend reason', value: (r) => r.suspendReason ?? '' },
       ]);
+      toast(`Exported ${all.length} rows`);
     } catch (e: any) {
       toast(e.message || 'Export failed', 'error');
     } finally {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, Clock, Download, Radio, Video, XCircle } from 'lucide-react';
 import {
@@ -141,6 +141,17 @@ function LiveTab() {
     return () => clearInterval(t);
   }, [reload]);
 
+  // Toast a failure once, not on every 30-second poll; a manual refresh shows it again.
+  const shownError = useRef('');
+  const refresh = useCallback(() => {
+    shownError.current = '';
+    reload();
+  }, [reload]);
+  useEffect(() => {
+    if (error && error !== shownError.current) toast(error, 'error', { button: { title: 'Retry', onClick: refresh } });
+    if (!loading) shownError.current = error;
+  }, [error, loading, refresh]);
+
   const rows = data?.sessions ?? [];
   const columns: Column<LiveSession>[] = [
     { key: 'therapist', header: 'Professional', render: (r) => <TherapistLink id={r.therapistId} name={r.therapist} /> },
@@ -161,13 +172,12 @@ function LiveTab() {
 
   return (
     <div className="space-y-3">
-      {error && <ErrorBanner message={error} onRetry={reload} />}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
         <span className="inline-flex items-center gap-1.5">
           <Radio className="h-3.5 w-3.5" /> {num(rows.length)} in progress · refreshes every 30 seconds
           {data?.generatedAt && <> · updated {timeAgo(data.generatedAt)}</>}
         </span>
-        <Btn size="sm" variant="ghost" onClick={reload} loading={loading && !!data}>Refresh</Btn>
+        <Btn size="sm" variant="ghost" onClick={refresh} loading={loading && !!data}>Refresh</Btn>
       </div>
       {!loading && !error && rows.length === 0 ? (
         <EmptyState icon={<Video className="h-5 w-5" />} title="No live sessions" body="Sessions appear here while a professional has a room open." />
@@ -208,6 +218,7 @@ function AllTab() {
         { header: 'Client (initials)', value: (r) => r.client },
         { header: 'Risk flag', value: (r) => (r.riskFlag ? 'yes' : '') },
       ]);
+      toast(`Exported ${rows.length} rows`);
     } catch (e: any) {
       toast(e.message || 'Export failed', 'error');
     } finally {
@@ -294,19 +305,17 @@ function RiskTab() {
   const [acking, setAcking] = useState<RiskFlag | null>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  const [ackError, setAckError] = useState('');
 
   const acknowledge = async () => {
     if (!acking) return;
     setBusy(true);
-    setAckError('');
     try {
       await adminFetch(`/api/admin/risk-flags/${acking.id}`, { method: 'PATCH', json: { note } });
       toast('Risk flag acknowledged');
       setAcking(null);
       reload();
     } catch (e: any) {
-      setAckError(e.message);
+      toast(e.message || 'Could not acknowledge the flag.', 'error');
     } finally {
       setBusy(false);
     }
@@ -331,7 +340,7 @@ function RiskTab() {
             {r.note && <span className="mt-0.5 block italic" style={{ color: 'var(--ink-muted)' }}>“{r.note}”</span>}
           </span>
         ) : can('people.write') ? (
-          <Btn size="sm" onClick={() => { setAcking(r); setNote(''); setAckError(''); }}>Acknowledge</Btn>
+          <Btn size="sm" onClick={() => { setAcking(r); setNote(''); }}>Acknowledge</Btn>
         ) : (
           <Badge tone="warn">Open</Badge>
         ),
@@ -386,7 +395,6 @@ function RiskTab() {
         <Field label="Note (optional)" hint="What was done, e.g. 'Called the professional; safety plan in place.'">
           <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000} />
         </Field>
-        {ackError && <ErrorBanner message={ackError} />}
       </Modal>
     </div>
   );

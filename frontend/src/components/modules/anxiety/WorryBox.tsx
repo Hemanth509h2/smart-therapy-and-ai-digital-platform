@@ -5,6 +5,7 @@ import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { apiFetch } from '@/lib/api';
+import { toast } from '@/components/practice/ui'
 import { OnOffButton } from '@/components/ui/on-off-button'
 
 interface WorryBoxProps {
@@ -51,12 +52,10 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
   const [flyingNote, setFlyingNote] = useState<{ text: string; color: string; top: number; left: number; width: number } | null>(null)
   const [revealed, setRevealed] = useState(0)
   const [tearing, setTearing] = useState<Set<string>>(new Set())
-  const [toast, setToast] = useState<{ msg: string } | null>(null)
   const [enteringReview, setEnteringReview] = useState(false)
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const cRef = useRef<HTMLDivElement>(null)
-  const toastT = useRef<ReturnType<typeof setTimeout>>()
   const tmr = useRef<ReturnType<typeof setTimeout>>()
   const worriesRef = useRef(worries)
   worriesRef.current = worries
@@ -95,13 +94,7 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
     return () => { clearInterval(iv); if (tmr.current) clearTimeout(tmr.current) }
   }, [reviewMode, worries.length])
 
-  useEffect(() => () => { if (toastT.current) clearTimeout(toastT.current); if (tmr.current) clearTimeout(tmr.current) }, [])
-
-  const showToast = useCallback((msg: string) => {
-    setToast({ msg })
-    if (toastT.current) clearTimeout(toastT.current)
-    toastT.current = setTimeout(() => setToast(null), TOAST_DUR)
-  }, [])
+  useEffect(() => () => { if (tmr.current) clearTimeout(tmr.current) }, [])
 
   const addWorry = useCallback(() => {
     const t = text.trim()
@@ -153,9 +146,9 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
         type: 'worry_released',
         detail: anonymous ? 'Released (let go of) a worry' : `Let go of the worry: "${text}"`,
       })
-      showToast(`"${text.length > 20 ? text.slice(0, 20) + '…' : text}" released 🌬️`)
+      toast(`"${text.length > 20 ? text.slice(0, 20) + '…' : text}" released 🌬️`, 'success', { duration: TOAST_DUR })
     }, TEAR_DUR)
-  }, [isT, write, showToast, sessionId, anonymous])
+  }, [isT, write, sessionId, anonymous])
 
   const clearAll = useCallback(() => {
     if (!isT) return
@@ -184,14 +177,15 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
     if (!isT) return
     const kept = worries.filter(w => w.kept)
     try {
-      await apiFetch('/api/notes', {
+      const res = await apiFetch('/api/notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, type: 'worry-box', worries: kept.map(w => ({ text: w.text, kept: w.kept, timestamp: w.timestamp })) }),
       })
-      showToast('Saved to session notes')
-    } catch { showToast('Could not save notes') }
-  }, [isT, worries, sessionId, showToast])
+      if (!res.ok) throw new Error(`Save failed (${res.status})`)
+      toast('Saved to session notes', 'success')
+    } catch { toast('Could not save notes. Try again.', 'error') }
+  }, [isT, worries, sessionId])
 
   const goAddWorry = useCallback(() => {
     if (guidedMode && !isT) return
@@ -469,17 +463,6 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
           </div>
         )}
       </div>
-
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', borderRadius: 10,
-          padding: '8px 16px', color: '#fff', fontSize: 16.5, zIndex: 100, pointerEvents: 'none',
-        }}>
-          {toast.msg}
-        </div>
-      )}
     </>
   )
 }

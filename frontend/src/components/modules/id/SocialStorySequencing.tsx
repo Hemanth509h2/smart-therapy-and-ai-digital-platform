@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic'
 import { deleteField, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { toast } from '@/components/practice/ui'
 import type { KidMood, SceneSpot } from './SocialStoryScene3D'
 import { STORY_DATA } from './socialStoryShared'
 import { ModuleHeaderSlot } from '@/components/session/moduleHeaderSlot'
@@ -238,7 +239,6 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
   const headerSlot = useContext(ModuleHeaderSlot)
   const [customTitle, setCustomTitle] = useState('')
   const [customPanels, setCustomPanels] = useState<{ emoji: string; caption: string }[]>(Array.from({ length: 4 }, () => ({ emoji: '😊', caption: '' })))
-  const [toast, setToast] = useState<{ msg: string } | null>(null)
   // The celebration replay runs on the board itself; `waiting` flips to true only
   // once every panel has been walked through and read, and that is what reveals
   // the same-set / new-set choice.
@@ -250,7 +250,6 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
   const [kid, setKid] = useState<{ at: string | null; walking: boolean }>({ at: null, walking: false })
   const [acting, setActing] = useState(false)
 
-  const toastT = useRef<ReturnType<typeof setTimeout>>()
   const chain = useRef<ReturnType<typeof setTimeout>[]>([])
   const revertT = useRef<ReturnType<typeof setTimeout>>()
   // Bumped whenever a replay is superseded (new story, reset, skip, unmount) so
@@ -300,16 +299,9 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
   }, [sessionId])
 
   useEffect(() => () => {
-    if (toastT.current) clearTimeout(toastT.current)
     if (revertT.current) clearTimeout(revertT.current)
     chain.current.forEach(t => clearTimeout(t))
     chain.current = []
-  }, [])
-
-  const showToast = useCallback((msg: string) => {
-    setToast({ msg })
-    if (toastT.current) clearTimeout(toastT.current)
-    toastT.current = setTimeout(() => setToast(null), 2000)
   }, [])
 
   // Resolved once here (not again at render time) so activePanels and the board
@@ -469,14 +461,14 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
       const na = (attempts || 0) + 1
       setAttempts(na)
       write({ 'moduleState.ssAttempts': na })
-      showToast('Almost! Tap the red steps to try them again')
+      toast('Almost! Tap the red steps to try them again', 'warning', { duration: 2000 })
       if (na >= 2) {
         const firstWrong = Array.from(wrong)[0]
         const correctPanelId = activePanels.find(p => p.correctIndex === firstWrong)?.id
         if (correctPanelId) setHintPanel(correctPanelId)
       }
     }
-  }, [allFilled, placed, slotCount, panelMap, write, storiesDone, showToast, activePanels, attempts, sessionId, storyId, customStory])
+  }, [allFilled, placed, slotCount, panelMap, write, storiesDone, activePanels, attempts, sessionId, storyId, customStory])
 
   /* When the last step lands right, finish automatically (only on the screen
      that placed it, so the result is written once). Wrong picks never get here
@@ -537,9 +529,9 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
 
   useEffect(() => {
     if (completed && waiting && !showAnswer) {
-      showToast('🌟 Story complete!')
+      toast('🌟 Story complete!', 'success', { duration: 2000 })
     }
-  }, [completed, waiting, showAnswer, showToast])
+  }, [completed, waiting, showAnswer])
 
   const revealAnswer = useCallback(() => {
     if (!isT) return
@@ -609,7 +601,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     const ps: Panel[] = customPanels.filter(p => p.caption.trim()).map((p, i) => ({
       id: `cp${i}`, emoji: p.emoji, caption: p.caption.trim(), correctIndex: i,
     }))
-    if (ps.length < 3) { showToast('Need at least 3 panels'); return }
+    if (ps.length < 3) { toast('Add at least 3 panels to save the story', 'warning'); return }
     const ord = shuffle(ps.map(p => p.id))
     write({
       'moduleState.ssCustomStory': { title: customTitle.trim(), panels: ps },
@@ -629,7 +621,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
     setAttempts(0)
     setCompleted(false)
     setShowCustomForm(false)
-  }, [customTitle, customPanels, write, showToast])
+  }, [customTitle, customPanels, write])
 
   // --- The scene ---
 
@@ -1093,17 +1085,6 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
               >New set</button>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', borderRadius: 10,
-          padding: '8px 16px', color: '#fff', fontSize: 16.5, zIndex: 100, pointerEvents: 'none',
-        }}>
-          {toast.msg}
         </div>
       )}
     </>

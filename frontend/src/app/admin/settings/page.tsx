@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Save } from 'lucide-react';
-import { AdminPage, Badge, Btn, Card, Checkbox, ErrorBanner, Field, Input, KV, Section, Spinner, useAdminQuery } from '@/components/admin/kit';
+import { AdminPage, Badge, Btn, Card, Checkbox, EmptyState, ErrorBanner, Field, Input, KV, Section, Spinner, useAdminQuery } from '@/components/admin/kit';
 import { toast } from '@/components/practice/ui';
 import { adminFetch, fmtDateTime } from '@/lib/adminApi';
 
@@ -186,6 +186,8 @@ export default function AdminSettingsPage() {
             </Card>
           </Section>
         </>
+      ) : !loading ? (
+        <EmptyState title="Nothing to show" />
       ) : null}
     </AdminPage>
   );

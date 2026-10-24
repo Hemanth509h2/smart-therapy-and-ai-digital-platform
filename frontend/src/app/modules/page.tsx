@@ -11,7 +11,6 @@ import {
   Btn,
   Chips,
   EmptyCard,
-  InlineError,
   Notch,
   SearchBox,
   SkeletonCard,
@@ -22,6 +21,7 @@ import { toast } from '@/components/practice/ui';
 import { AddClientDialog, StartSessionDialog } from '@/components/practice/dialogs';
 import { MODULE_CATEGORIES, resolveAllowedModuleIds } from '@/lib/modules';
 import { useModuleSettings } from '@/hooks/useModuleSettings';
+import { useErrorToast } from '@/components/practice/useErrorToast';
 
 const CATEGORY_LABEL: Record<string, string> = {
   sld: 'SLD',
@@ -107,6 +107,7 @@ function ModulesInner() {
   const params = useSearchParams();
   const { uid, role } = useAuthStore();
   const { profile, sessions, clients, loading, error, refresh } = usePracticeData();
+  useErrorToast(error, refresh);
 
   useEffect(() => {
     if (!uid) router.push('/auth');
@@ -200,8 +201,6 @@ function ModulesInner() {
           )}
         </div>
       </div>
-
-      {error && <InlineError message={error} onRetry={refresh} />}
 
       <div className="toolbar">
         <Chips value={filter} onChange={setFilter} options={chipOptions} />

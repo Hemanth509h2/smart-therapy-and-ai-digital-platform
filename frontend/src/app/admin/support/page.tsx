@@ -8,6 +8,7 @@ import {
   Btn,
   Checkbox,
   DataTable,
+  EmptyState,
   ErrorBanner,
   KV,
   Modal,
@@ -149,12 +150,10 @@ function TicketModal({ id, admins, onClose, onChanged }: { id: string | null; ad
   const [internal, setInternal] = useState(false);
   const [sending, setSending] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [actionError, setActionError] = useState('');
 
   useEffect(() => {
     setBody('');
     setInternal(false);
-    setActionError('');
   }, [id]);
 
   const ticket = data?.ticket && data.ticket.id === id ? data.ticket : null;
@@ -162,13 +161,13 @@ function TicketModal({ id, admins, onClose, onChanged }: { id: string | null; ad
   const update = async (patch: { status?: TicketStatus; assigneeUid?: string | null }) => {
     if (!ticket) return;
     setSaving(true);
-    setActionError('');
     try {
       await adminFetch(`/api/admin/support/${ticket.id}`, { method: 'PATCH', json: patch });
+      toast('Ticket updated');
       await reload();
       onChanged();
     } catch (e: any) {
-      setActionError(e.message);
+      toast(e.message || 'Could not update the ticket.', 'error');
     } finally {
       setSaving(false);
     }
@@ -177,17 +176,16 @@ function TicketModal({ id, admins, onClose, onChanged }: { id: string | null; ad
   const reply = async () => {
     if (!ticket || !body.trim()) return;
     setSending(true);
-    setActionError('');
     try {
       const res = await adminFetch<{ emailError: string | null }>(`/api/admin/support/${ticket.id}/replies`, { method: 'POST', json: { body, internal } });
       if (internal) toast('Internal note added');
-      else if (res.emailError) toast(`Reply saved, but the email failed: ${res.emailError}`, 'error');
+      else if (res.emailError) toast(`Reply saved, but the email failed: ${res.emailError}`, 'warning');
       else toast('Reply emailed to the user');
       setBody('');
       await reload();
       onChanged();
     } catch (e: any) {
-      setActionError(e.message);
+      toast(e.message || 'Could not send the reply.', 'error');
     } finally {
       setSending(false);
     }
@@ -197,7 +195,7 @@ function TicketModal({ id, admins, onClose, onChanged }: { id: string | null; ad
     <Modal open={!!id} onClose={onClose} wide title={ticket ? ticket.subject : 'Ticket'} description={ticket ? `${ticket.ref} · raised ${fmtDateTime(ticket.createdAt)}` : undefined}>
       {error && <ErrorBanner message={error} onRetry={reload} />}
       {!ticket ? (
-        loading && <div className="flex justify-center py-10"><Spinner /></div>
+        loading ? <div className="flex justify-center py-10"><Spinner /></div> : error ? <EmptyState title="Nothing to show" /> : null
       ) : (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
@@ -268,7 +266,6 @@ function TicketModal({ id, admins, onClose, onChanged }: { id: string | null; ad
             </div>
             {!internal && <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>Sending a reply marks the ticket as waiting on the user.</p>}
           </div>
-          {actionError && <ErrorBanner message={actionError} />}
         </div>
       )}
     </Modal>

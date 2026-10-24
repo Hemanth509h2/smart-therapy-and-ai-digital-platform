@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { apiFetch } from '@/lib/api';
+import { useErrorToast } from '@/components/practice/useErrorToast';
 
 interface SessionData {
   id: string;
@@ -24,6 +25,7 @@ export default function ProgressPage() {
 
   const [sessions, setSessions] = useState<SessionData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (!uid) { router.push('/auth'); return; }
@@ -36,10 +38,16 @@ export default function ProgressPage() {
     setLoading(true);
     try {
       const res = await apiFetch(`/api/sessions?clientId=${profile.id}`);
-      if (res.ok) { const d = await res.json(); setSessions(d.sessions || []); }
-    } catch (err) { console.error(err); }
+      if (res.ok) { const d = await res.json(); setSessions(d.sessions || []); setLoadError(''); }
+      else setLoadError('Could not load your sessions.');
+    } catch (err) {
+      console.error(err);
+      setLoadError('Could not reach the server. Please try again.');
+    }
     setLoading(false);
   };
+
+  useErrorToast(loadError, fetchSessions);
 
   const completedSessions = sessions.filter((s) => s.status === 'COMPLETED');
   const totalCompleted = completedSessions.length;

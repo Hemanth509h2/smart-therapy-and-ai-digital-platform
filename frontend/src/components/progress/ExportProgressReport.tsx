@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import type { ProgressMetric, ProgressReport, ProgressNote } from '@/lib/progressApi';
+import { toast } from '@/components/practice/ui';
 
 const CARD =
   'rounded-[14px] border-[0.5px] border-[var(--glass-border)] shadow-[var(--glass-shadow)] bg-[var(--glass-bg)] dark:bg-[#16221e]';
@@ -31,13 +32,11 @@ function downloadBlob(filename: string, blob: Blob) {
 
 export default function ExportProgressReport({ clientName, metrics, reports, notes }: Props) {
   const [exporting, setExporting] = useState<'csv' | 'pdf' | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const esc = (c: string) => `"${String(c).replace(/"/g, '""')}"`;
 
   const handleCsvExport = () => {
     setExporting('csv');
-    setError(null);
     try {
       const lines: string[] = [];
 
@@ -76,9 +75,10 @@ export default function ExportProgressReport({ clientName, metrics, reports, not
         `${clientName.replace(/\s+/g, '_')}_progress.csv`,
         new Blob([lines.join('\n')], { type: 'text/csv' })
       );
+      toast('CSV downloaded');
     } catch (e: any) {
       console.error('CSV export failed:', e);
-      setError(e.message || 'CSV export failed');
+      toast(e.message || 'Could not export the CSV.', 'error');
     } finally {
       setExporting(null);
     }
@@ -86,7 +86,6 @@ export default function ExportProgressReport({ clientName, metrics, reports, not
 
   const handlePdfExport = async () => {
     setExporting('pdf');
-    setError(null);
     try {
       // Loaded dynamically so it's only pulled into the client bundle when used.
       const { default: jsPDF } = await import('jspdf');
@@ -151,9 +150,10 @@ export default function ExportProgressReport({ clientName, metrics, reports, not
       }
 
       doc.save(`${clientName.replace(/\s+/g, '_')}_progress_report.pdf`);
+      toast('PDF report downloaded');
     } catch (e: any) {
       console.error('PDF export failed:', e);
-      setError(e.message || 'PDF export failed');
+      toast(e.message || 'Could not export the PDF.', 'error');
     } finally {
       setExporting(null);
     }
@@ -170,7 +170,6 @@ export default function ExportProgressReport({ clientName, metrics, reports, not
         <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
           Download this client's metrics, notes, and reports to share or archive.
         </p>
-        {error && <p className="text-sm mt-2 text-red-600">{error}</p>}
       </div>
       <div className="flex gap-2">
         <button

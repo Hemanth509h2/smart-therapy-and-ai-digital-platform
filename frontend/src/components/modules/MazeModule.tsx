@@ -315,7 +315,7 @@ export default function MazeModule({ sessionId, role, isLocked }: MazeModuleProp
             </ul>
 
             <div className="mt-4 pt-3.5 border-t border-slate-200/70 flex items-center gap-2 text-xs text-slate-500 font-semibold">
-              <Navigation className="w-4 h-4 text-slate-400 shrink-0" />
+              <Navigation className="w-4 h-4 text-slate-500 shrink-0" />
               <span>Tip: Use arrow buttons or keyboard <strong>↑ ↓ ← →</strong> keys.</span>
             </div>
           </div>
@@ -323,7 +323,7 @@ export default function MazeModule({ sessionId, role, isLocked }: MazeModuleProp
           {/* Stats Card */}
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-around text-center">
             <div>
-              <div className="flex items-center justify-center gap-1.5 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+              <div className="flex items-center justify-center gap-1.5 text-slate-500 text-xs font-semibold uppercase tracking-wider">
                 <Footprints className="w-4 h-4" /> Moves
               </div>
               <div className="text-3xl font-extrabold text-slate-800 mt-1 tabular-nums">
@@ -332,7 +332,7 @@ export default function MazeModule({ sessionId, role, isLocked }: MazeModuleProp
             </div>
             <div className="w-px h-10 bg-slate-200" />
             <div>
-              <div className="flex items-center justify-center gap-1.5 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+              <div className="flex items-center justify-center gap-1.5 text-slate-500 text-xs font-semibold uppercase tracking-wider">
                 <Flag className="w-4 h-4" /> Status
               </div>
               <div className="text-sm font-bold mt-1.5">
@@ -469,7 +469,7 @@ export default function MazeModule({ sessionId, role, isLocked }: MazeModuleProp
                   <ArrowLeft className="w-8 h-8 stroke-[2.5]" />
                 </button>
 
-                <div className="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center rounded-2xl bg-slate-100/80 border border-dashed border-slate-300 text-slate-400">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center rounded-2xl bg-slate-100/80 border border-dashed border-slate-300 text-slate-500">
                   <Compass className="w-6 h-6 text-emerald-600/70" />
                 </div>
 

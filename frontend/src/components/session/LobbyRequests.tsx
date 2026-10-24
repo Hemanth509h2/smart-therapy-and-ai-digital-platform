@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Pause, Play, UserCheck, UserX, Users, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
+import { toast } from '@/components/practice/ui'
 import { RC } from './roomTheme'
 
 interface Person {
@@ -44,11 +45,9 @@ const STOP_MESSAGES: Record<StopReason, string> = {
 
 export default function LobbyRequests({
   sessionId,
-  onDecided,
   floating,
 }: {
   sessionId: string
-  onDecided?: (msg: string) => void
   /** Pin the button above the bottom-right corner (layouts without the top bar);
    *  the panel then opens upwards. */
   floating?: boolean
@@ -143,6 +142,11 @@ export default function LobbyRequests({
     }
   }, [load])
 
+  // Once per outage, not on every failed poll.
+  useEffect(() => {
+    if (loadError) toast('Could not load the waiting room. Retrying…', 'warning')
+  }, [loadError])
+
   useEffect(() => {
     if (!confirmRemove) return
     const onKey = (e: KeyboardEvent) => {
@@ -172,16 +176,14 @@ export default function LobbyRequests({
           seenInCall.current.add(person.uid)
           stop('joined')
         }
-        onDecided?.(
-          action === 'admit' ? `${person.name} admitted`
-          : action === 'deny' ? `${person.name} was not admitted`
-          : `${person.name} removed from the call`,
-        )
+        if (action === 'admit') toast(`${person.name} admitted`, 'success')
+        else if (action === 'deny') toast(`${person.name} was not admitted`, 'info')
+        else toast(`${person.name} removed from the call`, 'info')
       } else {
-        onDecided?.('Could not update the waiting room. Try again.')
+        toast('Could not update the waiting room. Try again.', 'error')
       }
     } catch {
-      onDecided?.('Could not update the waiting room. Try again.')
+      toast('Could not update the waiting room. Try again.', 'error')
     } finally {
       setBusy(null)
     }
@@ -346,10 +348,6 @@ export default function LobbyRequests({
               {STOP_MESSAGES[stopReason]}{' '}
               New clients who open your invite link won&apos;t appear until you press Resume.
             </div>
-          )}
-
-          {!paused && loadError && (
-            <div style={{ fontSize: 12, color: RC.red, padding: '8px 4px 0' }}>Could not load the waiting room. Retrying…</div>
           )}
 
           <div style={sectionLabel}>Waiting to join ({waiting.length})</div>

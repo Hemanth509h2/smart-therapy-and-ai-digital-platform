@@ -31,12 +31,12 @@
   --secondary-foreground: 36 20% 28%;
 
   --muted: 40 25% 92%;
-  --muted-foreground: 36 12% 45%;
+  --muted-foreground: 36 14% 35%;
 
   --accent: 40 30% 88%;
   --accent-foreground: 36 22% 24%;
 
-  --destructive: 0 72% 55%;
+  --destructive: 0 72% 45%;
   --destructive-foreground: 40 30% 98%;
 
   /* Borders #D4C4A8 ≈ hsl(38 34% 75%) */
@@ -52,8 +52,8 @@
   --glass-strong: rgba(255, 251, 244, 0.92);
   --nav-bg: rgba(245, 239, 228, 0.7);
   --ink: #2C1F0E;
-  --ink-muted: #8B7355;
-  --ink-faint: rgba(139, 115, 85, 0.4);
+  --ink-muted: #6B5843;
+  --ink-faint: rgba(107, 88, 67, 0.75);
   --glass-shadow: 0 1px 3px rgba(139, 99, 64, 0.07), 0 6px 18px rgba(139, 99, 64, 0.06);
   --glass-shadow-lg: 0 10px 24px rgba(139, 99, 64, 0.14);
   /* `--sage` = primary accent #8B6340 (variable name kept for compatibility) */
@@ -63,10 +63,10 @@
   --viz-series: #B8662A;
   --viz-grid: rgba(44, 31, 14, 0.08);
   --sage-mid: #A87A4F;
-  /* `--c-accent` = secondary accent #C4784A (highlights, tags, live dot) */
-  --c-accent: #C4784A;
+  /* `--c-accent` = secondary accent #A35A2E (highlights, tags, live dot) */
+  --c-accent: #A35A2E;
   --c-accent-bg: rgba(196, 120, 74, 0.14);
-  --accent: #C4784A;
+  --accent: #A35A2E;
   --accent-bg: rgba(196, 120, 74, 0.14);
 }
 
@@ -264,10 +264,10 @@ h1, h2, h3, h4, h5, h6 {
   --ds-surface: #FFFFFF;
   --ds-surface-2: #FAF7F1;
   --ds-border: #EAE2D5;
-  --ds-border-strong: #DCD0BD;
+  --ds-border-strong: #C9B99F;
   --ds-ink: #1C2A25;
-  --ds-muted: #66706B;
-  --ds-faint: #9AA19D;
+  --ds-muted: #545D58;
+  --ds-faint: #6C7470;
   --ds-forest: #1F4136;
   --ds-forest-hover: #16332A;
   --ds-forest-soft: #E4EEE8;
@@ -276,17 +276,17 @@ h1, h2, h3, h4, h5, h6 {
   --ds-side-muted: rgba(232, 239, 234, 0.74);
   --ds-side-active: rgba(255, 255, 255, 0.11);
   --ds-side-border: rgba(255, 255, 255, 0.09);
-  --ds-clay: #B07B4F;
-  --ds-clay-hover: #986640;
+  --ds-clay: #94633B;
+  --ds-clay-hover: #7E5330;
   --ds-clay-soft: #F5E9DD;
-  --ds-clay-ink: #8A5A33;
-  --ds-green: #2E7D57;
+  --ds-clay-ink: #7A4E2B;
+  --ds-green: #24694A;
   --ds-green-soft: #E3F1E8;
-  --ds-amber: #B9800F;
+  --ds-amber: #8A5D05;
   --ds-amber-soft: #FBF0DA;
-  --ds-red: #C8473A;
+  --ds-red: #AD3A2E;
   --ds-red-soft: #FBE8E4;
-  --ds-blue: #3B6BA5;
+  --ds-blue: #345F94;
   --ds-blue-soft: #E7EEF8;
   --ds-violet: #6E55A8;
   --ds-violet-soft: #EFEAF8;
@@ -547,4 +547,21 @@ select.ds-input {
 }
 @keyframes btnBusySpin {
   to { transform: rotate(360deg); }
+}
+
+/* ── Sileo toasts (components/practice/ui.tsx) ─────────────────────
+   Above dialogs (z-50) and the old toaster's z-70; titles keep their
+   sentence case; descriptions are brighter than Sileo's 50% default for
+   AA contrast. Sileo draws a dark pill on light pages and a light pill on
+   dark ones, so the dark-page pill gets darker state colours. */
+[data-sileo-viewport] { z-index: 9999 !important; }
+[data-sileo-title] { text-transform: none !important; font-weight: 600 !important; }
+[data-sileo-viewport][data-theme=light] [data-sileo-description] { color: rgba(255, 255, 255, 0.82) !important; }
+[data-sileo-viewport][data-theme=dark] [data-sileo-description] { color: rgba(0, 0, 0, 0.75) !important; }
+[data-sileo-viewport][data-theme=dark] {
+  --sileo-state-success: #1f7a44;
+  --sileo-state-error: #b3311f;
+  --sileo-state-warning: #8a5d05;
+  --sileo-state-info: #345f94;
+  --sileo-state-action: #4a43b8;
 }

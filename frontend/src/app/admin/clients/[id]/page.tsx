@@ -177,8 +177,8 @@ export default function AdminClientDetailPage() {
             />
           )}
         </>
-      ) : !loading && !error ? (
-        <EmptyState title="Client not found" />
+      ) : !loading ? (
+        <EmptyState title={error ? 'Nothing to show' : 'Client not found'} />
       ) : null}
     </AdminPage>
   );
@@ -197,18 +197,16 @@ function ReassignModal({
   currentTherapistId: string | null;
   onDone: () => void;
 }) {
-  const { data, loading, error } = useAdminQuery<{ professionals: { id: string; name: string; email?: string }[] }>(
+  const { data, loading, error, reload } = useAdminQuery<{ professionals: { id: string; name: string; email?: string }[] }>(
     open ? '/api/admin/professionals?pageSize=200&sort=name&dir=asc' : null
   );
   const [target, setTarget] = useState('');
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
 
   const options = (data?.professionals ?? []).filter((p) => p.id !== currentTherapistId);
 
   const submit = async () => {
     setBusy(true);
-    setErr('');
     try {
       const res = await adminFetch<{ therapist: { name: string } }>(`/api/admin/clients/${clientId}`, { method: 'PATCH', json: { therapistId: target } });
       toast(`Client reassigned to ${res.therapist.name}`);
@@ -216,7 +214,7 @@ function ReassignModal({
       onDone();
       onClose();
     } catch (e: any) {
-      setErr(e.message);
+      toast(e.message || 'Could not reassign the client.', 'error');
     } finally {
       setBusy(false);
     }
@@ -238,7 +236,7 @@ function ReassignModal({
       {loading && open && !data && !error ? (
         <div className="flex justify-center py-6"><Spinner /></div>
       ) : error ? (
-        <ErrorBanner message={`Could not load professionals: ${error}`} />
+        <ErrorBanner message={`Could not load professionals: ${error}`} onRetry={reload} />
       ) : (
         <Field label="New professional">
           <Select
@@ -253,7 +251,6 @@ function ReassignModal({
           />
         </Field>
       )}
-      {err && <ErrorBanner message={err} />}
     </Modal>
   );
 }
