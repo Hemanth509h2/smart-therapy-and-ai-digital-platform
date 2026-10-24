@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     const auth = await requireAdmin(request, 'settings');
     if (!auth.ok) return auth.response;
 
-    const checks = await Promise.all([checkDb(), checkAppDb(), checkLiveKit(), checkSttRelay(), checkWhatsAppBot(), checkAutomation(), checkSmtp(), checkFirebase()]);
+    const checks = await Promise.all([checkDb(), checkAppDb(), checkLiveKit(), ...(await checkAiService()), checkWhatsAppBot(), checkAutomation(), checkSmtp(), checkFirebase()]);
 
     const jobs = await appDb.cronRun.findMany({ distinct: ['job'], select: { job: true } });
     const names = Array.from(new Set(['cleanup-transcripts', ...jobs.map((j) => j.job)]));
@@ -116,16 +116,56 @@ async function checkLiveKit(): Promise<Check> {
   }
 }
 
-async function checkSttRelay(): Promise<Check> {
-  const base = { id: 'stt', label: 'Transcription relay' };
+interface AiHealth {
+  authConfigured?: boolean;
+  sarvamConfigured?: boolean;
+  assistantConfigured?: boolean;
+  callPlanConfigured?: boolean;
+}
+
+// The AI service (ai/) runs STT, the AI Assistant (insights + reports) and AI
+// Notes (call plan). One /health call reports which of them are set up; each
+// gets its own card.
+async function checkAiService(): Promise<Check[]> {
+  const stt = { id: 'stt', label: 'Speech-to-text (STT)' };
+  const assistant = { id: 'ai-assistant', label: 'AI Assistant' };
+  const notes = { id: 'ai-notes', label: 'AI Notes' };
+  const all = (status: Status, message: string, latencyMs: number | null = null): Check[] =>
+    [stt, assistant, notes].map((base) => ({ ...base, status, latencyMs, message }));
+
   const url = process.env.STT_RELAY_URL || process.env.NEXT_PUBLIC_STT_RELAY_URL;
-  if (!url) return { ...base, status: 'warn', latencyMs: null, message: 'Relay URL not set on the backend, so it was not checked.' };
+  if (!url) return all('warn', 'AI service URL (STT_RELAY_URL) not set on the backend, so it was not checked.');
+  let data: AiHealth;
+  let ms: number;
   try {
-    const { ms } = await reach(toHttp(url));
-    return { ...base, status: 'ok', latencyMs: ms, message: 'Reachable.' };
+    const r = await reach(`${toHttp(url).replace(/\/+$/, '')}/health`);
+    ms = r.ms;
+    if (!r.value.ok) return all('down', `AI service health check answered ${r.value.status}.`, ms);
+    data = await r.value.json().catch(() => ({}));
   } catch (e) {
-    return { ...base, status: 'down', latencyMs: null, message: isTimeout(e) ? 'No answer within 4s.' : 'Unreachable.' };
+    return all('down', isTimeout(e) ? 'AI service gave no answer within 4s.' : 'AI service is unreachable.');
   }
+
+  // Tokens are minted here and verified there; a secret missing on either side
+  // gets connections refused in production.
+  const secretMissingOn = [!process.env.STT_TOKEN_SECRET && 'the backend', data.authConfigured === false && 'the AI service'].filter(Boolean);
+  const authMissing = process.env.NODE_ENV === 'production' && secretMissingOn.length > 0;
+  const authWarn = `STT_TOKEN_SECRET is not set on ${secretMissingOn.join(' or ')}, so connections are refused.`;
+  const llmMissing = 'OPENROUTER_API_KEY not set on the AI service';
+  const feature = (base: { id: string; label: string }, configured: boolean | undefined, off: string, ready: string): Check =>
+    configured === false
+      ? { ...base, status: 'down', latencyMs: ms, message: off }
+      : authMissing
+        ? { ...base, status: 'warn', latencyMs: ms, message: authWarn }
+        : configured === undefined
+          ? { ...base, status: 'warn', latencyMs: ms, message: 'AI service is running, but this version does not report whether this feature is set up.' }
+          : { ...base, status: 'ok', latencyMs: ms, message: ready };
+
+  return [
+    feature(stt, data.sarvamConfigured, 'SARVAM_API_KEY not set on the AI service, so live transcription and captions are off.', 'Running and the Sarvam key is set.'),
+    feature(assistant, data.assistantConfigured ?? data.callPlanConfigured, `${llmMissing}, so AI insights and session reports are off.`, 'Running and the OpenRouter key is set.'),
+    feature(notes, data.callPlanConfigured, `${llmMissing}, so the AI Notes call plan is off.`, 'Running and the OpenRouter key is set.'),
+  ];
 }
 
 async function checkWhatsAppBot(): Promise<Check> {

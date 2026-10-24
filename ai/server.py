@@ -36,6 +36,7 @@ from websockets.asyncio.server import ServerConnection, serve
 
 import call_plan
 import internal
+import openrouter
 import stt
 
 log = logging.getLogger("ai")
@@ -125,10 +126,14 @@ def client_ip(connection, request=None):
 HEALTH_PATHS = ("/health", "/")
 
 
+# Per-feature readiness for the admin System health page. Booleans only, never
+# key values.
 def health_body():
     return json.dumps({
         "ok": True,
+        "authConfigured": bool(os.environ.get("STT_TOKEN_SECRET")),
         "sarvamConfigured": bool(os.environ.get("SARVAM_API_KEY")),
+        "assistantConfigured": openrouter.is_configured(),
         "callPlanConfigured": call_plan.is_configured(),
     })
 
