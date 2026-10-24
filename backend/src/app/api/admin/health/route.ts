@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
+import { Prisma } from '@prisma/client';
+import { Prisma as AppPrisma } from '.prisma/app-client';
 import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { firebasePrivateKey } from '@/lib/core/firebaseKey'
@@ -24,7 +26,7 @@ export async function GET(request: Request) {
     const auth = await requireAdmin(request, 'settings');
     if (!auth.ok) return auth.response;
 
-    const checks = await Promise.all([checkDb(), checkAppDb(), checkLiveKit(), checkSttRelay(), checkWhatsAppBot(), checkSmtp(), checkFirebase()]);
+    const checks = await Promise.all([checkDb(), checkAppDb(), checkLiveKit(), checkSttRelay(), checkWhatsAppBot(), checkAutomation(), checkSmtp(), checkFirebase()]);
 
     const jobs = await appDb.cronRun.findMany({ distinct: ['job'], select: { job: true } });
     const names = Array.from(new Set(['cleanup-transcripts', ...jobs.map((j) => j.job)]));
@@ -50,19 +52,44 @@ async function timed<T>(fn: () => Promise<T>) {
 const isTimeout = (e: any) => e?.name === 'TimeoutError' || e?.name === 'AbortError' || /timed? ?out/i.test(e?.message || '');
 
 async function checkDb(): Promise<Check> {
-  return checkDatabase({ id: 'db', label: 'Database (HIPAA)' }, () => prisma.$queryRaw`SELECT 1`);
+  return checkDatabase({ id: 'db', label: 'Database (HIPAA)' }, prisma, Prisma.dmmf.datamodel.models);
 }
 
 async function checkAppDb(): Promise<Check> {
-  return checkDatabase({ id: 'app-db', label: 'Database (app)' }, () => appDb.$queryRaw`SELECT 1`);
+  return checkDatabase({ id: 'app-db', label: 'Database (app)' }, appDb, AppPrisma.dmmf.datamodel.models);
 }
 
-async function checkDatabase(base: { id: string; label: string }, ping: () => Promise<unknown>): Promise<Check> {
+type RawClient = { $queryRaw<T>(query: TemplateStringsArray, ...values: unknown[]): Promise<T> };
+type Models = ReadonlyArray<{ name: string; dbName: string | null; fields: ReadonlyArray<{ name: string; kind: string; dbName?: string | null }> }>;
+
+// Connects, then compares the live tables/columns with the Prisma schema, so a
+// migration that was never applied shows here instead of as a failing page.
+async function checkDatabase(base: { id: string; label: string }, db: RawClient, models: Models): Promise<Check> {
   try {
-    const { ms } = await timed(() =>
-      Promise.race([ping(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))])
+    const { value: rows, ms } = await timed(() =>
+      Promise.race([
+        db.$queryRaw<{ t: string; c: string }[]>`SELECT table_name::text AS t, column_name::text AS c FROM information_schema.columns WHERE table_schema = current_schema()`,
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000)),
+      ])
     );
-    return { ...base, status: ms > 1000 ? 'warn' : 'ok', latencyMs: ms, message: ms > 1000 ? 'Responding slowly.' : 'Connected.' };
+    const tables = new Set(rows.map((r) => r.t));
+    const columns = new Set(rows.map((r) => `${r.t}.${r.c}`));
+    const missing: string[] = [];
+    for (const m of models) {
+      const table = m.dbName || m.name;
+      if (!tables.has(table)) {
+        missing.push(`table ${table}`);
+        continue;
+      }
+      for (const f of m.fields) {
+        if (f.kind !== 'object' && !columns.has(`${table}.${f.dbName || f.name}`)) missing.push(`${table}.${f.dbName || f.name}`);
+      }
+    }
+    if (missing.length) {
+      const list = missing.slice(0, 3).join(', ') + (missing.length > 3 ? ` and ${missing.length - 3} more` : '');
+      return { ...base, status: 'warn', latencyMs: ms, message: `Connected, but a database update was not applied (missing ${list}).` };
+    }
+    return { ...base, status: ms > 1000 ? 'warn' : 'ok', latencyMs: ms, message: ms > 1000 ? 'Up to date, but responding slowly.' : 'Connected and up to date.' };
   } catch (e: any) {
     return { ...base, status: 'down', latencyMs: null, message: isTimeout(e) ? 'No answer within 5s.' : 'Query failed.' };
   }
@@ -115,6 +142,25 @@ async function checkWhatsAppBot(): Promise<Check> {
       : { ...base, status: 'ok', latencyMs: ms, message: 'Running and connected.' };
   } catch (e) {
     return { ...base, status: 'down', latencyMs: null, message: isTimeout(e) ? 'No answer within 4s.' : 'Unreachable.' };
+  }
+}
+
+// n8n runs the scheduled WhatsApp workflows; they call /api/automation/* with
+// AUTOMATION_API_KEY, so both n8n and the key have to be in place.
+async function checkAutomation(): Promise<Check> {
+  const base = { id: 'automation', label: 'Automation (n8n)' };
+  if (!process.env.AUTOMATION_API_KEY) {
+    return { ...base, status: 'down', latencyMs: null, message: 'AUTOMATION_API_KEY not set, so every workflow call is rejected.' };
+  }
+  const url = process.env.N8N_URL;
+  if (!url) return { ...base, status: 'warn', latencyMs: null, message: 'API key set. n8n URL (N8N_URL) not set on the backend, so it was not checked.' };
+  try {
+    const { value: res, ms } = await reach(`${url.replace(/\/+$/, '')}/healthz`);
+    return res.ok
+      ? { ...base, status: 'ok', latencyMs: ms, message: 'n8n is running and the API key is set.' }
+      : { ...base, status: 'down', latencyMs: ms, message: `n8n health check answered ${res.status}.` };
+  } catch (e) {
+    return { ...base, status: 'down', latencyMs: null, message: isTimeout(e) ? 'No answer within 4s.' : 'n8n is unreachable.' };
   }
 }
 

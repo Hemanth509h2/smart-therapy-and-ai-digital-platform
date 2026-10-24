@@ -97,6 +97,8 @@ services:
       # session reports (its /internal endpoint, not exposed by Caddy) and the
       # admin health check.
       STT_RELAY_URL: http://ai:4100
+      # n8n by its service name, for the admin health check.
+      N8N_URL: http://n8n:5678
     restart: unless-stopped
     logging: *logging
 
