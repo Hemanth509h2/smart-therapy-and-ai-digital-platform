@@ -40,6 +40,7 @@ interface Pipe {
   track: MediaStreamTrack
   speaker: TranscriptChunk['speaker']
   closing: boolean
+  openedAt: number
 }
 
 // The STT relay in the Python AI service (ai/, stt package; port 4100 locally). It holds the Sarvam
@@ -59,7 +60,14 @@ function buildProxyUrl(sessionId: string, speaker: string, token: string): strin
   return url.toString()
 }
 
-const MAX_RETRIES = 3
+// A slow relay (deploy/restart, network, Sarvam handshake) or a failed token
+// request must not end transcription for the rest of the call. Each connect
+// attempt gets a deadline, and a pipe that fails or drops keeps retrying
+// (capped backoff) for as long as transcription is on.
+const CONNECT_TIMEOUT_MS = 20_000
+const MAX_BACKOFF_MS = 15_000
+// A pipe that stayed open this long was healthy; its next drop retries from 1s.
+const STABLE_PIPE_MS = 30_000
 
 export function useSessionTranscription({
   sessionId,
@@ -72,6 +80,7 @@ export function useSessionTranscription({
   const startedRef = useRef(false)
   const pendingRef = useRef<Set<string>>(new Set())
   const retriesRef = useRef<Map<string, number>>(new Map())
+  const retryTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const startPipeRef = useRef<((key: string, track: MediaStreamTrack, speaker: TranscriptChunk['speaker']) => Promise<void>) | null>(null)
   const [state, setState] = useState<TranscriptionState>({
     isRecording: false,
@@ -153,6 +162,28 @@ export function useSessionTranscription({
     pipesRef.current.delete(key)
   }, [])
 
+  // Reopen a pipe after a failed connect or a drop, while transcription is on.
+  const scheduleRetry = useCallback(
+    (key: string, track: MediaStreamTrack, speaker: TranscriptChunk['speaker']) => {
+      if (!startedRef.current || track.readyState === 'ended') {
+        setState((s) => ({ ...s, error: 'Transcription disconnected' }))
+        return
+      }
+      const attempt = (retriesRef.current.get(key) ?? 0) + 1
+      retriesRef.current.set(key, attempt)
+      setState((s) => ({ ...s, error: 'Connecting to the transcription service…' }))
+      clearTimeout(retryTimersRef.current.get(key))
+      retryTimersRef.current.set(
+        key,
+        setTimeout(() => {
+          retryTimersRef.current.delete(key)
+          if (startedRef.current && !pipesRef.current.has(key)) startPipeRef.current?.(key, track, speaker)
+        }, Math.min(1000 * 2 ** (attempt - 1), MAX_BACKOFF_MS))
+      )
+    },
+    []
+  )
+
   // Open a Sarvam socket + audio graph for one participant track.
   const startPipe = useCallback(
     async (key: string, track: MediaStreamTrack, speaker: TranscriptChunk['speaker']) => {
@@ -164,6 +195,9 @@ export function useSessionTranscription({
       // The relay verifies this token when its STT_TOKEN_SECRET is set.
       // Dev without a secret may proceed tokenless; production may not.
       let token = ''
+      // 401/403/404 (signed out, not this session's therapist) won't fix
+      // themselves; anything else (5xx, timeout, network) is retried.
+      let permanent = false
       try {
         const { auth } = await import('@/lib/firebase')
         // After a refresh Firebase restores the login asynchronously; asking
@@ -172,15 +206,22 @@ export function useSessionTranscription({
         const idToken = await auth.currentUser?.getIdToken()
         const res = await apiFetch(`/api/stt-token?sessionId=${sessionId}`, {
           headers: { Authorization: `Bearer ${idToken}` },
+          // A hung request would leave this pipe pending (and silent) forever.
+          signal: AbortSignal.timeout(CONNECT_TIMEOUT_MS),
         })
-        if (!res.ok) throw new Error(await apiErrorMessage(res, 'start live transcription'))
+        if (!res.ok) {
+          permanent = res.status === 401 || res.status === 403 || res.status === 404
+          throw new Error(await apiErrorMessage(res, 'start live transcription'))
+        }
         const data = await res.json()
         token = data.token
       } catch (err) {
         if (process.env.NODE_ENV === 'production') {
           console.error('[Transcription] Failed to get token:', err)
-          pendingRef.current.delete(key)
-          setState((s) => ({ ...s, error: caughtErrorMessage(err, 'start live transcription') }))
+          // Stopped while the token was being fetched: nothing to retry.
+          const wanted = pendingRef.current.delete(key)
+          if (wanted && !permanent) scheduleRetry(key, track, speaker)
+          else setState((s) => ({ ...s, error: caughtErrorMessage(err, 'start live transcription') }))
           return
         }
         console.warn('[Transcription] No STT token (dev): continuing without one')
@@ -196,7 +237,16 @@ export function useSessionTranscription({
       const ctx = new AudioContext({ sampleRate: STT_SAMPLE_RATE })
       const source = ctx.createMediaStreamSource(new MediaStream([track]))
       const processor = ctx.createScriptProcessor(4096, 1, 1)
-      const pipe: Pipe = { ws, ctx, source, processor, track, speaker, closing: false }
+      const pipe: Pipe = { ws, ctx, source, processor, track, speaker, closing: false, openedAt: 0 }
+
+      // A handshake that hangs never fires onclose by itself; closing it here
+      // does (code 1006), which hands it to the retry below.
+      const connectTimer = setTimeout(() => {
+        if (ws.readyState === WebSocket.CONNECTING) {
+          console.warn(`[Transcription] Connect timed out (${speaker})`)
+          ws.close()
+        }
+      }, CONNECT_TIMEOUT_MS)
 
       processor.onaudioprocess = (e) => {
         if (ws.readyState !== WebSocket.OPEN) return
@@ -204,7 +254,8 @@ export function useSessionTranscription({
       }
 
       ws.onopen = () => {
-        retriesRef.current.delete(key)
+        clearTimeout(connectTimer)
+        pipe.openedAt = Date.now()
         if (ctx.state === 'suspended') ctx.resume().catch(() => {})
         source.connect(processor)
         processor.connect(ctx.destination)
@@ -235,25 +286,21 @@ export function useSessionTranscription({
       }
 
       ws.onclose = (ev) => {
+        clearTimeout(connectTimer)
         if (pipe.closing) return
         console.log(`[Transcription] Pipe closed (${speaker}) code=${ev.code}`)
         stopPipe(key)
         if (pipesRef.current.size === 0) setState((s) => ({ ...s, isRecording: false }))
-        // Auth/config failures will not fix themselves; transient ones get a bounded retry.
+        // Auth/config failures will not fix themselves; everything else is retried.
         const reason = ev.reason || ''
         if (/not configured|auth/i.test(reason)) {
           setState((s) => ({ ...s, error: reason }))
           return
         }
-        const attempt = (retriesRef.current.get(key) ?? 0) + 1
-        if (!startedRef.current || attempt > MAX_RETRIES || track.readyState === 'ended') {
-          setState((s) => ({ ...s, error: 'Transcription disconnected' }))
-          return
-        }
-        retriesRef.current.set(key, attempt)
-        setTimeout(() => {
-          if (startedRef.current && !pipesRef.current.has(key)) startPipeRef.current?.(key, track, speaker)
-        }, 1000 * 2 ** (attempt - 1))
+        // Reset the backoff only after a stable pipe, so a relay that accepts
+        // and then drops at once doesn't retry every second.
+        if (pipe.openedAt && Date.now() - pipe.openedAt > STABLE_PIPE_MS) retriesRef.current.delete(key)
+        scheduleRetry(key, track, speaker)
       }
 
       // Track ended (e.g. mic unpublished): tear the pipe down without touching the track.
@@ -261,7 +308,7 @@ export function useSessionTranscription({
 
       pipesRef.current.set(key, pipe)
     },
-    [writeChunk, publishCaption, sessionId, stopPipe]
+    [writeChunk, publishCaption, sessionId, stopPipe, scheduleRetry]
   )
   startPipeRef.current = startPipe
 
@@ -291,6 +338,8 @@ export function useSessionTranscription({
     for (const key of Array.from(pipesRef.current.keys())) stopPipe(key)
     pendingRef.current.clear()
     retriesRef.current.clear()
+    for (const timer of Array.from(retryTimersRef.current.values())) clearTimeout(timer)
+    retryTimersRef.current.clear()
     startedRef.current = false
     setState((s) => ({ ...s, isRecording: false }))
     console.log('[Transcription] Stopped')
