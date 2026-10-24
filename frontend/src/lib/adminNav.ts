@@ -39,7 +39,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin/coupons', label: 'Coupons', icon: TicketPercent, permission: 'billing.read' },
   { href: '/admin/support', label: 'Support inbox', icon: Inbox, permission: 'support' },
   { href: '/admin/messages', label: 'Messages', icon: MessageSquare, permission: 'support' },
-  { href: '/admin/usage', label: 'Usage & AI cost', icon: Gauge, permission: 'people.read' },
+  { href: '/admin/usage', label: 'Usage & cost', icon: Gauge, permission: 'people.read' },
   { href: '/admin/modules', label: 'Module library', icon: Boxes, permission: 'content' },
   { href: '/admin/reports', label: 'Reports', icon: FileDown, permission: 'people.read' },
   { href: '/admin/audit', label: 'Audit log', icon: ScrollText, permission: 'audit.read' },

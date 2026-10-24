@@ -51,7 +51,20 @@ const GROUPS: { title: string; description: string; fields: { key: string; label
     fields: [
       { key: 'costs.aiAnalysisInr', label: 'Cost per AI analysis', unit: '₹' },
       { key: 'costs.transcriptionMinuteInr', label: 'Cost per transcription minute', unit: '₹' },
+      { key: 'costs.aiReportInr', label: 'Cost per AI session report', unit: '₹' },
+      { key: 'costs.videoMinuteInr', label: 'Cost per video session minute', unit: '₹', hint: 'For the whole call, all participants together.' },
+      { key: 'costs.whatsappMessageInr', label: 'Cost per WhatsApp message sent', unit: '₹' },
       { key: 'usage.alertMonthlyAnalyses', label: 'Flag professionals above', unit: 'AI analyses / month' },
+    ],
+  },
+  {
+    title: 'Hosting & database',
+    description: 'Fixed monthly bills and plan limits, shown on the Usage page.',
+    fields: [
+      { key: 'costs.hostingMonthlyInr', label: 'Server hosting per month', unit: '₹' },
+      { key: 'costs.databaseMonthlyInr', label: 'Databases per month', unit: '₹', hint: 'Both Neon databases together.' },
+      { key: 'limits.appDbMb', label: 'App database storage limit', unit: 'MB' },
+      { key: 'limits.hipaaDbMb', label: 'HIPAA database storage limit', unit: 'MB' },
     ],
   },
 ];

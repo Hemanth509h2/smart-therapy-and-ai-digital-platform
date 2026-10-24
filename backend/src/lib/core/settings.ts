@@ -11,7 +11,16 @@ export const SETTING_DEFAULTS = {
   // INR cost estimates for the Usage page.
   'costs.aiAnalysisInr': 1.5,
   'costs.transcriptionMinuteInr': 0.5,
+  'costs.aiReportInr': 5,
+  'costs.videoMinuteInr': 0.25, // per session minute, all participants together
+  'costs.whatsappMessageInr': 0.12,
   'usage.alertMonthlyAnalyses': 500,
+  // Fixed monthly bills (INR), added to platform totals on the Usage page.
+  'costs.hostingMonthlyInr': 0,
+  'costs.databaseMonthlyInr': 0,
+  // Storage included in each database's plan, for the "% used" bars.
+  'limits.appDbMb': 512,
+  'limits.hipaaDbMb': 10240,
 } as const;
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
