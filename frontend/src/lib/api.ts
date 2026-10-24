@@ -46,6 +46,9 @@ export function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
 async function request(input: RequestInfo | URL, init?: RequestInit) {
   if (typeof input === 'string' && input.startsWith('/')) {
     const headers = new Headers(init?.headers);
+    // Pages can render from the cached session (AuthProvider) before Firebase
+    // has restored the signed-in user; wait for it so the token is attached.
+    await auth.authStateReady();
     const user = auth.currentUser;
     if (user) {
       if (!headers.has('Authorization')) {

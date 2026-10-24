@@ -37,51 +37,72 @@ export async function GET(request: Request) {
     const monthStart = startOfMonth();
     const now = new Date();
 
-    const [settings, daily, totals, transcribed, perTherapist, modulesInRange, modulesAllTime, monthAnalyses, therapists, payments, subscriptions] =
-      await Promise.all([
-        getSettings(),
-        appDb.$queryRaw<{ bucket: Date; type: string; n: number }[]>`
-          SELECT date_trunc('day', "createdAt") AS bucket, type, sum(count)::int AS n
-          FROM "UsageEvent" WHERE "createdAt" >= ${seriesSince}
-          GROUP BY 1, 2 ORDER BY 1`,
-        appDb.usageEvent.groupBy({ by: ['type'], where: { createdAt: { gte: since } }, _sum: { count: true } }),
-        appDb.usageEvent.findMany({
-          where: { type: 'TRANSCRIPTION', sessionId: { not: null }, createdAt: { gte: since } },
-          distinct: ['sessionId'],
-          select: { sessionId: true },
-        }),
-        appDb.usageEvent.groupBy({ by: ['therapistId', 'type'], where: { createdAt: { gte: since } }, _sum: { count: true } }),
-        appDb.usageEvent.groupBy({
-          by: ['label'],
-          where: { type: 'MODULE_LAUNCH', createdAt: { gte: since }, label: { not: null } },
-          _sum: { count: true },
-        }),
-        appDb.usageEvent.groupBy({ by: ['label'], where: { type: 'MODULE_LAUNCH', label: { not: null } }, _sum: { count: true } }),
-        appDb.usageEvent.groupBy({
-          by: ['therapistId'],
-          where: { type: 'AI_ANALYSIS', createdAt: { gte: monthStart } },
-          _sum: { count: true },
-        }),
-        appDb.profileTherapist.findMany({ select: { id: true, firstName: true, lastName: true, userId: true, createdAt: true } }),
-        appDb.payment.groupBy({
-          by: ['therapistId'],
-          where: { orderStatus: 'PAID', therapistId: { not: null }, paidAt: { gte: since } },
-          _sum: { amount: true },
-          _count: { _all: true },
-        }),
-        appDb.subscription.findMany({
-          where: { status: 'ACTIVE', currentPeriodEnd: { gt: now } },
-          orderBy: { startedAt: 'desc' },
-          select: { therapistId: true, plan: { select: { name: true } } },
-        }),
-      ]);
+    // Every query starts at once; the two that need another's result chain off
+    // it. Patient-side data (sessions, reports, messages, clients) lives in the
+    // HIPAA database.
+    const transcribedP = appDb.usageEvent.findMany({
+      where: { type: 'TRANSCRIPTION', sessionId: { not: null }, createdAt: { gte: since } },
+      distinct: ['sessionId'],
+      select: { sessionId: true },
+    });
+    const therapistsP = appDb.profileTherapist.findMany({ select: { id: true, firstName: true, lastName: true, userId: true, createdAt: true } });
 
-    // Patient-side data lives in the HIPAA database.
-    const [transcribedSessions, heldSessions, reports, whatsapp, clientCounts, storage] = await Promise.all([
-      prisma.session.findMany({
-        where: { id: { in: transcribed.map((t) => t.sessionId!) }, startedAt: { not: null }, endedAt: { not: null } },
-        select: { therapistId: true, startedAt: true, endedAt: true },
+    const [
+      settings,
+      daily,
+      totals,
+      perTherapist,
+      modulesInRange,
+      modulesAllTime,
+      monthAnalyses,
+      therapists,
+      users,
+      payments,
+      subscriptions,
+      transcribedSessions,
+      heldSessions,
+      reports,
+      whatsapp,
+      clientCounts,
+      storage,
+    ] = await Promise.all([
+      getSettings(),
+      appDb.$queryRaw<{ bucket: Date; type: string; n: number }[]>`
+        SELECT date_trunc('day', "createdAt") AS bucket, type, sum(count)::int AS n
+        FROM "UsageEvent" WHERE "createdAt" >= ${seriesSince}
+        GROUP BY 1, 2 ORDER BY 1`,
+      appDb.usageEvent.groupBy({ by: ['type'], where: { createdAt: { gte: since } }, _sum: { count: true } }),
+      appDb.usageEvent.groupBy({ by: ['therapistId', 'type'], where: { createdAt: { gte: since } }, _sum: { count: true } }),
+      appDb.usageEvent.groupBy({
+        by: ['label'],
+        where: { type: 'MODULE_LAUNCH', createdAt: { gte: since }, label: { not: null } },
+        _sum: { count: true },
       }),
+      appDb.usageEvent.groupBy({ by: ['label'], where: { type: 'MODULE_LAUNCH', label: { not: null } }, _sum: { count: true } }),
+      appDb.usageEvent.groupBy({
+        by: ['therapistId'],
+        where: { type: 'AI_ANALYSIS', createdAt: { gte: monthStart } },
+        _sum: { count: true },
+      }),
+      therapistsP,
+      therapistsP.then((ts) => usersById(ts.map((t) => t.userId), { email: true, status: true, lastSeenAt: true })),
+      appDb.payment.groupBy({
+        by: ['therapistId'],
+        where: { orderStatus: 'PAID', therapistId: { not: null }, paidAt: { gte: since } },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+      appDb.subscription.findMany({
+        where: { status: 'ACTIVE', currentPeriodEnd: { gt: now } },
+        orderBy: { startedAt: 'desc' },
+        select: { therapistId: true, plan: { select: { name: true } } },
+      }),
+      transcribedP.then((rows) =>
+        prisma.session.findMany({
+          where: { id: { in: rows.map((t) => t.sessionId!) }, startedAt: { not: null }, endedAt: { not: null } },
+          select: { therapistId: true, startedAt: true, endedAt: true },
+        })
+      ),
       prisma.session.findMany({
         where: { startedAt: { gte: since }, endedAt: { not: null } },
         select: { therapistId: true, startedAt: true, endedAt: true },
@@ -187,7 +208,6 @@ export async function GET(request: Request) {
 
     const planOf = new Map<string, string>();
     for (const s of subscriptions) if (!planOf.has(s.therapistId)) planOf.set(s.therapistId, s.plan.name);
-    const users = await usersById(therapists.map((t) => t.userId), { email: true, status: true, lastSeenAt: true });
 
     const professionals = therapists
       .map((t) => {

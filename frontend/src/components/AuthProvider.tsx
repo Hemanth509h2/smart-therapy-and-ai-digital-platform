@@ -1,21 +1,41 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { useAuthStore } from '@/store/useAuthStore';
+import { readCachedAuth, useAuthStore } from '@/store/useAuthStore';
 import { useRouter, usePathname } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setAuthUser, setRoleAndProfile, clearAuth, uid } = useAuthStore();
+  const { setAuthUser, setRoleAndProfile, clearAuth } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+  // Read by the auth listener, so it doesn't re-subscribe (and re-fetch the
+  // profile) on every navigation.
+  const pathRef = useRef(pathname);
+  pathRef.current = pathname;
 
   useEffect(() => {
+    // Show the page at once with the last signed-in user's role and profile.
+    // Firebase restoring the session and the profile request can take seconds;
+    // the listener below confirms the cached user or replaces it.
+    const cached = readCachedAuth();
+    if (cached) {
+      setAuthUser(cached.uid, cached.email);
+      setRoleAndProfile(cached.role, cached.profile);
+      setLoading(false);
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      const pathname = pathRef.current;
       if (firebaseUser) {
+        if (cached && cached.uid !== firebaseUser.uid) {
+          // A different account than the cached one: wait for its own profile.
+          clearAuth();
+          setLoading(true);
+        }
         setAuthUser(firebaseUser.uid, firebaseUser.email);
 
         // Guest joining via an invite link: signed in anonymously, so there
@@ -60,6 +80,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
             }
           } else if (res.status === 404) {
             // Profile doesn't exist yet, needs onboarding
+            setRoleAndProfile(null, null);
             if (pathname !== '/onboarding') {
               router.push('/onboarding');
             }
@@ -91,7 +112,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     });
 
     return () => unsubscribe();
-  }, [setAuthUser, setRoleAndProfile, clearAuth, router, pathname]);
+  }, [setAuthUser, setRoleAndProfile, clearAuth, router]);
 
   if (loading) {
     return (

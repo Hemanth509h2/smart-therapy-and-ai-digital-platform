@@ -273,21 +273,22 @@ export async function GET(request: Request) {
   const uid = auth.uid;
 
   try {
-    const found = await prisma.user.findUnique({
-      where: { id: uid },
-      include: {
-        client: true,
-      },
-    });
+    // Every page load waits on this request, so look up both databases at once.
+    const [found, therapist, admin] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: uid },
+        include: {
+          client: true,
+        },
+      }),
+      appDb.profileTherapist.findUnique({ where: { userId: uid } }),
+      appDb.profileAdmin.findUnique({ where: { userId: uid } }),
+    ]);
 
     if (!found) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const [therapist, admin] = await Promise.all([
-      appDb.profileTherapist.findUnique({ where: { userId: uid } }),
-      appDb.profileAdmin.findUnique({ where: { userId: uid } }),
-    ]);
     const user = { ...found, therapist, admin };
     return NextResponse.json({ user });
   } catch (error: any) {
