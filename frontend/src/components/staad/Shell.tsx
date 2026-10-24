@@ -7,6 +7,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { toast } from '@/components/practice/ui';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useTheme } from '@/components/ThemeProvider';
 import { initials, fullName } from '@/lib/practice';
 import { adminNavFor } from '@/lib/adminNav';
 import { ADMIN_ROLE_LABELS, adminRoleOf } from '@/lib/adminRoles';
@@ -21,6 +22,8 @@ import {
   IconProfile,
   IconSchedule,
   IconSessions,
+  IconThemeA,
+  IconThemeB,
 } from './icons';
 
 type Role = 'THERAPIST' | 'CLIENT' | 'ADMIN' | null;
@@ -65,6 +68,7 @@ export function StaadShell({ children, className }: { children: React.ReactNode;
   const { role, profile } = useAuthStore();
   const pathname = usePathname();
   const router = useRouter();
+  const { theme, toggle: toggleTheme } = useTheme();
 
   const [collapsed, setCollapsed] = useState(false);
   const [autoCollapsed, setAutoCollapsed] = useState(false);
@@ -152,6 +156,18 @@ export function StaadShell({ children, className }: { children: React.ReactNode;
         </div>
 
         <div className="sb-foot">
+          {/* Therapist pages switch theme from the TopBar; admin pages have no TopBar. */}
+          {isAdmin && (
+            <button
+              className="nav-item"
+              type="button"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              <span className="nav-ic">{theme === 'dark' ? <IconThemeB /> : <IconThemeA />}</span>
+              <span className="nav-label">Theme</span>
+            </button>
+          )}
           <button className="nav-item" type="button" onClick={handleLogout}>
             <span className="nav-ic">
               <IconLogout />
