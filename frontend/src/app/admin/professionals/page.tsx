@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, Ban, CreditCard, Download, Gauge, RotateCcw, SlidersHorizontal, Trash2, Users } from 'lucide-react';
+import { Activity, Ban, CreditCard, Download, Gauge, RotateCcw, SlidersHorizontal, Trash2, UserPlus, Users } from 'lucide-react';
 import {
   AdminPage,
   Badge,
@@ -28,6 +28,7 @@ import { caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 import { MODULE_CATEGORIES, ALL_MODULE_IDS } from '@/lib/modules';
 import { RemoveProfessionalDialog } from '@/components/admin/RemoveProfessionalDialog';
+import { AddProfessionalDialog } from '@/components/admin/AddProfessionalDialog';
 
 interface Row {
   id: string;
@@ -71,6 +72,7 @@ export default function AdminProfessionalsPage() {
   const { can } = useAdmin();
   const canWrite = can('people.write');
   const canRemove = can('admins.manage'); // permanent removal: super admins only
+  const [adding, setAdding] = useState(false);
   const list = useListState({ sort: 'createdAt', dir: 'desc', filters: { status: '', plan: '', from: '', to: '' } });
   const { data, loading, error, reload } = useAdminQuery<ListResponse>(`/api/admin/professionals?${list.query}`, 'load the professionals');
   const rows = data?.professionals ?? [];
@@ -301,7 +303,12 @@ export default function AdminProfessionalsPage() {
       title="Professionals"
       description="Find therapists, check their activity, and manage access and account status."
       permission="people.read"
-      actions={<Btn variant="ghost" icon={<Download className="h-4 w-4" />} loading={exporting} onClick={exportCsv}>Export CSV</Btn>}
+      actions={
+        <>
+          <Btn variant="ghost" icon={<Download className="h-4 w-4" />} loading={exporting} onClick={exportCsv}>Export CSV</Btn>
+          {canWrite && <Btn icon={<UserPlus className="h-4 w-4" />} onClick={() => setAdding(true)}>Add professional</Btn>}
+        </>
+      }
     >
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Professionals" value={k ? num(k.total) : '—'} icon={<Users className="h-4 w-4" />} />
@@ -444,6 +451,8 @@ export default function AdminProfessionalsPage() {
           reload();
         }}
       />
+
+      <AddProfessionalDialog open={adding} onClose={() => setAdding(false)} onCreated={() => reload()} />
     </AdminPage>
   );
 }

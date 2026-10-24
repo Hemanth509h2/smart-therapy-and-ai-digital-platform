@@ -12,7 +12,7 @@ import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 
 function OnboardingForm() {
-  const { uid, setRoleAndProfile } = useAuthStore();
+  const { uid, email, setRoleAndProfile } = useAuthStore();
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get('invite');
   const router = useRouter();
@@ -108,6 +108,23 @@ function OnboardingForm() {
             </div>
 
             <div className="space-y-4 animate-fadeIn">
+              {/* The account's sign-in email (from sign-up or Google); shown so the
+                  doctor can confirm it, not editable here. */}
+              <div className="space-y-1">
+                <Label htmlFor="email" className="font-medium" style={{ color: 'var(--ink-muted)' }}>Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email ?? ''}
+                  readOnly
+                  aria-describedby="email-hint"
+                  className="rounded-xl border"
+                  style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)' }}
+                />
+                <p id="email-hint" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+                  You sign in with this email. To use a different one, sign out and create the account with that email.
+                </p>
+              </div>
               <div className="space-y-1">
                 <Label htmlFor="phone" className="font-medium" style={{ color: 'var(--ink-muted)' }}>WhatsApp Phone Number</Label>
                 <Input
