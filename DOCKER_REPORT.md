@@ -222,7 +222,7 @@ These services need to know your new public address:
 | Stop everything | `docker compose down` |
 | Change a frontend `NEXT_PUBLIC_*` value | edit `frontend/.env`, then `docker compose up -d --build frontend` |
 | Change a backend or ai setting | edit its `.env`, then `docker compose up -d backend` (or `ai`) |
-| Backend database schema change | run `npx prisma db push` in `backend/` from your own machine |
+| Backend database schema change | from `backend/` on your own machine: HIPAA database `npx prisma db push`; app database **never** `db push` (it would drop tables), apply the SQL in `scripts/maintenance/` with `npx prisma db execute --schema prisma/app/schema.prisma --file <file>` |
 | Free disk space from old builds | `docker image prune -f` and `docker builder prune -f` |
 
 Data kept between restarts (Docker volumes):

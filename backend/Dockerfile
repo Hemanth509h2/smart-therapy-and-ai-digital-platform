@@ -20,11 +20,15 @@
 #   the mounted .env file when the container starts. Nothing secret is copied
 #   into the image, so the same image works with any .env.
 #
-# Database schema changes:
-#   Run `npx prisma db push` (HIPAA database) and
-#   `npx prisma db push --schema prisma/app/schema.prisma` (app database)
-#   from your own machine, inside backend/.
-#   The final image does not contain the Prisma command-line tool.
+# Database schema changes (from your own machine, inside backend/; the final
+# image does not contain the Prisma command-line tool):
+#   HIPAA database:  npx prisma db push
+#   App database:    NEVER `db push`. It still holds tables that are not in
+#                    prisma/app/schema.prisma (old patient tables, the feedback
+#                    board, n8n), and a push would drop them. Apply the SQL
+#                    files in scripts/maintenance/ instead:
+#                    npx prisma db execute --schema prisma/app/schema.prisma --file scripts/maintenance/<file>.sql
+#   Admin > System health shows a database as "Check" when an update is missing.
 #
 # The build has two stages:
 #   Stage 1 "build"  installs everything and compiles the app.

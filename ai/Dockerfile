@@ -3,9 +3,10 @@
 # =============================================================================
 #
 # What this is:
-#   The Python speech-to-text relay. The browser sends session audio here, this
-#   service forwards it to Sarvam (adding the secret API key) and sends the
-#   transcript back. It listens on port 4100 and is started by gunicorn.
+#   The Python AI service. It relays session audio to Sarvam for speech-to-text
+#   and runs the AI features the backend calls: live insights and the safety
+#   scan, the end-of-session report and the call-plan agent. It listens on
+#   port 4100 and is started by gunicorn.
 #
 # How to build (run inside the ai/ folder):
 #   docker build -t staad-ai .
@@ -17,9 +18,14 @@
 #   --env-file .env  gives the container your settings
 #
 # Where the settings come from:
-#   SARVAM_API_KEY, OPENROUTER_API_KEY, DATABASE_URL, NVIDIA_API_KEY,
-#   STT_TOKEN_SECRET (same value as in backend/.env) and ALLOWED_ORIGINS are
-#   read when the container starts.
+#   Read when the container starts (see .env.example):
+#     SARVAM_API_KEY, SARVAM_WS_URL            speech-to-text
+#     OPENROUTER_API_KEY, OPENROUTER_*_MODEL   the AI features
+#     DATABASE_URL (app database) and
+#     DATABASE_URL_2 (HIPAA database)          searches, same values as backend/.env
+#     NVIDIA_API_KEY                           embeddings for the searches
+#     STT_TOKEN_SECRET                         same value as in backend/.env
+#     ALLOWED_ORIGINS                          sites allowed to connect
 #   WEB_CONCURRENCY sets how many worker processes run (default 1).
 #
 # Safety:
