@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Pause, Play, UserCheck, UserX, Users, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
+import { apiErrorMessage, caughtErrorMessage, toastApiError } from '@/lib/apiError'
 import { toast } from '@/components/practice/ui'
 import { RC } from './roomTheme'
 
@@ -24,6 +25,10 @@ interface Person {
 }
 
 type Action = 'admit' | 'deny' | 'remove'
+
+// Completes "you can't …" in error messages.
+const lobbyAction = (action: Action, name: string) =>
+  action === 'admit' ? `admit ${name}` : action === 'deny' ? `turn ${name} away` : `remove ${name} from the call`
 
 // Fast while someone is waiting or the panel is open (the therapist is acting
 // on it); otherwise only watching for a new knock, which can wait a few seconds.
@@ -54,7 +59,7 @@ export default function LobbyRequests({
 }) {
   const [waiting, setWaiting] = useState<Person[]>([])
   const [inCall, setInCall] = useState<Person[]>([])
-  const [loadError, setLoadError] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   // Client the therapist clicked Remove on, awaiting confirmation.
@@ -81,7 +86,7 @@ export default function LobbyRequests({
     try {
       const res = await apiFetch(`/api/sessions/${sessionId}/lobby`)
       if (!res.ok) {
-        setLoadError(true)
+        setLoadError(await apiErrorMessage(res, 'load the waiting room'))
         return false
       }
       const data = await res.json()
@@ -89,7 +94,7 @@ export default function LobbyRequests({
       const c: Person[] = Array.isArray(data.inCall) ? data.inCall : []
       setWaiting(w)
       setInCall(c)
-      setLoadError(false)
+      setLoadError('')
       if (w.length) lastActiveAt.current = Date.now()
       // Someone new is knocking: open the panel so the therapist notices.
       if (w.some((p) => !seenWaiting.current.has(p.uid))) setOpen(true)
@@ -144,7 +149,7 @@ export default function LobbyRequests({
 
   // Once per outage, not on every failed poll.
   useEffect(() => {
-    if (loadError) toast('Could not load the waiting room. Retrying…', 'warning')
+    if (loadError) toast(`${loadError} Retrying…`, 'warning')
   }, [loadError])
 
   useEffect(() => {
@@ -176,14 +181,14 @@ export default function LobbyRequests({
           seenInCall.current.add(person.uid)
           stop('joined')
         }
-        if (action === 'admit') toast(`${person.name} admitted`, 'success')
-        else if (action === 'deny') toast(`${person.name} was not admitted`, 'info')
-        else toast(`${person.name} removed from the call`, 'info')
+        if (action === 'admit') toast(`${person.name} was admitted to the call.`, 'success')
+        else if (action === 'deny') toast(`${person.name} was not admitted.`, 'info')
+        else toast(`${person.name} was removed from the call.`, 'info')
       } else {
-        toast('Could not update the waiting room. Try again.', 'error')
+        await toastApiError(res, lobbyAction(action, person.name))
       }
-    } catch {
-      toast('Could not update the waiting room. Try again.', 'error')
+    } catch (e) {
+      toast(caughtErrorMessage(e, lobbyAction(action, person.name)), 'error')
     } finally {
       setBusy(null)
     }

@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { AdminPage, Badge, Card, Checkbox, EmptyState, ErrorBanner, SearchInput, Section, Select, Spinner, Toolbar, useAdminQuery } from '@/components/admin/kit';
 import { toast } from '@/components/practice/ui';
 import { adminFetch, num, timeAgo } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 
 interface ModuleRow {
   id: string;
@@ -34,7 +35,7 @@ const SHOW = [
 ];
 
 export default function AdminModulesPage() {
-  const { data, loading, error, reload, setData } = useAdminQuery<{ categories: Category[] }>('/api/admin/modules');
+  const { data, loading, error, reload, setData } = useAdminQuery<{ categories: Category[] }>('/api/admin/modules', 'load the modules');
   const [q, setQ] = useState('');
   const [show, setShow] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -64,6 +65,7 @@ export default function AdminModulesPage() {
       const res = await adminFetch<{ module: { enabled: boolean; featured: boolean; updatedAt: string; updatedBy: string } }>('/api/admin/modules', {
         method: 'PATCH',
         json: { moduleId: m.id, ...change },
+        action: `update ${m.name}`,
       });
       setData((d) =>
         d && {
@@ -73,9 +75,9 @@ export default function AdminModulesPage() {
           })),
         }
       );
-      toast(change.enabled === false ? `${m.name} turned off for everyone` : change.enabled ? `${m.name} turned on` : change.featured ? `${m.name} featured` : `${m.name} no longer featured`);
-    } catch (e: any) {
-      toast(e.message || 'Could not update the module', 'error');
+      toast(change.enabled === false ? `${m.name} is turned off for everyone.` : change.enabled ? `${m.name} is turned on.` : change.featured ? `${m.name} is now featured.` : `${m.name} is no longer featured.`);
+    } catch (e) {
+      toast(caughtErrorMessage(e, `update ${m.name}`), 'error');
     } finally {
       setBusy(null);
     }

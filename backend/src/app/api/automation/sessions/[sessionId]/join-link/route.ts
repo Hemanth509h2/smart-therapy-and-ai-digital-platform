@@ -21,9 +21,9 @@ export async function POST(request: Request, { params }: { params: { sessionId: 
       where: { id: params.sessionId },
       include: { client: true },
     })
-    if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+    if (!session) return NextResponse.json({ error: 'This session no longer exists. It may have been deleted.' }, { status: 404 })
     if (session.status === 'CANCELLED' || session.status === 'COMPLETED') {
-      return NextResponse.json({ error: `Session is ${session.status.toLowerCase()}` }, { status: 409 })
+      return NextResponse.json({ error: `This session is ${session.status.toLowerCase()}, so it has no join link.` }, { status: 409 })
     }
 
     const invite = await getOrCreateGuestInvite(session)

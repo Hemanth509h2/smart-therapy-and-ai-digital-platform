@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { dateRange, listParams } from '@/lib/admin/adminList';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,7 +43,6 @@ export async function GET(request: Request) {
       targetTypes: targetTypes.map((t) => t.targetType),
     });
   } catch (error: any) {
-    console.error('Admin audit GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin audit GET error', "We couldn't load the audit log. Please try again.");
   }
 }

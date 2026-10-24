@@ -4,6 +4,7 @@ import { prisma } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { dateRange, daysAgo, listParams } from '@/lib/admin/adminList';
 import { therapistsById } from '@/lib/core/links';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,7 +97,6 @@ export async function GET(request: Request) {
       sentDaily,
     });
   } catch (e: any) {
-    console.error('GET /api/admin/messages failed:', e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return errorResponse(e, 'GET /api/admin/messages failed', "We couldn't load the message log. Please try again.");
   }
 }

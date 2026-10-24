@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { daysAgo } from '@/lib/admin/adminList';
 import { ALL_MODULE_IDS, MODULE_CATEGORIES } from '@/lib/modules/modules';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,8 +53,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ categories });
   } catch (error: any) {
-    console.error('Admin modules GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin modules GET error', "We couldn't load the tool settings. Please try again.");
   }
 }
 
@@ -66,13 +66,13 @@ export async function PATCH(request: Request) {
     const body = await request.json().catch(() => ({}));
     const moduleId = String(body.moduleId || '');
     if (!ALL_MODULE_IDS.includes(moduleId)) {
-      return NextResponse.json({ error: 'Unknown module.' }, { status: 400 });
+      return NextResponse.json({ error: "That tool doesn't exist. Refresh the page and try again." }, { status: 400 });
     }
     const change: { enabled?: boolean; featured?: boolean } = {};
     if (typeof body.enabled === 'boolean') change.enabled = body.enabled;
     if (typeof body.featured === 'boolean') change.featured = body.featured;
     if (!Object.keys(change).length) {
-      return NextResponse.json({ error: 'Nothing to change: send enabled and/or featured.' }, { status: 400 });
+      return NextResponse.json({ error: "Nothing to change. Turn the tool on or off, or change whether it's featured." }, { status: 400 });
     }
 
     const existing = await appDb.moduleSetting.findUnique({ where: { moduleId } });
@@ -91,7 +91,6 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ module: saved });
   } catch (error: any) {
-    console.error('Admin modules PATCH error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin modules PATCH error', "We couldn't save the tool settings. Please try again.");
   }
 }

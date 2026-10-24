@@ -4,7 +4,7 @@ import { prisma, appDb } from '@/lib/core/db';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { normalizePhoneNumber } from '@/lib/core/phone';
-import { errorResponse } from '@/lib/http/apiError';
+import { errorResponse, notYourProfile } from '@/lib/http/apiError';
 
 // The caller must own the therapist profile or be an ADMIN.
 async function mayAccessTherapist(uid: string, therapistId: string) {
@@ -26,7 +26,14 @@ export async function POST(request: Request) {
     const { therapistId, firstName, lastName, diagnosis, scheduledAt, phoneNumber } = await request.json();
 
     if (!therapistId || !firstName) {
-      return NextResponse.json({ error: 'therapistId and firstName are required' }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: !firstName
+            ? "Enter the client's first name."
+            : "Your therapist profile hasn't loaded yet. Refresh the page and try again.",
+        },
+        { status: 400 }
+      );
     }
 
     // Ensure the therapist exists
@@ -35,9 +42,9 @@ export async function POST(request: Request) {
       select: { userId: true },
     });
     if (!therapist || therapist.userId !== auth.uid) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return notYourProfile('this therapist profile');
     }
-    const noPlan = await requireActivePlan({ therapistId });
+    const noPlan = await requireActivePlan({ therapistId }, 'invite a client');
     if (noPlan) return noPlan;
 
     const normalizedPhoneNumber =
@@ -72,10 +79,10 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const therapistId = searchParams.get('therapistId');
     if (!therapistId) {
-      return NextResponse.json({ error: 'therapistId is required' }, { status: 400 });
+      return NextResponse.json({ error: "Your therapist profile hasn't loaded yet. Refresh the page and try again." }, { status: 400 });
     }
     if (!(await mayAccessTherapist(auth.uid, therapistId))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return notYourProfile('these invites');
     }
 
     const invites = await prisma.invite.findMany({

@@ -124,7 +124,7 @@ export default function ProfessionalUsagePage() {
   const [page, setPage] = useState(1);
   useEffect(() => setPage(1), [range]);
 
-  const { data, loading, error, reload } = useAdminQuery<ProfessionalUsage>(`/api/admin/usage/${therapistId}?range=${range}`);
+  const { data, loading, error, reload } = useAdminQuery<ProfessionalUsage>(`/api/admin/usage/${therapistId}?range=${range}`, 'load usage for this professional');
   const rangeLabel = RANGES.find((r) => r.value === range)?.label ?? '';
   const seriesLabel = data && data.range.days == null ? 'Last 12 months' : rangeLabel;
   const p = data?.professional;

@@ -7,6 +7,7 @@ import {
   Textarea, useAdmin, useAdminQuery,
 } from '@/components/admin/kit';
 import { adminFetch, inr, num } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 
 interface Plan {
@@ -79,11 +80,15 @@ export default function AdminPlansPage() {
   const setArchived = async (p: Plan, archived: boolean) => {
     setBusy(p.id);
     try {
-      await adminFetch(`/api/admin/plans/${p.id}`, { method: 'PATCH', json: { isActive: !archived } });
-      toast(archived ? `${p.name} archived` : `${p.name} is live again`);
+      await adminFetch(`/api/admin/plans/${p.id}`, {
+        method: 'PATCH',
+        json: { isActive: !archived },
+        action: archived ? 'archive this plan' : 'restore this plan',
+      });
+      toast(archived ? `${p.name} was archived.` : `${p.name} is live again.`);
       reload();
-    } catch (e: any) {
-      toast(e.message, 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, archived ? 'archive this plan' : 'restore this plan'), 'error');
     } finally {
       setBusy('');
     }
@@ -162,8 +167,8 @@ export default function AdminPlansPage() {
         confirmLabel="Delete"
         danger
         onConfirm={async () => {
-          await adminFetch(`/api/admin/plans/${deleting!.id}`, { method: 'DELETE' });
-          toast('Plan deleted');
+          await adminFetch(`/api/admin/plans/${deleting!.id}`, { method: 'DELETE', action: 'delete this plan' });
+          toast(`${deleting!.name} was deleted.`);
           reload();
         }}
       />
@@ -245,13 +250,13 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | 'new' | null; onCl
       ...parseLimits(form),
     };
     try {
-      if (isNew) await adminFetch('/api/admin/plans', { method: 'POST', json });
-      else await adminFetch(`/api/admin/plans/${(plan as Plan).id}`, { method: 'PATCH', json });
-      toast(isNew ? 'Plan created' : 'Plan saved');
+      if (isNew) await adminFetch('/api/admin/plans', { method: 'POST', json, action: 'create the plan' });
+      else await adminFetch(`/api/admin/plans/${(plan as Plan).id}`, { method: 'PATCH', json, action: 'save the plan' });
+      toast(isNew ? `${form.name.trim()} plan created.` : `${form.name.trim()} plan saved.`);
       onClose();
       onSaved();
-    } catch (e: any) {
-      toast(e.message || 'Could not save the plan.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, isNew ? 'create the plan' : 'save the plan'), 'error');
     } finally {
       setSaving(false);
     }

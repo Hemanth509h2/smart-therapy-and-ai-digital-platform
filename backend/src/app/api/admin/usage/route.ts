@@ -6,6 +6,7 @@ import { startOfMonth } from '@/lib/admin/adminList';
 import { getSettings } from '@/lib/core/settings';
 import { ALL_MODULE_IDS, moduleName } from '@/lib/modules/modules';
 import { SENT_STATUSES, minutesBetween, round2, therapistStorage, usageCost, usageRange, usageRates } from '@/lib/admin/usage';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -307,7 +308,6 @@ export async function GET(request: Request) {
       },
     });
   } catch (error: any) {
-    console.error('Admin usage error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin usage error', "We couldn't load usage and costs. Please try again.");
   }
 }

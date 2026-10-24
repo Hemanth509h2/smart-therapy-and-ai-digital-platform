@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { PracticeBooking, PracticeClient, PracticeInvite, PracticeSession } from '@/lib/practice';
 import { apiFetch } from '@/lib/api';
+import { apiErrorMessage, networkErrorMessage } from '@/lib/apiError';
 
 interface PracticeSnapshot {
   sessions: PracticeSession[];
@@ -43,7 +44,7 @@ async function fetchSnapshot(key: string, profileId: string, isTherapist: boolea
         bookings: bRes.ok ? (await bRes.json()).bookings ?? [] : prev?.bookings ?? [],
         clients: cRes?.ok ? (await cRes.json()).clients ?? [] : prev?.clients ?? [],
         invites: iRes?.ok ? (await iRes.json()).invites ?? [] : prev?.invites ?? [],
-        error: sRes.ok ? null : 'Could not load your sessions. Please refresh.',
+        error: sRes.ok ? null : await apiErrorMessage(sRes, 'load your sessions'),
         at: Date.now(),
       };
       cache.set(key, snap);
@@ -54,7 +55,7 @@ async function fetchSnapshot(key: string, profileId: string, isTherapist: boolea
         bookings: prev?.bookings ?? [],
         clients: prev?.clients ?? [],
         invites: prev?.invites ?? [],
-        error: 'Could not reach the server. Check your connection and refresh.',
+        error: networkErrorMessage('load your sessions'),
         at: prev?.at ?? 0, // a failed fetch must not count as fresh
       };
       cache.set(key, snap);

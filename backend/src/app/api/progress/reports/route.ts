@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const clientId = searchParams.get('clientId');
     if (!clientId) {
-      return NextResponse.json({ error: 'clientId is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Choose a client to see their progress reports.' }, { status: 400 });
     }
 
     const reports = await prisma.progressReport.findMany({
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const auth = await requireTherapist(request);
   if (!auth.ok) return auth.response;
-  const noPlan = await requireActivePlan({ therapistId: auth.therapist.id });
+  const noPlan = await requireActivePlan({ therapistId: auth.therapist.id }, 'save progress reports');
   if (noPlan) return noPlan;
 
   try {
@@ -46,14 +46,14 @@ export async function POST(request: Request) {
 
     if (!clientId || !periodStart || !periodEnd || !summary) {
       return NextResponse.json(
-        { error: 'clientId, periodStart, periodEnd and summary are required' },
+        { error: 'Choose the start and end dates and write a summary for the report.' },
         { status: 400 }
       );
     }
 
     const client = await prisma.profileClient.findUnique({ where: { id: clientId } });
     if (!client) {
-      return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+      return NextResponse.json({ error: "We couldn't find that client. They may have been removed." }, { status: 404 });
     }
 
     const start = new Date(periodStart);

@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { can } from '@/lib/admin/adminRoles';
 import { therapistsById, usersById } from '@/lib/core/links';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     if (!auth.ok) return auth.response;
     const reveal = new URL(request.url).searchParams.get('reveal') === '1';
     if (reveal && !can(auth.adminRole, 'phi.read')) {
-      return NextResponse.json({ error: 'Your admin role does not allow revealing client details.', code: 'ADMIN_FORBIDDEN' }, { status: 403 });
+      return NextResponse.json({ error: "Your admin role doesn't allow viewing full client details. Ask a super admin if you need access.", code: 'ADMIN_FORBIDDEN' }, { status: 403 });
     }
 
     const client = await prisma.profileClient.findUnique({
@@ -32,7 +33,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
         _count: { select: { progressMetrics: true, progressReports: true, progressNotes: true, bookings: true } },
       },
     });
-    if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+    if (!client) return NextResponse.json({ error: "We couldn't find this client. They may have been removed." }, { status: 404 });
 
     if (reveal) {
       await audit(request, auth, 'phi.reveal', { type: 'ProfileClient', id: client.id }, { after: { scope: 'client.detail' } });
@@ -104,8 +105,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
       })),
     });
   } catch (error: any) {
-    console.error('Admin client detail error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin client detail error', "We couldn't load this client. Please try again.");
   }
 }
 
@@ -117,16 +117,16 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (!auth.ok) return auth.response;
     const { therapistId } = await request.json();
     if (!therapistId || typeof therapistId !== 'string') {
-      return NextResponse.json({ error: 'therapistId is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Choose the professional to move this client to.' }, { status: 400 });
     }
 
     const client = await prisma.profileClient.findUnique({ where: { id: params.id }, select: { id: true, therapistId: true } });
-    if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+    if (!client) return NextResponse.json({ error: "We couldn't find this client. They may have been removed." }, { status: 404 });
     if (client.therapistId === therapistId) {
       return NextResponse.json({ error: 'The client is already assigned to this therapist.' }, { status: 400 });
     }
     const target = await appDb.profileTherapist.findUnique({ where: { id: therapistId }, select: { id: true, firstName: true, lastName: true } });
-    if (!target) return NextResponse.json({ error: 'Target therapist not found' }, { status: 404 });
+    if (!target) return NextResponse.json({ error: "We couldn't find the professional you chose. Their account may have been removed." }, { status: 404 });
 
     await prisma.profileClient.update({ where: { id: client.id }, data: { therapistId: target.id } });
     await audit(request, auth, 'client.reassign', { type: 'ProfileClient', id: client.id }, {
@@ -136,7 +136,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     return NextResponse.json({ success: true, therapist: { id: target.id, name: therapistName(target) } });
   } catch (error: any) {
-    console.error('Admin client reassign error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin client reassign error', "We couldn't move this client to the new professional. Please try again.");
   }
 }

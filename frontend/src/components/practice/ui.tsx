@@ -599,5 +599,5 @@ export const toast = (
 /** Mounted once in the root layout; follows the app's light/dark theme. */
 export function Toaster() {
   const { theme } = useTheme();
-  return <SileoToaster position="top-right" theme={theme} />;
+  return <SileoToaster position="top-center" theme={theme} />;
 }

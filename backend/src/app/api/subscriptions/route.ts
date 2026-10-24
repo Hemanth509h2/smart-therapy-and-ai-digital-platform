@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma, appDb } from '@/lib/core/db';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { resolveCurrent, serializeSubscription } from '@/lib/billing/subscriptions';
-import { errorResponse } from '@/lib/http/apiError';
+import { errorResponse, notYourProfile } from '@/lib/http/apiError';
 import { getSetting } from '@/lib/core/settings';
 
 // The caller must own the therapist profile or be an ADMIN.
@@ -28,10 +28,10 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const therapistId = searchParams.get('therapistId');
     if (!therapistId) {
-      return NextResponse.json({ error: 'therapistId is required' }, { status: 400 });
+      return NextResponse.json({ error: "Your therapist profile hasn't loaded yet. Refresh the page and try again." }, { status: 400 });
     }
     if (!(await mayAccessTherapist(auth.uid, therapistId))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return notYourProfile("this therapist's plan");
     }
 
     const [subs, pending, approvalRequired] = await Promise.all([

@@ -12,7 +12,7 @@ export async function GET(request: Request, { params }: { params: { token: strin
     });
 
     if (!invite) {
-      return NextResponse.json({ error: 'Invite not found' }, { status: 404 });
+      return NextResponse.json({ error: 'That invite link is not valid. Ask your therapist for a new invite.' }, { status: 404 });
     }
     const therapist = await appDb.profileTherapist.findUnique({
       where: { id: invite.therapistId },

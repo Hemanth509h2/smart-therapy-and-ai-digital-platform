@@ -20,6 +20,7 @@ import {
   type Column,
 } from '@/components/admin/kit';
 import { downloadCsv, fetchAllPages, fmtDate, num } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 
 interface ClientRow {
@@ -40,9 +41,9 @@ export default function AdminClientsPage() {
   const list = useListState({ sort: 'createdAt', dir: 'desc' });
   const [reveal, setReveal] = useState(false);
   const path = `/api/admin/clients?${list.query}${reveal ? '&reveal=1' : ''}`;
-  const { data, loading, error, reload } = useAdminQuery<{ clients: ClientRow[]; total: number }>(path);
+  const { data, loading, error, reload } = useAdminQuery<{ clients: ClientRow[]; total: number }>(path, 'load the clients');
   // Therapist filter options; the filter is hidden if this list can't load.
-  const pros = useAdminQuery<{ professionals: { id: string; name: string }[] }>('/api/admin/professionals?pageSize=200&sort=name&dir=asc');
+  const pros = useAdminQuery<{ professionals: { id: string; name: string }[] }>('/api/admin/professionals?pageSize=200&sort=name&dir=asc', 'load the professionals');
   const [exporting, setExporting] = useState(false);
 
   const exportCsv = async () => {
@@ -63,8 +64,9 @@ export default function AdminClientsPage() {
         { header: 'Account', value: (r) => r.status },
         { header: 'Created', value: (r) => r.createdAt },
       ]);
-    } catch (e: any) {
-      toast(e.message, 'error');
+      toast(`Exported ${rows.length} client${rows.length === 1 ? '' : 's'}.`);
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'export the clients'), 'error');
     } finally {
       setExporting(false);
     }

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Lock, Menu } from 'lucide-react';
 import Sidebar from './Sidebar';
-import { cx, toast } from '@/components/practice/ui';
+import { cx } from '@/components/practice/ui';
 import { apiFetch, PLAN_REQUIRED_EVENT } from '@/lib/api';
 
 interface DashboardLayoutProps {
@@ -39,10 +39,9 @@ function useNoActivePlan(role: DashboardLayoutProps['role'], therapistId: string
   }, [role, therapistId, pathname]);
 
   useEffect(() => {
-    const onPlanRequired = (e: Event) => {
-      setNoPlan(true);
-      toast((e as CustomEvent<string>).detail || 'You need an active plan to do this.', 'error');
-    };
+    // The call site already toasts the reason (apiErrorMessage); here we only
+    // show the banner, so the user doesn't get the same message twice.
+    const onPlanRequired = () => setNoPlan(true);
     window.addEventListener(PLAN_REQUIRED_EVENT, onPlanRequired);
     return () => window.removeEventListener(PLAN_REQUIRED_EVENT, onPlanRequired);
   }, []);

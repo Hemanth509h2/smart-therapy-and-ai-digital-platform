@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     if (!auth.ok) return auth.response;
     const body = await request.json();
     const name = String(body.name || '').trim();
-    if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 });
+    if (!name) return NextResponse.json({ error: 'Enter a name for the plan.' }, { status: 400 });
 
     const features = parseFeatures(body.features);
     if (typeof features === 'string') return NextResponse.json({ error: features }, { status: 400 });

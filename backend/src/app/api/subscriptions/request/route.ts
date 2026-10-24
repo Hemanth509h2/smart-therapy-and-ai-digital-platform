@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma, appDb } from '@/lib/core/db';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { ALL_MODULE_IDS } from '@/lib/modules/modules';
-import { errorResponse } from '@/lib/http/apiError';
+import { errorResponse, notYourProfile } from '@/lib/http/apiError';
 import { pricePurchase } from '@/lib/billing/purchase';
 
 // The caller must own the therapist profile or be an ADMIN.
@@ -27,10 +27,17 @@ export async function POST(request: Request) {
     const { therapistId, planId, months, modules, note, couponCode } = await request.json();
 
     if (!therapistId || !planId) {
-      return NextResponse.json({ error: 'therapistId and planId are required' }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: !planId
+            ? 'Choose a plan first.'
+            : "Your therapist profile hasn't loaded yet. Refresh the page and try again.",
+        },
+        { status: 400 }
+      );
     }
     if (!(await mayAccessTherapist(auth.uid, therapistId))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return notYourProfile('this therapist profile');
     }
 
     const [therapist, plan, existingPending] = await Promise.all([
@@ -39,9 +46,9 @@ export async function POST(request: Request) {
       appDb.subscriptionRequest.findFirst({ where: { therapistId, status: { in: ['PENDING', 'AWAITING_PAYMENT'] } } }),
     ]);
 
-    if (!therapist) return NextResponse.json({ error: 'Therapist not found' }, { status: 404 });
+    if (!therapist) return NextResponse.json({ error: "We couldn't find your therapist profile. Refresh the page or sign in again." }, { status: 404 });
     if (!plan || !plan.isActive) {
-      return NextResponse.json({ error: 'Plan not available' }, { status: 404 });
+      return NextResponse.json({ error: 'That plan is no longer available. Choose another plan on the Plans page.' }, { status: 404 });
     }
     if (existingPending) {
       return NextResponse.json(
@@ -63,11 +70,11 @@ export async function POST(request: Request) {
     // Enforce the plan's tool quota (null = unlimited, tool selection ignored).
     if (plan.toolQuota != null) {
       if (cleaned.length === 0) {
-        return NextResponse.json({ error: 'Please select at least one tool.' }, { status: 400 });
+        return NextResponse.json({ error: 'Select at least one tool for this plan.' }, { status: 400 });
       }
       if (cleaned.length > plan.toolQuota) {
         return NextResponse.json(
-          { error: `This plan allows up to ${plan.toolQuota} tools.` },
+          { error: `This plan includes up to ${plan.toolQuota} tools. Remove some tools or choose a bigger plan.` },
           { status: 400 }
         );
       }

@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
     if (!email || !subject?.trim() || !message?.trim()) {
       return NextResponse.json(
-        { error: 'email, subject and message are required' },
+        { error: 'Enter your email, a subject and a message.' },
         { status: 400 }
       );
     }
@@ -125,6 +125,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, ref, emailed: true });
   } catch (error: any) {
-    return errorResponse(error, 'Support ticket error', 'Failed to send ticket');
+    return errorResponse(error, 'Support ticket error', "We couldn't send your support request. Please try again, or email us directly.");
   }
 }

@@ -26,6 +26,7 @@ import {
   type Tone,
 } from '@/components/admin/kit';
 import { adminFetch, fmtDateTime, timeAgo } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 
 type TicketStatus = 'OPEN' | 'PENDING' | 'RESOLVED';
@@ -74,7 +75,7 @@ export default function AdminSupportPage() {
     total: number;
     counts: Record<TicketStatus, number>;
     admins: { id: string; email: string }[];
-  }>(`/api/admin/support?${list.query}`);
+  }>(`/api/admin/support?${list.query}`, 'load the support tickets');
   const [openId, setOpenId] = useState<string | null>(null);
   const counts = data?.counts;
 
@@ -145,7 +146,7 @@ export default function AdminSupportPage() {
 
 function TicketModal({ id, admins, onClose, onChanged }: { id: string | null; admins: { id: string; email: string }[]; onClose: () => void; onChanged: () => void }) {
   const { uid } = useAdmin();
-  const { data, loading, error, reload } = useAdminQuery<{ ticket: TicketDetail }>(id ? `/api/admin/support/${id}` : null);
+  const { data, loading, error, reload } = useAdminQuery<{ ticket: TicketDetail }>(id ? `/api/admin/support/${id}` : null, 'load this ticket');
   const [body, setBody] = useState('');
   const [internal, setInternal] = useState(false);
   const [sending, setSending] = useState(false);
@@ -162,12 +163,12 @@ function TicketModal({ id, admins, onClose, onChanged }: { id: string | null; ad
     if (!ticket) return;
     setSaving(true);
     try {
-      await adminFetch(`/api/admin/support/${ticket.id}`, { method: 'PATCH', json: patch });
-      toast('Ticket updated');
+      await adminFetch(`/api/admin/support/${ticket.id}`, { method: 'PATCH', json: patch, action: 'update this ticket' });
+      toast('Ticket updated.');
       await reload();
       onChanged();
-    } catch (e: any) {
-      toast(e.message || 'Could not update the ticket.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'update this ticket'), 'error');
     } finally {
       setSaving(false);
     }
@@ -177,15 +178,19 @@ function TicketModal({ id, admins, onClose, onChanged }: { id: string | null; ad
     if (!ticket || !body.trim()) return;
     setSending(true);
     try {
-      const res = await adminFetch<{ emailError: string | null }>(`/api/admin/support/${ticket.id}/replies`, { method: 'POST', json: { body, internal } });
-      if (internal) toast('Internal note added');
-      else if (res.emailError) toast(`Reply saved, but the email failed: ${res.emailError}`, 'warning');
-      else toast('Reply emailed to the user');
+      const res = await adminFetch<{ emailError: string | null }>(`/api/admin/support/${ticket.id}/replies`, {
+        method: 'POST',
+        json: { body, internal },
+        action: internal ? 'add the note' : 'send the reply',
+      });
+      if (internal) toast('Internal note added.');
+      else if (res.emailError) toast(`Reply saved, but the email to ${ticket.email} could not be sent: ${res.emailError}`, 'warning');
+      else toast(`Reply emailed to ${ticket.email}.`);
       setBody('');
       await reload();
       onChanged();
-    } catch (e: any) {
-      toast(e.message || 'Could not send the reply.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, internal ? 'add the note' : 'send the reply'), 'error');
     } finally {
       setSending(false);
     }

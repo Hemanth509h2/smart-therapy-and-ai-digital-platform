@@ -3,7 +3,7 @@ import { RoomServiceClient } from 'livekit-server-sdk';
 import { prisma } from '@/lib/core/db';
 import { therapistIdForUser } from '@/lib/core/links';
 import { requireAuth } from '@/lib/http/apiAuth';
-import { errorResponse } from '@/lib/http/apiError';
+import { errorResponse, notYourProfile } from '@/lib/http/apiError';
 import { isTranslationLanguage } from '@/lib/sessions/translationLanguages';
 
 // POST /api/sessions/[sessionId]/translation — push the caption languages to
@@ -27,10 +27,10 @@ export async function POST(request: Request, { params }: { params: { sessionId: 
       therapistIdForUser(auth.uid),
     ]);
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return NextResponse.json({ error: 'This session no longer exists. It may have been deleted.' }, { status: 404 });
     }
     if (session.therapistId !== therapistId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return notYourProfile('this session');
     }
 
     const body = await request.json().catch(() => ({}));
@@ -38,12 +38,12 @@ export async function POST(request: Request, { params }: { params: { sessionId: 
     const therapist = isTranslationLanguage(body.therapist) ? body.therapist : null;
     const client = isTranslationLanguage(body.client) ? body.client : null;
     if (enabled && (!therapist || !client)) {
-      return NextResponse.json({ error: 'Invalid languages' }, { status: 400 });
+      return NextResponse.json({ error: 'Choose a language for both you and your client.' }, { status: 400 });
     }
 
     const url = process.env.LIVEKIT_URL || process.env.NEXT_PUBLIC_LIVEKIT_URL;
     if (!url) {
-      return NextResponse.json({ error: 'LIVEKIT_URL not set' }, { status: 500 });
+      return NextResponse.json({ error: "Live translation isn't set up on the server yet. Ask an admin to configure video calls." }, { status: 500 });
     }
     const svc = new RoomServiceClient(
       url.replace(/^wss:/i, 'https:').replace(/^ws:/i, 'http:'),

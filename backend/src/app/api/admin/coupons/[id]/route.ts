@@ -17,7 +17,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (typeof data === 'string') return NextResponse.json({ error: data }, { status: 400 });
 
     const before = await appDb.coupon.findUnique({ where: { id: params.id } });
-    if (!before) return NextResponse.json({ error: 'Coupon not found' }, { status: 404 });
+    if (!before) return NextResponse.json({ error: "We couldn't find this coupon. It may have been deleted." }, { status: 404 });
     const invalid = checkCoupon({ ...before, ...data } as any);
     if (invalid) return NextResponse.json({ error: invalid }, { status: 400 });
 
@@ -33,7 +33,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (error.code === 'P2002') {
       return NextResponse.json({ error: 'A coupon with that code already exists.' }, { status: 409 });
     }
-    if (error.code === 'P2025') return NextResponse.json({ error: 'Coupon not found' }, { status: 404 });
+    if (error.code === 'P2025') return NextResponse.json({ error: "We couldn't find this coupon. It may have been deleted." }, { status: 404 });
     if (error.code === 'P2003') return NextResponse.json({ error: 'That professional no longer exists.' }, { status: 400 });
     return errorResponse(error, 'Admin coupon PATCH error');
   }
@@ -48,7 +48,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     if (!auth.ok) return auth.response;
 
     const coupon = await appDb.coupon.findUnique({ where: { id: params.id } });
-    if (!coupon) return NextResponse.json({ error: 'Coupon not found' }, { status: 404 });
+    if (!coupon) return NextResponse.json({ error: "We couldn't find this coupon. It may have been deleted." }, { status: 404 });
 
     const used = await appDb.payment.count({ where: { couponId: params.id } });
     if (used > 0) {
@@ -65,7 +65,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     await audit(request, auth, 'coupon.delete', { type: 'Coupon', id: coupon.id }, { before: coupon });
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    if (error.code === 'P2025') return NextResponse.json({ error: 'Coupon not found' }, { status: 404 });
+    if (error.code === 'P2025') return NextResponse.json({ error: "We couldn't find this coupon. It may have been deleted." }, { status: 404 });
     return errorResponse(error, 'Admin coupon DELETE error');
   }
 }

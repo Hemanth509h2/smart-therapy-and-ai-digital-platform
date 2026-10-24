@@ -1,5 +1,6 @@
 'use client';
 
+import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
 import React, { useEffect, useState } from 'react';
 import {
   Chart as ChartJS,
@@ -30,14 +31,11 @@ export default function ProgressCharts({ clientId }) {
     setLoading(true);
     fetch(`/api/progress-features/measurement/${clientId}`)
       .then(async (res) => {
-        if (!res.ok) {
-          const d = await res.json().catch(() => ({}));
-          throw new Error(d.error || `Request failed (${res.status})`);
-        }
+        if (!res.ok) throw new Error(await apiErrorMessage(res, 'load the measurements'));
         return res.json();
       })
       .then((data) => !cancelled && setMetrics(data.metrics))
-      .catch((e) => !cancelled && setError(e.message))
+      .catch((e) => !cancelled && setError(caughtErrorMessage(e, 'load the measurements')))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;

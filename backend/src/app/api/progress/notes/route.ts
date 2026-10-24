@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const reportId = searchParams.get('reportId');
 
     if (!clientId) {
-      return NextResponse.json({ error: 'clientId is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Choose a client to see their progress notes.' }, { status: 400 });
     }
 
     const notes = await prisma.progressNote.findMany({
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const auth = await requireTherapist(request);
   if (!auth.ok) return auth.response;
-  const noPlan = await requireActivePlan({ therapistId: auth.therapist.id });
+  const noPlan = await requireActivePlan({ therapistId: auth.therapist.id }, 'save progress notes');
   if (noPlan) return noPlan;
 
   try {
@@ -48,12 +48,12 @@ export async function POST(request: Request) {
     const { clientId, content, reportId, isPrivate } = body || {};
 
     if (!clientId || !content) {
-      return NextResponse.json({ error: 'clientId and content are required' }, { status: 400 });
+      return NextResponse.json({ error: "The note can't be empty. Write something and save again." }, { status: 400 });
     }
 
     const client = await prisma.profileClient.findUnique({ where: { id: clientId } });
     if (!client) {
-      return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+      return NextResponse.json({ error: "We couldn't find that client. They may have been removed." }, { status: 404 });
     }
 
     const note = await prisma.progressNote.create({

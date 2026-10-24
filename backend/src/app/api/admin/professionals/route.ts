@@ -7,6 +7,7 @@ import { requireAdmin } from '@/lib/http/apiAuth';
 import { dateRange, daysAgo, listParams } from '@/lib/admin/adminList';
 import { resolveCurrent } from '@/lib/billing/subscriptions';
 import { ALL_MODULE_IDS } from '@/lib/modules/modules';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -141,8 +142,7 @@ export async function GET(request: Request) {
       plans,
     });
   } catch (error: any) {
-    console.error('Admin professionals GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin professionals GET error', "We couldn't load the professionals list. Please try again.");
   }
 }
 

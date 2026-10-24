@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 
     const sessionId = new URL(req.url).searchParams.get('sessionId')
     if (!sessionId) {
-      return NextResponse.json({ error: 'sessionId is required' }, { status: 400 })
+      return NextResponse.json({ error: "We couldn't tell which session this is for. Refresh the page and try again." }, { status: 400 })
     }
 
     const [user, therapistId] = await Promise.all([
@@ -45,7 +45,10 @@ export async function GET(req: NextRequest) {
     } else if (user?.role === 'CLIENT' && user.client) {
       where = { sessionId, visibleToClient: true, session: { clientId: user.client.id } }
     } else {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      return NextResponse.json(
+        { error: "Only the session's therapist or client can view this report." },
+        { status: 403 }
+      )
     }
 
     const report = await prisma.sessionReport.findFirst({ where })
@@ -66,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     const { sessionId } = await req.json()
     if (!sessionId) {
-      return NextResponse.json({ error: 'sessionId is required' }, { status: 400 })
+      return NextResponse.json({ error: "We couldn't tell which session this is for. Refresh the page and try again." }, { status: 400 })
     }
 
     // Not-owned and non-existent sessions are indistinguishable (both 404).
@@ -75,9 +78,9 @@ export async function POST(req: NextRequest) {
       include: { client: true },
     })
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+      return NextResponse.json({ error: 'This session no longer exists. It may have been deleted.' }, { status: 404 })
     }
-    const noPlan = await requireActivePlan({ therapistId: session.therapistId })
+    const noPlan = await requireActivePlan({ therapistId: session.therapistId }, 'generate a session report')
     if (noPlan) return noPlan
 
     const priorCount = await prisma.session.count({
@@ -116,7 +119,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ report, stats })
   } catch (e: any) {
-    return errorResponse(e, 'session-report generate', 'Report generation failed')
+    return errorResponse(e, 'session-report generate', "We couldn't generate the report. Please try again.")
   }
 }
 
@@ -130,11 +133,11 @@ export async function PATCH(req: NextRequest) {
     const { sessionId, content } = await req.json()
     if (!sessionId || typeof content !== 'string') {
       return NextResponse.json(
-        { error: 'sessionId and content are required' },
+        { error: "The report can't be empty. Add some text and save again." },
         { status: 400 }
       )
     }
-    const noPlan = await requireActivePlan({ therapistId: auth.therapist.id })
+    const noPlan = await requireActivePlan({ therapistId: auth.therapist.id }, 'edit session reports')
     if (noPlan) return noPlan
     // Ownership is part of the update's filter, so a report on another
     // therapist's session can never be written. A missing or non-owned report
@@ -145,6 +148,6 @@ export async function PATCH(req: NextRequest) {
     })
     return NextResponse.json({ report })
   } catch (e: any) {
-    return errorResponse(e, 'session-report save', 'Save failed')
+    return errorResponse(e, 'session-report save', "We couldn't save the report. Please try again.")
   }
 }

@@ -4,7 +4,8 @@ import { requireAuth } from '@/lib/http/apiAuth'
 import { requireActivePlan } from '@/lib/billing/subscriptions'
 import { prisma, appDb } from '@/lib/core/db'
 import { sendWhatsAppInvite } from '@/lib/messaging/whatsapp-bot'
-import { errorResponse, logError } from '@/lib/http/apiError'
+import { WhatsAppNotConfiguredError, WhatsAppSendError } from '@/lib/messaging/whatsapp-cloud-api'
+import { errorResponse, logError, notYourProfile } from '@/lib/http/apiError'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
 
     if (!therapistId || !inviteLink) {
       return NextResponse.json(
-        { error: 'therapistId and inviteLink are required' },
+        { error: 'Create an invite link first, then send it on WhatsApp.' },
         { status: 400 }
       )
     }
@@ -27,14 +28,14 @@ export async function POST(request: Request) {
       select: { userId: true, firstName: true, lastName: true },
     })
     if (!therapist || therapist.userId !== auth.uid) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      return notYourProfile('this therapist profile')
     }
-    const noPlan = await requireActivePlan({ therapistId: String(therapistId) })
+    const noPlan = await requireActivePlan({ therapistId: String(therapistId) }, 'send a WhatsApp invite')
     if (noPlan) return noPlan
 
     const url = new URL(String(inviteLink))
     if (url.protocol !== 'https:' && url.hostname !== 'localhost') {
-      return NextResponse.json({ error: 'Invalid invite link' }, { status: 400 })
+      return NextResponse.json({ error: 'That invite link is not valid. Create a new invite.' }, { status: 400 })
     }
 
     const inviteToken = url.searchParams.get('invite')
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
         })
       : null
     if (!invite) {
-      return NextResponse.json({ error: 'Invite does not belong to this therapist' }, { status: 403 })
+      return notYourProfile('this invite')
     }
     if (!invite.phoneNumber) {
       return NextResponse.json(
@@ -111,8 +112,20 @@ export async function POST(request: Request) {
     const isAuthError = message.includes('Firebase ID token') || message.includes('auth/')
     if (isAuthError) {
       logError('whatsapp/invite', error)
-      return NextResponse.json({ error: 'Invalid authentication token' }, { status: 401 })
+      return NextResponse.json({ error: 'Your sign-in has expired. Please sign in again.', code: 'AUTH_EXPIRED' }, { status: 401 })
     }
-    return errorResponse(error, 'whatsapp/invite', 'WhatsApp send failed')
+    // Config and Meta errors get a plain reason; the technical text stays on the message row.
+    if (error instanceof WhatsAppNotConfiguredError) {
+      logError('whatsapp/invite', error)
+      return NextResponse.json(
+        { error: `The invite wasn't sent: ${error.publicReason}`, code: 'WHATSAPP_NOT_CONFIGURED' },
+        { status: 503 }
+      )
+    }
+    if (error instanceof WhatsAppSendError) {
+      logError('whatsapp/invite', error)
+      return NextResponse.json({ error: `The invite wasn't sent: ${error.publicReason}.`, code: 'WHATSAPP_FAILED' }, { status: 502 })
+    }
+    return errorResponse(error, 'whatsapp/invite', "We couldn't send the WhatsApp invite. Please try again.")
   }
 }

@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   const targetLang = searchParams.get('targetLang')
 
   if (!roomName || !participantName) {
-    return NextResponse.json({ error: 'Missing params' }, { status: 400 })
+    return NextResponse.json({ error: "We couldn't tell which session to join. Open the session link again." }, { status: 400 })
   }
 
   // `identity` is the display name, which says nothing about who the person is
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     prisma.session.findUnique({ where: { id: roomName }, select: { therapistId: true } }),
     therapistIdForUser(auth.uid),
   ])
-  if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+  if (!session) return NextResponse.json({ error: 'This session no longer exists. It may have been deleted.' }, { status: 404 })
 
   let claimedRole: 'therapist' | 'client'
   if (session.therapistId === therapistId) {
@@ -50,9 +50,9 @@ export async function GET(req: NextRequest) {
     // Waiting room: no token until the therapist admits this guest. The
     // client's browser polls this endpoint while it gets `waiting: true`.
     const entry = await getLobbyEntry(roomName, auth.uid)
-    if (!entry) return NextResponse.json({ error: 'Not invited to this session' }, { status: 403 })
+    if (!entry) return NextResponse.json({ error: "You haven't been invited to this session. Open the invite link your therapist sent you." }, { status: 403 })
     if (entry.status === 'denied' || entry.status === 'removed') {
-      return NextResponse.json({ error: 'Not admitted', denied: true }, { status: 403 })
+      return NextResponse.json({ error: "The therapist didn't let you into this session.", denied: true }, { status: 403 })
     }
     if (entry.status !== 'admitted') return NextResponse.json({ waiting: true }, { status: 409 })
     claimedRole = 'client'

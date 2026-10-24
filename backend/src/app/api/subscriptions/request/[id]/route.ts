@@ -16,14 +16,14 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     const therapist = await appDb.profileTherapist.findUnique({ where: { userId: auth.uid }, select: { id: true } });
     const req = await appDb.subscriptionRequest.findUnique({ where: { id: params.id }, select: { therapistId: true } });
     if (!therapist || !req || req.therapistId !== therapist.id) {
-      return NextResponse.json({ error: 'Request not found' }, { status: 404 });
+      return NextResponse.json({ error: "We couldn't find that plan request. It may already have been withdrawn." }, { status: 404 });
     }
 
     const { count } = await appDb.subscriptionRequest.updateMany({
       where: { id: params.id, status: { in: ['PENDING', 'AWAITING_PAYMENT'] } },
       data: { status: 'CANCELLED', reviewedAt: new Date() },
     });
-    if (!count) return NextResponse.json({ error: 'This request is already closed.' }, { status: 409 });
+    if (!count) return NextResponse.json({ error: 'This plan request has already been approved, rejected or withdrawn.' }, { status: 409 });
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return errorResponse(error, 'Subscription request withdraw error');

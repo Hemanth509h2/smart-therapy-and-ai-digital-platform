@@ -16,6 +16,7 @@ import { toast } from '@/components/practice/ui';
 import { useAuthStore } from '@/store/useAuthStore';
 import { auth } from '@/lib/firebase';
 import { adminFetch, registerReauthPrompt } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 import { adminRoleOf, canAdmin, type AdminPermission } from '@/lib/adminRoles';
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
@@ -176,8 +177,11 @@ function ReauthPrompt() {
 
 // ─── Data loading ────────────────────────────────────────────────────────────
 
-/** GET an admin endpoint; refetches when `path` changes. `path` null = skip. */
-export function useAdminQuery<T = any>(path: string | null) {
+/**
+ * GET an admin endpoint; refetches when `path` changes. `path` null = skip.
+ * `action` names what failed in the error message, e.g. "load the sessions".
+ */
+export function useAdminQuery<T = any>(path: string | null, action = 'load this page') {
   const { role } = useAuthStore();
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
@@ -190,14 +194,14 @@ export function useAdminQuery<T = any>(path: string | null) {
     setLoading(true);
     setError('');
     try {
-      const d = await adminFetch<T>(path);
+      const d = await adminFetch<T>(path, { action });
       if (mine === seq.current) setData(d);
-    } catch (e: any) {
-      if (mine === seq.current) setError(e.message || 'Could not load data.');
+    } catch (e) {
+      if (mine === seq.current) setError(caughtErrorMessage(e, action));
     } finally {
       if (mine === seq.current) setLoading(false);
     }
-  }, [path, role]);
+  }, [path, role, action]);
 
   useEffect(() => {
     load();
@@ -490,8 +494,8 @@ export function ConfirmDialog({
     try {
       await onConfirm(reason.trim());
       onClose();
-    } catch (e: any) {
-      toast(e.message || 'Something went wrong.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, confirmLabel.toLowerCase()), 'error');
     } finally {
       setBusy(false);
     }

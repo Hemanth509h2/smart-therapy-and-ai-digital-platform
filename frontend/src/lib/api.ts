@@ -10,10 +10,16 @@ export const API_URL = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '
 /** Fired on window when the backend refuses an action because the therapist has no active plan. */
 export const PLAN_REQUIRED_EVENT = 'staad:plan-required';
 
+/** Fired on window when the backend says the profile id a page sent isn't the
+ *  signed-in user's (code PROFILE_MISMATCH) — the page is using a stale cached
+ *  profile. AuthProvider reloads the profile in response. */
+export const PROFILE_MISMATCH_EVENT = 'staad:profile-mismatch';
+
 // The backend answers therapist actions with 402 + code PLAN_REQUIRED when
-// there is no active plan. Announce it so the dashboard can say why, whichever
-// page made the call. Reads a clone so the caller still gets the body.
-function notifyPlanRequired(res: Response) {
+// there is no active plan, and 403 + PROFILE_MISMATCH when the page sent
+// another profile's id. Announce them so the app can react, whichever page
+// made the call. Reads a clone so the caller still gets the body.
+function announce(res: Response) {
   if (typeof window === 'undefined') return;
   res
     .clone()
@@ -21,6 +27,8 @@ function notifyPlanRequired(res: Response) {
     .then((body) => {
       if (body?.code === 'PLAN_REQUIRED') {
         window.dispatchEvent(new CustomEvent(PLAN_REQUIRED_EVENT, { detail: body.error }));
+      } else if (body?.code === 'PROFILE_MISMATCH') {
+        window.dispatchEvent(new CustomEvent(PROFILE_MISMATCH_EVENT));
       }
     })
     .catch(() => {});
@@ -68,7 +76,7 @@ async function request(input: RequestInfo | URL, init?: RequestInit) {
     // Any write may change what a cached read returned — drop them all.
     if (method !== 'GET' && method !== 'HEAD') apiCache.clear();
     const res = await fetch(`${API_URL}${input}`, { ...init, headers });
-    if (res.status === 402) notifyPlanRequired(res);
+    if (res.status === 402 || res.status === 403) announce(res);
     return res;
   }
   return fetch(input, init);

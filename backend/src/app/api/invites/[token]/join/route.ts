@@ -33,7 +33,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
     });
 
     if (!invite) {
-      return NextResponse.json({ error: 'Invite not found' }, { status: 404 });
+      return NextResponse.json({ error: 'That invite link is not valid. Ask your therapist for a new invite.' }, { status: 404 });
     }
     if (invite.status === 'EXPIRED' || (invite.expiresAt && invite.expiresAt < new Date())) {
       return NextResponse.json({ error: 'This invite has expired. Ask your therapist for a new link.' }, { status: 410 });
@@ -86,7 +86,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
         select: { id: true, status: true },
       });
       if (!session) {
-        return NextResponse.json({ error: 'Session for this invite no longer exists' }, { status: 409 });
+        return NextResponse.json({ error: 'The session for this invite no longer exists. Ask your therapist for a new link.' }, { status: 409 });
       }
       // Call already ended (or cancelled) — the invite link is dead.
       if (session.status === 'COMPLETED' || session.status === 'CANCELLED') {

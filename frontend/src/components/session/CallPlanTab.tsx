@@ -6,6 +6,7 @@ import { db } from '@/lib/firebase'
 import { CheckCircle2, Circle, FileText, Play, RefreshCw, Sparkles, Upload } from 'lucide-react'
 import { GLASS } from './roomTheme'
 import { toast } from '@/components/practice/ui'
+import { caughtErrorMessage } from '@/lib/apiError'
 import { useModuleSettings } from '@/hooks/useModuleSettings'
 import {
   AGENT_STEP_LABEL,
@@ -103,9 +104,9 @@ export default function CallPlanTab({
       setReplacing(false)
       setFile(null)
       setPasted('')
-      toast('Call plan ready', 'success')
+      toast('Your call plan is ready.', 'success')
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'The AI agent failed.', 'error')
+      toast(caughtErrorMessage(e, 'make the call plan'), 'error')
     } finally {
       setStep(null)
     }
@@ -123,9 +124,14 @@ export default function CallPlanTab({
         next,
         checkedAt: Date.now(),
       })
-      toast(plan.tasks.some((t) => !t.done && done.has(t.id)) ? 'Progress updated' : 'No new tasks covered yet', 'info')
+      toast(
+        plan.tasks.some((t) => !t.done && done.has(t.id))
+          ? 'Progress updated: covered tasks were ticked off.'
+          : 'No new tasks have been covered yet.',
+        'info'
+      )
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not check progress.', 'error')
+      toast(caughtErrorMessage(e, 'check the call plan progress'), 'error')
     } finally {
       setChecking(false)
     }
@@ -136,7 +142,9 @@ export default function CallPlanTab({
     const tasks = plan.tasks.map((t) =>
       t.id === task.id ? { ...t, done: !t.done, doneBy: 'therapist' as const } : t
     )
-    savePlan({ ...plan, tasks }).catch(() => toast('Could not save. Check your connection.', 'error'))
+    savePlan({ ...plan, tasks }).catch(() =>
+      toast("We couldn't save the task change. Check your internet connection and try again.", 'error')
+    )
   }
 
   const pickFile = (f: File | undefined) => {

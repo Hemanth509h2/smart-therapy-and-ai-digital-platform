@@ -41,6 +41,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ current: serializeSubscription(updated) });
   } catch (error: any) {
     console.error('Subscription cancel error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't update your plan cancellation. Please try again." },
+      { status: 500 }
+    );
   }
 }

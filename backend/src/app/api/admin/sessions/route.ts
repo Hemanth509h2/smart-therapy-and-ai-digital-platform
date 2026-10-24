@@ -4,6 +4,7 @@ import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { daysAgo, listParams } from '@/lib/admin/adminList';
 import { therapistsById } from '@/lib/core/links';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -202,7 +203,6 @@ export async function GET(request: Request) {
       },
     });
   } catch (e: any) {
-    console.error('GET /api/admin/sessions failed:', e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return errorResponse(e, 'GET /api/admin/sessions failed', "We couldn't load sessions. Please try again.");
   }
 }

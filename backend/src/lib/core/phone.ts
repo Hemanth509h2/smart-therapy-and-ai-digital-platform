@@ -10,7 +10,7 @@ export function normalizePhoneNumber(value: string): string {
       : `+${compact}`
 
   if (!/^\+[1-9]\d{7,14}$/.test(withCountryCode)) {
-    throw new PublicError('Enter a valid phone number with country code', 400)
+    throw new PublicError('Enter a valid phone number, including the country code (for example +91 98765 43210).', 400)
   }
 
   return withCountryCode

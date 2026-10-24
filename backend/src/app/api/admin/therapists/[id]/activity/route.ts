@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { listParams } from '@/lib/admin/adminList';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const { skip, take } = listParams(request, { sortable: ['createdAt'], defaultSort: 'createdAt' });
 
     const therapist = await appDb.profileTherapist.findUnique({ where: { id: params.id }, select: { id: true, userId: true } });
-    if (!therapist) return NextResponse.json({ error: 'Therapist not found' }, { status: 404 });
+    if (!therapist) return NextResponse.json({ error: "We couldn't find this professional. Their account may have been removed." }, { status: 404 });
 
     const where = {
       OR: [
@@ -42,7 +43,6 @@ export async function GET(request: Request, { params }: { params: { id: string }
       total,
     });
   } catch (error: any) {
-    console.error('Admin therapist activity error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin therapist activity error', "We couldn't load this professional's activity. Please try again.");
   }
 }

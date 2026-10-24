@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const secret = req.headers.get('x-cron-secret') || bearer
   if (!expected || secret !== expected) {
     return NextResponse.json(
-      { error: 'Unauthorized' },
+      { error: 'Only the scheduled cleanup job can run this.' },
       { status: 401 }
     )
   }
@@ -66,6 +66,6 @@ export async function GET(req: NextRequest) {
   } catch (e: any) {
     console.error('[cleanup-transcripts]', e)
     await finish(false, { error: e?.message || String(e) })
-    return NextResponse.json({ error: 'Cleanup failed' }, { status: 500 })
+    return NextResponse.json({ error: 'Transcript cleanup failed. It will run again on the next schedule.' }, { status: 500 })
   }
 }

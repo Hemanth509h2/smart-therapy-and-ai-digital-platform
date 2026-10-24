@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin, requireRecentLogin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,7 @@ function botConfig() {
   return url && secret ? { base: url.replace(/\/+$/, ''), secret } : null;
 }
 
-const NOT_CONFIGURED = 'WhatsApp bot is not configured (WHATSAPP_BOT_URL / WHATSAPP_BOT_SECRET).';
+const NOT_CONFIGURED = "The WhatsApp bot isn't set up on the server yet. Ask whoever manages hosting to connect it.";
 
 // GET /api/admin/messages/bot — is the bot reachable and linked to a number?
 export async function GET(request: Request) {
@@ -25,10 +26,10 @@ export async function GET(request: Request) {
   try {
     const res = await fetch(`${cfg.base}/health`, { signal: AbortSignal.timeout(8_000), cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) return NextResponse.json({ configured: true, reachable: false, connected: false, error: `Bot responded ${res.status}` });
+    if (!res.ok) return NextResponse.json({ configured: true, reachable: false, connected: false, error: `The WhatsApp bot returned an error (${res.status}). Check that the bot is running.` });
     return NextResponse.json({ configured: true, reachable: true, connected: !!data.connected, checkedAt: new Date() });
   } catch (e: any) {
-    return NextResponse.json({ configured: true, reachable: false, connected: false, error: e?.message || 'Bot unreachable' });
+    return NextResponse.json({ configured: true, reachable: false, connected: false, error: "The WhatsApp bot can't be reached. Check that the bot is running." });
   }
 }
 
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
     if (stepUp) return stepUp;
 
     const body = await request.json().catch(() => ({}));
-    if (body.action !== 'logout') return NextResponse.json({ error: "action must be 'logout'" }, { status: 400 });
+    if (body.action !== 'logout') return NextResponse.json({ error: "We couldn't tell what to do with the bot. Refresh the page and try again." }, { status: 400 });
 
     const cfg = botConfig();
     if (!cfg) return NextResponse.json({ error: NOT_CONFIGURED }, { status: 503 });
@@ -53,12 +54,11 @@ export async function POST(request: Request) {
       signal: AbortSignal.timeout(20_000),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) return NextResponse.json({ error: data.error || `Bot responded ${res.status}` }, { status: 502 });
+    if (!res.ok) return NextResponse.json({ error: data.error || `The WhatsApp bot returned an error (${res.status}). Check that the bot is running.` }, { status: 502 });
 
     await audit(request, auth, 'whatsapp.bot.logout', { type: 'WhatsAppBot' });
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    console.error('POST /api/admin/messages/bot failed:', e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return errorResponse(e, 'POST /api/admin/messages/bot failed', "We couldn't disconnect the WhatsApp account from the bot. Please try again.");
   }
 }

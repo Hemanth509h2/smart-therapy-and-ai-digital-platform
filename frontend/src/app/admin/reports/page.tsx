@@ -5,6 +5,7 @@ import { Download, FileText } from 'lucide-react';
 import { AdminPage, Btn, Card, Field, Input, Section, useAdmin } from '@/components/admin/kit';
 import { toast } from '@/components/practice/ui';
 import { adminFetch, downloadCsv } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 
 type CsvType = 'therapists' | 'clients' | 'sessions' | 'usage' | 'audit';
 
@@ -40,17 +41,19 @@ export default function AdminReportsPage() {
       const qs = new URLSearchParams({ type });
       if (from) qs.set('from', from);
       if (to) qs.set('to', to);
-      const { rows } = await adminFetch<{ rows: Record<string, unknown>[] }>(`/api/admin/reports?${qs}`);
+      const { rows } = await adminFetch<{ rows: Record<string, unknown>[] }>(`/api/admin/reports?${qs}`, {
+        action: 'export this report',
+      });
       if (!rows.length) {
-        toast('Nothing to export for these dates.', 'error');
+        toast('Nothing to export for these dates.', 'info');
         return;
       }
       const keys = Object.keys(rows[0]);
       const suffix = from || to ? `${from || 'start'}_to_${to || 'today'}` : new Date().toISOString().slice(0, 10);
       downloadCsv(`staad-${type}-${suffix}`, rows, keys.map((k) => ({ header: k, value: (r: Record<string, unknown>) => r[k] })));
-      toast(`Exported ${rows.length} rows${rows.length >= 20000 ? ' (limit reached — narrow the dates)' : ''}`);
-    } catch (e: any) {
-      toast(e.message || 'Export failed', 'error');
+      toast(`Exported ${rows.length} rows${rows.length >= 20000 ? ' (limit reached — narrow the dates)' : ''}.`);
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'export this report'), 'error');
     } finally {
       setBusy(null);
     }
@@ -59,7 +62,9 @@ export default function AdminReportsPage() {
   const monthlyPdf = async () => {
     setBusy('monthly');
     try {
-      const r = await adminFetch<Monthly>(`/api/admin/reports?type=monthly&month=${month}`);
+      const r = await adminFetch<Monthly>(`/api/admin/reports?type=monthly&month=${month}`, {
+        action: 'build the monthly report',
+      });
       const { default: jsPDF } = await import('jspdf');
       const { default: autoTable } = await import('jspdf-autotable');
       const doc = new jsPDF();
@@ -133,8 +138,9 @@ export default function AdminReportsPage() {
         });
       }
       doc.save(`staad-monthly-report-${r.month}.pdf`);
-    } catch (e: any) {
-      toast(e.message || 'Could not build the report', 'error');
+      toast(`Monthly report for ${label} downloaded.`);
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'build the monthly report'), 'error');
     } finally {
       setBusy(null);
     }

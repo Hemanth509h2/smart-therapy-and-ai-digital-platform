@@ -19,12 +19,12 @@ export async function POST(request: Request) {
     const { role, firstName, lastName, specialty, phoneNumber, dateOfBirth, diagnosis, inviteToken } = await request.json();
 
     if (!email || !role) {
-      return NextResponse.json({ error: 'Missing core credentials' }, { status: 400 });
+      return NextResponse.json({ error: "We couldn't read your account email or role. Sign out, sign in again and retry." }, { status: 400 });
     }
 
     const existing = await prisma.user.findUnique({ where: { id: uid }, select: { id: true } });
     if (existing) {
-      return NextResponse.json({ error: 'Profile already exists for this account' }, { status: 409 });
+      return NextResponse.json({ error: 'This account already has a profile. Refresh the page to go to your dashboard.' }, { status: 409 });
     }
 
     const roleEnum = role === 'THERAPIST' ? 'THERAPIST' : 'CLIENT';
@@ -34,12 +34,12 @@ export async function POST(request: Request) {
     if (roleEnum === 'THERAPIST') {
       const digits = String(phoneNumber ?? '').replace(/\D/g, '');
       if (digits.length < 10) {
-        return NextResponse.json({ error: 'A valid phone number is required' }, { status: 400 });
+        return NextResponse.json({ error: 'Enter a valid phone number with at least 10 digits.' }, { status: 400 });
       }
       therapistPhone = digits.length === 10 ? `91${digits}` : digits;
       const taken = await appDb.profileTherapist.findUnique({ where: { phoneNumber: therapistPhone }, select: { id: true } });
       if (taken) {
-        return NextResponse.json({ error: 'This phone number is already registered' }, { status: 409 });
+        return NextResponse.json({ error: 'This phone number is already used by another account. Use a different number.' }, { status: 409 });
       }
     }
 
@@ -149,7 +149,7 @@ export async function PUT(request: Request) {
 
     const user = await prisma.user.findUnique({ where: { id: uid }, select: { role: true } });
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: "We couldn't find your account. Sign out and sign in again." }, { status: 404 });
     }
 
     if (user.role === 'THERAPIST') {
@@ -158,7 +158,7 @@ export async function PUT(request: Request) {
       if (phoneNumber !== undefined) {
         const digits = String(phoneNumber).replace(/\D/g, '');
         if (digits.length < 10) {
-          return NextResponse.json({ error: 'A valid phone number is required' }, { status: 400 });
+          return NextResponse.json({ error: 'Enter a valid phone number with at least 10 digits.' }, { status: 400 });
         }
         therapistPhone = digits.length === 10 ? `91${digits}` : digits;
         const taken = await appDb.profileTherapist.findFirst({
@@ -166,7 +166,7 @@ export async function PUT(request: Request) {
           select: { id: true },
         });
         if (taken) {
-          return NextResponse.json({ error: 'This phone number is already registered' }, { status: 409 });
+          return NextResponse.json({ error: 'This phone number is already used by another account. Use a different number.' }, { status: 409 });
         }
       }
 
@@ -200,7 +200,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ profile: updated });
     }
 
-    return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
+    return NextResponse.json({ error: "Your account type can't be edited here." }, { status: 400 });
   } catch (error: any) {
     return errorResponse(error, 'Profile PUT error');
   }
@@ -227,7 +227,7 @@ export async function DELETE(request: Request) {
       therapistForUser(uid, { id: true }),
     ]);
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: "We couldn't find your account. Sign out and sign in again." }, { status: 404 });
     }
 
     await prisma.$transaction(async (tx) => {
@@ -286,7 +286,7 @@ export async function GET(request: Request) {
     ]);
 
     if (!found) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: "We couldn't find your account. Sign out and sign in again." }, { status: 404 });
     }
 
     const user = { ...found, therapist, admin };

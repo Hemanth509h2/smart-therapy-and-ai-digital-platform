@@ -17,6 +17,7 @@ import {
   type ProgressNote,
 } from '@/lib/progressApi';
 import { apiFetchCached } from '@/lib/api';
+import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 import { useErrorToast } from '@/components/practice/useErrorToast';
 
@@ -61,7 +62,10 @@ export default function ClientProgressPage() {
         fetchClientMetrics(clientId),
         fetchClientReports(clientId),
         fetchClientNotes(clientId),
-        apiFetchCached(`/api/clients?therapistId=${profile?.id || ''}`).then((res) => res.json()),
+        apiFetchCached(`/api/clients?therapistId=${profile?.id || ''}`).then(async (res) => {
+          if (!res.ok) throw new Error(await apiErrorMessage(res, "load this client's progress"));
+          return res.json();
+        }),
       ]);
       setMetrics(m);
       setReports(r);
@@ -69,8 +73,8 @@ export default function ClientProgressPage() {
       const found = clientRes?.clients?.find((c: any) => c.id === clientId);
       if (found) setClientName(`${found.firstName} ${found.lastName}`);
       setLoadError(null);
-    } catch (e: any) {
-      setLoadError(e.message || 'Could not load progress data.');
+    } catch (e) {
+      setLoadError(caughtErrorMessage(e, "load this client's progress"));
     } finally {
       setLoading(false);
     }
@@ -91,9 +95,9 @@ export default function ClientProgressPage() {
       const created = await createMetric({ clientId, metricType, value: numeric, unit });
       setMetrics((prev) => [...prev, created]);
       setValue('');
-      toast('Metric added');
-    } catch (e: any) {
-      toast(e.message || 'Could not add the metric.', 'error');
+      toast('Measurement added.');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'add the measurement'), 'error');
     } finally {
       setAdding(false);
     }

@@ -34,7 +34,7 @@ const STATUS: Record<Status, { tone: Tone; label: string; icon: React.ReactNode 
 };
 
 export default function AdminHealthPage() {
-  const { data, loading, error, reload } = useAdminQuery<Health>('/api/admin/health');
+  const { data, loading, error, reload } = useAdminQuery<Health>('/api/admin/health', 'check system health');
 
   return (
     <AdminPage

@@ -5,6 +5,7 @@ import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { apiFetch } from '@/lib/api';
+import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui'
 import { OnOffButton } from '@/components/ui/on-off-button'
 
@@ -182,9 +183,9 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, type: 'worry-box', worries: kept.map(w => ({ text: w.text, kept: w.kept, timestamp: w.timestamp })) }),
       })
-      if (!res.ok) throw new Error(`Save failed (${res.status})`)
-      toast('Saved to session notes', 'success')
-    } catch { toast('Could not save notes. Try again.', 'error') }
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'save the worries to the session notes'))
+      toast('The kept worries were saved to the session notes.', 'success')
+    } catch (e) { toast(caughtErrorMessage(e, 'save the worries to the session notes'), 'error') }
   }, [isT, worries, sessionId])
 
   const goAddWorry = useCallback(() => {

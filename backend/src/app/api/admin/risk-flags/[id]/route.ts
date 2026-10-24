@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,8 +16,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const note = typeof body.note === 'string' ? body.note.trim().slice(0, 2000) : '';
 
     const before = await prisma.riskFlag.findUnique({ where: { id: params.id } });
-    if (!before) return NextResponse.json({ error: 'Risk flag not found' }, { status: 404 });
-    if (before.acknowledgedAt) return NextResponse.json({ error: 'This flag was already acknowledged.' }, { status: 409 });
+    if (!before) return NextResponse.json({ error: "We couldn't find this risk flag. It may have been removed." }, { status: 404 });
+    if (before.acknowledgedAt) return NextResponse.json({ error: 'This risk flag has already been acknowledged.' }, { status: 409 });
 
     const flag = await prisma.riskFlag.update({
       where: { id: params.id },
@@ -28,7 +29,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     });
     return NextResponse.json({ flag });
   } catch (e: any) {
-    console.error('PATCH /api/admin/risk-flags failed:', e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return errorResponse(e, 'PATCH /api/admin/risk-flags failed', "We couldn't update this risk flag. Please try again.");
   }
 }

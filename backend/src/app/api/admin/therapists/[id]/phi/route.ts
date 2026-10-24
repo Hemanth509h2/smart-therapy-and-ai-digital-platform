@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const { id } = params;
 
     const therapist = await appDb.profileTherapist.findUnique({ where: { id }, select: { id: true } });
-    if (!therapist) return NextResponse.json({ error: 'Therapist not found' }, { status: 404 });
+    if (!therapist) return NextResponse.json({ error: "We couldn't find this professional. Their account may have been removed." }, { status: 404 });
 
     // Same population as the detail view: linked clients + anyone they've had a session with.
     const clients = await prisma.profileClient.findMany({
@@ -52,7 +53,6 @@ export async function GET(request: Request, { params }: { params: { id: string }
       })),
     });
   } catch (error: any) {
-    console.error('Admin therapist PHI error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin therapist PHI error', "We couldn't load this professional's client details. Please try again.");
   }
 }

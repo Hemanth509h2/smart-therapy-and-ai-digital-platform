@@ -3,6 +3,7 @@
 // Session / Booking / ProfileClient rows — there are no extra schema fields for
 // status, duration or session numbers, so they are computed.
 import { apiFetch } from '@/lib/api';
+import { apiErrorMessage, type WhatsAppOutcome } from '@/lib/apiError';
 
 export type SessionStatus = 'SCHEDULED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 
@@ -400,27 +401,29 @@ export function clientFocus(
 
 /* ─────────────────────────── API calls ─────────────────────────── */
 
-async function jsonOrThrow(res: Response) {
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'Request failed');
-  return data;
+// Throws a plain-language reason (see lib/apiError) naming `action`.
+async function jsonOrThrow(res: Response, action: string) {
+  if (!res.ok) throw new Error(await apiErrorMessage(res, action));
+  return res.json().catch(() => ({}));
 }
 
 /** Creates the Session row (what every view reads) and a matching Booking that
- *  records the planned duration. */
+ *  records the planned duration. A booking also WhatsApps the client a
+ *  confirmation; `whatsapp` says whether that was sent. */
 export async function createSession(
   therapistId: string,
   clientId: string,
   when: Date,
   duration?: number,
   booking = false
-): Promise<PracticeSession> {
+): Promise<{ session: PracticeSession; whatsapp?: WhatsAppOutcome }> {
   const data = await jsonOrThrow(
     await apiFetch('/api/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ therapistId, clientId, scheduledAt: when.toISOString(), booking }),
-    })
+    }),
+    booking ? 'book this session' : 'start this session'
   );
   if (duration) {
     await apiFetch('/api/bookings', {
@@ -429,7 +432,7 @@ export async function createSession(
       body: JSON.stringify({ therapistId, clientId, dateTime: when.toISOString(), duration }),
     }).catch(() => {});
   }
-  return data.session;
+  return { session: data.session, whatsapp: data.whatsapp };
 }
 
 export async function updateSchedule(sessionId: string, action: 'cancel' | 'reschedule', scheduledAt?: Date) {
@@ -438,7 +441,8 @@ export async function updateSchedule(sessionId: string, action: 'cancel' | 'resc
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, scheduledAt: scheduledAt?.toISOString() }),
-    })
+    }),
+    action === 'cancel' ? 'cancel this session' : 'reschedule this session'
   );
   return data.session as PracticeSession;
 }

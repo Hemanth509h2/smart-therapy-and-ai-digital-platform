@@ -163,7 +163,7 @@ const SORT_VALUE: Record<string, (r: ProfessionalUsage) => number | string> = {
 
 export default function AdminUsagePage() {
   const [range, setRange] = useState('30d');
-  const { data, loading, error, reload } = useAdminQuery<Usage>(`/api/admin/usage?range=${range}`);
+  const { data, loading, error, reload } = useAdminQuery<Usage>(`/api/admin/usage?range=${range}`, 'load the usage figures');
   const { can } = useAdmin();
   const router = useRouter();
   const rangeLabel = RANGES.find((r) => r.value === range)?.label ?? '';
@@ -460,7 +460,7 @@ export default function AdminUsagePage() {
 }
 
 function InfraSection() {
-  const { data, loading, error, reload } = useAdminQuery<Infra>('/api/admin/usage/infra');
+  const { data, loading, error, reload } = useAdminQuery<Infra>('/api/admin/usage/infra', 'load database and hosting usage');
   const s = data?.server;
   const memUsed = s ? s.memory.total - s.memory.free : 0;
   const diskUsed = s?.disk ? s.disk.total - s.disk.free : 0;

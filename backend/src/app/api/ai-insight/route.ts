@@ -10,7 +10,7 @@ import {
   getSessionTranscript,
 } from '@/lib/sessions/transcript-store'
 import { getSetting } from '@/lib/core/settings'
-import { errorResponse, logError } from '@/lib/http/apiError'
+import { errorResponse, logError, notYourProfile } from '@/lib/http/apiError'
 import { firebasePrivateKey } from '@/lib/core/firebaseKey'
 
 export async function POST(request: Request) {
@@ -28,20 +28,20 @@ export async function POST(request: Request) {
 
     if (!sessionId || typeof sessionId !== 'string') {
       return NextResponse.json(
-        { error: 'sessionId is required and must be a string' },
+        { error: "We couldn't tell which session this is for. Refresh the page and try again." },
         { status: 400 }
       )
     }
 
     if (!bodyTherapistId || typeof bodyTherapistId !== 'string') {
       return NextResponse.json(
-        { error: 'therapistId is required and must be a string' },
+        { error: "Your therapist profile hasn't loaded yet. Refresh the page and try again." },
         { status: 400 }
       )
     }
     if (!clientProfile || typeof clientProfile !== 'object') {
       return NextResponse.json(
-        { error: 'clientProfile is required and must be an object' },
+        { error: "The client's details haven't loaded yet. Refresh the page and try again." },
         { status: 400 }
       )
     }
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     // used: the client is taken from the verified session row below.
     if (!String(clientProfile.clientId ?? '')) {
       return NextResponse.json(
-        { error: 'clientProfile.clientId is required' },
+        { error: "The client's details haven't loaded yet. Refresh the page and try again." },
         { status: 400 }
       )
     }
@@ -58,10 +58,10 @@ export async function POST(request: Request) {
     // The body's therapistId must be the caller's own uid; from here on only the
     // verified uid is used (study material, previous notes, usage logging).
     if (bodyTherapistId !== auth.uid) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      return notYourProfile('this therapist profile')
     }
     const therapistId = auth.uid
-    const noPlan = await requireActivePlan({ therapistId: auth.therapist.id })
+    const noPlan = await requireActivePlan({ therapistId: auth.therapist.id }, 'use AI insights')
     if (noPlan) return noPlan
 
     // Ownership check before consent, transcript, notes, LLM calls or writes.
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
       select: { id: true, clientId: true },
     })
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+      return NextResponse.json({ error: 'This session no longer exists. It may have been deleted.' }, { status: 404 })
     }
 
     // name/age/conditions are the owning therapist's descriptive input for the
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     if (!consent && !sttTestMode) {
       return NextResponse.json(
         {
-          error: 'AI analysis not consented',
+          error: 'Both you and the client need to allow AI analysis before AI insights can run.',
           detail: 'Both therapist and client must consent to AI analysis',
         },
         { status: 403 }
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
     const existingTranscript = await getSessionTranscript(sessionId)
     if (existingTranscript.length === 0) {
       return NextResponse.json(
-        { error: 'No transcript data found for this session' },
+        { error: 'There is no transcript for this session yet. AI insights appear once the conversation has been transcribed.' },
         { status: 404 }
       )
     }

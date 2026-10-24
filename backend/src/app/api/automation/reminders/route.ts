@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     const to = Number(params.get('toMinutes') ?? 75)
     if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to <= from || to > 7 * 24 * 60) {
       return NextResponse.json(
-        { error: 'fromMinutes and toMinutes must be whole numbers with 0 <= fromMinutes < toMinutes <= 10080' },
+        { error: 'fromMinutes and toMinutes must be whole numbers, with fromMinutes from 0 up to (but less than) toMinutes, and toMinutes at most 10080 (7 days).' },
         { status: 400 }
       )
     }

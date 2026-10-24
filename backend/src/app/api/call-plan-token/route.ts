@@ -27,10 +27,10 @@ export async function POST(request: Request) {
 
     const { sessionId } = await request.json().catch(() => ({}));
     if (!sessionId || typeof sessionId !== 'string') {
-      return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
+      return NextResponse.json({ error: "We couldn't tell which session this is for. Refresh the page and try again." }, { status: 400 });
     }
 
-    const noPlan = await requireActivePlan({ therapistId: auth.therapist.id });
+    const noPlan = await requireActivePlan({ therapistId: auth.therapist.id }, 'use AI assistance in calls');
     if (noPlan) return noPlan;
 
     const session = await prisma.session.findFirst({
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       select: { id: true },
     });
     if (!session) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return NextResponse.json({ error: 'This session no longer exists. It may have been deleted.' }, { status: 404 });
     }
 
     // Same dev-only bypass as /api/ai-insight, never in production.
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
     const secret = process.env.STT_TOKEN_SECRET;
     if (!secret) {
-      return NextResponse.json({ error: 'STT_TOKEN_SECRET not configured' }, { status: 503 });
+      return NextResponse.json({ error: "AI assistance isn't set up on the server yet. Ask an admin to finish the AI setup." }, { status: 503 });
     }
 
     return NextResponse.json({ token: mintSttToken(sessionId, secret, TOKEN_TTL_MS, 'call-plan') });

@@ -32,6 +32,7 @@ import { useSessionActions } from '@/components/practice/useSessionActions';
 import { toast } from '@/components/practice/ui';
 import SessionReportDrawer from '@/components/report/SessionReportDrawer';
 import { apiFetchCached } from '@/lib/api';
+import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
 import { Sparkles } from 'lucide-react';
 import { MODULE_CATEGORIES, type ModuleItem } from '@/lib/modules';
 import {
@@ -169,7 +170,10 @@ export default function ClientProfilePage() {
       fetchClientMetrics(clientId),
       fetchClientNotes(clientId),
       fetchClientReports(clientId),
-      apiFetchCached(`/api/notes?clientId=${encodeURIComponent(clientId)}`).then((res) => (res.ok ? res.json() : { notes: [] })),
+      apiFetchCached(`/api/notes?clientId=${encodeURIComponent(clientId)}`).then(async (res) => {
+        if (!res.ok) throw new Error(await apiErrorMessage(res, 'load the session notes'));
+        return res.json();
+      }),
     ])
       .then(([m, n, r, sn]) => {
         if (cancelled) return;
@@ -177,8 +181,11 @@ export default function ClientProfilePage() {
         if (n.status === 'fulfilled') setNotes(n.value);
         if (r.status === 'fulfilled') setReports(r.value);
         if (sn.status === 'fulfilled') setSessionNotes(sn.value.notes ?? []);
-        if ([m, n, r, sn].some((x) => x.status === 'rejected')) {
-          toast('Some client details could not be loaded.', 'warning');
+        const failed = [m, n, r, sn].find((x): x is PromiseRejectedResult => x.status === 'rejected');
+        if (failed) {
+          toast(caughtErrorMessage(failed.reason, "load all of this client's details"), 'warning', {
+            title: 'Some client details are missing',
+          });
         }
       })
       .finally(() => {
@@ -255,7 +262,7 @@ export default function ClientProfilePage() {
       setNoteDraft('');
       toast('Note saved.');
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not save the note.', 'error');
+      toast(caughtErrorMessage(e, 'save the note'), 'error');
     } finally {
       setSavingNote(false);
     }

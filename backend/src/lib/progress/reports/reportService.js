@@ -11,7 +11,7 @@ import { PublicError } from '@/lib/http/apiError';
 export async function generateClientReportPdf(prisma, clientId) {
   const client = await prisma.profileClient.findUnique({ where: { id: clientId } });
   if (!client) {
-    throw new PublicError('Client not found', 404);
+    throw new PublicError("We couldn't find that client. They may have been removed.", 404);
   }
 
   const metrics = await getClientMetrics(prisma, clientId);

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/core/db';
 import { requireTherapist } from '@/lib/http/progressAuth';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
-import { errorResponse } from '@/lib/http/apiError';
+import { errorResponse, notYourProfile } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,24 +13,24 @@ export const dynamic = 'force-dynamic';
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const auth = await requireTherapist(request);
   if (!auth.ok) return auth.response;
-  const noPlan = await requireActivePlan({ therapistId: auth.therapist.id });
+  const noPlan = await requireActivePlan({ therapistId: auth.therapist.id }, 'edit progress metrics');
   if (noPlan) return noPlan;
 
   try {
     const { id } = params;
     const existing = await prisma.progressMetric.findUnique({ where: { id } });
     if (!existing) {
-      return NextResponse.json({ error: 'Progress metric not found' }, { status: 404 });
+      return NextResponse.json({ error: "We couldn't find that progress entry. It may have been deleted." }, { status: 404 });
     }
     if (existing.therapistId !== auth.therapist.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return notYourProfile('this progress entry');
     }
 
     const body = await request.json();
     const { value, unit, notes, metricType, recordedAt } = body || {};
 
     if (value !== undefined && (typeof value !== 'number' || Number.isNaN(value))) {
-      return NextResponse.json({ error: 'value must be a number' }, { status: 400 });
+      return NextResponse.json({ error: 'The value must be a number.' }, { status: 400 });
     }
 
     const metric = await prisma.progressMetric.update({
@@ -54,17 +54,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   const auth = await requireTherapist(request);
   if (!auth.ok) return auth.response;
-  const noPlan = await requireActivePlan({ therapistId: auth.therapist.id });
+  const noPlan = await requireActivePlan({ therapistId: auth.therapist.id }, 'delete progress metrics');
   if (noPlan) return noPlan;
 
   try {
     const { id } = params;
     const existing = await prisma.progressMetric.findUnique({ where: { id } });
     if (!existing) {
-      return NextResponse.json({ error: 'Progress metric not found' }, { status: 404 });
+      return NextResponse.json({ error: "We couldn't find that progress entry. It may have been deleted." }, { status: 404 });
     }
     if (existing.therapistId !== auth.therapist.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return notYourProfile('this progress entry');
     }
 
     await prisma.progressMetric.delete({ where: { id } });

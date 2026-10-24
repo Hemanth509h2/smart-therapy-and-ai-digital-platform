@@ -102,8 +102,8 @@ function AuthForm() {
       } else {
         await createUserWithEmailAndPassword(auth, email, password);
       }
-    } catch (err: any) {
-      toast(err.message || 'Authentication failed. Please try again.', 'error');
+    } catch (err) {
+      toast(authErrorMessage(err, isLogin ? 'sign you in' : 'create your account'), 'error');
     } finally {
       setLoading(false);
     }
@@ -115,8 +115,10 @@ function AuthForm() {
     try {
       // Redirect (by role, or to onboarding) happens in the uid effect above.
       await signInWithPopup(auth, provider);
-    } catch (err: any) {
-      toast(err.message || 'Google sign-in failed. Please try again.', 'error');
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
+      toast(authErrorMessage(err, 'sign you in with Google'), 'error');
     } finally {
       setLoading(false);
     }
@@ -322,4 +324,32 @@ export default function AuthPage() {
       <AuthForm />
     </Suspense>
   );
+}
+
+// Firebase errors read like "Firebase: Error (auth/invalid-credential)."; show a sentence instead.
+function authErrorMessage(err: unknown, action: string) {
+  const code = (err as { code?: string })?.code || '';
+  switch (code) {
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+    case 'auth/invalid-login-credentials':
+      return 'That email and password don\'t match an account. Check them and try again.';
+    case 'auth/invalid-email':
+      return 'That email address doesn\'t look right. Check it and try again.';
+    case 'auth/email-already-in-use':
+      return 'An account with this email already exists. Sign in instead.';
+    case 'auth/weak-password':
+      return 'Choose a stronger password (at least 6 characters).';
+    case 'auth/too-many-requests':
+      return 'Too many sign-in attempts. Wait a few minutes and try again.';
+    case 'auth/user-disabled':
+      return 'This account has been disabled. Contact support for help.';
+    case 'auth/network-request-failed':
+      return `We couldn't reach the server to ${action}. Check your internet connection and try again.`;
+    case 'auth/popup-blocked':
+      return 'Your browser blocked the Google sign-in window. Allow pop-ups for this site and try again.';
+    default:
+      return `We couldn't ${action}. Please try again.`;
+  }
 }

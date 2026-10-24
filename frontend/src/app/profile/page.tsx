@@ -27,6 +27,7 @@ import {
   type Availability,
 } from '@/lib/practice';
 import { apiFetch } from '@/lib/api';
+import { apiErrorMessage, caughtErrorMessage, networkErrorMessage } from '@/lib/apiError';
 
 const SPECIALITIES = ['SLD', 'ADHD', 'Anxiety', 'Depression', 'ID', 'Autism', 'Dyslexia', 'Trauma', 'General'];
 const QUALIFICATIONS = ['BA/BSc', 'MA/MSc', 'M.Phil', 'Ph.D', 'MD', 'DM'];
@@ -140,12 +141,12 @@ export default function ProfilePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'save your profile'));
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not save your profile.');
       setRoleAndProfile(role, { ...profile, ...data.profile });
-      toast('Profile saved');
+      toast('Your profile was saved.');
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not save your profile.', 'error');
+      toast(caughtErrorMessage(e, 'save your profile'), 'error');
     } finally {
       setSaving(false);
     }
@@ -157,8 +158,16 @@ export default function ProfilePage() {
     try {
       await sendPasswordResetEmail(auth, email);
       toast(`Reset link sent to ${email}`);
-    } catch {
-      toast('Could not send the reset email. Please try again.', 'error');
+    } catch (e) {
+      const code = (e as { code?: string })?.code;
+      toast(
+        code === 'auth/network-request-failed'
+          ? networkErrorMessage('send the reset email')
+          : code === 'auth/too-many-requests'
+            ? 'Too many reset emails were requested. Wait a few minutes and try again.'
+            : "We couldn't send the password reset email. Please try again.",
+        'error'
+      );
     }
     setPwSending(false);
   };
@@ -183,7 +192,7 @@ export default function ProfilePage() {
       // Delete server-side data FIRST: the backend verifies the Firebase ID
       // token, which becomes invalid once the Firebase user is deleted.
       const res = await apiFetch('/api/users/profile', { method: 'DELETE' });
-      if (!res.ok) throw new Error('delete-failed');
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'delete your account'));
       if (currentUser) await deleteUser(currentUser);
       clearAuth();
       toast('Your account has been deleted.');
@@ -192,7 +201,7 @@ export default function ProfilePage() {
       toast(
         err?.code === 'auth/requires-recent-login'
           ? 'For security, please log out and log back in, then try again.'
-          : 'Could not delete your account. Please try again.',
+          : caughtErrorMessage(err, 'delete your account'),
         'error'
       );
     } finally {

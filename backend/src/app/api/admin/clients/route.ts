@@ -6,6 +6,7 @@ import { audit } from '@/lib/admin/audit';
 import { can } from '@/lib/admin/adminRoles';
 import { listParams } from '@/lib/admin/adminList';
 import { therapistsById } from '@/lib/core/links';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
 
     const reveal = sp.get('reveal') === '1';
     if (reveal && !can(auth.adminRole, 'phi.read')) {
-      return NextResponse.json({ error: 'Your admin role does not allow revealing client details.', code: 'ADMIN_FORBIDDEN' }, { status: 403 });
+      return NextResponse.json({ error: "Your admin role doesn't allow viewing full client details. Ask a super admin if you need access.", code: 'ADMIN_FORBIDDEN' }, { status: 403 });
     }
 
     const and: Prisma.ProfileClientWhereInput[] = [];
@@ -110,7 +111,6 @@ export async function GET(request: Request) {
       revealed: reveal,
     });
   } catch (error: any) {
-    console.error('Admin clients list error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin clients list error', "We couldn't load the client list. Please try again.");
   }
 }

@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams
     const date = params.get('date') ?? istDateString()
     if (!isValidDateString(date)) {
-      return NextResponse.json({ error: 'date must be YYYY-MM-DD' }, { status: 400 })
+      return NextResponse.json({ error: 'Give the date in YYYY-MM-DD format.' }, { status: 400 })
     }
     const doctorId = params.get('doctorId') ?? undefined
 

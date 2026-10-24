@@ -3,7 +3,7 @@ import { prisma, appDb } from '@/lib/core/db';
 import { withTherapists } from '@/lib/core/links';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { requireAuth } from '@/lib/http/apiAuth';
-import { errorResponse } from '@/lib/http/apiError';
+import { errorResponse, notYourProfile } from '@/lib/http/apiError';
 
 // The caller must own the referenced therapist/client profile or be an ADMIN.
 async function mayAccess(uid: string, ref: { therapistId?: string | null; clientId?: string | null }) {
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     const therapistId = searchParams.get('therapistId');
     const clientId = searchParams.get('clientId');
     if ((therapistId || clientId) && !(await mayAccess(auth.uid, { therapistId, clientId }))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return notYourProfile('these bookings');
     }
 
     if (therapistId) {
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ bookings: await withTherapists(bookings) });
     }
 
-    return NextResponse.json({ error: 'Missing filter parameter' }, { status: 400 });
+    return NextResponse.json({ error: 'Choose whose bookings to show.' }, { status: 400 });
   } catch (error: any) {
     return errorResponse(error, 'bookings GET');
   }
@@ -66,9 +66,9 @@ export async function POST(request: Request) {
 
     const { therapistId, clientId, dateTime, duration } = await request.json();
     if (!therapistId || !(await mayAccess(auth.uid, { therapistId }))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return notYourProfile('this therapist profile');
     }
-    const noPlan = await requireActivePlan({ therapistId });
+    const noPlan = await requireActivePlan({ therapistId }, 'book a session');
     if (noPlan) return noPlan;
 
     const booking = await prisma.booking.create({

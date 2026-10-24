@@ -18,7 +18,7 @@ export async function GET(
       include: { client: true },
     });
     if (!found) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return NextResponse.json({ error: 'This session no longer exists. It may have been deleted.' }, { status: 404 });
     }
     const [session] = await withTherapists([found]);
     return NextResponse.json({ session });
@@ -46,21 +46,24 @@ export async function PATCH(
     const finalAction = action ?? queryAction;
     const finalScheduledAt = scheduledAt ?? queryScheduledAt;
     if (!finalAction) {
-      return NextResponse.json({ error: 'Missing action' }, { status: 400 });
+      return NextResponse.json({ error: "We couldn't tell what to do with this session. Refresh the page and try again." }, { status: 400 });
     }
 
     const existing = await prisma.session.findUnique({
       where: { id: params.sessionId },
     });
     if (!existing) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return NextResponse.json({ error: 'This session no longer exists. It may have been deleted.' }, { status: 404 });
     }
 
     // No plan: no new or rescheduled sessions. Cancelling and ending stay open
     // so existing bookings can be wound down, and a call already live can be
     // rejoined.
     if (finalAction === 'reschedule' || (finalAction === 'start' && existing.status !== 'ACTIVE')) {
-      const noPlan = await requireActivePlan({ therapistId: existing.therapistId });
+      const noPlan = await requireActivePlan(
+        { therapistId: existing.therapistId },
+        finalAction === 'reschedule' ? 'reschedule a session' : 'start a session'
+      );
       if (noPlan) return noPlan;
     }
 
@@ -73,14 +76,14 @@ export async function PATCH(
     //   - 'reschedule': SCHEDULED/CANCELLED -> SCHEDULED at the new `scheduledAt`
     if (finalAction === 'cancel' || finalAction === 'reschedule') {
       if (finalAction === 'cancel' && existing.status !== 'SCHEDULED') {
-        return NextResponse.json({ error: 'Only scheduled sessions can be cancelled' }, { status: 409 });
+        return NextResponse.json({ error: 'This session has already started, ended or been cancelled, so it can no longer be cancelled.' }, { status: 409 });
       }
       if (finalAction === 'reschedule') {
         if (existing.status !== 'SCHEDULED' && existing.status !== 'CANCELLED') {
-          return NextResponse.json({ error: 'Only scheduled or cancelled sessions can be rescheduled' }, { status: 409 });
+          return NextResponse.json({ error: 'This session has already started or ended, so it can no longer be rescheduled.' }, { status: 409 });
         }
         if (!finalScheduledAt || Number.isNaN(new Date(finalScheduledAt).getTime())) {
-          return NextResponse.json({ error: 'A valid scheduledAt is required' }, { status: 400 });
+          return NextResponse.json({ error: 'Choose a valid new date and time for the session.' }, { status: 400 });
         }
       }
       const updated = await prisma.session.update({
@@ -113,7 +116,7 @@ export async function PATCH(
         // be locked out of their own session by the rules.
         console.error('Session provisioning failed:', e);
         return NextResponse.json(
-          { error: 'Could not provision session room' },
+          { error: "We couldn't open the session room. Please try again in a moment." },
           { status: 500 }
         );
       }
@@ -136,7 +139,7 @@ export async function PATCH(
       };
     } else {
       return NextResponse.json(
-        { error: "Invalid action. Use 'start' or 'end'." },
+        { error: "We couldn't tell what to do with this session. Refresh the page and try again." },
         { status: 400 }
       );
     }
@@ -156,9 +159,10 @@ export async function PATCH(
 
     // Send the patient join link when the session starts. Skipped if the
     // "Start a new session" dialog already sent it for this session.
-    if (finalAction === 'start' && session.status === 'ACTIVE') {
-      await sendSessionLinkWhatsApp(session.id, request);
-    }
+    const whatsapp =
+      finalAction === 'start' && session.status === 'ACTIVE'
+        ? await sendSessionLinkWhatsApp(session.id, request)
+        : undefined;
 
     // When the therapist ends the call, expire the invite link(s) that led to
     // this client so the link can never be used to rejoin after the session,
@@ -180,7 +184,7 @@ export async function PATCH(
       }
     }
 
-    return NextResponse.json({ session });
+    return NextResponse.json({ session, whatsapp });
   } catch (error: any) {
     return errorResponse(error, 'Session PATCH error');
   }

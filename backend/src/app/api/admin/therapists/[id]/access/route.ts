@@ -18,7 +18,7 @@ export async function PATCH(
 
     const therapist = await appDb.profileTherapist.findUnique({ where: { id: params.id } });
     if (!therapist) {
-      return NextResponse.json({ error: 'Therapist not found' }, { status: 404 });
+      return NextResponse.json({ error: "We couldn't find this professional. Their account may have been removed." }, { status: 404 });
     }
 
     // Keep only known module ids.

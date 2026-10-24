@@ -26,6 +26,7 @@ import {
   type Tone,
 } from '@/components/admin/kit';
 import { adminFetch, downloadCsv, fetchAllPages, fmtDateTime, fmtMinutes, num, timeAgo } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 
 type Tab = 'live' | 'all' | 'risk';
@@ -134,7 +135,7 @@ export default function AdminSessionsPage() {
 // ─── Live ────────────────────────────────────────────────────────────────────
 
 function LiveTab() {
-  const { data, loading, error, reload } = useAdminQuery<{ sessions: LiveSession[]; generatedAt: string }>('/api/admin/sessions?view=live');
+  const { data, loading, error, reload } = useAdminQuery<{ sessions: LiveSession[]; generatedAt: string }>('/api/admin/sessions?view=live', 'load the live sessions');
 
   useEffect(() => {
     const t = setInterval(reload, 30_000);
@@ -196,7 +197,8 @@ const STATUS_LABEL: Record<SessionRow['status'], string> = { SCHEDULED: 'Schedul
 function AllTab() {
   const list = useListState({ sort: 'scheduledAt', dir: 'desc', filters: { status: '', therapist: '', from: '', to: '' } });
   const { data, loading, error, reload } = useAdminQuery<{ sessions: SessionRow[]; total: number; stats: Stats; therapists: { id: string; name: string }[] }>(
-    `/api/admin/sessions?view=all&${list.query}`
+    `/api/admin/sessions?view=all&${list.query}`,
+    'load the sessions'
   );
   const [exporting, setExporting] = useState(false);
   const stats = data?.stats;
@@ -218,9 +220,9 @@ function AllTab() {
         { header: 'Client (initials)', value: (r) => r.client },
         { header: 'Risk flag', value: (r) => (r.riskFlag ? 'yes' : '') },
       ]);
-      toast(`Exported ${rows.length} rows`);
-    } catch (e: any) {
-      toast(e.message || 'Export failed', 'error');
+      toast(`Exported ${rows.length} session${rows.length === 1 ? '' : 's'}.`);
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'export the sessions'), 'error');
     } finally {
       setExporting(false);
     }
@@ -300,7 +302,8 @@ function RiskTab() {
   const [state, setState] = useState<'open' | 'acknowledged' | ''>('open');
   const [page, setPage] = useState(1);
   const { data, loading, error, reload } = useAdminQuery<{ flags: RiskFlag[]; total: number; open: number; pageSize: number }>(
-    `/api/admin/sessions?view=risk&page=${page}${state ? `&state=${state}` : ''}`
+    `/api/admin/sessions?view=risk&page=${page}${state ? `&state=${state}` : ''}`,
+    'load the risk flags'
   );
   const [acking, setAcking] = useState<RiskFlag | null>(null);
   const [note, setNote] = useState('');
@@ -310,12 +313,16 @@ function RiskTab() {
     if (!acking) return;
     setBusy(true);
     try {
-      await adminFetch(`/api/admin/risk-flags/${acking.id}`, { method: 'PATCH', json: { note } });
-      toast('Risk flag acknowledged');
+      await adminFetch(`/api/admin/risk-flags/${acking.id}`, {
+        method: 'PATCH',
+        json: { note },
+        action: 'acknowledge this risk flag',
+      });
+      toast('Risk flag acknowledged.');
       setAcking(null);
       reload();
-    } catch (e: any) {
-      toast(e.message || 'Could not acknowledge the flag.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'acknowledge this risk flag'), 'error');
     } finally {
       setBusy(false);
     }

@@ -7,6 +7,7 @@ import {
   Spinner, useAdmin, useAdminQuery, type Column, type Tone,
 } from '@/components/admin/kit';
 import { adminFetch, fmtDate, inr, num } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 
 interface Coupon {
@@ -48,8 +49,8 @@ function couponStatus(c: Coupon): { label: string; tone: Tone } {
 export default function AdminCouponsPage() {
   const { can } = useAdmin();
   const canWrite = can('billing.write');
-  const { data, loading, error, reload } = useAdminQuery<{ coupons: Coupon[] }>('/api/admin/coupons');
-  const { data: planData } = useAdminQuery<{ plans: Plan[] }>('/api/admin/plans');
+  const { data, loading, error, reload } = useAdminQuery<{ coupons: Coupon[] }>('/api/admin/coupons', 'load the coupons');
+  const { data: planData } = useAdminQuery<{ plans: Plan[] }>('/api/admin/plans', 'load the plans');
   const coupons = data?.coupons ?? [];
   const paidPlans = (planData?.plans ?? []).filter((p) => p.priceMonthly > 0);
   const planName = (id: string) => paidPlans.find((p) => p.id === id)?.name ?? 'Removed plan';
@@ -61,11 +62,15 @@ export default function AdminCouponsPage() {
   const setActive = async (c: Coupon, isActive: boolean) => {
     setBusy(c.id);
     try {
-      await adminFetch(`/api/admin/coupons/${c.id}`, { method: 'PATCH', json: { isActive } });
-      toast(isActive ? `${c.code} enabled` : `${c.code} disabled`);
+      await adminFetch(`/api/admin/coupons/${c.id}`, {
+        method: 'PATCH',
+        json: { isActive },
+        action: isActive ? 'enable this coupon' : 'disable this coupon',
+      });
+      toast(isActive ? `Coupon ${c.code} is enabled.` : `Coupon ${c.code} is disabled.`);
       reload();
-    } catch (e: any) {
-      toast(e.message, 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, isActive ? 'enable this coupon' : 'disable this coupon'), 'error');
     } finally {
       setBusy('');
     }
@@ -182,8 +187,8 @@ export default function AdminCouponsPage() {
         confirmLabel="Delete"
         danger
         onConfirm={async () => {
-          await adminFetch(`/api/admin/coupons/${deleting!.id}`, { method: 'DELETE' });
-          toast('Coupon deleted');
+          await adminFetch(`/api/admin/coupons/${deleting!.id}`, { method: 'DELETE', action: 'delete this coupon' });
+          toast(`Coupon ${deleting!.code} deleted.`);
           reload();
         }}
       />
@@ -238,7 +243,8 @@ function CouponModal({ coupon, plans, onClose, onSaved }: { coupon: Coupon | 'ne
   const [openedFor, setOpenedFor] = useState<Coupon | 'new' | null>(null);
   const { can } = useAdmin();
   const pros = useAdminQuery<{ professionals: Professional[] }>(
-    coupon && can('people.read') ? '/api/admin/professionals?pageSize=200&sort=name&dir=asc' : null
+    coupon && can('people.read') ? '/api/admin/professionals?pageSize=200&sort=name&dir=asc' : null,
+    'load the professionals'
   );
 
   // Reset the form each time the modal opens for a different coupon.
@@ -290,13 +296,13 @@ function CouponModal({ coupon, plans, onClose, onSaved }: { coupon: Coupon | 'ne
       isActive: form.isActive,
     };
     try {
-      if (isNew) await adminFetch('/api/admin/coupons', { method: 'POST', json });
-      else await adminFetch(`/api/admin/coupons/${(coupon as Coupon).id}`, { method: 'PATCH', json });
-      toast(isNew ? 'Coupon created' : 'Coupon saved');
+      if (isNew) await adminFetch('/api/admin/coupons', { method: 'POST', json, action: 'create the coupon' });
+      else await adminFetch(`/api/admin/coupons/${(coupon as Coupon).id}`, { method: 'PATCH', json, action: 'save the coupon' });
+      toast(isNew ? `Coupon ${form.code.trim().toUpperCase()} created.` : 'Coupon saved.');
       onClose();
       onSaved();
-    } catch (e: any) {
-      toast(e.message || 'Could not save the coupon.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, isNew ? 'create the coupon' : 'save the coupon'), 'error');
     } finally {
       setSaving(false);
     }

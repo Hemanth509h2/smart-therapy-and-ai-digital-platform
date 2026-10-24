@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/core/db';
 import { requireAdmin, requireRecentLogin, invalidateAccountStatus } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,17 +21,17 @@ export async function PATCH(request: Request, { params }: { params: { uid: strin
     const action = body?.action;
     const reason = typeof body?.reason === 'string' ? body.reason.trim().slice(0, 500) : '';
     if (action !== 'suspend' && action !== 'reactivate') {
-      return NextResponse.json({ error: "action must be 'suspend' or 'reactivate'" }, { status: 400 });
+      return NextResponse.json({ error: "We couldn't tell whether to suspend or reactivate this account. Refresh the page and try again." }, { status: 400 });
     }
     if (action === 'suspend' && !reason) {
-      return NextResponse.json({ error: 'A reason is required to suspend an account.' }, { status: 400 });
+      return NextResponse.json({ error: 'Enter a reason for suspending this account.' }, { status: 400 });
     }
 
     const user = await prisma.user.findUnique({
       where: { id: params.uid },
       select: { id: true, email: true, role: true, status: true, suspendedAt: true, suspendReason: true },
     });
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!user) return NextResponse.json({ error: "We couldn't find this account. It may have been removed." }, { status: 404 });
     if (action === 'suspend') {
       if (user.id === auth.uid) return NextResponse.json({ error: "You can't suspend your own account." }, { status: 400 });
       if (user.role === 'ADMIN') {
@@ -56,7 +57,6 @@ export async function PATCH(request: Request, { params }: { params: { uid: strin
 
     return NextResponse.json({ user: updated });
   } catch (error: any) {
-    console.error('Admin user status PATCH error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin user status PATCH error', "We couldn't change this account's status. Please try again.");
   }
 }

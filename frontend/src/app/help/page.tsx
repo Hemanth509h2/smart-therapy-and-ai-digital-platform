@@ -19,6 +19,7 @@ import { DsDialog, toast } from '@/components/practice/ui';
 import { FAQS, GUIDES, SUPPORT_EMAIL, SUPPORT_HOURS, type HelpCategory } from '@/content/help';
 import { fullName } from '@/lib/practice';
 import { apiFetch } from '@/lib/api';
+import { caughtErrorMessage, toastApiError } from '@/lib/apiError';
 
 type Filter = 'All' | HelpCategory;
 const FILTERS: Filter[] = ['All', 'Sessions', 'Clients', 'Billing', 'Privacy'];
@@ -69,18 +70,18 @@ export default function HelpPage() {
           message: message.trim(),
         }),
       });
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast(data.error || 'Could not submit your ticket. Please try again.', 'error');
+        await toastApiError(res, 'submit your support ticket');
       } else {
+        const data = await res.json().catch(() => ({}));
         setSentRef(data.ref || 'Submitted');
         setSubject('');
         setMessage('');
         setCategory(CATEGORIES[0]);
-        toast('Ticket submitted');
+        toast(data.ref ? `Your ticket ${data.ref} was submitted. We'll reply by email.` : "Your ticket was submitted. We'll reply by email.");
       }
-    } catch {
-      toast('Network error. Please try again.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'submit your support ticket'), 'error');
     } finally {
       setSending(false);
     }

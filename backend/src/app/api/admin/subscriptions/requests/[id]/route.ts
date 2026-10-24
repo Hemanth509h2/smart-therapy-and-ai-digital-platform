@@ -28,7 +28,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       where: { id: params.id },
       include: { plan: true, therapist: { select: { userId: true } } },
     });
-    if (!req) return NextResponse.json({ error: 'Request not found' }, { status: 404 });
+    if (!req) return NextResponse.json({ error: "We couldn't find this plan request. The professional may have withdrawn it." }, { status: 404 });
     const target = { type: 'SubscriptionRequest', id: req.id };
     const before = {
       status: req.status,
@@ -46,16 +46,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
         where: { id: req.id, status: { in: ['PENDING', 'AWAITING_PAYMENT'] } },
         data: { status: 'REJECTED', reviewedAt: new Date() },
       });
-      if (!count) return NextResponse.json({ error: 'Request already closed.' }, { status: 409 });
+      if (!count) return NextResponse.json({ error: 'This plan request is already closed. Refresh the page to see its current status.' }, { status: 409 });
       await audit(request, auth, 'subscription_request.reject', target, { before, after: { status: 'REJECTED' } });
       return NextResponse.json({ success: true });
     }
     if (req.status !== 'PENDING') {
-      return NextResponse.json({ error: 'Request already reviewed.' }, { status: 409 });
+      return NextResponse.json({ error: 'This plan request has already been reviewed. Refresh the page to see its current status.' }, { status: 409 });
     }
 
     if (action !== 'approve') {
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+      return NextResponse.json({ error: "We couldn't tell what to do. Refresh the page and try again." }, { status: 400 });
     }
 
     const plan = req.plan;
@@ -73,7 +73,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       }
       if (plan.toolQuota != null && cleaned.length > plan.toolQuota) {
         return NextResponse.json(
-          { error: `This plan allows up to ${plan.toolQuota} tools.` },
+          { error: `This plan includes up to ${plan.toolQuota} tools. Select fewer tools.` },
           { status: 400 }
         );
       }
@@ -109,7 +109,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         where: { id: req.id, status: 'PENDING' },
         data: { status: 'AWAITING_PAYMENT', reviewedAt: new Date(), months: months_, modules: grant, ...pricing },
       });
-      if (!count) return NextResponse.json({ error: 'Request already reviewed.' }, { status: 409 });
+      if (!count) return NextResponse.json({ error: 'This plan request has already been reviewed. Refresh the page to see its current status.' }, { status: 409 });
       await audit(request, auth, 'subscription_request.approve', target, {
         before,
         after: { status: 'AWAITING_PAYMENT', months: months_, modules: grant, unlimited, ...pricing },
@@ -125,7 +125,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       });
       // Claim the request, so two admins approving at once can't both activate it.
       const { count } = await tx.subscriptionRequest.updateMany({ where: { id: req.id, status: 'PENDING' }, data: pricing });
-      if (!count) throw new PublicError('Request already reviewed.', 409);
+      if (!count) throw new PublicError('This plan request has already been reviewed. Refresh the page to see its current status.', 409);
       const { subscription: sub, grantedModules } = await activateFreePurchase(tx, {
         therapistId: req.therapistId,
         userId: req.therapist.userId,

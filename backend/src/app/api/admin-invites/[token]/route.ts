@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { adminAuth } from '@/lib/core/firebaseAdmin';
 import { therapistForUser } from '@/lib/core/links';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ function inviteState(invite: { acceptedAt: Date | null; revokedAt: Date | null; 
 export async function GET(_request: Request, { params }: { params: { token: string } }) {
   try {
     const invite = await appDb.adminInvite.findUnique({ where: { token: params.token } });
-    if (!invite) return NextResponse.json({ error: 'Invite not found' }, { status: 404 });
+    if (!invite) return NextResponse.json({ error: 'That invite link is not valid. Ask the admin who invited you for a new invite.' }, { status: 404 });
     const state = inviteState(invite);
     return NextResponse.json({
       email: invite.email,
@@ -32,8 +33,7 @@ export async function GET(_request: Request, { params }: { params: { token: stri
       valid: state === 'valid',
     });
   } catch (error: any) {
-    console.error('Admin invite GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin invite GET error', "We couldn't load this invite. Please try again.");
   }
 }
 
@@ -47,11 +47,11 @@ export async function POST(request: Request, { params }: { params: { token: stri
     if (!auth.ok) return auth.response;
     const uid = auth.uid;
     if (uid.startsWith('guest:') || uid.startsWith('client:')) {
-      return NextResponse.json({ error: 'Sign in with your own account to accept.' }, { status: 403 });
+      return NextResponse.json({ error: 'Sign in with your own account (not a client or guest link) to accept this invite.' }, { status: 403 });
     }
 
     const invite = await appDb.adminInvite.findUnique({ where: { token: params.token } });
-    if (!invite) return NextResponse.json({ error: 'Invite not found' }, { status: 404 });
+    if (!invite) return NextResponse.json({ error: 'That invite link is not valid. Ask the admin who invited you for a new invite.' }, { status: 404 });
     const state = inviteState(invite);
     if (state !== 'valid') {
       const why = { accepted: 'has already been used', revoked: 'was revoked', expired: 'has expired' }[state];
@@ -119,8 +119,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
 
     return NextResponse.json({ success: true, adminRole: invite.adminRole });
   } catch (error: any) {
-    console.error('Admin invite accept error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin invite accept error', "We couldn't accept this invite. Please try again.");
   }
 }
 

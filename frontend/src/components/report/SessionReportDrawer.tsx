@@ -6,6 +6,7 @@ import SessionReportView from '@/components/report/SessionReportView';
 import { Loader2, Sparkles, RefreshCw, Pencil, Save } from 'lucide-react';
 import { fmtListDate, fullName, type PracticeSession } from '@/lib/practice';
 import { apiFetch } from '@/lib/api';
+import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
 
 // View / generate / edit the AI session report for one session. Shared by the
 // Sessions list and the client profile's Session History tab.
@@ -30,14 +31,18 @@ export default function SessionReportDrawer({
     if (!session) return;
     setReportLoading(true);
     apiFetch(`/api/session-report?sessionId=${session.id}`)
-      .then((r) => r.ok ? r.json() : { report: null, stats: null })
+      .then(async (r) => {
+        if (r.ok) return r.json();
+        if (r.status === 404) return { report: null, stats: null }; // not generated yet
+        throw new Error(await apiErrorMessage(r, 'load the session report'));
+      })
       .then((d) => {
         setReport(d.report);
         setReportStats(d.stats);
       })
-      .catch(() => {
+      .catch((e) => {
         setReport(null);
-        toast('Could not load the session report.', 'error');
+        toast(caughtErrorMessage(e, 'load the session report'), 'error');
       })
       .finally(() => setReportLoading(false));
   }, [session]);
@@ -50,13 +55,13 @@ export default function SessionReportDrawer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId }),
       });
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'generate the report'));
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to generate report');
       setReport(data.report);
       setReportStats(data.stats);
-      toast('Report generated successfully');
+      toast('The session report was generated.');
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not generate report', 'error');
+      toast(caughtErrorMessage(e, 'generate the report'), 'error');
     } finally {
       setGenerating(false);
     }
@@ -71,13 +76,13 @@ export default function SessionReportDrawer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: session.id, content: draft }),
       });
-      if (!res.ok) throw new Error('Failed to save');
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'save your changes to the report'));
       const data = await res.json();
       setReport(data.report);
       setEditing(false);
-      toast('Report updated');
+      toast('Your changes to the report were saved.');
     } catch (e) {
-      toast('Could not save report changes', 'error');
+      toast(caughtErrorMessage(e, 'save your changes to the report'), 'error');
     } finally {
       setSavingReport(false);
     }

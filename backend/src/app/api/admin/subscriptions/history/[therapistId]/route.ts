@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { appDb, prisma } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { resolveCurrent, serializeSubscription, subscriptionState } from '@/lib/billing/subscriptions';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +35,7 @@ export async function GET(request: Request, { params }: { params: { therapistId:
         subscriptionRequests: { include: { plan: { select: { name: true } } }, orderBy: { createdAt: 'desc' } },
       },
     });
-    if (!therapist) return NextResponse.json({ error: 'Professional not found' }, { status: 404 });
+    if (!therapist) return NextResponse.json({ error: "We couldn't find this professional. Their account may have been removed." }, { status: 404 });
     const user = await prisma.user.findUnique({ where: { id: therapist.userId }, select: { email: true } });
 
     const now = new Date();
@@ -95,7 +96,6 @@ export async function GET(request: Request, { params }: { params: { therapistId:
       events,
     });
   } catch (error: any) {
-    console.error('Admin subscription history GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin subscription history GET error', "We couldn't load this professional's plan history. Please try again.");
   }
 }

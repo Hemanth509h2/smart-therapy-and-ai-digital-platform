@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     if (!found.ok) return found.response
 
     const clientId = new URL(request.url).searchParams.get('clientId')
-    if (!clientId) return NextResponse.json({ error: 'clientId is required' }, { status: 400 })
+    if (!clientId) return NextResponse.json({ error: 'Give the clientId of the client to look up.' }, { status: 400 })
 
     const client = await prisma.profileClient.findFirst({
       where: { AND: [{ id: clientId }, doctorClientsWhere(found.doctor.id)] },
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
         },
       },
     })
-    if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+    if (!client) return NextResponse.json({ error: "We couldn't find that client. They may have been removed." }, { status: 404 })
 
     return NextResponse.json({
       client: {

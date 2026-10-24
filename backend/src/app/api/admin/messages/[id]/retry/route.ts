@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { getSetting } from '@/lib/core/settings';
 import { retryWhatsAppMessage, WHATSAPP_OFF } from '@/lib/sessions/session-whatsapp';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,9 +23,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
       where: { id: params.id },
       select: { id: true, status: true, attempts: true, errorMessage: true, messageType: true, inviteId: true, sessionId: true },
     });
-    if (!before) return NextResponse.json({ error: 'Message not found' }, { status: 404 });
+    if (!before) return NextResponse.json({ error: "We couldn't find this message. It may have been deleted." }, { status: 404 });
     if (before.status !== 'FAILED') {
-      return NextResponse.json({ error: `Only failed messages can be retried (this one is ${before.status}).` }, { status: 409 });
+      return NextResponse.json({ error: `Only failed messages can be resent. This one is ${String(before.status).toLowerCase()}.` }, { status: 409 });
     }
 
     if (before.messageType === 'CLIENT_INVITE' ? !before.inviteId : !before.sessionId) {
@@ -38,7 +39,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     });
     return NextResponse.json({ message, ok: message.status === 'SENT' });
   } catch (e: any) {
-    console.error('POST /api/admin/messages/[id]/retry failed:', e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return errorResponse(e, 'POST /api/admin/messages/[id]/retry failed', "We couldn't resend this message. Please try again.");
   }
 }

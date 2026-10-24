@@ -10,6 +10,7 @@ import { signOut } from 'firebase/auth';
 import { ShieldCheck } from 'lucide-react';
 import { auth } from '@/lib/firebase';
 import { apiFetch } from '@/lib/api';
+import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
 import { useAuthStore } from '@/store/useAuthStore';
 import { ADMIN_ROLE_LABELS, type AdminRole } from '@/lib/adminRoles';
 import { fmtDate } from '@/lib/adminApi';
@@ -53,11 +54,12 @@ export default function AdminInvitePage({ params }: { params: { token: string } 
   useEffect(() => {
     apiFetch(`/api/admin-invites/${encodeURIComponent(token)}`)
       .then(async (res) => {
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(res.status === 404 ? 'This invite link is not valid.' : data.error || 'Could not load the invite.');
-        setInvite(data);
+        if (!res.ok) {
+          throw new Error(res.status === 404 ? 'This invite link is not valid.' : await apiErrorMessage(res, 'load this invite'));
+        }
+        setInvite(await res.json());
       })
-      .catch((e) => setLoadError(e.message))
+      .catch((e) => setLoadError(caughtErrorMessage(e, 'load this invite')))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -90,8 +92,8 @@ export default function AdminInvitePage({ params }: { params: { token: string } 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ firstName: firstName.trim() || undefined, lastName: lastName.trim() || undefined }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok && data.code !== 'ALREADY_ADMIN') throw new Error(data.error || 'Could not accept the invite.');
+      const data = await res.clone().json().catch(() => ({}));
+      if (!res.ok && data.code !== 'ALREADY_ADMIN') throw new Error(await apiErrorMessage(res, 'accept this invite'));
       // Load the new role before navigating so the admin guard doesn't bounce us.
       const prof = await apiFetch('/api/users/profile');
       if (prof.ok) {
@@ -100,8 +102,8 @@ export default function AdminInvitePage({ params }: { params: { token: string } 
       }
       toast('Invite accepted. Welcome to the admin portal.');
       router.replace('/admin');
-    } catch (e: any) {
-      toast(e.message || 'Could not accept the invite.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'accept this invite'), 'error');
       setAccepting(false);
     }
   };

@@ -18,7 +18,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     if (body.name !== undefined) {
       data.name = String(body.name).trim();
-      if (!data.name) return NextResponse.json({ error: 'name is required' }, { status: 400 });
+      if (!data.name) return NextResponse.json({ error: 'Enter a name for the plan.' }, { status: 400 });
     }
     if (body.description !== undefined) data.description = body.description?.trim() || null;
     if (body.priceMonthly !== undefined) data.priceMonthly = Math.max(0, Number(body.priceMonthly) || 0);
@@ -37,7 +37,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     Object.assign(data, limits);
 
     const before = await appDb.plan.findUnique({ where: { id: params.id } });
-    if (!before) return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
+    if (!before) return NextResponse.json({ error: "We couldn't find this plan. It may have been deleted." }, { status: 404 });
 
     const plan = await appDb.plan.update({ where: { id: params.id }, data });
 
@@ -53,7 +53,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: 'A plan with that name already exists.' }, { status: 409 });
     }
     if (error.code === 'P2025') {
-      return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
+      return NextResponse.json({ error: "We couldn't find this plan. It may have been deleted." }, { status: 404 });
     }
     return errorResponse(error, 'Admin plan PATCH error');
   }
@@ -70,7 +70,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     if (stepUp) return stepUp;
 
     const plan = await appDb.plan.findUnique({ where: { id: params.id } });
-    if (!plan) return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
+    if (!plan) return NextResponse.json({ error: "We couldn't find this plan. It may have been deleted." }, { status: 404 });
 
     const [subs, reqs] = await Promise.all([
       appDb.subscription.count({ where: { planId: params.id } }),
@@ -94,7 +94,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     return NextResponse.json({ success: true });
   } catch (error: any) {
     if (error.code === 'P2025') {
-      return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
+      return NextResponse.json({ error: "We couldn't find this plan. It may have been deleted." }, { status: 404 });
     }
     return errorResponse(error, 'Admin plan DELETE error');
   }

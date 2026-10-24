@@ -24,6 +24,7 @@ import {
   type Tone,
 } from '@/components/admin/kit';
 import { adminFetch, fmtDate, fmtDateTime, fmtMinutes, num, timeAgo } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 
 interface ClientDetail {
@@ -62,7 +63,7 @@ export default function AdminClientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { can } = useAdmin();
   const [reveal, setReveal] = useState(false);
-  const { data, loading, error, reload } = useAdminQuery<ClientDetail>(`/api/admin/clients/${id}${reveal ? '?reveal=1' : ''}`);
+  const { data, loading, error, reload } = useAdminQuery<ClientDetail>(`/api/admin/clients/${id}${reveal ? '?reveal=1' : ''}`, 'load this client');
   const [reassignOpen, setReassignOpen] = useState(false);
 
   const c = data?.client;
@@ -198,7 +199,8 @@ function ReassignModal({
   onDone: () => void;
 }) {
   const { data, loading, error, reload } = useAdminQuery<{ professionals: { id: string; name: string; email?: string }[] }>(
-    open ? '/api/admin/professionals?pageSize=200&sort=name&dir=asc' : null
+    open ? '/api/admin/professionals?pageSize=200&sort=name&dir=asc' : null,
+    'load the professionals'
   );
   const [target, setTarget] = useState('');
   const [busy, setBusy] = useState(false);
@@ -208,13 +210,17 @@ function ReassignModal({
   const submit = async () => {
     setBusy(true);
     try {
-      const res = await adminFetch<{ therapist: { name: string } }>(`/api/admin/clients/${clientId}`, { method: 'PATCH', json: { therapistId: target } });
-      toast(`Client reassigned to ${res.therapist.name}`);
+      const res = await adminFetch<{ therapist: { name: string } }>(`/api/admin/clients/${clientId}`, {
+        method: 'PATCH',
+        json: { therapistId: target },
+        action: 'reassign this client',
+      });
+      toast(`Client reassigned to ${res.therapist.name}.`);
       setTarget('');
       onDone();
       onClose();
-    } catch (e: any) {
-      toast(e.message || 'Could not reassign the client.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'reassign this client'), 'error');
     } finally {
       setBusy(false);
     }

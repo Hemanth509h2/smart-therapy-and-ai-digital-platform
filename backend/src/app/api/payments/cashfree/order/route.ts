@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 
     if (!cashfreeConfigured()) {
       return NextResponse.json(
-        { error: 'Cashfree is not configured. Set CASHFREE_APP_ID and CASHFREE_SECRET_KEY.' },
+        { error: 'Payments are not available right now. An admin needs to finish setting up payments.' },
         { status: 503 }
       );
     }
@@ -24,11 +24,11 @@ export async function POST(request: Request) {
 
     const orderAmount = Number(amount);
     if (!Number.isFinite(orderAmount) || orderAmount < 1) {
-      return NextResponse.json({ error: 'Amount must be at least ₹1' }, { status: 400 });
+      return NextResponse.json({ error: 'Enter an amount of at least ₹1.' }, { status: 400 });
     }
     const phone = String(customerPhone || '').replace(/\D/g, '').slice(-10);
     if (phone.length !== 10) {
-      return NextResponse.json({ error: 'A 10-digit phone number is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Enter a 10-digit phone number.' }, { status: 400 });
     }
 
     const order = await createCashfreeOrder({
@@ -46,7 +46,13 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('Cashfree create order error:', error.details || error);
     return NextResponse.json(
-      { error: error.message, details: error.details },
+      {
+        error:
+          error.status && error.status < 500
+            ? 'The payment provider rejected this payment. Check the amount and phone number and try again.'
+            : "We couldn't start the payment. Please try again in a few minutes.",
+        details: error.details,
+      },
       { status: error.status && error.status < 500 ? 400 : 500 }
     );
   }

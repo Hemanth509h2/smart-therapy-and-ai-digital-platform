@@ -6,6 +6,7 @@ import { dateRange, listParams } from '@/lib/admin/adminList';
 import { moduleName } from '@/lib/modules/modules';
 import { resolveCurrent } from '@/lib/billing/subscriptions';
 import { therapistsById, usersById } from '@/lib/core/links';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
   try {
     const { sp, from, to } = listParams(request, { sortable: [], defaultSort: '' });
     const type = sp.get('type') as ReportType;
-    if (!TYPES.includes(type)) return NextResponse.json({ error: `type must be one of ${TYPES.join(', ')}` }, { status: 400 });
+    if (!TYPES.includes(type)) return NextResponse.json({ error: "That report type doesn't exist. Choose one from the list." }, { status: 400 });
 
     const auth = await requireAdmin(request, type === 'audit' ? 'audit.read' : 'people.read');
     if (!auth.ok) return auth.response;
@@ -152,8 +153,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(await monthly(sp.get('month'), billing));
   } catch (error: any) {
-    console.error('Admin reports error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin reports error', "We couldn't generate this report. Please try again.");
   }
 }
 

@@ -4,7 +4,7 @@ import { therapistIdForUser } from '@/lib/core/links';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { requireTherapist } from '@/lib/http/progressAuth';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
-import { errorResponse } from '@/lib/http/apiError';
+import { errorResponse, notYourProfile } from '@/lib/http/apiError';
 
 // Session notes belong to the session's therapist; admins may read them too.
 async function mayAccessSession(uid: string, sessionId: string) {
@@ -37,12 +37,12 @@ export async function GET(request: Request) {
     }
 
     if (!sessionId) {
-      return NextResponse.json({ error: 'sessionId or clientId is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Choose a session or client to see its notes.' }, { status: 400 });
     }
     const auth = await requireAuth(request);
     if (!auth.ok) return auth.response;
     if (!(await mayAccessSession(auth.uid, sessionId))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return notYourProfile("this session's notes");
     }
 
     const notes = await prisma.therapistNote.findMany({
@@ -67,10 +67,10 @@ export async function POST(request: Request) {
       ? await prisma.session.findUnique({ where: { id: sessionId }, select: { therapistId: true } })
       : null;
     if (!session || session.therapistId !== therapistId || session.therapistId !== (await therapistIdForUser(auth.uid))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return notYourProfile('this session');
     }
     if (typeof therapistId === 'string') {
-      const noPlan = await requireActivePlan({ therapistId });
+      const noPlan = await requireActivePlan({ therapistId }, 'save session notes');
       if (noPlan) return noPlan;
     }
 

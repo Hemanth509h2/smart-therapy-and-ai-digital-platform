@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from 'react'
 import { apiFetch } from '@/lib/api'
+import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError'
 import { useAuthStore } from '@/store/useAuthStore'
 import { openCashfreeCheckout } from '@/lib/cashfree'
 
@@ -36,8 +37,8 @@ export default function PaymentTestPage() {
   const verify = async (orderId: string) => {
     addLog(`Verifying order ${orderId} with Cashfree…`)
     const res = await apiFetch(`/api/payments/cashfree/order/${encodeURIComponent(orderId)}`)
+    if (!res.ok) throw new Error(await apiErrorMessage(res, 'check the order status'))
     const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Failed to fetch order status')
     setStatus(data)
     addLog(`Order status: ${data.orderStatus}`)
   }
@@ -45,7 +46,7 @@ export default function PaymentTestPage() {
   // Coming back from a redirect-based payment method (?order_id=...).
   useEffect(() => {
     const orderId = new URLSearchParams(window.location.search).get('order_id')
-    if (orderId) verify(orderId).catch((e) => setError(e.message))
+    if (orderId) verify(orderId).catch((e) => setError(caughtErrorMessage(e, 'check the order status')))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -66,8 +67,8 @@ export default function PaymentTestPage() {
           returnUrl: `${window.location.origin}/payment-test`,
         }),
       })
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'create the order'))
       const order = await res.json()
-      if (!res.ok) throw new Error(order.error || 'Failed to create order')
       addLog(`Order ${order.orderId} created (${order.environment})`)
 
       addLog('Opening Cashfree checkout…')
@@ -78,9 +79,10 @@ export default function PaymentTestPage() {
       else if (result.paymentMessage) addLog(`Checkout: ${result.paymentMessage}`)
 
       if (!result.redirected) await verify(order.orderId)
-    } catch (e: any) {
-      setError(e.message)
-      addLog(`Error: ${e.message}`)
+    } catch (e) {
+      const msg = caughtErrorMessage(e, 'complete the payment')
+      setError(msg)
+      addLog(`Error: ${msg}`)
     } finally {
       setBusy(false)
     }
@@ -138,7 +140,7 @@ export default function PaymentTestPage() {
                 <div className="text-gray-500">{p.message}</div>
               </div>
             ))}
-            <button onClick={() => verify(status.orderId).catch((e) => setError(e.message))}
+            <button onClick={() => verify(status.orderId).catch((e) => setError(caughtErrorMessage(e, 'check the order status')))}
               className="text-xs underline">Refresh status</button>
           </div>
         )}

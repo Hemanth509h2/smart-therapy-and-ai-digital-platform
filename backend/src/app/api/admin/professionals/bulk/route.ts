@@ -3,6 +3,7 @@ import { appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { ALL_MODULE_IDS } from '@/lib/modules/modules';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,16 +26,16 @@ export async function POST(request: Request) {
     const moduleIds: string[] = Array.isArray(body?.moduleIds) ? Array.from(new Set(body.moduleIds)) : [];
 
     if (!['grantModules', 'revokeModules', 'allowAllModules'].includes(action)) {
-      return NextResponse.json({ error: "action must be 'grantModules', 'revokeModules' or 'allowAllModules'" }, { status: 400 });
+      return NextResponse.json({ error: "We couldn't tell which bulk action to run. Refresh the page and try again." }, { status: 400 });
     }
-    if (!therapistIds.length) return NextResponse.json({ error: 'therapistIds is required' }, { status: 400 });
+    if (!therapistIds.length) return NextResponse.json({ error: 'Select at least one professional.' }, { status: 400 });
     if (therapistIds.length > MAX_IDS) {
-      return NextResponse.json({ error: `At most ${MAX_IDS} professionals per bulk action` }, { status: 400 });
+      return NextResponse.json({ error: `You can update at most ${MAX_IDS} professionals at a time. Select fewer and try again.` }, { status: 400 });
     }
     if (action !== 'allowAllModules') {
-      if (!moduleIds.length) return NextResponse.json({ error: 'moduleIds is required' }, { status: 400 });
+      if (!moduleIds.length) return NextResponse.json({ error: 'Select at least one tool.' }, { status: 400 });
       const unknown = moduleIds.filter((m) => !ALL_MODULE_IDS.includes(m));
-      if (unknown.length) return NextResponse.json({ error: `Unknown module ids: ${unknown.join(', ')}` }, { status: 400 });
+      if (unknown.length) return NextResponse.json({ error: `Some of the selected tools no longer exist (${unknown.join(', ')}). Refresh the page and try again.` }, { status: 400 });
     }
 
     const therapists = await appDb.profileTherapist.findMany({
@@ -79,7 +80,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ updated: toUpdate.length, unchanged: changes.length - toUpdate.length, missing });
   } catch (error: any) {
-    console.error('Admin professionals bulk error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin professionals bulk error', "We couldn't update the selected professionals. Please try again.");
   }
 }

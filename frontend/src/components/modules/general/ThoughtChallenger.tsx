@@ -7,6 +7,7 @@ import { Plus, Search, Shield, Scale, ArrowDown, Lightbulb, Pencil, Check, Arrow
 import { db } from '@/lib/firebase'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { apiFetch } from '@/lib/api';
+import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui'
 
 interface ThoughtChallengerProps {
@@ -246,10 +247,10 @@ export default function ThoughtChallenger({ sessionId, role, isLocked }: Thought
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, type: 'thought-challenger', thought, reframe }),
       })
-      if (!res.ok) throw new Error(`Save failed (${res.status})`)
-      toast('Saved to session notes', 'success')
-    } catch {
-      toast('Could not save notes. Try again.', 'error')
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'save the thought to the session notes'))
+      toast('The thought and reframe were saved to the session notes.', 'success')
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'save the thought to the session notes'), 'error')
     }
   }, [isT, sessionId, thought, reframe])
 

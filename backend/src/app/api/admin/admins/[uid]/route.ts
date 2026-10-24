@@ -5,6 +5,7 @@ import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin, requireRecentLogin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { adminAuth } from '@/lib/core/firebaseAdmin';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,14 +41,14 @@ export async function PATCH(request: Request, { params }: { params: { uid: strin
 
     const { adminRole } = await request.json().catch(() => ({}));
     if (!ADMIN_ROLES.includes(adminRole)) {
-      return NextResponse.json({ error: 'Invalid adminRole' }, { status: 400 });
+      return NextResponse.json({ error: 'Choose a valid admin role.' }, { status: 400 });
     }
     if (params.uid === auth.uid) {
       return NextResponse.json({ error: "You can't change your own role." }, { status: 400 });
     }
 
     const target = await loadAdmin(params.uid);
-    if (!target) return NextResponse.json({ error: 'Admin not found' }, { status: 404 });
+    if (!target) return NextResponse.json({ error: "We couldn't find this admin. Their access may already have been removed." }, { status: 404 });
     if (target.adminRole === adminRole) {
       return NextResponse.json({ success: true, admin: { userId: target.id, adminRole } });
     }
@@ -68,8 +69,7 @@ export async function PATCH(request: Request, { params }: { params: { uid: strin
 
     return NextResponse.json({ success: true, admin: { userId: target.id, adminRole } });
   } catch (error: any) {
-    console.error('Admin PATCH error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin PATCH error', "We couldn't update this admin. Please try again.");
   }
 }
 
@@ -88,7 +88,7 @@ export async function DELETE(request: Request, { params }: { params: { uid: stri
     }
 
     const target = await loadAdmin(params.uid);
-    if (!target) return NextResponse.json({ error: 'Admin not found' }, { status: 404 });
+    if (!target) return NextResponse.json({ error: "We couldn't find this admin. Their access may already have been removed." }, { status: 404 });
     if (target.adminRole === 'SUPER_ADMIN' && (await countSuperAdmins()) <= 1) {
       return NextResponse.json({ error: "You can't remove the last super admin." }, { status: 409 });
     }
@@ -108,8 +108,7 @@ export async function DELETE(request: Request, { params }: { params: { uid: stri
 
     return NextResponse.json({ success: true, userId: target.id, role: newRole });
   } catch (error: any) {
-    console.error('Admin DELETE error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin DELETE error', "We couldn't remove this admin. Please try again.");
   }
 }
 

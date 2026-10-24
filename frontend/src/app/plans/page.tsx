@@ -12,6 +12,7 @@ import { useErrorToast } from '@/components/practice/useErrorToast';
 import { ALL_MODULE_IDS, MODULE_CATEGORIES, resolveAllowedModuleIds } from '@/lib/modules';
 import { fmtDate } from '@/lib/practice';
 import { apiFetch, apiFetchCached, clearApiCache } from '@/lib/api';
+import { apiErrorMessage, caughtErrorMessage, toastApiError } from '@/lib/apiError';
 import { openCashfreeCheckout } from '@/lib/cashfree';
 
 interface Plan {
@@ -128,9 +129,11 @@ export default function PlansPage() {
         setPending(d.pendingRequest);
         setApprovalRequired(!!d.approvalRequired);
       }
-      setLoadError(pRes.ok && sRes.ok ? '' : 'Some plan details could not be loaded.');
-    } catch {
-      setLoadError('Could not reach the server. Please try again.');
+      setLoadError(
+        !pRes.ok ? await apiErrorMessage(pRes, 'load the plans') : !sRes.ok ? await apiErrorMessage(sRes, 'load your current plan') : ''
+      );
+    } catch (e) {
+      setLoadError(caughtErrorMessage(e, 'load the plans'));
     }
     setLoading(false);
   }, [profile?.id]);
@@ -157,8 +160,8 @@ export default function PlansPage() {
   const confirmPayment = useCallback(
     async (orderId: string) => {
       const res = await apiFetch(`/api/payments/cashfree/order/${encodeURIComponent(orderId)}`);
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'check the payment status'));
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not check the payment status.');
       if (data.orderStatus === 'PAID') {
         toast(
           data.planActivated
@@ -184,7 +187,7 @@ export default function PlansPage() {
     window.history.replaceState(null, '', window.location.pathname);
     confirmPayment(orderId)
       .then((paid) => !paid && toast('Payment was not completed. You have not been charged.', 'warning'))
-      .catch((e) => toast(e.message, 'error'));
+      .catch((e) => toast(caughtErrorMessage(e, 'check the payment status'), 'error'));
   }, [role, confirmPayment]);
 
   const openRequest = (p: Plan) => {
@@ -205,15 +208,16 @@ export default function PlansPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: couponInput, planId: reqPlan.id, months: term }),
       });
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setCoupon(null);
-        toast(data.error || 'Could not apply that coupon.', 'error');
+        await toastApiError(res, 'apply that coupon');
       } else {
+        const data = await res.json().catch(() => ({}));
         setCoupon({ code: data.code, description: data.description, months: term, discount: data.discount, total: data.total });
+        if (term === months) toast(`Coupon ${data.code} applied.`); // not when re-pricing for a new term
       }
-    } catch {
-      toast('Network error. Please try again.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'apply that coupon'), 'error');
     } finally {
       setCouponBusy(false);
     }
@@ -254,18 +258,17 @@ export default function PlansPage() {
           couponCode: couponApplies ? coupon!.code : undefined,
         }),
       });
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         // e.g. the coupon expired or ran out since it was applied
         if (coupon) setCoupon(null);
-        toast(data.error || 'Could not submit the request.', 'error');
+        await toastApiError(res, 'request this plan');
       } else {
         toast(`Request for ${reqPlan.name} sent — an admin will review it.`);
         setReqPlan(null);
         load();
       }
-    } catch {
-      toast('Network error. Please try again.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'request this plan'), 'error');
     }
     setSubmitting(false);
   };
@@ -294,13 +297,13 @@ export default function PlansPage() {
           couponCode: coupon?.code,
         }),
       });
-      const order = await res.json().catch(() => ({}));
       if (!res.ok) {
         // e.g. the coupon expired or ran out since it was applied
         if (coupon) setCoupon(null);
-        toast(order.error || 'Could not start the payment.', 'error');
+        await toastApiError(res, 'start the payment');
         return;
       }
+      const order = await res.json().catch(() => ({}));
       if (order.activated) {
         // ₹0 total: started without Cashfree.
         toast(`${reqPlan.name} is active.`);
@@ -316,8 +319,8 @@ export default function PlansPage() {
       const paid = await confirmPayment(order.orderId);
       if (paid) setReqPlan(null);
       else toast(result.closedMessage ? 'Payment was cancelled. You have not been charged.' : 'Payment was not completed. Please try again.', 'warning');
-    } catch (e: any) {
-      toast(e?.message || 'Network error. Please try again.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'complete the payment'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -337,12 +340,12 @@ export default function PlansPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId: pending.id, customerPhone: phone, returnUrl: `${window.location.origin}/plans` }),
       });
-      const order = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast(order.error || 'Could not start the payment.', 'error');
+        await toastApiError(res, 'start the payment');
         if (res.status === 409) load();
         return;
       }
+      const order = await res.json().catch(() => ({}));
       if (order.activated) {
         toast(`${pending.planName} is active.`);
         setPayOpen(false);
@@ -355,8 +358,8 @@ export default function PlansPage() {
       const paid = await confirmPayment(order.orderId);
       if (paid) setPayOpen(false);
       else toast(result.closedMessage ? 'Payment was cancelled. You have not been charged.' : 'Payment was not completed. Please try again.', 'warning');
-    } catch (e: any) {
-      toast(e?.message || 'Network error. Please try again.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'complete the payment'), 'error');
     } finally {
       setPayBusy(false);
     }
@@ -367,13 +370,12 @@ export default function PlansPage() {
     setWithdrawing(true);
     try {
       const res = await apiFetch(`/api/subscriptions/request/${pending.id}`, { method: 'DELETE' });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) toast(data.error || 'Could not withdraw the request.', 'error');
-      else toast('Request withdrawn.');
+      if (!res.ok) await toastApiError(res, 'withdraw the request');
+      else toast('Your plan request was withdrawn.');
       setPayOpen(false);
       load();
-    } catch {
-      toast('Network error. Please try again.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'withdraw the request'), 'error');
     } finally {
       setWithdrawing(false);
     }
@@ -388,11 +390,11 @@ export default function PlansPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ undo }),
       });
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast(data.error || 'Could not update your plan.', 'error');
+        await toastApiError(res, undo ? 'undo the cancellation' : 'cancel your plan');
         return;
       }
+      const data = await res.json().catch(() => ({}));
       setCurrent(data.current);
       setCancelOpen(false);
       toast(
@@ -400,8 +402,8 @@ export default function PlansPage() {
           ? 'Cancellation undone — your plan continues.'
           : `Plan cancelled. You keep access until ${fmtDate(data.current.currentPeriodEnd)}.`
       );
-    } catch {
-      toast('Network error. Please try again.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, undo ? 'undo the cancellation' : 'cancel your plan'), 'error');
     } finally {
       setCancelBusy(false);
     }

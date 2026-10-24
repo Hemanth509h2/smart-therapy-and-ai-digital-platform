@@ -4,6 +4,7 @@ import { appDb, prisma } from '@/lib/core/db';
 import { appUrl } from '@/lib/core/app-url';
 import { getSetting } from '@/lib/core/settings';
 import { sendSessionScheduledMessage, sendWhatsAppInvite } from '@/lib/messaging/whatsapp-bot';
+import { WhatsAppNotConfiguredError, whatsAppPublicReason } from '@/lib/messaging/whatsapp-cloud-api';
 
 // WhatsApp rules for sessions:
 //   - booking a session      -> date/time confirmation, NO link
@@ -85,6 +86,17 @@ async function therapistName(therapistId: string | null | undefined) {
   return fullName(await appDb.profileTherapist.findUnique({ where: { id: therapistId }, select: { firstName: true, lastName: true } }));
 }
 
+/** What happened to a WhatsApp message, returned to the therapist's UI so it
+ *  can say whether the patient was messaged. SENT means WhatsApp accepted the
+ *  message; delivery receipts aren't tracked. */
+export type WhatsAppOutcome =
+  | { status: 'SENT'; to: string }
+  | { status: 'FAILED'; to: string; reason: string }
+  | { status: 'SKIPPED'; reason: string } // turned off by an admin
+  | { status: 'NOT_CONFIGURED'; reason: string } // no WhatsApp credentials on the server
+  | { status: 'NO_PHONE' }
+  | { status: 'ALREADY_SENT'; to: string };
+
 // Records the attempt in whatsAppMessage, sends, and marks SENT/FAILED.
 // Best-effort: never throws, so a WhatsApp failure can't break the caller.
 async function deliver(
@@ -94,7 +106,7 @@ async function deliver(
   messageType: MessageType,
   generatedLink: string,
   send: () => Promise<{ id?: string }>
-) {
+): Promise<WhatsAppOutcome> {
   const now = new Date();
   try {
     // Admin kill switch: record the message as SKIPPED instead of sending.
@@ -104,7 +116,7 @@ async function deliver(
         create: { id: randomUUID(), sessionId, clientId, phoneNumber, generatedLink, messageType, status: 'SKIPPED', errorMessage: WHATSAPP_OFF, updatedAt: now },
         update: { phoneNumber, generatedLink, status: 'SKIPPED', errorMessage: WHATSAPP_OFF, updatedAt: now },
       });
-      return;
+      return { status: 'SKIPPED', reason: WHATSAPP_OFF };
     }
     const delivery = await prisma.whatsAppMessage.upsert({
       where: { sessionId_messageType: { sessionId, messageType } },
@@ -142,6 +154,7 @@ async function deliver(
         updatedAt: new Date(),
       },
     });
+    return { status: 'SENT', to: phoneNumber };
   } catch (error: any) {
     console.error(`${messageType} WhatsApp notification failed:`, error);
     await prisma.whatsAppMessage
@@ -150,20 +163,23 @@ async function deliver(
         data: { status: 'FAILED', errorMessage: error?.message || 'WhatsApp send failed', updatedAt: new Date() },
       })
       .catch(() => {});
+    // The row keeps the technical message for admins; the UI gets a plain reason.
+    if (error instanceof WhatsAppNotConfiguredError) return { status: 'NOT_CONFIGURED', reason: error.publicReason };
+    return { status: 'FAILED', to: phoneNumber, reason: whatsAppPublicReason(error) };
   }
 }
 
 /** Booking confirmation: date and time only, no link. */
-export async function sendSessionBookedWhatsApp(sessionId: string) {
+export async function sendSessionBookedWhatsApp(sessionId: string): Promise<WhatsAppOutcome> {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
     include: { client: true },
   });
   const phone = session?.client.phoneNumber;
-  if (!session || !phone) return;
+  if (!session || !phone) return { status: 'NO_PHONE' };
   const therapist = await therapistName(session.therapistId);
 
-  await deliver(session.id, session.clientId, phone, 'SESSION_SCHEDULED', '', () =>
+  return deliver(session.id, session.clientId, phone, 'SESSION_SCHEDULED', '', () =>
     sendSessionScheduledMessage({
       to: phone,
       patientName: session.client.firstName,
@@ -174,26 +190,26 @@ export async function sendSessionBookedWhatsApp(sessionId: string) {
 }
 
 /** Patient join link, sent once per session (skipped if already sent). */
-export async function sendSessionLinkWhatsApp(sessionId: string, request: Request) {
+export async function sendSessionLinkWhatsApp(sessionId: string, request: Request): Promise<WhatsAppOutcome> {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
     include: { client: true },
   });
   const phone = session?.client.phoneNumber;
-  if (!session || !phone) return;
+  if (!session || !phone) return { status: 'NO_PHONE' };
 
   const alreadySent = await prisma.whatsAppMessage.findFirst({
     where: { sessionId, messageType: 'SESSION_STARTED', status: 'SENT' },
-    select: { id: true },
+    select: { id: true, phoneNumber: true },
   });
-  if (alreadySent) return;
+  if (alreadySent) return { status: 'ALREADY_SENT', to: alreadySent.phoneNumber };
 
   const invite = await getOrCreateGuestInvite(session);
   const link = `${appUrl(request)}/join/${invite.token}`;
 
   const therapist = await therapistName(session.therapistId);
 
-  await deliver(session.id, session.clientId, phone, 'SESSION_STARTED', link, async () => {
+  return deliver(session.id, session.clientId, phone, 'SESSION_STARTED', link, async () => {
     // Webhook first; only if it fails do we send via the WhatsApp Cloud API.
     if (process.env.WHATSAPP_LINK_WEBHOOK_URL) {
       try {

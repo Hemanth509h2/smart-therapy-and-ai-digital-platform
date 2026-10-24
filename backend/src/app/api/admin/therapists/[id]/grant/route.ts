@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { ALL_MODULE_IDS } from '@/lib/modules/modules';
 import { addMonths } from '@/lib/billing/subscriptions';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,14 +24,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
       where: { id: params.id },
       select: { id: true, allModulesAllowed: true, moduleAccess: true },
     });
-    if (!therapist) return NextResponse.json({ error: 'Therapist not found' }, { status: 404 });
+    if (!therapist) return NextResponse.json({ error: "We couldn't find this professional. Their account may have been removed." }, { status: 404 });
 
     const plan = planId ? await appDb.plan.findUnique({ where: { id: String(planId) } }) : null;
-    if (!plan) return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
+    if (!plan) return NextResponse.json({ error: "We couldn't find this plan. It may have been deleted." }, { status: 404 });
 
     const months_ = Number(months);
     if (!Number.isInteger(months_) || months_ < 1 || months_ > 36) {
-      return NextResponse.json({ error: 'months must be a whole number from 1 to 36.' }, { status: 400 });
+      return NextResponse.json({ error: 'Enter a number of months from 1 to 36.' }, { status: 400 });
     }
 
     const unlimited = plan.toolQuota == null;
@@ -42,7 +43,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         return NextResponse.json({ error: 'Select at least one tool to grant.' }, { status: 400 });
       }
       if (cleaned.length > plan.toolQuota!) {
-        return NextResponse.json({ error: `This plan allows up to ${plan.toolQuota} tools.` }, { status: 400 });
+        return NextResponse.json({ error: `This plan includes up to ${plan.toolQuota} tools. Select fewer tools.` }, { status: 400 });
       }
     }
 
@@ -83,7 +84,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     return NextResponse.json({ success: true, subscription });
   } catch (error: any) {
-    console.error('Admin grant plan error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin grant plan error', "We couldn't grant this plan. Please try again.");
   }
 }

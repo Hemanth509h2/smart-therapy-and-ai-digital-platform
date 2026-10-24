@@ -26,7 +26,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const { action, months } = await request.json();
 
     const sub = await appDb.subscription.findUnique({ where: { id: params.id }, include: { plan: true } });
-    if (!sub) return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });
+    if (!sub) return NextResponse.json({ error: "We couldn't find this plan term. It may have been deleted." }, { status: 404 });
     const target = { type: 'Subscription', id: sub.id };
 
     if (action === 'cancel') {
@@ -88,7 +88,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ subscription: updated });
     }
 
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    return NextResponse.json({ error: "We couldn't tell what to do. Refresh the page and try again." }, { status: 400 });
   } catch (error: any) {
     return errorResponse(error, 'Subscription PATCH error');
   }

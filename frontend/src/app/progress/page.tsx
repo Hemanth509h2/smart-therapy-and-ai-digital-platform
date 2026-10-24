@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { apiFetch } from '@/lib/api';
+import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
 import { useErrorToast } from '@/components/practice/useErrorToast';
 
 interface SessionData {
@@ -39,10 +40,10 @@ export default function ProgressPage() {
     try {
       const res = await apiFetch(`/api/sessions?clientId=${profile.id}`);
       if (res.ok) { const d = await res.json(); setSessions(d.sessions || []); setLoadError(''); }
-      else setLoadError('Could not load your sessions.');
+      else setLoadError(await apiErrorMessage(res, 'load your sessions'));
     } catch (err) {
       console.error(err);
-      setLoadError('Could not reach the server. Please try again.');
+      setLoadError(caughtErrorMessage(err, 'load your sessions'));
     }
     setLoading(false);
   };

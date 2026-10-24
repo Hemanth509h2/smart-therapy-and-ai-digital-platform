@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Btn, Field, Input, Modal } from '@/components/admin/kit';
 import { adminFetch } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 
 export interface RemoveTarget {
@@ -42,13 +43,14 @@ export function RemoveProfessionalDialog({
       const r = await adminFetch<{ sessions: number; clients: number; warnings: string[] }>(`/api/admin/users/${target.userId}`, {
         method: 'DELETE',
         json: { confirmEmail: typed.trim() },
+        action: 'remove this professional',
       });
-      toast(`${who} removed${r.sessions ? ` (${r.sessions} session${r.sessions === 1 ? '' : 's'} deleted)` : ''}`);
-      if (r.warnings?.length) toast(`Some session transcripts couldn't be deleted (${r.warnings.length}). See the audit log.`, 'error');
+      toast(`${who} was removed${r.sessions ? ` (${r.sessions} session${r.sessions === 1 ? '' : 's'} deleted)` : ''}.`);
+      if (r.warnings?.length) toast(`Some session transcripts couldn't be deleted (${r.warnings.length}). See the audit log.`, 'warning');
       onClose();
       onRemoved();
-    } catch (e: any) {
-      toast(e.message || 'Could not remove the professional.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'remove this professional'), 'error');
     } finally {
       setBusy(false);
     }

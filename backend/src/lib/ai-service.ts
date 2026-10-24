@@ -42,7 +42,7 @@ function serviceUrl(sessionId: string): string {
   return url.toString()
 }
 
-const unavailable = () => new PublicError('The AI service is not reachable. Try again in a minute.', 503)
+const unavailable = () => new PublicError("The AI service can't be reached right now. Please try again in a minute.", 503)
 
 export function callAIService<K extends keyof Replies>(
   type: K,
@@ -60,7 +60,7 @@ export function callAIService<K extends keyof Replies>(
       if (result instanceof Error) reject(result)
       else resolve(result)
     }
-    const timer = setTimeout(() => finish(new PublicError('The AI took too long to answer. Try again.', 504)), TIMEOUT_MS)
+    const timer = setTimeout(() => finish(new PublicError('The AI took too long to answer. Please try again.', 504)), TIMEOUT_MS)
 
     ws.onopen = () => ws.send(JSON.stringify({ ...payload, type }))
     ws.onmessage = (event) => {
@@ -77,7 +77,7 @@ export function callAIService<K extends keyof Replies>(
         reply?.code === 'model'
           ? new PublicError(String(reply.error), 502)
           : reply?.code === 'not_configured'
-            ? new PublicError('AI is not set up on the server.', 503)
+            ? new PublicError("AI isn't set up on the server yet. Ask an admin to finish the AI setup.", 503)
             : unavailable()
       )
     }

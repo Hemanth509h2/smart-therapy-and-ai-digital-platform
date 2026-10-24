@@ -6,6 +6,7 @@ import { db } from '@/lib/firebase'
 import { useSessionRoom } from '@/components/StaadVideo'
 import type { TranscriptChunk } from '@/lib/rag/types'
 import { apiFetch } from '@/lib/api';
+import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
 import {
   STT_SAMPLE_RATE,
   STT_STREAM_PARAMS,
@@ -172,14 +173,14 @@ export function useSessionTranscription({
         const res = await apiFetch(`/api/stt-token?sessionId=${sessionId}`, {
           headers: { Authorization: `Bearer ${idToken}` },
         })
+        if (!res.ok) throw new Error(await apiErrorMessage(res, 'start live transcription'))
         const data = await res.json()
-        if (!res.ok) throw new Error(data.error || 'Failed to get STT token')
         token = data.token
       } catch (err) {
         if (process.env.NODE_ENV === 'production') {
           console.error('[Transcription] Failed to get token:', err)
           pendingRef.current.delete(key)
-          setState((s) => ({ ...s, error: 'Transcription auth error' }))
+          setState((s) => ({ ...s, error: caughtErrorMessage(err, 'start live transcription') }))
           return
         }
         console.warn('[Transcription] No STT token (dev): continuing without one')

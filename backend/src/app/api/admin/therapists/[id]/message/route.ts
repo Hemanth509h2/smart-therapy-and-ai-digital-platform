@@ -4,6 +4,7 @@ import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { can } from '@/lib/admin/adminRoles';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,28 +18,28 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const auth = await requireAdmin(request);
     if (!auth.ok) return auth.response;
     if (!can(auth.adminRole, 'support') && !can(auth.adminRole, 'people.write')) {
-      return NextResponse.json({ error: 'Your admin role does not allow this.', code: 'ADMIN_FORBIDDEN' }, { status: 403 });
+      return NextResponse.json({ error: "Your admin role doesn't allow this. Ask a super admin if you need access.", code: 'ADMIN_FORBIDDEN' }, { status: 403 });
     }
 
     const { subject, body } = await request.json();
     const subj = String(subject || '').trim().slice(0, 200);
     const text = String(body || '').trim().slice(0, 10000);
-    if (!subj || !text) return NextResponse.json({ error: 'subject and body are required' }, { status: 400 });
+    if (!subj || !text) return NextResponse.json({ error: 'Enter a subject and a message.' }, { status: 400 });
 
     const therapist = await appDb.profileTherapist.findUnique({
       where: { id: params.id },
       select: { id: true, firstName: true, userId: true },
     });
-    if (!therapist) return NextResponse.json({ error: 'Therapist not found' }, { status: 404 });
+    if (!therapist) return NextResponse.json({ error: "We couldn't find this professional. Their account may have been removed." }, { status: 404 });
     const to = (await prisma.user.findUnique({ where: { id: therapist.userId }, select: { email: true } }))?.email;
-    if (!to) return NextResponse.json({ error: 'This therapist has no email address.' }, { status: 400 });
+    if (!to) return NextResponse.json({ error: "This professional has no email address, so we can't email them." }, { status: 400 });
 
     const host = process.env.SMTP_HOST || 'smtp.gmail.com';
     const port = Number(process.env.SMTP_PORT || 587);
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
     if (!user || !pass) {
-      return NextResponse.json({ error: 'Email is not configured on the server.' }, { status: 503 });
+      return NextResponse.json({ error: "Email isn't set up on the server yet, so nothing was sent. Ask whoever manages hosting to set it up." }, { status: 503 });
     }
 
     const transporter = nodemailer.createTransport({
@@ -61,7 +62,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {
-    console.error('Admin therapist message error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin therapist message error', "We couldn't send the message to this professional. Please try again.");
   }
 }

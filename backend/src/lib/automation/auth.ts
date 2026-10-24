@@ -22,7 +22,7 @@ function hasValidKey(request: Request): boolean {
  */
 export function rejectUnlessAutomation(request: Request): NextResponse | null {
   if (hasValidKey(request)) return null
-  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  return NextResponse.json({ error: 'This endpoint needs a valid automation API key in the x-api-key header.' }, { status: 401 })
 }
 
 /** For /api/whatsapp/send: the automation key, or a logged-in therapist. */

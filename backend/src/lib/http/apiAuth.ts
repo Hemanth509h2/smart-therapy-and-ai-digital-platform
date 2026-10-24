@@ -56,7 +56,7 @@ async function accountBlock(uid: string) {
   }
   if (entry.status === 'SUSPENDED') {
     return NextResponse.json(
-      { error: 'This account has been suspended. Contact support.', code: 'ACCOUNT_SUSPENDED' },
+      { error: 'This account has been suspended. Contact support to restore access.', code: 'ACCOUNT_SUSPENDED' },
       { status: 403 }
     );
   }
@@ -96,7 +96,7 @@ async function verifyIdentity(request: Request) {
     return {
       ok: false as const,
       response: NextResponse.json(
-        { error: 'Missing Authorization: Bearer <idToken> header' },
+        { error: 'Please sign in to continue.', code: 'AUTH_REQUIRED' },
         { status: 401 }
       ),
     };
@@ -138,7 +138,7 @@ async function verifyIdentity(request: Request) {
     return {
       ok: false as const,
       response: NextResponse.json(
-        { error: 'Invalid or expired authentication token' },
+        { error: 'Your sign-in has expired. Please sign in again.', code: 'AUTH_EXPIRED' },
         { status: 401 }
       ),
     };
@@ -158,7 +158,7 @@ export async function requireAdmin(request: Request, permission?: AdminPermissio
   if (rateLimited(auth.uid)) {
     return {
       ok: false as const,
-      response: NextResponse.json({ error: 'Too many requests. Slow down.' }, { status: 429 }),
+      response: NextResponse.json({ error: 'Too many requests in a short time. Wait a moment and try again.' }, { status: 429 }),
     };
   }
 
@@ -168,7 +168,7 @@ export async function requireAdmin(request: Request, permission?: AdminPermissio
     return {
       ok: false as const,
       response: NextResponse.json(
-        { error: 'Admin access required' },
+        { error: 'Only admins can do this.' },
         { status: 403 }
       ),
     };
@@ -181,7 +181,7 @@ export async function requireAdmin(request: Request, permission?: AdminPermissio
     return {
       ok: false as const,
       response: NextResponse.json(
-        { error: 'Your admin role does not allow this.', code: 'ADMIN_FORBIDDEN' },
+        { error: "Your admin role doesn't allow this. Ask a super admin if you need access.", code: 'ADMIN_FORBIDDEN' },
         { status: 403 }
       ),
     };

@@ -18,7 +18,7 @@ function loadSdk(): Promise<void> {
     const s = document.createElement('script');
     s.src = SDK_URL;
     s.onload = () => resolve();
-    s.onerror = () => reject(new Error('Failed to load the Cashfree checkout'));
+    s.onerror = () => reject(new Error("We couldn't open the payment window. Check your internet connection and try again."));
     document.body.appendChild(s);
   });
 }

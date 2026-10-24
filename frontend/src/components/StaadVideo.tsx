@@ -4,6 +4,10 @@ import {
   RoomAudioRenderer,
 } from '@livekit/components-react'
 import { apiFetch } from '@/lib/api';
+import { apiErrorMessage, networkErrorMessage } from '@/lib/apiError';
+
+// The server refused the video token (the message says why).
+class TokenError extends Error {}
 import { toast } from '@/components/practice/ui';
 import '@livekit/components-styles'
 import { Room, RoomEvent, Track, VideoPresets, type LocalTrackPublication, type RoomOptions } from 'livekit-client'
@@ -138,7 +142,13 @@ export default function StaadVideo({
       // strand the client in the waiting room.
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('timeout')), 10_000))
-      Promise.race([apiFetch(`/api/livekit-token?${params.toString()}`).then(r => r.json()), timeout])
+      Promise.race([
+        apiFetch(`/api/livekit-token?${params.toString()}`).then(async r => {
+          if (!r.ok) throw new TokenError(await apiErrorMessage(r, 'join the video call'))
+          return r.json()
+        }),
+        timeout,
+      ])
         .then(d => {
           if (cancelled) return
           if (d.waiting) {
@@ -150,13 +160,13 @@ export default function StaadVideo({
             done = true
             setWaiting(false)
             setToken(d.token)
-          } else setError('Could not connect to the video call.')
+          } else setError("We couldn't join the video call. Please leave and rejoin the session.")
         })
-        .catch(() => {
+        .catch((e) => {
           if (cancelled) return
           // While waiting, a failed poll is just retried.
           if (isWaiting) schedule(3000)
-          else setError('Video connection failed. Check your connection and rejoin.')
+          else setError(e instanceof TokenError ? e.message : networkErrorMessage('join the video call'))
         })
         .finally(() => { polling = false })
     }

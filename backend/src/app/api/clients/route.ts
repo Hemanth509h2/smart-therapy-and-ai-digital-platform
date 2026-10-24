@@ -5,7 +5,7 @@ import { requireAuth } from '@/lib/http/apiAuth';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { requireTherapist } from '@/lib/http/progressAuth';
 import { normalizePhoneNumber } from '@/lib/core/phone';
-import { errorResponse } from '@/lib/http/apiError';
+import { errorResponse, notYourProfile } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,16 +19,23 @@ export async function POST(request: Request) {
 
     const { therapistId, firstName, lastName, diagnosis, phoneNumber, dateOfBirth, email, gender } = await request.json();
     if (!therapistId || !firstName) {
-      return NextResponse.json({ error: 'therapistId and firstName are required' }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: !firstName
+            ? "Enter the client's first name."
+            : "Your therapist profile hasn't loaded yet. Refresh the page and try again.",
+        },
+        { status: 400 }
+      );
     }
 
     const contactEmail = typeof email === 'string' && email.trim() ? email.trim().toLowerCase() : null;
     if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
-      return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 });
+      return NextResponse.json({ error: 'Enter a valid email address, like name@example.com.' }, { status: 400 });
     }
     const dob = dateOfBirth ? new Date(dateOfBirth) : null;
     if (dob && (Number.isNaN(dob.getTime()) || dob.getTime() > Date.now())) {
-      return NextResponse.json({ error: 'Enter a valid date of birth' }, { status: 400 });
+      return NextResponse.json({ error: 'Enter a valid date of birth. It cannot be in the future.' }, { status: 400 });
     }
 
     const therapist = await appDb.profileTherapist.findUnique({
@@ -36,9 +43,9 @@ export async function POST(request: Request) {
       select: { userId: true },
     });
     if (!therapist || therapist.userId !== auth.uid) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return notYourProfile('this therapist profile');
     }
-    const noPlan = await requireActivePlan({ therapistId });
+    const noPlan = await requireActivePlan({ therapistId }, 'add a client');
     if (noPlan) return noPlan;
 
     const client = await prisma.$transaction(async (tx) => {
@@ -86,7 +93,7 @@ export async function GET(request: Request) {
 
     const requested = new URL(request.url).searchParams.get('therapistId');
     if (requested && requested !== therapistId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return notYourProfile('these clients');
     }
 
     // One query for every session of this therapist; everything else is

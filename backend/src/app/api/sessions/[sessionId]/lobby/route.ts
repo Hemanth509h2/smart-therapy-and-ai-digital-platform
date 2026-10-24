@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { appDb, prisma } from '@/lib/core/db';
 import { therapistIdForUser } from '@/lib/core/links';
 import { requireAuth } from '@/lib/http/apiAuth';
-import { errorResponse } from '@/lib/http/apiError';
+import { errorResponse, notYourProfile } from '@/lib/http/apiError';
 import { provisionSessionDocs, revokeSessionUid } from '@/lib/sessions/session-provisioning';
 import { removeParticipantByUid } from '@/lib/sessions/livekit-room';
 import { getLobbyEntry, listLobby, setLobbyStatus, touchLobbyEntry } from '@/lib/sessions/lobby';
@@ -29,11 +29,11 @@ export async function POST(request: Request, { params }: Params) {
       where: { id: params.sessionId },
       select: { status: true, therapistId: true },
     });
-    if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    if (!session) return NextResponse.json({ error: 'This session no longer exists. It may have been deleted.' }, { status: 404 });
 
     // Only a uid that came through this session's invite link has an entry.
     const entry = await getLobbyEntry(params.sessionId, auth.uid);
-    if (!entry) return NextResponse.json({ error: 'Not invited to this session' }, { status: 403 });
+    if (!entry) return NextResponse.json({ error: "You haven't been invited to this session. Open the invite link your therapist sent you." }, { status: 403 });
 
     if (session.status === 'COMPLETED' || session.status === 'CANCELLED') {
       return NextResponse.json({ status: 'ended' });
@@ -72,10 +72,10 @@ export async function PATCH(request: Request, { params }: Params) {
 
     const { uid, action } = await request.json().catch(() => ({}));
     if (typeof uid !== 'string' || !['admit', 'deny', 'remove'].includes(action)) {
-      return NextResponse.json({ error: "Body must be { uid, action: 'admit' | 'deny' | 'remove' }" }, { status: 400 });
+      return NextResponse.json({ error: "We couldn't tell what to do with this person. Refresh the page and try again." }, { status: 400 });
     }
     const entry = await getLobbyEntry(params.sessionId, uid);
-    if (!entry) return NextResponse.json({ error: 'Not in the waiting room' }, { status: 404 });
+    if (!entry) return NextResponse.json({ error: 'That person is no longer in the waiting room.' }, { status: 404 });
 
     if (action === 'admit') {
       // Grant Firestore access first, so the guest's room page can read the
@@ -109,7 +109,7 @@ async function requireSessionTherapist(request: Request, sessionId: string) {
     therapistIdForUser(auth.uid),
   ]);
   if (!session || session.therapistId !== therapistId) {
-    return { ok: false as const, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+    return { ok: false as const, response: notYourProfile('this session') };
   }
   return auth;
 }

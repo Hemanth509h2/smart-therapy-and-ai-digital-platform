@@ -5,6 +5,7 @@ import { requireAdmin } from '@/lib/http/apiAuth';
 import { can } from '@/lib/admin/adminRoles';
 import { daysAgo, startOfDay, startOfMonth } from '@/lib/admin/adminList';
 import { resolveCurrent } from '@/lib/billing/subscriptions';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -106,8 +107,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(result);
   } catch (error: any) {
-    console.error('Admin dashboard error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin dashboard error', "We couldn't load the dashboard. Please try again.");
   }
 }
 

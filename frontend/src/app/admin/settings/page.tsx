@@ -5,6 +5,7 @@ import { Save } from 'lucide-react';
 import { AdminPage, Badge, Btn, Card, Checkbox, EmptyState, ErrorBanner, Field, Input, KV, Section, Spinner, useAdminQuery } from '@/components/admin/kit';
 import { toast } from '@/components/practice/ui';
 import { adminFetch, fmtDateTime } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 
 type Value = string | number | boolean;
 interface SettingRow {
@@ -81,7 +82,7 @@ const GROUPS: { title: string; description: string; fields: { key: string; label
 ];
 
 export default function AdminSettingsPage() {
-  const { data, loading, error, reload } = useAdminQuery<{ settings: SettingRow[]; integrations: Integrations }>('/api/admin/settings');
+  const { data, loading, error, reload } = useAdminQuery<{ settings: SettingRow[]; integrations: Integrations }>('/api/admin/settings', 'load the settings');
   const [form, setForm] = useState<Record<string, Value>>({});
   const [saving, setSaving] = useState(false);
 
@@ -107,11 +108,11 @@ export default function AdminSettingsPage() {
     }
     setSaving(true);
     try {
-      await adminFetch('/api/admin/settings', { method: 'PATCH', json: body });
-      toast('Settings saved');
+      await adminFetch('/api/admin/settings', { method: 'PATCH', json: body, action: 'save the settings' });
+      toast('Settings saved.');
       reload();
-    } catch (e: any) {
-      toast(e.message || 'Could not save settings', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'save the settings'), 'error');
     } finally {
       setSaving(false);
     }

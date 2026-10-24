@@ -1,14 +1,16 @@
 import { auth } from '@/lib/firebase';
 import { apiFetch } from '@/lib/api';
+import { apiErrorMessage } from '@/lib/apiError';
 
 /**
  * Wraps `fetch` and attaches the signed-in therapist's Firebase ID token as
  * `Authorization: Bearer <token>`. All /api/progress/* routes require this.
+ * Throws a plain-language reason naming `action` (e.g. "save the note").
  */
-export async function progressFetch(input: string, init: RequestInit = {}) {
+export async function progressFetch(input: string, init: RequestInit = {}, action = 'load progress tracking') {
   const user = auth.currentUser;
   if (!user) {
-    throw new Error('You must be signed in to access progress tracking.');
+    throw new Error('Your sign-in has expired. Please sign in again.');
   }
   const token = await user.getIdToken();
 
@@ -19,16 +21,7 @@ export async function progressFetch(input: string, init: RequestInit = {}) {
   }
 
   const res = await apiFetch(input, { ...init, headers });
-  if (!res.ok) {
-    let message = `Request failed (${res.status})`;
-    try {
-      const data = await res.json();
-      message = data.error || message;
-    } catch {
-      /* ignore parse errors */
-    }
-    throw new Error(message);
-  }
+  if (!res.ok) throw new Error(await apiErrorMessage(res, action));
   return res.json();
 }
 
@@ -74,7 +67,9 @@ export const fetchClientMetrics = (clientId: string, metricType?: string) =>
   progressFetch(
     `/api/progress/metrics?clientId=${encodeURIComponent(clientId)}${
       metricType ? `&metricType=${encodeURIComponent(metricType)}` : ''
-    }`
+    }`,
+    {},
+    'load the progress metrics'
   ).then((d) => d.metrics as ProgressMetric[]);
 
 export const createMetric = (payload: {
@@ -89,7 +84,7 @@ export const createMetric = (payload: {
   progressFetch('/api/progress/metrics', {
     method: 'POST',
     body: JSON.stringify(payload),
-  }).then((d) => d.metric as ProgressMetric);
+  }, 'save the measurement').then((d) => d.metric as ProgressMetric);
 
 export const updateMetric = (
   id: string,
@@ -98,10 +93,10 @@ export const updateMetric = (
   progressFetch(`/api/progress/metrics/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
-  }).then((d) => d.metric as ProgressMetric);
+  }, 'update the measurement').then((d) => d.metric as ProgressMetric);
 
 export const fetchClientNotes = (clientId: string) =>
-  progressFetch(`/api/progress/notes?clientId=${encodeURIComponent(clientId)}`).then(
+  progressFetch(`/api/progress/notes?clientId=${encodeURIComponent(clientId)}`, {}, 'load the notes').then(
     (d) => d.notes as ProgressNote[]
   );
 
@@ -109,10 +104,10 @@ export const createNote = (payload: { clientId: string; content: string; reportI
   progressFetch('/api/progress/notes', {
     method: 'POST',
     body: JSON.stringify(payload),
-  }).then((d) => d.note as ProgressNote);
+  }, 'save the note').then((d) => d.note as ProgressNote);
 
 export const fetchClientReports = (clientId: string) =>
-  progressFetch(`/api/progress/reports?clientId=${encodeURIComponent(clientId)}`).then(
+  progressFetch(`/api/progress/reports?clientId=${encodeURIComponent(clientId)}`, {}, 'load the reports').then(
     (d) => d.reports as ProgressReport[]
   );
 
@@ -127,4 +122,4 @@ export const createReport = (payload: {
   progressFetch('/api/progress/reports', {
     method: 'POST',
     body: JSON.stringify(payload),
-  }).then((d) => d.report as ProgressReport);
+  }, 'create the report').then((d) => d.report as ProgressReport);

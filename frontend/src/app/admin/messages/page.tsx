@@ -27,6 +27,7 @@ import {
 } from '@/components/admin/kit';
 import { ChartCard, type Point } from '@/components/admin/charts';
 import { adminFetch, fmtDateTime, num, timeAgo } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 
 type MsgStatus = 'PENDING' | 'SENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED' | 'SKIPPED';
@@ -83,7 +84,7 @@ const pct = (r: number | null) => (r == null ? '—' : `${Math.round(r * 1000) /
 export default function AdminMessagesPage() {
   const { can } = useAdmin();
   const list = useListState({ sort: 'createdAt', dir: 'desc', filters: { status: '', type: '', from: '', to: '' } });
-  const { data, loading, error, reload } = useAdminQuery<MessagesResponse>(`/api/admin/messages?${list.query}`);
+  const { data, loading, error, reload } = useAdminQuery<MessagesResponse>(`/api/admin/messages?${list.query}`, 'load the messages');
   const [retrying, setRetrying] = useState<string | null>(null);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
 
@@ -96,12 +97,15 @@ export default function AdminMessagesPage() {
   const retry = async (m: Message) => {
     setRetrying(m.id);
     try {
-      const res = await adminFetch<{ ok: boolean; message: Message }>(`/api/admin/messages/${m.id}/retry`, { method: 'POST' });
-      if (res.ok) toast('Message sent');
-      else toast(`Still failing: ${res.message.errorMessage || 'send failed'}`, 'error');
+      const res = await adminFetch<{ ok: boolean; message: Message }>(`/api/admin/messages/${m.id}/retry`, {
+        method: 'POST',
+        action: 'resend this message',
+      });
+      if (res.ok) toast('Message resent.');
+      else toast(`The message still could not be sent${res.message.errorMessage ? `: ${res.message.errorMessage}` : '.'}`, 'error');
       reload();
-    } catch (e: any) {
-      toast(e.message || 'Retry failed', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'resend this message'), 'error');
     } finally {
       setRetrying(null);
     }
@@ -208,7 +212,8 @@ export default function AdminMessagesPage() {
 
 function BotCard({ canManage }: { canManage: boolean }) {
   const { data, loading, error, reload } = useAdminQuery<{ configured: boolean; reachable: boolean; connected: boolean; error?: string; checkedAt?: string }>(
-    '/api/admin/messages/bot'
+    '/api/admin/messages/bot',
+    'check the WhatsApp bot'
   );
   const [confirm, setConfirm] = useState(false);
 
@@ -253,7 +258,7 @@ function BotCard({ canManage }: { canManage: boolean }) {
         confirmLabel="Unlink and clear"
         danger
         onConfirm={async () => {
-          await adminFetch('/api/admin/messages/bot', { method: 'POST', json: { action: 'logout' } });
+          await adminFetch('/api/admin/messages/bot', { method: 'POST', json: { action: 'logout' }, action: 'clear the WhatsApp account' });
           toast('WhatsApp account cleared. Pair a new number from the bot’s QR page.');
           reload();
         }}
@@ -280,10 +285,14 @@ function BroadcastModal({ open, onClose }: { open: boolean; onClose: () => void 
   const preview = async () => {
     setBusy('preview');
     try {
-      const res = await adminFetch<{ recipients: number }>('/api/admin/messages/broadcast', { method: 'POST', json: { audience, dryRun: true } });
+      const res = await adminFetch<{ recipients: number }>('/api/admin/messages/broadcast', {
+        method: 'POST',
+        json: { audience, dryRun: true },
+        action: 'count the recipients',
+      });
       setRecipients(res.recipients);
-    } catch (e: any) {
-      toast(e.message || 'Could not count recipients.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'count the recipients'), 'error');
     } finally {
       setBusy('');
     }
@@ -295,17 +304,18 @@ function BroadcastModal({ open, onClose }: { open: boolean; onClose: () => void 
       const res = await adminFetch<{ ok: boolean; sent: number; recipients: number; failures: string[] }>('/api/admin/messages/broadcast', {
         method: 'POST',
         json: { audience, subject, body },
+        action: 'send the announcement',
       });
       if (res.ok) {
-        toast(`Announcement emailed to ${num(res.sent)} people`);
+        toast(`Announcement emailed to ${num(res.sent)} people.`);
         setSubject('');
         setBody('');
         onClose();
       } else {
         toast(`Sent to ${num(res.sent)} of ${num(res.recipients)}. Some batches failed: ${res.failures.join('; ')}`, 'warning');
       }
-    } catch (e: any) {
-      toast(e.message || 'Could not send the announcement.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'send the announcement'), 'error');
     } finally {
       setBusy('');
     }

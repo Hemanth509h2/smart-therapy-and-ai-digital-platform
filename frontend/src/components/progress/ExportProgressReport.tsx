@@ -75,10 +75,10 @@ export default function ExportProgressReport({ clientName, metrics, reports, not
         `${clientName.replace(/\s+/g, '_')}_progress.csv`,
         new Blob([lines.join('\n')], { type: 'text/csv' })
       );
-      toast('CSV downloaded');
-    } catch (e: any) {
+      toast('The progress CSV was downloaded.');
+    } catch (e) {
       console.error('CSV export failed:', e);
-      toast(e.message || 'Could not export the CSV.', 'error');
+      toast("We couldn't create the CSV file. Please try again.", 'error');
     } finally {
       setExporting(null);
     }
@@ -150,10 +150,10 @@ export default function ExportProgressReport({ clientName, metrics, reports, not
       }
 
       doc.save(`${clientName.replace(/\s+/g, '_')}_progress_report.pdf`);
-      toast('PDF report downloaded');
-    } catch (e: any) {
+      toast('The PDF progress report was downloaded.');
+    } catch (e) {
       console.error('PDF export failed:', e);
-      toast(e.message || 'Could not export the PDF.', 'error');
+      toast("We couldn't create the PDF report. Please try again.", 'error');
     } finally {
       setExporting(null);
     }

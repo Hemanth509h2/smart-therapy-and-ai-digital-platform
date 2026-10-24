@@ -37,16 +37,16 @@ export async function POST(request: Request) {
     if (requestId) {
       const req = await appDb.subscriptionRequest.findUnique({ where: { id: String(requestId) }, include: { plan: true } });
       if (!req || req.therapistId !== therapist.id) {
-        return NextResponse.json({ error: 'Request not found' }, { status: 404 });
+        return NextResponse.json({ error: "We couldn't find that plan request. It may have been withdrawn." }, { status: 404 });
       }
       if (req.status !== 'AWAITING_PAYMENT' || req.total == null) {
         return NextResponse.json(
-          { error: req.status === 'PENDING' ? 'An admin has not approved this request yet.' : 'This request is no longer waiting for payment.' },
+          { error: req.status === 'PENDING' ? "An admin hasn't approved this plan request yet. You can pay once it's approved." : 'This plan request is no longer waiting for payment. Check its status on the Plans page.' },
           { status: 409 }
         );
       }
       const alreadyPaid = await appDb.payment.count({ where: { requestId: req.id, orderStatus: 'PAID' } });
-      if (alreadyPaid) return NextResponse.json({ error: 'This request is already paid.' }, { status: 409 });
+      if (alreadyPaid) return NextResponse.json({ error: 'This plan request has already been paid. Refresh the page to see your plan.' }, { status: 409 });
       purchase = {
         plan: req.plan,
         months: req.months,
@@ -70,10 +70,10 @@ export async function POST(request: Request) {
       // A pending admin request doesn't block paying; activation closes it.
       const plan = planId ? await appDb.plan.findUnique({ where: { id: String(planId) } }) : null;
       if (!plan || !plan.isActive) {
-        return NextResponse.json({ error: 'Plan not available' }, { status: 404 });
+        return NextResponse.json({ error: 'That plan is no longer available. Choose another plan on the Plans page.' }, { status: 404 });
       }
       if (plan.priceMonthly <= 0) {
-        return NextResponse.json({ error: 'This plan is free — request it instead.' }, { status: 400 });
+        return NextResponse.json({ error: "This plan is free, so there's nothing to pay. Send a request for it instead." }, { status: 400 });
       }
       const tools = cleanPlanModules(plan, modules);
       if (!tools.ok) return NextResponse.json({ error: tools.error }, { status: 400 });
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
     }
 
     if (!cashfreeConfigured()) {
-      return NextResponse.json({ error: 'Payments are not available right now.' }, { status: 503 });
+      return NextResponse.json({ error: 'Payments are not available right now. Please try again later or contact support.' }, { status: 503 });
     }
     const phone = String(customerPhone || '').replace(/\D/g, '').slice(-10);
     if (phone.length !== 10) {
@@ -126,7 +126,13 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('Cashfree subscription checkout error:', error.details || error);
     return NextResponse.json(
-      { error: error.message, details: error.details },
+      {
+        error:
+          error.status && error.status < 500
+            ? 'The payment provider rejected this payment. Check your phone number and try again.'
+            : "We couldn't start the payment. Please try again in a few minutes.",
+        details: error.details,
+      },
       { status: error.status && error.status < 500 ? 400 : 500 }
     );
   }

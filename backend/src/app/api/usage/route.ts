@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma, appDb } from '@/lib/core/db';
 import { requireAuth } from '@/lib/http/apiAuth';
-import { errorResponse } from '@/lib/http/apiError';
+import { errorResponse, notYourProfile } from '@/lib/http/apiError';
 
 // The caller must own the therapist profile or be an ADMIN.
 async function mayAccessTherapist(uid: string, therapistId: string) {
@@ -24,10 +24,10 @@ export async function POST(request: Request) {
     const { therapistId, type, label, sessionId, count } = await request.json();
 
     if (!therapistId || !ALLOWED_TYPES.includes(type)) {
-      return NextResponse.json({ error: 'therapistId and a valid type are required' }, { status: 400 });
+      return NextResponse.json({ error: "We couldn't record this usage. Refresh the page and try again." }, { status: 400 });
     }
     if (!(await mayAccessTherapist(auth.uid, therapistId))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return notYourProfile('this therapist profile');
     }
 
     // Ignore unknown therapists rather than erroring (logging must never break UX).

@@ -7,6 +7,7 @@ import {
   SearchInput, Section, Select, Spinner, Toolbar, useAdmin, useAdminQuery, useListState, type Column, type Tone,
 } from '@/components/admin/kit';
 import { adminFetch, downloadCsv, fetchAllPages, fmtDate, fmtDateTime, inr } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 import { MODULE_CATEGORIES, moduleName } from '@/lib/modules';
 import { toast } from '@/components/practice/ui';
 
@@ -83,9 +84,10 @@ export default function AdminSubscriptionsPage() {
   const canWrite = can('billing.write');
   const list = useListState({ sort: 'joined', dir: 'asc', filters: { status: '', planId: '' } });
   const { data, loading, error, reload } = useAdminQuery<{ professionals: Professional[]; total: number; requests: PlanRequest[] }>(
-    `/api/admin/subscriptions?${list.query}`
+    `/api/admin/subscriptions?${list.query}`,
+    'load the subscriptions'
   );
-  const { data: planData } = useAdminQuery<{ plans: { id: string; name: string }[] }>('/api/admin/plans');
+  const { data: planData } = useAdminQuery<{ plans: { id: string; name: string }[] }>('/api/admin/plans', 'load the plans');
 
   const [approving, setApproving] = useState<PlanRequest | null>(null);
   const [rejecting, setRejecting] = useState<PlanRequest | null>(null);
@@ -102,11 +104,15 @@ export default function AdminSubscriptionsPage() {
   const reactivate = async (term: Term) => {
     setBusy(term.id);
     try {
-      await adminFetch(`/api/admin/subscriptions/${term.id}`, { method: 'PATCH', json: { action: 'reactivate' } });
-      toast('Term reactivated');
+      await adminFetch(`/api/admin/subscriptions/${term.id}`, {
+        method: 'PATCH',
+        json: { action: 'reactivate' },
+        action: 'reactivate this term',
+      });
+      toast('Subscription term reactivated.');
       reload();
-    } catch (e: any) {
-      toast(e.message, 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'reactivate this term'), 'error');
     } finally {
       setBusy('');
     }
@@ -131,9 +137,9 @@ export default function AdminSubscriptionsPage() {
         { header: 'Renewals', value: (r) => (r.current ?? r.latest)?.renewalCount ?? '' },
         { header: 'Terms on record', value: (r) => r.termCount },
       ]);
-      toast(`Exported ${rows.length} rows`);
-    } catch (e: any) {
-      toast(e.message || 'Export failed', 'error');
+      toast(`Exported ${rows.length} subscription${rows.length === 1 ? '' : 's'}.`);
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'export the subscriptions'), 'error');
     } finally {
       setExporting(false);
     }
@@ -362,8 +368,12 @@ export default function AdminSubscriptionsPage() {
         confirmLabel={rejecting?.status === 'AWAITING_PAYMENT' ? 'Revoke' : 'Reject'}
         danger
         onConfirm={async () => {
-          await adminFetch(`/api/admin/subscriptions/requests/${rejecting!.id}`, { method: 'POST', json: { action: 'reject' } });
-          toast(rejecting!.status === 'AWAITING_PAYMENT' ? 'Approval revoked' : 'Request rejected');
+          await adminFetch(`/api/admin/subscriptions/requests/${rejecting!.id}`, {
+            method: 'POST',
+            json: { action: 'reject' },
+            action: rejecting!.status === 'AWAITING_PAYMENT' ? 'revoke this approval' : 'reject this request',
+          });
+          toast(rejecting!.status === 'AWAITING_PAYMENT' ? 'Approval revoked.' : 'Request rejected.');
           reload();
         }}
       />
@@ -378,8 +388,12 @@ export default function AdminSubscriptionsPage() {
         confirmLabel="Cancel term"
         danger
         onConfirm={async () => {
-          await adminFetch(`/api/admin/subscriptions/${cancelling!.term.id}`, { method: 'PATCH', json: { action: 'cancel' } });
-          toast('Term cancelled');
+          await adminFetch(`/api/admin/subscriptions/${cancelling!.term.id}`, {
+            method: 'PATCH',
+            json: { action: 'cancel' },
+            action: 'cancel this term',
+          });
+          toast('Subscription term cancelled.');
           reload();
         }}
       />
@@ -443,12 +457,13 @@ function ApproveModal({ request, onClose, onDone }: { request: PlanRequest | nul
       const res = await adminFetch<{ status: string; total: number }>(`/api/admin/subscriptions/requests/${request.id}`, {
         method: 'POST',
         json: { action: 'approve', months: Number(months), modules: Array.from(selected), removeCoupon },
+        action: 'approve this request',
       });
       toast(res.status === 'APPROVED' ? 'Approved — the plan is active (nothing to pay).' : `Approved — waiting for them to pay ${inr(res.total)}.`);
       onClose();
       onDone();
-    } catch (e: any) {
-      toast(e.message || 'Could not approve.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'approve this request'), 'error');
     } finally {
       setSaving(false);
     }
@@ -551,12 +566,16 @@ function RenewModal({ target, onClose, onDone }: { target: { pro: Professional; 
     if (!target) return;
     setSaving(true);
     try {
-      await adminFetch(`/api/admin/subscriptions/${target.term.id}`, { method: 'PATCH', json: { action: 'renew', months: Number(months) } });
-      toast('Term renewed');
+      await adminFetch(`/api/admin/subscriptions/${target.term.id}`, {
+        method: 'PATCH',
+        json: { action: 'renew', months: Number(months) },
+        action: 'renew this term',
+      });
+      toast(`Subscription renewed for ${months} month${months === '1' ? '' : 's'}.`);
       onClose();
       onDone();
-    } catch (e: any) {
-      toast(e.message || 'Could not renew.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'renew this term'), 'error');
     } finally {
       setSaving(false);
     }
@@ -614,7 +633,7 @@ const EVENT_LABEL: Record<string, string> = {
 };
 
 function HistoryModal({ pro, onClose }: { pro: Professional | null; onClose: () => void }) {
-  const { data, loading, error, reload } = useAdminQuery<History>(pro ? `/api/admin/subscriptions/history/${pro.therapistId}` : null);
+  const { data, loading, error, reload } = useAdminQuery<History>(pro ? `/api/admin/subscriptions/history/${pro.therapistId}` : null, 'load the subscription history');
   const ready = data && pro && !loading;
 
   return (

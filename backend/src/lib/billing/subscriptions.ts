@@ -94,7 +94,9 @@ export async function hasActivePlan(therapistId: string): Promise<boolean> {
 // (a uid with no therapist profile is not gated). The frontend's apiFetch
 // recognises code PLAN_REQUIRED and points the therapist to /plans.
 export async function requireActivePlan(
-  who: { therapistId: string } | { userId: string }
+  who: { therapistId: string } | { userId: string },
+  /** What was refused, e.g. "add a client" — names the action in the message. */
+  action?: string
 ): Promise<NextResponse | null> {
   let therapistId: string;
   if ('therapistId' in who) {
@@ -106,7 +108,12 @@ export async function requireActivePlan(
   }
   if (await hasActivePlan(therapistId)) return null;
   return NextResponse.json(
-    { error: 'You need an active plan to do this. Choose a plan to continue.', code: 'PLAN_REQUIRED' },
+    {
+      error: action
+        ? `You don't have an active plan, so you can't ${action}. Choose a plan on the Plans page to continue.`
+        : "You don't have an active plan, so you can't do this yet. Choose a plan on the Plans page to continue.",
+      code: 'PLAN_REQUIRED',
+    },
     { status: 402 }
   );
 }

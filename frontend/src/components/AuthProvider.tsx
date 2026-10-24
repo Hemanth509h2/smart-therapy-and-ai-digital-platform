@@ -5,7 +5,9 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { readCachedAuth, useAuthStore } from '@/store/useAuthStore';
 import { useRouter, usePathname } from 'next/navigation';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, PROFILE_MISMATCH_EVENT } from '@/lib/api';
+import { toast } from '@/components/practice/ui';
+import { apiErrorMessage, networkErrorMessage } from '@/lib/apiError';
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setAuthUser, setRoleAndProfile, clearAuth } = useAuthStore();
@@ -84,9 +86,14 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
             if (pathname !== '/onboarding') {
               router.push('/onboarding');
             }
+          } else {
+            // Without a fresh profile the page keeps the cached one, and its
+            // requests may fail; say why instead of failing silently.
+            toast(await apiErrorMessage(res, 'load your account'), 'error');
           }
         } catch (err) {
           console.error("Failed to load user profile context:", err);
+          toast(networkErrorMessage('load your account'), 'error');
         }
       } else {
         clearAuth();
@@ -113,6 +120,33 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
     return () => unsubscribe();
   }, [setAuthUser, setRoleAndProfile, clearAuth, router]);
+
+  // A request was refused because the page sent a profile id that isn't the
+  // signed-in user's — the cached profile is stale (e.g. data was migrated or
+  // another account signed in on this browser). Reload the real profile; pages
+  // keyed on the profile id then refetch on their own.
+  useEffect(() => {
+    let last = 0;
+    const reload = async () => {
+      if (Date.now() - last < 10_000) return; // one reload per burst of failures
+      last = Date.now();
+      try {
+        const res = await apiFetch('/api/users/profile');
+        const data = res.ok ? await res.json() : null;
+        const role = data?.user?.role;
+        if (role === 'THERAPIST' || role === 'ADMIN') {
+          setRoleAndProfile(role, role === 'THERAPIST' ? data.user.therapist : data.user.admin);
+          toast('Your account details were out of date and have been refreshed.', 'info');
+        } else {
+          toast(res.ok ? 'Please sign in again to continue.' : await apiErrorMessage(res, 'refresh your account'), 'error');
+        }
+      } catch {
+        toast(networkErrorMessage('refresh your account'), 'error');
+      }
+    };
+    window.addEventListener(PROFILE_MISMATCH_EVENT, reload);
+    return () => window.removeEventListener(PROFILE_MISMATCH_EVENT, reload);
+  }, [setRoleAndProfile]);
 
   if (loading) {
     return (

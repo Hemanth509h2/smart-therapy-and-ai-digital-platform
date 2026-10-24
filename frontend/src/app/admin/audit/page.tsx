@@ -19,6 +19,7 @@ import {
 } from '@/components/admin/kit';
 import { toast } from '@/components/practice/ui';
 import { downloadCsv, fetchAllPages, fmtDateTime } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 
 interface Entry {
   id: string;
@@ -43,7 +44,7 @@ interface AuditResponse {
 // Read-only view of the admin audit trail. There is no edit or delete.
 export default function AdminAuditPage() {
   const list = useListState({ pageSize: 50, filters: { action: '', targetType: '', targetId: '', from: '', to: '' } });
-  const { data, loading, error, reload } = useAdminQuery<AuditResponse>(`/api/admin/audit?${list.query}`);
+  const { data, loading, error, reload } = useAdminQuery<AuditResponse>(`/api/admin/audit?${list.query}`, 'load the audit log');
   const [open, setOpen] = useState<Entry | null>(null);
   const [exporting, setExporting] = useState(false);
 
@@ -73,9 +74,9 @@ export default function AdminAuditPage() {
         { header: 'Before', value: (r) => (r.before == null ? '' : JSON.stringify(r.before)) },
         { header: 'After', value: (r) => (r.after == null ? '' : JSON.stringify(r.after)) },
       ]);
-      toast(`Exported ${rows.length} entries`);
-    } catch (e: any) {
-      toast(e.message || 'Export failed', 'error');
+      toast(`Exported ${rows.length} audit log entr${rows.length === 1 ? 'y' : 'ies'}.`);
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'export the audit log'), 'error');
     } finally {
       setExporting(false);
     }

@@ -31,6 +31,7 @@ import {
 } from '@/components/admin/kit';
 import { ChartCard } from '@/components/admin/charts';
 import { adminFetch, fmtDate, fmtDateTime, fmtMinutes, num, timeAgo } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 import { MODULE_CATEGORIES, moduleName } from '@/lib/modules';
 import { toast } from '@/components/practice/ui';
 import { RemoveProfessionalDialog } from '@/components/admin/RemoveProfessionalDialog';
@@ -121,7 +122,7 @@ const SUB_TONE: Record<string, Tone> = { ACTIVE: 'good', EXPIRED: 'neutral', CAN
 export default function TherapistDetailPage() {
   const { therapistId } = useParams<{ therapistId: string }>();
   const { can } = useAdmin();
-  const { data, loading, error, reload } = useAdminQuery<Detail>(`/api/admin/therapists/${therapistId}`);
+  const { data, loading, error, reload } = useAdminQuery<Detail>(`/api/admin/therapists/${therapistId}`, 'load this professional');
   const [tab, setTab] = useState<Tab>('overview');
   const [emailOpen, setEmailOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
@@ -136,8 +137,9 @@ export default function TherapistDetailPage() {
     await adminFetch(`/api/admin/users/${t!.userId}/status`, {
       method: 'PATCH',
       json: { action: suspended ? 'reactivate' : 'suspend', reason },
+      action: suspended ? 'reactivate this account' : 'suspend this account',
     });
-    toast(suspended ? 'Account reactivated' : 'Account suspended');
+    toast(suspended ? `${t!.name || 'The account'} was reactivated.` : `${t!.name || 'The account'} was suspended.`);
     reload();
   };
 
@@ -293,10 +295,12 @@ function ClientsTab({ therapistId, clients }: { therapistId: string; clients: De
   const reveal = async () => {
     setRevealing(true);
     try {
-      const d = await adminFetch<{ clients: PhiClient[] }>(`/api/admin/therapists/${therapistId}/phi`);
+      const d = await adminFetch<{ clients: PhiClient[] }>(`/api/admin/therapists/${therapistId}/phi`, {
+        action: 'reveal client details',
+      });
       setPhi(new Map(d.clients.map((c) => [c.id, c])));
-    } catch (e: any) {
-      toast(e.message || 'Could not reveal client details.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'reveal client details'), 'error');
     } finally {
       setRevealing(false);
     }
@@ -478,7 +482,7 @@ interface Plan {
 }
 
 function GrantModal({ open, onClose, therapistId, onGranted }: { open: boolean; onClose: () => void; therapistId: string; onGranted: () => void }) {
-  const { data, loading, error, reload } = useAdminQuery<{ plans: Plan[] }>(open ? '/api/admin/plans' : null);
+  const { data, loading, error, reload } = useAdminQuery<{ plans: Plan[] }>(open ? '/api/admin/plans' : null, 'load the plans');
   const [planId, setPlanId] = useState('');
   const [months, setMonths] = useState('1');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -509,12 +513,13 @@ function GrantModal({ open, onClose, therapistId, onGranted }: { open: boolean; 
       await adminFetch(`/api/admin/therapists/${therapistId}/grant`, {
         method: 'POST',
         json: { planId, months: Number(months), modules: Array.from(selected) },
+        action: 'grant this plan',
       });
-      toast(`${plan?.name} granted for ${months} month${months === '1' ? '' : 's'}`);
+      toast(`${plan?.name ?? 'The plan'} was granted for ${months} month${months === '1' ? '' : 's'}.`);
       onGranted();
       onClose();
-    } catch (e: any) {
-      toast(e.message || 'Could not grant the plan.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'grant this plan'), 'error');
     } finally {
       setBusy(false);
     }
@@ -637,7 +642,8 @@ function ActivityTab({ therapistId }: { therapistId: string }) {
   const [page, setPage] = useState(1);
   const pageSize = 25;
   const { data, loading, error, reload } = useAdminQuery<{ entries: AuditEntry[]; total: number }>(
-    `/api/admin/therapists/${therapistId}/activity?page=${page}&pageSize=${pageSize}`
+    `/api/admin/therapists/${therapistId}/activity?page=${page}&pageSize=${pageSize}`,
+    'load the admin activity'
   );
   return (
     <Section title="Admin activity" description="Admin actions taken on this account, newest first.">
@@ -677,13 +683,17 @@ function EmailModal({ open, onClose, therapistId, email }: { open: boolean; onCl
   const send = async () => {
     setBusy(true);
     try {
-      await adminFetch(`/api/admin/therapists/${therapistId}/message`, { method: 'POST', json: { subject, body } });
-      toast('Email sent');
+      await adminFetch(`/api/admin/therapists/${therapistId}/message`, {
+        method: 'POST',
+        json: { subject, body },
+        action: 'send the email',
+      });
+      toast(`Email sent to ${email}.`);
       setSubject('');
       setBody('');
       onClose();
-    } catch (e: any) {
-      toast(e.message || 'Could not send the email.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'send the email'), 'error');
     } finally {
       setBusy(false);
     }

@@ -6,6 +6,7 @@ import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin, requireRecentLogin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { appUrl } from '@/lib/core/app-url';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,10 +35,10 @@ export async function POST(request: Request) {
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
     const adminRole: AdminRole = body.adminRole ?? 'SUPPORT';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 });
+      return NextResponse.json({ error: 'Enter a valid email address, like name@example.com.' }, { status: 400 });
     }
     if (!ADMIN_ROLES.includes(adminRole)) {
-      return NextResponse.json({ error: 'Invalid adminRole' }, { status: 400 });
+      return NextResponse.json({ error: 'Choose a valid admin role.' }, { status: 400 });
     }
 
     const existingAdmin = await prisma.user.findFirst({
@@ -85,8 +86,7 @@ export async function POST(request: Request) {
       emailed,
     });
   } catch (error: any) {
-    console.error('Admin invite POST error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin invite POST error', "We couldn't create the admin invite. Please try again.");
   }
 }
 
@@ -97,12 +97,12 @@ export async function DELETE(request: Request) {
     if (!auth.ok) return auth.response;
 
     const id = new URL(request.url).searchParams.get('id');
-    if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    if (!id) return NextResponse.json({ error: "We couldn't tell which invite to revoke. Refresh the page and try again." }, { status: 400 });
 
     const invite = await appDb.adminInvite.findUnique({ where: { id } });
-    if (!invite) return NextResponse.json({ error: 'Invite not found' }, { status: 404 });
+    if (!invite) return NextResponse.json({ error: "We couldn't find this invite. It may already have been revoked." }, { status: 404 });
     if (invite.acceptedAt) {
-      return NextResponse.json({ error: 'This invite was already accepted.' }, { status: 409 });
+      return NextResponse.json({ error: "This invite has already been accepted, so it can't be revoked. Remove the admin instead." }, { status: 409 });
     }
     if (!invite.revokedAt) {
       await appDb.adminInvite.update({ where: { id }, data: { revokedAt: new Date() } });
@@ -112,8 +112,7 @@ export async function DELETE(request: Request) {
     }
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Admin invite DELETE error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin invite DELETE error', "We couldn't revoke the admin invite. Please try again.");
   }
 }
 

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { fetchClientNotes, createNote, type ProgressNote } from '@/lib/progressApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 import { OnOffButton } from '@/components/ui/on-off-button';
 import { toast } from '@/components/practice/ui';
 
@@ -25,7 +26,7 @@ export default function TherapistNotesInput({ clientId, reportId }: Props) {
     setLoading(true);
     fetchClientNotes(clientId)
       .then((n) => !cancelled && setNotes(n))
-      .catch((e) => !cancelled && toast(e.message || 'Could not load the notes.', 'error'))
+      .catch((e) => !cancelled && toast(caughtErrorMessage(e, 'load the notes'), 'error'))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
@@ -40,9 +41,9 @@ export default function TherapistNotesInput({ clientId, reportId }: Props) {
       const note = await createNote({ clientId, content: content.trim(), reportId, isPrivate });
       setNotes((prev) => [note, ...prev]);
       setContent('');
-      toast('Note saved');
-    } catch (e: any) {
-      toast(e.message || 'Could not save the note.', 'error');
+      toast('Note saved.');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'save the note'), 'error');
     } finally {
       setSaving(false);
     }

@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     const to = searchParams.get('to');
 
     if (!clientId) {
-      return NextResponse.json({ error: 'clientId is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Choose a client to see their progress metrics.' }, { status: 400 });
     }
 
     const metrics = await prisma.progressMetric.findMany({
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const auth = await requireTherapist(request);
   if (!auth.ok) return auth.response;
-  const noPlan = await requireActivePlan({ therapistId: auth.therapist.id });
+  const noPlan = await requireActivePlan({ therapistId: auth.therapist.id }, 'record progress metrics');
   if (noPlan) return noPlan;
 
   try {
@@ -64,17 +64,17 @@ export async function POST(request: Request) {
 
     if (!clientId || !metricType || value === undefined || value === null) {
       return NextResponse.json(
-        { error: 'clientId, metricType and value are required' },
+        { error: 'Choose a metric and enter a value.' },
         { status: 400 }
       );
     }
     if (typeof value !== 'number' || Number.isNaN(value)) {
-      return NextResponse.json({ error: 'value must be a number' }, { status: 400 });
+      return NextResponse.json({ error: 'The value must be a number.' }, { status: 400 });
     }
 
     const client = await prisma.profileClient.findUnique({ where: { id: clientId } });
     if (!client) {
-      return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+      return NextResponse.json({ error: "We couldn't find that client. They may have been removed." }, { status: 404 });
     }
 
     const metric = await prisma.progressMetric.create({

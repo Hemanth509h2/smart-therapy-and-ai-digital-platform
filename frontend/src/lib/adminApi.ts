@@ -1,6 +1,7 @@
 // Admin API helpers: adminFetch (apiFetch + JSON + the "confirm your
 // password" step-up for destructive actions), formatting and CSV export.
 import { apiFetch } from '@/lib/api';
+import { apiErrorMessage } from '@/lib/apiError';
 
 export class AdminApiError extends Error {
   status: number;
@@ -21,26 +22,31 @@ export function registerReauthPrompt(fn: (() => Promise<boolean>) | null) {
 
 /**
  * fetch + JSON for /api/admin/* (and other API) calls. Throws AdminApiError
- * with the server's message on failure. When the backend answers
- * REAUTH_REQUIRED, asks for the password once and retries.
+ * with a plain-language message on failure (see apiErrorMessage); `action`
+ * completes "you can't …", e.g. "approve this request". When the backend
+ * answers REAUTH_REQUIRED, asks for the password once and retries.
  */
-export async function adminFetch<T = any>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
+export async function adminFetch<T = any>(
+  path: string,
+  init?: RequestInit & { json?: unknown; action?: string }
+): Promise<T> {
+  const { json, action = 'complete that request', ...rest } = init ?? {};
   const doFetch = () =>
     apiFetch(path, {
-      ...init,
-      headers: { ...(init?.json !== undefined ? { 'Content-Type': 'application/json' } : {}), ...init?.headers },
-      body: init?.json !== undefined ? JSON.stringify(init.json) : init?.body,
+      ...rest,
+      headers: { ...(json !== undefined ? { 'Content-Type': 'application/json' } : {}), ...rest.headers },
+      body: json !== undefined ? JSON.stringify(json) : rest.body,
     });
 
   let res = await doFetch();
-  let data = await res.json().catch(() => ({}));
+  let data = await res.clone().json().catch(() => ({}));
   if (res.status === 401 && data?.code === 'REAUTH_REQUIRED' && reauthPrompt) {
     if (await reauthPrompt()) {
       res = await doFetch();
-      data = await res.json().catch(() => ({}));
+      data = await res.clone().json().catch(() => ({}));
     }
   }
-  if (!res.ok) throw new AdminApiError(data?.error || `Request failed (${res.status})`, res.status, data?.code);
+  if (!res.ok) throw new AdminApiError(await apiErrorMessage(res, action), res.status, data?.code);
   return data as T;
 }
 
@@ -110,7 +116,7 @@ export async function fetchAllPages<T>(path: string, key: string, params: Record
   const out: T[] = [];
   for (let page = 1; page <= 100; page++) {
     const qs = new URLSearchParams({ ...params, page: String(page), pageSize: '200' });
-    const data = await adminFetch<any>(`${path}?${qs}`);
+    const data = await adminFetch<any>(`${path}?${qs}`, { action: 'export this list' });
     const rows: T[] = data[key] || [];
     out.push(...rows);
     if (rows.length < 200) break;

@@ -4,7 +4,7 @@ import { therapistIdForUser, withTherapists } from '@/lib/core/links';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { sendSessionBookedWhatsApp } from '@/lib/sessions/session-whatsapp';
-import { errorResponse } from '@/lib/http/apiError';
+import { errorResponse, notYourProfile } from '@/lib/http/apiError';
 
 // The caller must own the referenced therapist/client profile or be an ADMIN.
 async function mayAccess(uid: string, ref: { therapistId?: string | null; clientId?: string | null }) {
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     if (therapistId) {
       const owner = await appDb.profileTherapist.findUnique({ where: { id: therapistId }, select: { userId: true } });
       if (!owner || owner.userId !== auth.uid) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        return notYourProfile('these sessions');
       }
       // Note count + report presence let the UI flag completed sessions whose
       // documentation is still outstanding ("Notes pending").
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
         (client.userId !== auth.uid &&
           (!client.therapistId || client.therapistId !== (await therapistIdForUser(auth.uid))))
       ) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        return notYourProfile("this client's sessions");
       }
       const sessions = await prisma.session.findMany({
         where: { clientId },
@@ -70,7 +70,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ sessions: await withTherapists(sessions) });
     }
 
-    return NextResponse.json({ error: 'Missing filter parameter' }, { status: 400 });
+    return NextResponse.json({ error: 'Choose whose sessions to show.' }, { status: 400 });
   } catch (error: any) {
     return errorResponse(error, 'Sessions GET error');
   }
@@ -83,9 +83,9 @@ export async function POST(request: Request) {
 
     const { therapistId, clientId, scheduledAt, booking } = await request.json();
     if (!therapistId || !(await mayAccess(auth.uid, { therapistId }))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return notYourProfile('this therapist profile');
     }
-    const noPlan = await requireActivePlan({ therapistId });
+    const noPlan = await requireActivePlan({ therapistId }, booking ? 'book a session' : 'start a session');
     if (noPlan) return noPlan;
 
     // If clientId is a userId (firebase UID), look up the profile ID
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
       if (clientProfile) {
         finalClientId = clientProfile.id;
       } else {
-        return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+        return NextResponse.json({ error: "We couldn't find that client. They may have been removed." }, { status: 404 });
       }
     }
 
@@ -116,9 +116,9 @@ export async function POST(request: Request) {
 
     // A booking gets a date/time confirmation (no link). Instant sessions get
     // nothing here — the join link is sent when the session is started.
-    if (booking) await sendSessionBookedWhatsApp(session.id);
+    const whatsapp = booking ? await sendSessionBookedWhatsApp(session.id) : undefined;
 
-    return NextResponse.json({ session });
+    return NextResponse.json({ session, whatsapp });
   } catch (error: any) {
     return errorResponse(error, 'Session creation error');
   }

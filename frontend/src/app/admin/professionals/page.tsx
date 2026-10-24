@@ -24,6 +24,7 @@ import {
   type Column,
 } from '@/components/admin/kit';
 import { adminFetch, downloadCsv, fetchAllPages, fmtDate, num, timeAgo } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 import { MODULE_CATEGORIES, ALL_MODULE_IDS } from '@/lib/modules';
 import { RemoveProfessionalDialog } from '@/components/admin/RemoveProfessionalDialog';
@@ -71,7 +72,7 @@ export default function AdminProfessionalsPage() {
   const canWrite = can('people.write');
   const canRemove = can('admins.manage'); // permanent removal: super admins only
   const list = useListState({ sort: 'createdAt', dir: 'desc', filters: { status: '', plan: '', from: '', to: '' } });
-  const { data, loading, error, reload } = useAdminQuery<ListResponse>(`/api/admin/professionals?${list.query}`);
+  const { data, loading, error, reload } = useAdminQuery<ListResponse>(`/api/admin/professionals?${list.query}`, 'load the professionals');
   const rows = data?.professionals ?? [];
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -123,12 +124,13 @@ export default function AdminProfessionalsPage() {
       await adminFetch(`/api/admin/therapists/${editing.id}/access`, {
         method: 'PATCH',
         json: { allModulesAllowed: allowAll, moduleAccess: Array.from(picked) },
+        action: 'update module access',
       });
-      toast(`Module access updated for ${editing.name || 'professional'}`);
+      toast(`Module access updated for ${editing.name || 'the professional'}.`);
       setEditing(null);
       reload();
-    } catch (e: any) {
-      toast(e.message || 'Could not update access', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'update module access'), 'error');
     } finally {
       setSavingAccess(false);
     }
@@ -138,8 +140,9 @@ export default function AdminProfessionalsPage() {
     const res = await adminFetch<{ updated: number; unchanged: number; missing: string[] }>('/api/admin/professionals/bulk', {
       method: 'POST',
       json: { therapistIds: Array.from(selected), action, moduleIds },
+      action: 'update the selected professionals',
     });
-    toast(`Updated ${res.updated} professional${res.updated === 1 ? '' : 's'}${res.unchanged ? ` · ${res.unchanged} already set` : ''}`);
+    toast(`Updated ${res.updated} professional${res.updated === 1 ? '' : 's'}${res.unchanged ? ` · ${res.unchanged} already set` : ''}.`);
     setSelected(new Set());
     reload();
   };
@@ -150,8 +153,8 @@ export default function AdminProfessionalsPage() {
     try {
       await runBulk(bulk, Array.from(bulkModules));
       setBulk(null);
-    } catch (e: any) {
-      toast(e.message || 'Bulk update failed', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'update the selected professionals'), 'error');
     } finally {
       setBulkBusy(false);
     }
@@ -163,8 +166,9 @@ export default function AdminProfessionalsPage() {
     await adminFetch(`/api/admin/users/${statusTarget.userId}/status`, {
       method: 'PATCH',
       json: suspend ? { action: 'suspend', reason } : { action: 'reactivate' },
+      action: suspend ? 'suspend this account' : 'reactivate this account',
     });
-    toast(`${statusTarget.name || 'Account'} ${suspend ? 'suspended' : 'reactivated'}`);
+    toast(`${statusTarget.name || 'The account'} was ${suspend ? 'suspended' : 'reactivated'}.`);
     reload();
   };
 
@@ -190,9 +194,9 @@ export default function AdminProfessionalsPage() {
         { header: 'Signed up', value: (r) => r.createdAt },
         { header: 'Suspend reason', value: (r) => r.suspendReason ?? '' },
       ]);
-      toast(`Exported ${all.length} rows`);
-    } catch (e: any) {
-      toast(e.message || 'Export failed', 'error');
+      toast(`Exported ${all.length} professional${all.length === 1 ? '' : 's'}.`);
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'export the professionals'), 'error');
     } finally {
       setExporting(false);
     }

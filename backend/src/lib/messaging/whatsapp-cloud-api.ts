@@ -27,15 +27,50 @@ export interface CloudApiConfig {
   phoneNumberId: string
 }
 
+/** The server has no Cloud API credentials. The message (env var names) is
+ *  for logs and the admin message log; users get `publicReason`. */
+export class WhatsAppNotConfiguredError extends Error {
+  readonly publicReason = "WhatsApp isn't set up on the server yet. An admin needs to add the WhatsApp Business account details."
+  constructor() {
+    super('WhatsApp Cloud API not configured. Set WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID')
+    this.name = 'WhatsAppNotConfiguredError'
+  }
+}
+
+/** Meta refused the message. `message` keeps Meta's text for logs; `publicReason`
+ *  is a plain explanation for the therapist. */
+export class WhatsAppSendError extends Error {
+  constructor(message: string, readonly publicReason: string, readonly metaCode?: number) {
+    super(message)
+    this.name = 'WhatsAppSendError'
+  }
+}
+
+// Common Graph API error codes → what they mean for the person sending.
+function explainMetaError(code?: number): string {
+  if (code === 190) return "the server's WhatsApp access token has expired or is invalid. An admin needs to renew it"
+  if (code === 131026) return "this number isn't on WhatsApp or can't receive messages right now"
+  if (code === 131047)
+    return "WhatsApp only allows a first message through an approved template, and none is set up. An admin needs to add the message template"
+  if (code === 132001) return "the WhatsApp message template isn't approved or doesn't exist. An admin needs to check the template name"
+  if (code === 131030) return "this number isn't on the WhatsApp test account's allowed list. An admin needs to add it, or switch to a live number"
+  if (code === 131056 || code === 130429 || code === 80007) return 'too many WhatsApp messages were sent in a short time. Try again in a few minutes'
+  if (code === 100) return 'WhatsApp rejected the message details. An admin needs to check the WhatsApp setup'
+  return 'WhatsApp rejected the message'
+}
+
+/** What to tell a user about any WhatsApp send error. */
+export function whatsAppPublicReason(error: unknown): string {
+  if (error instanceof WhatsAppNotConfiguredError || error instanceof WhatsAppSendError) return error.publicReason
+  if (error instanceof PublicError) return error.message
+  return "WhatsApp couldn't be reached"
+}
+
 function getCloudApiConfig(): CloudApiConfig {
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
 
-  if (!accessToken || !phoneNumberId) {
-    throw new Error(
-      'WhatsApp Cloud API not configured. Set WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID'
-    )
-  }
+  if (!accessToken || !phoneNumberId) throw new WhatsAppNotConfiguredError()
 
   return { accessToken, phoneNumberId }
 }
@@ -51,7 +86,7 @@ export function normalizeWhatsAppNumber(value: string): string {
       : `+${compact}`
 
   if (!/^\+[1-9]\d{7,14}$/.test(withCountryCode)) {
-    throw new PublicError('Enter a valid WhatsApp number with country code', 400)
+    throw new PublicError('Enter a valid WhatsApp number, including the country code (for example +91 98765 43210).', 400)
   }
 
   return withCountryCode
@@ -89,7 +124,11 @@ export async function sendCloudApiText(
   }
 
   if (!response.ok || !payload.messages?.[0]?.id) {
-    throw new Error(payload.error?.message || 'Cloud API could not send the message')
+    throw new WhatsAppSendError(
+      payload.error?.message || 'Cloud API could not send the message',
+      explainMetaError(payload.error?.code),
+      payload.error?.code
+    )
   }
 
   return {
@@ -138,7 +177,11 @@ export async function sendCloudApiTemplate(
   }
 
   if (!response.ok || !payload.messages?.[0]?.id) {
-    throw new Error(payload.error?.message || 'Cloud API could not send template message')
+    throw new WhatsAppSendError(
+      payload.error?.message || 'Cloud API could not send template message',
+      explainMetaError(payload.error?.code),
+      payload.error?.code
+    )
   }
 
   return {
@@ -166,10 +209,14 @@ export async function sendCloudApiInteractive(
   })
   const payload = (await response.json().catch(() => ({}))) as {
     messages?: Array<{ id: string }>
-    error?: { message: string }
+    error?: { message: string; code?: number }
   }
   if (!response.ok || !payload.messages?.[0]?.id) {
-    throw new Error(payload.error?.message || 'Cloud API could not send the interactive message')
+    throw new WhatsAppSendError(
+      payload.error?.message || 'Cloud API could not send the interactive message',
+      explainMetaError(payload.error?.code),
+      payload.error?.code
+    )
   }
   return { id: payload.messages[0].id, status: 'sent', to }
 }

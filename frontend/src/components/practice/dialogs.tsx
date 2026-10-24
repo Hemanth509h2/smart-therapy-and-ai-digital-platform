@@ -27,6 +27,7 @@ import {
   type PracticeSession,
 } from '@/lib/practice';
 import { apiFetch } from '@/lib/api';
+import { apiErrorMessage, caughtErrorMessage, toastWhatsApp } from '@/lib/apiError';
 import { MODULE_CATEGORIES, resolveAllowedModuleIds } from '@/lib/modules';
 
 const DURATIONS = [30, 45, 50, 60, 80];
@@ -106,12 +107,13 @@ export function BookSessionDialog({
     if (when.getTime() < Date.now() - 60_000) return void toast('Pick a time in the future.', 'warning');
     setSaving(true);
     try {
-      const session = await createSession(profile.id, clientId, when, duration, true);
-      toast(`Session booked for ${fmtDayTime(when)}`);
+      const { session, whatsapp } = await createSession(profile.id, clientId, when, duration, true);
+      toast(`Session booked for ${fmtDayTime(when)}.`);
+      toastWhatsApp(whatsapp, fullName(clients.find((c) => c.id === clientId)), 'the booking confirmation');
       onOpenChange(false);
       onBooked?.(session);
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not book the session.', 'error');
+      toast(caughtErrorMessage(e, 'book this session'), 'error');
     } finally {
       setSaving(false);
     }
@@ -249,16 +251,19 @@ export function StartSessionDialog({
     if (!profile?.id || !clientId) return void toast('Choose a client.', 'warning');
     setStarting(true);
     try {
-      const id = existing?.id ?? (await createSession(profile.id, clientId, new Date())).id;
-      // Get (or create) the patient join link for this session first.
+      const id = existing?.id ?? (await createSession(profile.id, clientId, new Date())).session.id;
+      // Get (or create) the patient join link for this session first. The
+      // server also WhatsApps it to the client and says whether that worked.
       const res = await apiFetch(`/api/sessions/${id}/guest-link`, { method: 'POST' });
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'create the session link'));
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not create the patient link.');
       setSessionId(id);
       setPatientLink(`${window.location.origin}/join/${data.token}`);
       setStarting(false);
+      toast('Session link is ready.');
+      toastWhatsApp(data.whatsapp, fullName(clients.find((c) => c.id === clientId)), 'the session link');
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not start the session.', 'error');
+      toast(caughtErrorMessage(e, 'start the session'), 'error');
       setStarting(false);
     }
   };
@@ -479,13 +484,12 @@ export function AddClientDialog({
           gender,
         }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not add the client.');
-      toast(`${firstName.trim()} added to your clients`);
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'add a client'));
+      toast(`${[firstName.trim(), lastName.trim()].filter(Boolean).join(' ')} was added to your clients.`);
       onCreated?.();
       onOpenChange(false);
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not add the client.', 'error');
+      toast(caughtErrorMessage(e, 'add a client'), 'error');
     } finally {
       setSaving(false);
     }
@@ -613,11 +617,11 @@ export function RescheduleDialog({
     setSaving(true);
     try {
       await updateSchedule(session.id, 'reschedule', when);
-      toast(`Session moved to ${fmtDayTime(when)}`);
+      toast(`Session moved to ${fmtDayTime(when)}.`);
       onClose();
       onDone?.();
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not reschedule the session.', 'error');
+      toast(caughtErrorMessage(e, 'reschedule this session'), 'error');
     } finally {
       setSaving(false);
     }
@@ -679,7 +683,7 @@ export function ConfirmDialog({
       await onConfirm();
       onOpenChange(false);
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Something went wrong.', 'error');
+      toast(caughtErrorMessage(e, confirmLabel.toLowerCase()), 'error');
     } finally {
       setBusy(false);
     }
@@ -730,7 +734,7 @@ export function CancelSessionDialog({
       onConfirm={async () => {
         if (!session) return;
         await updateSchedule(session.id, 'cancel');
-        toast('Session cancelled');
+        toast(`${fullName(session.client) || 'The client'}'s session on ${fmtDayTime(session.scheduledAt)} was cancelled.`);
         onDone?.();
       }}
     />
@@ -755,7 +759,7 @@ export function AvailabilityDialog({ open, onOpenChange }: { open: boolean; onOp
   const save = () => {
     if (av.start >= av.end) return void toast('End time must be after start time.', 'warning');
     saveAvailability(profile?.id, av);
-    toast('Working hours saved');
+    toast('Your working hours were saved.');
     onOpenChange(false);
   };
 
@@ -834,14 +838,14 @@ export function NotesDrawer({
     setDraft('');
     setLoading(true);
     apiFetch(`/api/notes?sessionId=${session.id}`)
-      .then((r) => {
-        if (!r.ok) throw new Error();
+      .then(async (r) => {
+        if (!r.ok) throw new Error(await apiErrorMessage(r, 'load the notes for this session'));
         return r.json();
       })
       .then((d) => setNotes(d.notes ?? []))
-      .catch(() => {
+      .catch((e) => {
         setNotes([]);
-        toast('Could not load the notes for this session.', 'error');
+        toast(caughtErrorMessage(e, 'load the notes for this session'), 'error');
       })
       .finally(() => setLoading(false));
   }, [session]);
@@ -855,14 +859,14 @@ export function NotesDrawer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: session.id, therapistId: profile.id, content: draft.trim() }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'save the note'));
       const d = await res.json();
       setNotes((prev) => [d.note, ...prev]);
       setDraft('');
-      toast('Note saved');
+      toast('Note saved.');
       onChanged?.();
-    } catch {
-      toast('Could not save the note.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'save the note'), 'error');
     } finally {
       setSaving(false);
     }

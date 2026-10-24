@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/core/db';
 import { requireAdmin, requireRecentLogin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     const subject = typeof body.subject === 'string' ? body.subject.trim().slice(0, 200) : '';
     const text = typeof body.body === 'string' ? body.body.trim().slice(0, 20_000) : '';
     const dryRun = body.dryRun === true;
-    if (!audience) return NextResponse.json({ error: "audience must be 'therapists' or 'all'" }, { status: 400 });
+    if (!audience) return NextResponse.json({ error: 'Choose who should receive this broadcast.' }, { status: 400 });
 
     // Guest / placeholder accounts use *.local addresses that can't receive mail.
     const where: Prisma.UserWhereInput = {
@@ -38,13 +39,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ dryRun: true, audience, recipients });
     }
 
-    if (!subject || !text) return NextResponse.json({ error: 'subject and body are required' }, { status: 400 });
+    if (!subject || !text) return NextResponse.json({ error: 'Enter a subject and a message.' }, { status: 400 });
     const stepUp = requireRecentLogin(auth);
     if (stepUp) return stepUp;
 
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
-    if (!user || !pass) return NextResponse.json({ error: 'Email is not configured on the server.' }, { status: 503 });
+    if (!user || !pass) return NextResponse.json({ error: "Email isn't set up on the server yet, so nothing was sent. Ask whoever manages hosting to set it up." }, { status: 503 });
     const port = Number(process.env.SMTP_PORT || 587);
     const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST || 'smtp.gmail.com', port, secure: port === 465, auth: { user, pass } });
     const from = process.env.SMTP_FROM || `STAAD <${user}>`;
@@ -70,7 +71,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ ok: failures.length === 0, audience, recipients: emails.length, sent, failures });
   } catch (e: any) {
-    console.error('POST /api/admin/messages/broadcast failed:', e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return errorResponse(e, 'POST /api/admin/messages/broadcast failed', "We couldn't send the broadcast. Please try again.");
   }
 }

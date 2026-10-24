@@ -27,7 +27,7 @@ export async function requireTherapist(request: Request) {
     return {
       ok: false as const,
       response: NextResponse.json(
-        { error: 'Only authenticated therapists may access progress tracking' },
+        { error: 'Only therapists can do this. Sign in with a therapist account.' },
         { status: 403 }
       ),
     };

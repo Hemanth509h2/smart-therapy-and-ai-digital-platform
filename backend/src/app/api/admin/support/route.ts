@@ -3,6 +3,7 @@ import type { Prisma, TicketStatus } from '@prisma/client';
 import { prisma } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { dateRange, listParams } from '@/lib/admin/adminList';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,7 +77,6 @@ export async function GET(request: Request) {
       admins,
     });
   } catch (e: any) {
-    console.error('GET /api/admin/support failed:', e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return errorResponse(e, 'GET /api/admin/support failed', "We couldn't load support tickets. Please try again.");
   }
 }

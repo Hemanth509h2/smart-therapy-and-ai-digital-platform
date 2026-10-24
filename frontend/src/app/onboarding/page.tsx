@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { apiFetch } from '@/lib/api';
+import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 
 function OnboardingForm() {
@@ -56,17 +57,14 @@ function OnboardingForm() {
         }),
       });
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || 'Could not save your profile details.');
-      }
+      if (!response.ok) throw new Error(await apiErrorMessage(response, 'save your profile details'));
 
       const data = await response.json();
       setRoleAndProfile('THERAPIST', data.profile);
       toast('Profile created — welcome to STAAD.');
       router.push('/');
-    } catch (err: any) {
-      toast(err.message || 'Could not complete your profile. Please try again.', 'error');
+    } catch (err) {
+      toast(caughtErrorMessage(err, 'save your profile details'), 'error');
     } finally {
       setLoading(false);
     }

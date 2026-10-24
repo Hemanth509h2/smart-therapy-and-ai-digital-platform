@@ -10,6 +10,7 @@
 // stored anywhere.
 
 import { apiFetch } from '@/lib/api'
+import { apiErrorMessage } from '@/lib/apiError'
 import { ALL_MODULES, MODULE_CATEGORIES } from '@/lib/modules'
 
 export interface CallPlanModule {
@@ -67,8 +68,8 @@ async function agentToken(sessionId: string): Promise<string> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessionId }),
   })
+  if (!res.ok) throw new Error(await apiErrorMessage(res, 'start the AI agent'))
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || 'Could not start the AI agent.')
   return data.token
 }
 
@@ -107,12 +108,22 @@ async function ask(
         return
       }
       if (msg.type === 'status') onStep?.(msg.step as AgentStep)
-      else if (msg.type === 'error') finish(() => reject(new Error(msg.error || 'The AI agent failed.')))
+      else if (msg.type === 'error')
+        finish(() => reject(new Error(msg.error || 'The AI agent ran into a problem. Please try again.')))
       else finish(() => resolve(msg))
     }
-    ws.onerror = () => finish(() => reject(new Error('Could not reach the AI service.')))
+    ws.onerror = () =>
+      finish(() => reject(new Error("We couldn't reach the AI service. Check your internet connection and try again.")))
     ws.onclose = (event) =>
-      finish(() => reject(new Error(event.code === 1008 ? 'Not allowed to use the AI agent.' : 'The AI agent disconnected.')))
+      finish(() =>
+        reject(
+          new Error(
+            event.code === 1008
+              ? "Your account isn't allowed to use the AI agent for this session."
+              : 'The AI agent disconnected before it finished. Please try again.'
+          )
+        )
+      )
   })
 }
 

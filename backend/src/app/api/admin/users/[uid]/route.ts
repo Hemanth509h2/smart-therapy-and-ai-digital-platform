@@ -4,6 +4,7 @@ import { therapistForUser } from '@/lib/core/links';
 import { requireAdmin, requireRecentLogin, invalidateAccountStatus } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { adminAuth, adminDb } from '@/lib/core/firebaseAdmin';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +34,7 @@ export async function DELETE(request: Request, { params }: { params: { uid: stri
       prisma.user.findUnique({ where: { id: params.uid }, select: { id: true, email: true, role: true } }),
       therapistForUser(params.uid, { id: true, firstName: true, lastName: true }),
     ]);
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!user) return NextResponse.json({ error: "We couldn't find this account. It may have been removed." }, { status: 404 });
     if (user.id === auth.uid) return NextResponse.json({ error: "You can't remove your own account." }, { status: 400 });
     if (user.role !== 'THERAPIST' || !therapist) {
       return NextResponse.json({ error: 'Only professional (therapist) accounts can be removed here.' }, { status: 400 });
@@ -56,7 +57,7 @@ export async function DELETE(request: Request, { params }: { params: { uid: stri
       await adminAuth().deleteUser(user.id);
     } catch (e: any) {
       if (e?.code !== 'auth/user-not-found') {
-        return NextResponse.json({ error: `Couldn't delete the sign-in account: ${e?.message || e}` }, { status: 502 });
+        return NextResponse.json({ error: "We couldn't delete this professional's sign-in account, so nothing was removed. Please try again." }, { status: 502 });
       }
     }
 
@@ -114,7 +115,6 @@ export async function DELETE(request: Request, { params }: { params: { uid: stri
 
     return NextResponse.json({ removed: true, ...counts, warnings });
   } catch (error: any) {
-    console.error('Admin user DELETE error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin user DELETE error', "We couldn't delete this user. Please try again.");
   }
 }

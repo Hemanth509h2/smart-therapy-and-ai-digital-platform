@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { signInWithCustomToken } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { apiFetch } from '@/lib/api';
+import { apiErrorMessage, caughtErrorMessage, networkErrorMessage } from '@/lib/apiError';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Heart, Video, ShieldCheck, Loader2 } from 'lucide-react';
@@ -33,9 +34,12 @@ export default function GuestJoinPage({ params }: { params: { token: string } })
   useEffect(() => {
     let cancelled = false;
     apiFetch(`/api/invites/${token}`)
-      .then((res) => (res.ok ? res.json() : res.json().then((d) => Promise.reject(new Error(d.error || 'Invite not found')))))
+      .then(async (res) => {
+        if (!res.ok) throw new Error(await apiErrorMessage(res, 'open this invite link'));
+        return res.json();
+      })
       .then((data) => !cancelled && setInvite(data.invite))
-      .catch((e) => !cancelled && toast(e.message || 'This invite link is not valid.', 'error'))
+      .catch((e) => !cancelled && toast(caughtErrorMessage(e, 'open this invite link'), 'error'))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
@@ -52,8 +56,8 @@ export default function GuestJoinPage({ params }: { params: { token: string } })
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'join the session'));
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not join the session.');
       await signInWithCustomToken(auth, data.guestToken);
       sessionStorage.setItem('guestName', data.clientName || 'Guest');
       router.push(`/session/${data.sessionId}?guest=1`);
@@ -61,9 +65,9 @@ export default function GuestJoinPage({ params }: { params: { token: string } })
       if (e?.code === 'auth/operation-not-allowed') {
         toast('Guest access is not enabled yet. Please ask your therapist for an account link instead.', 'error');
       } else if (e?.code === 'auth/network-request-failed') {
-        toast('Network problem — please check your internet connection and try again.', 'error');
+        toast(networkErrorMessage('join the session'), 'error');
       } else {
-        toast(e?.message || 'Could not join the session.', 'error');
+        toast(caughtErrorMessage(e, 'join the session'), 'error');
       }
       setJoining(false);
     }

@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
   if (!secret || (request.headers.get('x-cron-secret') !== secret && bearer !== secret)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Only the scheduled subscription job can run this.' }, { status: 401 });
   }
 
   const dryRun = new URL(request.url).searchParams.get('dryRun') === '1';
@@ -159,7 +159,10 @@ export async function GET(request: Request) {
         .update({ where: { id: run.id }, data: { ok: false, detail: { error: error.message }, finishedAt: new Date() } })
         .catch(() => {});
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: 'The subscription job failed. It will run again on the next schedule.' },
+      { status: 500 }
+    );
   }
 }
 

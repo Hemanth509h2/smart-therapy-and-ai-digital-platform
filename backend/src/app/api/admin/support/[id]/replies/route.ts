@@ -4,6 +4,7 @@ import { prisma } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { getSetting } from '@/lib/core/settings';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,10 +21,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const payload = await request.json().catch(() => ({}));
     const body = typeof payload.body === 'string' ? payload.body.trim().slice(0, 20_000) : '';
     const internal = payload.internal === true;
-    if (!body) return NextResponse.json({ error: 'body is required' }, { status: 400 });
+    if (!body) return NextResponse.json({ error: 'Write a reply before sending.' }, { status: 400 });
 
     const ticket = await prisma.supportTicket.findUnique({ where: { id: params.id } });
-    if (!ticket) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
+    if (!ticket) return NextResponse.json({ error: "We couldn't find this support ticket. It may have been deleted." }, { status: 404 });
 
     let reply = await prisma.supportReply.create({
       data: { ticketId: ticket.id, authorUid: auth.uid, authorEmail: auth.email ?? null, body, internal },
@@ -34,7 +35,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       try {
         const user = process.env.SMTP_USER;
         const pass = process.env.SMTP_PASS;
-        if (!user || !pass) throw new Error('Email is not configured on the server.');
+        if (!user || !pass) throw new Error("Email isn't set up on the server yet, so nothing was sent. Ask whoever manages hosting to set it up.");
         const port = Number(process.env.SMTP_PORT || 587);
         const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST || 'smtp.gmail.com', port, secure: port === 465, auth: { user, pass } });
         await transporter.sendMail({
@@ -60,7 +61,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     });
     return NextResponse.json({ reply, emailError });
   } catch (e: any) {
-    console.error('POST /api/admin/support/[id]/replies failed:', e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return errorResponse(e, 'POST /api/admin/support/[id]/replies failed', "We couldn't save your reply. Please try again.");
   }
 }

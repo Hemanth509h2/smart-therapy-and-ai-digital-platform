@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/http/apiAuth';
 import { getSettings } from '@/lib/core/settings';
 import { moduleName } from '@/lib/modules/modules';
 import { SENT_STATUSES, minutesBetween, round2, therapistStorage, usageCost, usageRange, usageRates } from '@/lib/admin/usage';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,7 @@ export async function GET(request: Request, { params }: { params: { therapistId:
       where: { id: therapistId },
       select: { id: true, firstName: true, lastName: true, userId: true, createdAt: true, specialty: true },
     });
-    if (!therapist) return NextResponse.json({ error: 'Professional not found' }, { status: 404 });
+    if (!therapist) return NextResponse.json({ error: "We couldn't find this professional. Their account may have been removed." }, { status: 404 });
 
     const range = usageRange(new URL(request.url).searchParams);
     const { since } = range;
@@ -230,7 +231,6 @@ export async function GET(request: Request, { params }: { params: { therapistId:
       storage: storage.sort((a, b) => b.bytes - a.bytes).map(({ table, rows, bytes }) => ({ table, rows, bytes })),
     });
   } catch (error: any) {
-    console.error('Admin professional usage error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin professional usage error', "We couldn't load this professional's usage. Please try again.");
   }
 }

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/core/db';
 import { sendViaBot } from '@/lib/messaging/whatsapp-bot';
 import { normalizeWhatsAppNumber, sendCloudApiInteractive } from '@/lib/messaging/whatsapp-cloud-api';
 import { requireAutomationOrTherapist } from '@/lib/automation/auth';
+import { notYourProfile } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,20 +23,20 @@ export async function POST(request: Request) {
 
     // A therapist can only log sends against their own profile.
     if (caller.kind === 'therapist' && therapistId && therapistId !== caller.therapist.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return notYourProfile('this therapist profile');
     }
 
     if (!to) {
-      return NextResponse.json({ error: 'to (phone number) is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Enter a phone number to send the WhatsApp message to.' }, { status: 400 });
     }
     if (!type || !['text', 'interactive'].includes(type)) {
-      return NextResponse.json({ error: 'type must be "text" or "interactive"' }, { status: 400 });
+      return NextResponse.json({ error: "We couldn't tell what kind of WhatsApp message to send. Refresh the page and try again." }, { status: 400 });
     }
     if (type === 'text' && !textBody) {
-      return NextResponse.json({ error: 'body is required for text messages' }, { status: 400 });
+      return NextResponse.json({ error: 'Type a message before sending.' }, { status: 400 });
     }
     if (type === 'interactive' && !interactive) {
-      return NextResponse.json({ error: 'interactive object is required for interactive messages' }, { status: 400 });
+      return NextResponse.json({ error: "This message is missing its buttons or options. Refresh the page and try again." }, { status: 400 });
     }
 
     const normalizedTo = normalizeWhatsAppNumber(to);
@@ -96,6 +97,6 @@ export async function POST(request: Request) {
     }
   } catch (error: any) {
     console.error('WhatsApp send error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "We couldn't send the WhatsApp message. Please try again." }, { status: 500 });
   }
 }

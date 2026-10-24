@@ -3,6 +3,7 @@ import { appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { SETTING_DEFAULTS, coerceSetting, isSettingKey, type SettingKey } from '@/lib/core/settings';
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,8 +31,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ settings, integrations: integrationStatus() });
   } catch (error: any) {
-    console.error('Admin settings GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin settings GET error', "We couldn't load the settings. Please try again.");
   }
 }
 
@@ -44,16 +44,16 @@ export async function PATCH(request: Request) {
 
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
-      return NextResponse.json({ error: 'Send an object of { key: value }.' }, { status: 400 });
+      return NextResponse.json({ error: "We couldn't read the settings you sent. Refresh the page and try again." }, { status: 400 });
     }
 
     const updates: { key: SettingKey; value: string | number | boolean }[] = [];
     for (const [key, raw] of Object.entries(body)) {
-      if (!isSettingKey(key)) return NextResponse.json({ error: `Unknown setting: ${key}` }, { status: 400 });
+      if (!isSettingKey(key)) return NextResponse.json({ error: `"${key}" is not a setting we recognise. Refresh the page and try again.` }, { status: 400 });
       const value = coerceSetting(key, raw);
-      if (value === undefined) return NextResponse.json({ error: `Invalid value for ${key}` }, { status: 400 });
+      if (value === undefined) return NextResponse.json({ error: `The value for "${key}" is not valid. Check it and try again.` }, { status: 400 });
       if (key === 'support.email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value))) {
-        return NextResponse.json({ error: 'Support email is not a valid address.' }, { status: 400 });
+        return NextResponse.json({ error: 'Enter a valid support email address, like help@example.com.' }, { status: 400 });
       }
       updates.push({ key, value });
     }
@@ -82,8 +82,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ ok: true, changed: changed.map((u) => u.key) });
   } catch (error: any) {
-    console.error('Admin settings PATCH error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin settings PATCH error', "We couldn't save the settings. Please try again.");
   }
 }
 

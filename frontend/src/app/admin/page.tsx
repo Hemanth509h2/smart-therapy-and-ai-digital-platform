@@ -19,7 +19,7 @@ interface Dashboard {
 }
 
 export default function AdminDashboardPage() {
-  const { data, loading, error, reload } = useAdminQuery<Dashboard>('/api/admin/dashboard');
+  const { data, loading, error, reload } = useAdminQuery<Dashboard>('/api/admin/dashboard', 'load the dashboard');
 
   return (
     <AdminPage title="Dashboard" description="How the platform is doing today, and what needs attention.">

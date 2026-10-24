@@ -14,12 +14,12 @@ export async function GET(request: Request, { params }: { params: { orderId: str
     if (!auth.ok) return auth.response;
 
     if (!cashfreeConfigured()) {
-      return NextResponse.json({ error: 'Cashfree is not configured' }, { status: 503 });
+      return NextResponse.json({ error: 'Payments are not available right now. An admin needs to finish setting up payments.' }, { status: 503 });
     }
 
     const payment = await appDb.payment.findUnique({ where: { id: params.orderId } });
     if (!payment || payment.userId !== auth.uid) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+      return NextResponse.json({ error: "We couldn't find that payment. If money was taken, contact support with your order ID." }, { status: 404 });
     }
 
     const { order, payments } = await syncCashfreeOrder(params.orderId);
@@ -44,7 +44,13 @@ export async function GET(request: Request, { params }: { params: { orderId: str
   } catch (error: any) {
     console.error('Cashfree get order error:', error.details || error);
     return NextResponse.json(
-      { error: error.message, details: error.details },
+      {
+        error:
+          error.status === 404
+            ? "We couldn't find that payment. If money was taken, contact support with your order ID."
+            : "We couldn't check this payment's status. Refresh the page in a minute.",
+        details: error.details,
+      },
       { status: error.status === 404 ? 404 : 500 }
     );
   }

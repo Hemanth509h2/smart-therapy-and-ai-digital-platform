@@ -80,10 +80,10 @@ export async function POST(request: Request) {
     const { email: rawEmail, password, firstName, lastName, adminRole } = await request.json();
     const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
     if (!email) {
-      return NextResponse.json({ error: 'email is required' }, { status: 400 });
+      return NextResponse.json({ error: "Enter the new admin's email address." }, { status: 400 });
     }
     if (adminRole !== undefined && !ADMIN_ROLES.includes(adminRole)) {
-      return NextResponse.json({ error: 'Invalid adminRole' }, { status: 400 });
+      return NextResponse.json({ error: 'Choose a valid admin role.' }, { status: 400 });
     }
 
     const firebaseAdminAuth = adminAuth();
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     } catch {
       if (!password || String(password).length < 6) {
         return NextResponse.json(
-          { error: 'A password of at least 6 characters is required for a new admin.' },
+          { error: 'Enter a password of at least 6 characters for the new admin.' },
           { status: 400 }
         );
       }

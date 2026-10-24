@@ -23,11 +23,11 @@ export async function GET(request: Request) {
     const from = params.get('from') ?? istDateString()
     const to = params.get('to') ?? from
     if (!isValidDateString(from) || !isValidDateString(to)) {
-      return NextResponse.json({ error: 'from and to must be YYYY-MM-DD' }, { status: 400 })
+      return NextResponse.json({ error: 'Give the from and to dates in YYYY-MM-DD format.' }, { status: 400 })
     }
     const days = daysBetween(from, to)
     if (days < 1 || days > MAX_DAYS) {
-      return NextResponse.json({ error: `to must not be before from, and the range is at most ${MAX_DAYS} days` }, { status: 400 })
+      return NextResponse.json({ error: `The to date can't be before the from date, and the range can be at most ${MAX_DAYS} days.` }, { status: 400 })
     }
 
     let statuses: SessionStatus[] = ['SCHEDULED', 'ACTIVE', 'COMPLETED']
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     if (status) {
       statuses = status.split(',').map((s) => s.trim().toUpperCase()) as SessionStatus[]
       if (statuses.length === 0 || statuses.some((s) => !STATUSES.includes(s))) {
-        return NextResponse.json({ error: `status must be a comma-separated list of ${STATUSES.join(', ')}` }, { status: 400 })
+        return NextResponse.json({ error: `Status must be a comma-separated list of: ${STATUSES.join(', ')}.` }, { status: 400 })
       }
     }
 

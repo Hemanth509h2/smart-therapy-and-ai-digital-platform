@@ -7,6 +7,7 @@ import {
   useAdmin, useAdminQuery, type Column,
 } from '@/components/admin/kit';
 import { adminFetch, fmtDate, timeAgo } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
 import { ADMIN_ROLE_LABELS, type AdminRole } from '@/lib/adminRoles';
 import { toast } from '@/components/practice/ui';
 
@@ -39,7 +40,7 @@ function RoleBadge({ role }: { role: AdminRole }) {
 
 export default function AdminsPage() {
   const { uid } = useAdmin();
-  const { data, loading, error, reload } = useAdminQuery<{ admins: AdminRow[]; invites: InviteRow[] }>('/api/admin/admins');
+  const { data, loading, error, reload } = useAdminQuery<{ admins: AdminRow[]; invites: InviteRow[] }>('/api/admin/admins', 'load the admins');
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [roleChange, setRoleChange] = useState<{ admin: AdminRow; role: AdminRole } | null>(null);
@@ -152,8 +153,9 @@ export default function AdminsPage() {
           await adminFetch(`/api/admin/admins/${encodeURIComponent(roleChange.admin.userId)}`, {
             method: 'PATCH',
             json: { adminRole: roleChange.role },
+            action: 'change this role',
           });
-          toast('Role updated');
+          toast(`${roleChange.admin.email} is now ${ADMIN_ROLE_LABELS[roleChange.role].label}.`);
           reload();
         }}
       />
@@ -174,8 +176,11 @@ export default function AdminsPage() {
         danger
         onConfirm={async () => {
           if (!removing) return;
-          await adminFetch(`/api/admin/admins/${encodeURIComponent(removing.userId)}`, { method: 'DELETE' });
-          toast('Admin removed');
+          await adminFetch(`/api/admin/admins/${encodeURIComponent(removing.userId)}`, {
+            method: 'DELETE',
+            action: 'remove this admin',
+          });
+          toast(`${removing.name || removing.email} no longer has admin access.`);
           reload();
         }}
       />
@@ -189,8 +194,11 @@ export default function AdminsPage() {
         danger
         onConfirm={async () => {
           if (!revoking) return;
-          await adminFetch(`/api/admin/invites?id=${encodeURIComponent(revoking.id)}`, { method: 'DELETE' });
-          toast('Invite revoked');
+          await adminFetch(`/api/admin/invites?id=${encodeURIComponent(revoking.id)}`, {
+            method: 'DELETE',
+            action: 'revoke this invite',
+          });
+          toast(`The invite for ${revoking.email} was ${revoking.expired ? 'removed' : 'revoked'}.`);
           reload();
         }}
       />
@@ -215,13 +223,14 @@ function InviteModal({ open, onClose, onInvited }: { open: boolean; onClose: () 
       const d = await adminFetch<{ link: string; emailed: boolean }>('/api/admin/invites', {
         method: 'POST',
         json: { email: email.trim(), adminRole: role },
+        action: 'send the invite',
       });
       setResult({ link: d.link, emailed: d.emailed, email: email.trim() });
-      if (d.emailed) toast(`Invite emailed to ${email.trim()}`);
+      if (d.emailed) toast(`Invite emailed to ${email.trim()}.`);
       else toast(`Email isn't set up on the server, so send this link to ${email.trim()} yourself.`, 'warning');
       onInvited();
-    } catch (e: any) {
-      toast(e.message || 'Could not send the invite.', 'error');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'send the invite'), 'error');
     } finally {
       setBusy(false);
     }
@@ -231,7 +240,7 @@ function InviteModal({ open, onClose, onInvited }: { open: boolean; onClose: () 
     if (!result) return;
     try {
       await navigator.clipboard.writeText(result.link);
-      toast('Link copied');
+      toast('Invite link copied.');
     } catch {
       toast('Could not copy — select the link and copy it.', 'error');
     }

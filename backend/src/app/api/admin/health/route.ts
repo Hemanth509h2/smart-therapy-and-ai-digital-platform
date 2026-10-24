@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { firebasePrivateKey } from '@/lib/core/firebaseKey'
+import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,8 +37,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ checkedAt: new Date(), checks, cron });
   } catch (error: any) {
-    console.error('Admin health error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return errorResponse(error, 'Admin health error', "We couldn't check system health. Please try again.");
   }
 }
 

@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
+import { toast } from '@/components/practice/ui';
 
 export default function ReportDownload({ clientId }) {
   const [downloading, setDownloading] = useState(false);
@@ -11,10 +13,7 @@ export default function ReportDownload({ clientId }) {
     setError(null);
     try {
       const res = await fetch(`/api/progress-features/reports/${clientId}`);
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.error || `Request failed (${res.status})`);
-      }
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'download the progress report'));
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -24,8 +23,9 @@ export default function ReportDownload({ clientId }) {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      toast('The progress report was downloaded.');
     } catch (e) {
-      setError(e.message);
+      setError(caughtErrorMessage(e, 'download the progress report'));
     } finally {
       setDownloading(false);
     }
