@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { AlertTriangle, Blocks, Brain, Cpu, Database, Download, FileText, HardDrive, IndianRupee, MemoryStick, MessageCircle, Mic, Server, TrendingUp, Users, Video } from 'lucide-react';
 import {
   AdminPage,
@@ -23,7 +23,7 @@ import {
   type Column,
 } from '@/components/admin/kit';
 import { ChartCard, type Point } from '@/components/admin/charts';
-import { downloadCsv, inr, num, timeAgo } from '@/lib/adminApi';
+import { downloadCsv, fmtBytes as bytes, inr, num, timeAgo } from '@/lib/adminApi';
 
 interface ProfessionalUsage {
   therapistId: string;
@@ -131,18 +131,6 @@ const RANGES = [
 
 const PAGE_SIZE = 25;
 
-function bytes(n: number | null | undefined) {
-  if (n == null) return '—';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let i = 0;
-  let v = n;
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024;
-    i++;
-  }
-  return `${v.toLocaleString('en-IN', { maximumFractionDigits: i ? 1 : 0 })} ${units[i]}`;
-}
-
 function duration(sec: number) {
   const d = Math.floor(sec / 86400);
   const h = Math.floor((sec % 86400) / 3600);
@@ -176,6 +164,7 @@ export default function AdminUsagePage() {
   const [range, setRange] = useState('30d');
   const { data, loading, error, reload } = useAdminQuery<Usage>(`/api/admin/usage?range=${range}`);
   const { can } = useAdmin();
+  const router = useRouter();
   const rangeLabel = RANGES.find((r) => r.value === range)?.label ?? '';
   const seriesLabel = data && data.range.days == null ? 'Last 12 months' : rangeLabel;
 
@@ -242,7 +231,7 @@ export default function AdminUsagePage() {
     header: 'Professional',
     sortKey: 'name',
     render: (r) => (
-      <Link href={`/admin/professionals/${r.therapistId}`} className="block min-w-[180px]">
+      <div className="min-w-[180px]">
         <div className="flex items-center gap-1.5 font-semibold">
           {r.name}
           {r.status === 'SUSPENDED' && <Badge tone="bad">Suspended</Badge>}
@@ -251,7 +240,7 @@ export default function AdminUsagePage() {
         <div className="mt-1 flex flex-wrap gap-1">
           <Badge tone={r.plan ? 'info' : 'neutral'}>{r.plan ?? 'Free'}</Badge>
         </div>
-      </Link>
+      </div>
     ),
   };
   const right = (key: string, header: string, sortKey: string, render: (r: ProfessionalUsage) => React.ReactNode): Column<ProfessionalUsage> => ({
@@ -344,7 +333,7 @@ export default function AdminUsagePage() {
 
           <Section
             title="Every professional"
-            description={`${num(rows.length)} of ${num(data.professionals.length)} professionals, ${rangeLabel.toLowerCase()}. Click a name for their full profile.`}
+            description={`${num(rows.length)} of ${num(data.professionals.length)} professionals, ${rangeLabel.toLowerCase()}. Click a row for everything about that professional.`}
           >
             <Toolbar>
               <SearchInput value={q} onChange={setQ} placeholder="Search name or email…" />
@@ -368,6 +357,7 @@ export default function AdminUsagePage() {
               sort={sort}
               dir={dir}
               onSort={onSort}
+              onRowClick={(r) => router.push(`/admin/usage/${r.therapistId}?range=${range}`)}
               loading={loading}
               empty={q || usedOnly !== 'all' ? 'No professionals match.' : 'No professionals yet.'}
             />
@@ -380,13 +370,17 @@ export default function AdminUsagePage() {
             <Section title="Heavy users this month" description={`More than ${num(data.alerts.threshold)} AI analyses since the 1st. Change the threshold in Settings.`}>
               <Card className="space-y-2">
                 {data.alerts.therapists.map((a) => (
-                  <Link key={a.therapistId} href={`/admin/professionals/${a.therapistId}`} className="flex flex-wrap items-center gap-3 rounded-lg px-1 py-1.5 text-sm hover:bg-[var(--sage-light)]">
+                  <button
+                    key={a.therapistId}
+                    onClick={() => router.push(`/admin/usage/${a.therapistId}?range=${range}`)}
+                    className="flex w-full flex-wrap items-center gap-3 rounded-lg px-1 py-1.5 text-left text-sm hover:bg-[var(--sage-light)]"
+                  >
                     <AlertTriangle className="h-4 w-4" style={{ color: '#b45309' }} />
                     <span className="font-semibold" style={{ color: 'var(--ink)' }}>{a.name}</span>
                     <span style={{ color: 'var(--ink-muted)' }}>{a.email}</span>
                     <span className="flex-1" />
                     <Badge tone="warn">{num(a.aiAnalyses)} analyses</Badge>
-                  </Link>
+                  </button>
                 ))}
               </Card>
             </Section>

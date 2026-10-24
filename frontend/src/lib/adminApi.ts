@@ -72,6 +72,18 @@ export function timeAgo(d: string | Date | null | undefined) {
   return fmtDate(d);
 }
 
+export function fmtBytes(n: number | null | undefined) {
+  if (n == null) return '—';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0;
+  let v = n;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${v.toLocaleString('en-IN', { maximumFractionDigits: i ? 1 : 0 })} ${units[i]}`;
+}
+
 export const fmtMinutes = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${Math.round(m % 60)}m` : `${Math.round(m)}m`);
 
 // ─── CSV export ──────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, Ban, CreditCard, Download, RotateCcw, SlidersHorizontal, Trash2, Users } from 'lucide-react';
+import { Activity, Ban, CreditCard, Download, Gauge, RotateCcw, SlidersHorizontal, Trash2, Users } from 'lucide-react';
 import {
   AdminPage,
   Badge,
@@ -257,27 +257,30 @@ export default function AdminProfessionalsPage() {
     },
     { key: 'access', header: 'Modules', render: (r) => <Badge tone={r.access.allModulesAllowed ? 'info' : 'warn'}>{accessLabel(r)}</Badge> },
     { key: 'createdAt', header: 'Joined', sortKey: 'createdAt', render: (r) => <span className="whitespace-nowrap text-xs" style={{ color: 'var(--ink-muted)' }}>{fmtDate(r.createdAt)}</span> },
-    ...(canWrite
-      ? [
-          {
-            key: 'actions',
-            header: '',
-            render: (r: Row) => (
-              <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                <Btn size="sm" variant="ghost" icon={<SlidersHorizontal className="h-3.5 w-3.5" />} onClick={() => openAccess(r)}>Access</Btn>
-                {r.status === 'SUSPENDED' ? (
-                  <Btn size="sm" variant="ghost" icon={<RotateCcw className="h-3.5 w-3.5" />} onClick={() => setStatusTarget(r)}>Reactivate</Btn>
-                ) : (
-                  <Btn size="sm" variant="danger" icon={<Ban className="h-3.5 w-3.5" />} onClick={() => setStatusTarget(r)}>Suspend</Btn>
-                )}
-                {canRemove && (
-                  <Btn size="sm" variant="danger" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setRemoveTarget(r)} title="Remove permanently">Remove</Btn>
-                )}
-              </div>
-            ),
-          } as Column<Row>,
-        ]
-      : []),
+    {
+      key: 'actions',
+      header: '',
+      render: (r: Row) => (
+        <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <Btn size="sm" variant="ghost" icon={<Gauge className="h-3.5 w-3.5" />} onClick={() => router.push(`/admin/usage/${r.id}`)} title="Usage, cost, storage and payments">
+            Usage & cost
+          </Btn>
+          {canWrite && (
+            <>
+              <Btn size="sm" variant="ghost" icon={<SlidersHorizontal className="h-3.5 w-3.5" />} onClick={() => openAccess(r)}>Access</Btn>
+              {r.status === 'SUSPENDED' ? (
+                <Btn size="sm" variant="ghost" icon={<RotateCcw className="h-3.5 w-3.5" />} onClick={() => setStatusTarget(r)}>Reactivate</Btn>
+              ) : (
+                <Btn size="sm" variant="danger" icon={<Ban className="h-3.5 w-3.5" />} onClick={() => setStatusTarget(r)}>Suspend</Btn>
+              )}
+              {canRemove && (
+                <Btn size="sm" variant="danger" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setRemoveTarget(r)} title="Remove permanently">Remove</Btn>
+              )}
+            </>
+          )}
+        </div>
+      ),
+    },
   ];
 
   const k = data?.kpis;

@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, Clock, Eye, Gift, Mail, Sparkles, Trash2, UserX, UserCheck, Users } from 'lucide-react';
+import { Activity, Clock, Eye, Gauge, Gift, Mail, Sparkles, Trash2, UserX, UserCheck, Users } from 'lucide-react';
 import {
   AdminPage,
   Badge,
@@ -159,6 +159,7 @@ export default function TherapistDetailPage() {
       actions={
         t && (
           <>
+            <Btn variant="ghost" icon={<Gauge className="h-4 w-4" />} onClick={() => router.push(`/admin/usage/${therapistId}`)}>Usage & cost</Btn>
             {canMessage && (
               <Btn variant="ghost" icon={<Mail className="h-4 w-4" />} onClick={() => setEmailOpen(true)}>Email</Btn>
             )}

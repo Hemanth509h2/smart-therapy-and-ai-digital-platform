@@ -2,57 +2,14 @@ import { NextResponse } from 'next/server';
 import { prisma, appDb } from '@/lib/core/db';
 import { usersById } from '@/lib/core/links';
 import { requireAdmin } from '@/lib/http/apiAuth';
-import { daysAgo, startOfMonth } from '@/lib/admin/adminList';
+import { startOfMonth } from '@/lib/admin/adminList';
 import { getSettings } from '@/lib/core/settings';
 import { ALL_MODULE_IDS, moduleName } from '@/lib/modules/modules';
+import { SENT_STATUSES, minutesBetween, round2, therapistStorage, usageCost, usageRange, usageRates } from '@/lib/admin/usage';
 
 export const dynamic = 'force-dynamic';
 
 const TYPES = ['AI_ANALYSIS', 'TRANSCRIPTION', 'MODULE_LAUNCH'] as const;
-// null = all time. The daily charts never go back further than a year.
-const RANGES: Record<string, number | null> = { '7d': 7, '30d': 30, '90d': 90, '365d': 365, all: null };
-const MAX_SERIES_DAYS = 365;
-const SENT_STATUSES = ['SENT', 'DELIVERED', 'READ'] as const;
-
-// Tables holding a therapist's rows, per database, for the per-professional
-// storage estimate. Fixed names only: they go into the SQL as-is.
-const HIPAA_TABLES: [table: string, column: string][] = [
-  ['ProfileClient', 'therapistId'],
-  ['Invite', 'therapistId'],
-  ['Booking', 'therapistId'],
-  ['Session', 'therapistId'],
-  ['SessionReport', 'therapistId'],
-  ['TherapistNote', 'therapistId'],
-  ['ProgressMetric', 'therapistId'],
-  ['ProgressReport', 'therapistId'],
-  ['ProgressNote', 'therapistId'],
-  ['RiskFlag', 'therapistId'],
-  ['document_chunks', 'therapist_id'],
-  ['WhatsAppMessage', 'therapistId'],
-];
-const APP_TABLES: [table: string, column: string][] = [
-  ['UsageEvent', 'therapistId'],
-  ['Subscription', 'therapistId'],
-  ['SubscriptionRequest', 'therapistId'],
-  ['Payment', 'therapistId'],
-];
-
-// Approximate bytes of each therapist's rows (pg_column_size of the row; large
-// values stored out of line are counted compressed). Best effort: a missing
-// table must not break the page, so failures count as zero.
-async function storageByTherapist(): Promise<Map<string, number>> {
-  const sql = (tables: [string, string][]) =>
-    `SELECT t, sum(b)::bigint AS b FROM (${tables
-      .map(([table, col]) => `SELECT "${col}" AS t, pg_column_size(x.*) AS b FROM "${table}" x WHERE "${col}" IS NOT NULL`)
-      .join(' UNION ALL ')}) s GROUP BY t`;
-  const [hipaa, app] = await Promise.all([
-    prisma.$queryRawUnsafe<{ t: string; b: bigint }[]>(sql(HIPAA_TABLES)).catch((e) => (console.error('Storage estimate (HIPAA) failed:', e.message), [])),
-    appDb.$queryRawUnsafe<{ t: string; b: bigint }[]>(sql(APP_TABLES)).catch((e) => (console.error('Storage estimate (app) failed:', e.message), [])),
-  ]);
-  const out = new Map<string, number>();
-  for (const r of [...hipaa, ...app]) out.set(r.t, (out.get(r.t) ?? 0) + Number(r.b));
-  return out;
-}
 
 // GET /api/admin/usage?range=30d — usage and estimated cost for the platform
 // and for every professional (including those with no usage).
@@ -76,11 +33,7 @@ export async function GET(request: Request) {
     if (!auth.ok) return auth.response;
 
     const sp = new URL(request.url).searchParams;
-    const rangeKey = (sp.get('range') || '') in RANGES ? sp.get('range')! : '30d';
-    const days = RANGES[rangeKey];
-    const since = days == null ? new Date(0) : daysAgo(days);
-    const seriesDays = Math.min(days ?? MAX_SERIES_DAYS, MAX_SERIES_DAYS);
-    const seriesSince = daysAgo(seriesDays);
+    const { key: rangeKey, days, since, seriesDays, seriesSince } = usageRange(sp);
     const monthStart = startOfMonth();
     const now = new Date();
 
@@ -145,10 +98,8 @@ export async function GET(request: Request) {
           SELECT "therapistId", "clientId" FROM "Session"
           UNION SELECT "therapistId", id AS "clientId" FROM "ProfileClient" WHERE "therapistId" IS NOT NULL
         ) c GROUP BY 1`,
-      storageByTherapist(),
+      therapistStorage(),
     ]);
-
-    const minutesBetween = (s: { startedAt: Date | null; endedAt: Date | null }) => Math.max(0, (s.endedAt!.getTime() - s.startedAt!.getTime()) / 60000);
 
     let totalMinutes = 0;
     const minutesOf = new Map<string, number>();
@@ -158,13 +109,7 @@ export async function GET(request: Request) {
       minutesOf.set(s.therapistId, (minutesOf.get(s.therapistId) ?? 0) + m);
     }
 
-    const rates = {
-      aiAnalysisInr: settings['costs.aiAnalysisInr'],
-      transcriptionMinuteInr: settings['costs.transcriptionMinuteInr'],
-      aiReportInr: settings['costs.aiReportInr'],
-      videoMinuteInr: settings['costs.videoMinuteInr'],
-      whatsappMessageInr: settings['costs.whatsappMessageInr'],
-    };
+    const rates = usageRates(settings);
     const threshold = settings['usage.alertMonthlyAnalyses'];
 
     // Continuous daily series per type (missing days = 0).
@@ -237,6 +182,9 @@ export async function GET(request: Request) {
       r.revenueInr = round2(Number(g._sum.amount ?? 0));
     }
 
+    const storageOf = new Map<string, number>();
+    for (const r of storage) storageOf.set(r.therapistId, (storageOf.get(r.therapistId) ?? 0) + r.bytes);
+
     const planOf = new Map<string, string>();
     for (const s of subscriptions) if (!planOf.has(s.therapistId)) planOf.set(s.therapistId, s.plan.name);
     const users = await usersById(therapists.map((t) => t.userId), { email: true, status: true, lastSeenAt: true });
@@ -245,14 +193,7 @@ export async function GET(request: Request) {
       .map((t) => {
         const r = byTherapist.get(t.id)!;
         const videoMinutes = Math.round(r.videoMinutes);
-        const cost = {
-          aiAnalysisInr: round2(r.aiAnalyses * rates.aiAnalysisInr),
-          aiReportInr: round2(r.aiReports * rates.aiReportInr),
-          transcriptionInr: round2(r.transcriptionMinutes * rates.transcriptionMinuteInr),
-          videoInr: round2(videoMinutes * rates.videoMinuteInr),
-          whatsappInr: round2(r.whatsappMessages * rates.whatsappMessageInr),
-        };
-        const estCostInr = round2(Object.values(cost).reduce((a, b) => a + b, 0));
+        const { cost, estCostInr } = usageCost({ ...r, videoMinutes }, rates);
         const user = users.get(t.userId);
         return {
           therapistId: t.id,
@@ -263,7 +204,7 @@ export async function GET(request: Request) {
           joinedAt: t.createdAt,
           plan: planOf.get(t.id) ?? null,
           ...r,
-          storageBytes: storage.get(t.id) ?? 0,
+          storageBytes: storageOf.get(t.id) ?? 0,
           videoMinutes,
           cost,
           estCostInr,
@@ -350,5 +291,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
-
-const round2 = (n: number) => Math.round(n * 100) / 100;
