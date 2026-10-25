@@ -57,10 +57,17 @@ interface ListResponse {
 
 const ACTIVE_MS = 30 * 864e5;
 
-function statusOf(r: Row): { label: string; tone: 'good' | 'neutral' | 'bad' } {
-  if (r.status === 'SUSPENDED') return { label: 'Suspended', tone: 'bad' };
+// Only Suspended is an account state (set with Suspend / Reactivate). Active
+// and Idle just describe activity in the last 30 days; an idle account works
+// normally and turns Active again by itself when they sign in or hold a session.
+function statusOf(r: Row): { label: string; tone: 'good' | 'neutral' | 'bad'; hint: string } {
+  if (r.status === 'SUSPENDED') {
+    return { label: 'Suspended', tone: 'bad', hint: `Can't sign in.${r.suspendReason ? ` Reason: ${r.suspendReason}` : ''}` };
+  }
   const active = r.lastActive && Date.now() - new Date(r.lastActive).getTime() <= ACTIVE_MS;
-  return active ? { label: 'Active', tone: 'good' } : { label: 'Inactive', tone: 'neutral' };
+  return active
+    ? { label: 'Active', tone: 'good', hint: 'Signed in or held a session in the last 30 days.' }
+    : { label: 'Idle', tone: 'neutral', hint: 'No sign-in or session in the last 30 days. The account works normally and shows Active again once they use it.' };
 }
 
 const accessLabel = (r: Row) => (r.access.allModulesAllowed ? 'All' : `${r.access.allowedCount}/${r.access.totalModules}`);
@@ -240,7 +247,7 @@ export default function AdminProfessionalsPage() {
       header: 'Status',
       render: (r) => {
         const s = statusOf(r);
-        return <Badge tone={s.tone} title={r.suspendReason ? `Reason: ${r.suspendReason}` : undefined}>{s.label}</Badge>;
+        return <Badge tone={s.tone} title={s.hint}>{s.label}</Badge>;
       },
     },
     { key: 'clients', header: 'Clients', sortKey: 'clients', align: 'right', render: (r) => num(r.clients) },
@@ -326,7 +333,7 @@ export default function AdminProfessionalsPage() {
           options={[
             { value: '', label: 'All statuses' },
             { value: 'active', label: 'Active' },
-            { value: 'inactive', label: 'Inactive' },
+            { value: 'inactive', label: 'Idle (30 days)' },
             { value: 'suspended', label: 'Suspended' },
           ]}
         />
