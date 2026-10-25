@@ -6,17 +6,19 @@ export const dynamic = 'force-dynamic';
 
 // GET /server-stats — CPU, memory and disk of the machine this website runs
 // on, for the admin "Database & hosting" page. The backend asks for it with a
-// 60-second token signed with STT_TOKEN_SECRET (sent as a Bearer header), so
-// it must be set here to the backend's value. Without it, or with a wrong
-// token, the route says it doesn't exist. Same shape as the backend's own
-// report (backend/src/lib/admin/host-stats.ts). Not under /api, which may be
-// proxied to the backend (see next.config.mjs).
+// 60-second token signed with SERVER_STATS_SECRET (sent as a Bearer header),
+// set to the same value here and on the backend. A secret of its own, so the
+// website holds nothing that could open the AI service (STT_TOKEN_SECRET).
+// Same shape as the backend's own report (backend/src/lib/admin/host-stats.ts).
+// Not under /api, which may be proxied to the backend (see next.config.mjs).
+//
+// The statuses tell the backend what to ask the admin to fix: 503 = secret
+// not set here, 403 = token rejected (the two secrets differ).
 export async function GET(request: Request) {
-  const secret = process.env.STT_TOKEN_SECRET;
+  const secret = process.env.SERVER_STATS_SECRET;
+  if (!secret) return new Response('SERVER_STATS_SECRET is not set', { status: 503 });
   const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? '';
-  if (!secret || !validToken(token, secret)) {
-    return new Response('Not found', { status: 404 });
-  }
+  if (!validToken(token, secret)) return new Response('Forbidden', { status: 403 });
 
   // On Vercel each request runs in a short-lived function whose disk is
   // read-only (it always reads as full), so no disk is reported there.

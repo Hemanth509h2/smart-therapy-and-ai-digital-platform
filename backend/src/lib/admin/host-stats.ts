@@ -51,18 +51,36 @@ export type ServerReport =
   | { name: string; ok: false; reason: string };
 
 // The frontend and AI service only answer /server-stats with a short-lived
-// token signed with STT_TOKEN_SECRET (the secret the AI service already
-// shares with the backend; the frontend needs it set too).
+// signed token. The AI service checks it with STT_TOKEN_SECRET, which it
+// already shares with the backend. The frontend gets a secret of its own,
+// SERVER_STATS_SECRET, so the website never holds a key to the AI service.
 export const STATS_SID = 'server-stats';
 const STATS_SCOPE = 'server-stats';
 
+// The frontend's address, taken from the CORS list: the first origin that
+// isn't localhost (so a deployed backend skips the dev entry), else the first.
+function frontendUrl() {
+  const origins = (process.env.ALLOWED_ORIGINS ?? '').split(',').map((o) => o.trim()).filter(Boolean);
+  return origins.find((o) => !/^https?:\/\/(localhost|127\.0\.0\.1)(:|$)/.test(o)) ?? origins[0];
+}
+
 /** Asks the frontend or AI service for its machine's stats. Never throws. */
 export async function remoteHostStats(name: string, service: 'frontend' | 'ai'): Promise<ServerReport> {
-  const base = (service === 'frontend' ? process.env.APP_URL : process.env.STT_RELAY_URL || process.env.NEXT_PUBLIC_STT_RELAY_URL)?.replace(/\/+$/, '');
-  const urlVar = service === 'frontend' ? 'APP_URL' : 'STT_RELAY_URL';
+  const frontend = service === 'frontend';
+  const base = (frontend ? frontendUrl() : process.env.STT_RELAY_URL || process.env.NEXT_PUBLIC_STT_RELAY_URL)?.replace(/\/+$/, '');
+  const urlVar = frontend ? 'ALLOWED_ORIGINS' : 'STT_RELAY_URL';
   if (!base) return { name, ok: false, reason: `${urlVar} is not set on the backend, so we don't know where this server is.` };
-  const secret = process.env.STT_TOKEN_SECRET;
-  if (!secret) return { name, ok: false, reason: 'STT_TOKEN_SECRET is not set on the backend.' };
+  const secretVar = frontend ? 'SERVER_STATS_SECRET' : 'STT_TOKEN_SECRET';
+  const secret = process.env[secretVar];
+  if (!secret) {
+    return {
+      name,
+      ok: false,
+      reason: frontend
+        ? 'SERVER_STATS_SECRET is not set on the backend. Generate one (openssl rand -hex 32) and set the same value on the backend and the frontend.'
+        : 'STT_TOKEN_SECRET is not set on the backend.',
+    };
+  }
 
   const token = mintSttToken(STATS_SID, secret, 60_000, STATS_SCOPE);
   const url =
@@ -71,21 +89,30 @@ export async function remoteHostStats(name: string, service: 'frontend' | 'ai'):
       : `${base}/server-stats?sid=${STATS_SID}&token=${encodeURIComponent(token)}`;
   try {
     const res = await fetch(url, {
-      headers: service === 'frontend' ? { Authorization: `Bearer ${token}` } : undefined,
+      headers: frontend ? { Authorization: `Bearer ${token}` } : undefined,
       signal: AbortSignal.timeout(8000),
       cache: 'no-store',
     });
-    if (res.ok) return { name, ok: true, stats: (await res.json()) as HostStats };
-    // Both answer 404/403 when they run a version without /server-stats, or
-    // when their STT_TOKEN_SECRET differs from the backend's.
-    return {
-      name,
-      ok: false,
-      reason:
-        `It answered ${res.status}. Deploy the latest version there, and set STT_TOKEN_SECRET on it ` +
-        `to the same value as the backend's.`,
-    };
+    if (res.ok) {
+      const stats = await res.json().catch(() => null);
+      // A page instead of JSON: the URL points somewhere that isn't this app's
+      // /server-stats (e.g. a login or a 404 page answered with 200).
+      if (stats && typeof stats.cpus === 'number') return { name, ok: true, stats: stats as HostStats };
+      return { name, ok: false, reason: `${base}/server-stats did not answer with server stats. Check that ${urlVar} has this app's address.` };
+    }
+    return { name, ok: false, reason: failureReason(res.status, frontend, base, urlVar, secretVar) };
   } catch (e: any) {
     return { name, ok: false, reason: `Couldn't reach it at ${base} (${e?.name === 'TimeoutError' ? 'timed out' : e?.message || 'network error'}).` };
   }
+}
+
+// What the admin should fix, from the status /server-stats answered with.
+function failureReason(status: number, frontend: boolean, base: string, urlVar: string, secretVar: string) {
+  if (status === 401) {
+    return `${base} asked for a login (401). On Vercel that's Deployment Protection: point ${urlVar} at the production domain, or turn protection off for it.`;
+  }
+  if (frontend && status === 503) return 'SERVER_STATS_SECRET is not set on the frontend. Set it to the same value as on the backend, then redeploy the frontend.';
+  if (status === 403) return `${secretVar} on this server is different from the backend's. Make them the same value, then redeploy.`;
+  if (status === 404) return `${base} has no /server-stats yet. Deploy the latest version there.`;
+  return `${base}/server-stats answered ${status}.`;
 }
