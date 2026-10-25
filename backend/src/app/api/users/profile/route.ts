@@ -3,7 +3,7 @@ import { prisma, appDb } from '@/lib/core/db';
 import { adminAuth } from '@/lib/core/firebaseAdmin';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { errorResponse } from '@/lib/http/apiError';
-import { therapistForUser } from '@/lib/core/links';
+import { deleteAccount } from '@/lib/core/deleteAccount';
 
 export const dynamic = 'force-dynamic';
 
@@ -225,11 +225,9 @@ export async function PUT(request: Request) {
   }
 }
 
-// DELETE /api/users/profile — permanently remove a user and all their data.
-// Sessions/bookings/notes/invites are not cascade-deleted from the profile, so
-// they are cleared explicitly inside a transaction before the user is removed
-// (deleting the User cascades to the client profile). Therapist/admin profiles
-// live in the app database and are deleted after, so this is not atomic.
+// DELETE /api/users/profile — permanently remove a user and all their data
+// in both databases (see lib/core/deleteAccount.ts). For a therapist that
+// includes the clients they added.
 export async function DELETE(request: Request) {
   try {
     // Only the signed-in user may delete their own account. The uid comes
@@ -238,44 +236,10 @@ export async function DELETE(request: Request) {
     if (!auth.ok) return auth.response;
     const uid = auth.uid;
 
-    const [user, therapist] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: uid },
-        include: { client: true },
-      }),
-      therapistForUser(uid, { id: true }),
-    ]);
-    if (!user) {
+    const removed = await deleteAccount(uid);
+    if (!removed) {
       return NextResponse.json({ error: "We couldn't find your account. Sign out and sign in again." }, { status: 404 });
     }
-
-    await prisma.$transaction(async (tx) => {
-      if (therapist) {
-        const tId = therapist.id;
-        await tx.therapistNote.deleteMany({ where: { therapistId: tId } });
-        await tx.session.deleteMany({ where: { therapistId: tId } });
-        await tx.booking.deleteMany({ where: { therapistId: tId } });
-        await tx.invite.deleteMany({ where: { therapistId: tId } });
-        await tx.documentChunk.deleteMany({ where: { therapistId: tId } });
-        // Used to cascade (or set null) from ProfileTherapist.
-        await tx.whatsAppMessage.deleteMany({ where: { therapistId: tId } });
-        await tx.progressNote.deleteMany({ where: { therapistId: tId } });
-        await tx.progressReport.deleteMany({ where: { therapistId: tId } });
-        await tx.progressMetric.deleteMany({ where: { therapistId: tId } });
-        await tx.profileClient.updateMany({ where: { therapistId: tId }, data: { therapistId: null } });
-      }
-      if (user.client) {
-        const cId = user.client.id;
-        // Deleting the client's sessions cascades their notes.
-        await tx.booking.deleteMany({ where: { clientId: cId } });
-        await tx.session.deleteMany({ where: { clientId: cId } });
-      }
-      // Removes the User and cascades to the client profile.
-      await tx.user.delete({ where: { id: uid } });
-    });
-    // Patient data is gone by now; the profiles cascade to their app-side rows.
-    await appDb.profileTherapist.deleteMany({ where: { userId: uid } });
-    await appDb.profileAdmin.deleteMany({ where: { userId: uid } });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
