@@ -178,14 +178,18 @@ These must still be filled in by you:
 docker compose up -d --build
 ```
 
-The first build takes several minutes. Then:
+The first build takes several minutes. Later builds are much faster: the npm
+downloads and the Next.js compile cache are kept in Docker's build cache
+(`docker builder prune` clears it). Then:
 
 ```bash
 docker compose ps          # every service should be "running" (and "healthy")
 docker compose logs -f     # watch the logs; Ctrl+C to stop watching
 ```
 
-On a small server (2 GB RAM), build one service at a time instead:
+`up --build` compiles the three Next.js apps at the same time. With 8 GB RAM or
+less this runs out of memory and slows to a crawl (swapping), so build one
+service at a time instead:
 
 ```bash
 docker compose build backend

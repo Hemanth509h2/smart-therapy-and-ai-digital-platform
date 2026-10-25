@@ -60,14 +60,19 @@ ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY
 # are reinstalled only when package.json or package-lock.json change.
 COPY package.json package-lock.json ./
 
-# Install the exact versions from package-lock.json.
-RUN npm ci
+# Install the exact versions from package-lock.json. The downloaded packages
+# are kept in a build cache (not in the image), so the next build only
+# downloads what changed.
+RUN --mount=type=cache,id=npm,target=/root/.npm \
+    npm ci --prefer-offline --no-audit --no-fund
 
 # Now copy the rest of the source code (.env is NOT copied: it holds secrets).
 COPY . .
 
-# Compile the site.
-RUN npm run build
+# Compile the site. Next.js keeps its compile cache in a build cache (not in
+# the image), so the next build only recompiles the files that changed.
+RUN --mount=type=cache,id=feedback-next-cache,target=/app/.next/cache \
+    npm run build
 
 
 # -----------------------------------------------------------------------------

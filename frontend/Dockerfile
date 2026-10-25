@@ -55,8 +55,11 @@ ARG NEXT_PUBLIC_STT_RELAY_URL
 # are reinstalled only when package.json or package-lock.json change.
 COPY package.json package-lock.json ./
 
-# Install the exact versions from package-lock.json.
-RUN npm ci
+# Install the exact versions from package-lock.json. The downloaded packages
+# are kept in a build cache (not in the image), so the next build only
+# downloads what changed.
+RUN --mount=type=cache,id=npm,target=/root/.npm \
+    npm ci --prefer-offline --no-audit --no-fund
 
 # Now copy the rest of the source code (including .env).
 COPY . .
@@ -70,7 +73,10 @@ RUN if [ ! -f .env ]; then \
 
 # Compile the site. This also downloads the MediaPipe face model into
 # public/mediapipe, so the build needs internet access.
-RUN npm run build
+# Next.js keeps its compile cache in a build cache (not in the image), so the
+# next build only recompiles the files that changed.
+RUN --mount=type=cache,id=frontend-next-cache,target=/app/.next/cache \
+    npm run build
 
 
 # -----------------------------------------------------------------------------

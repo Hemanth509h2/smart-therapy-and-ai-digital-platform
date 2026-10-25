@@ -63,14 +63,19 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma
 
 # Install the exact versions from package-lock.json (dev tools included,
-# because they are needed to build).
-RUN npm ci
+# because they are needed to build). The downloaded packages are kept in a
+# build cache (not in the image), so the next build only downloads what changed.
+RUN --mount=type=cache,id=npm,target=/root/.npm \
+    npm ci --prefer-offline --no-audit --no-fund
 
 # Now copy the rest of the source code (.env is NOT copied: it holds secrets).
 COPY . .
 
-# Compile the app (runs `prisma generate` and `next build`).
-RUN npm run build
+# Compile the app (runs `prisma generate` and `next build`). Next.js keeps its
+# compile cache in a build cache (not in the image), so the next build only
+# recompiles the files that changed.
+RUN --mount=type=cache,id=backend-next-cache,target=/app/.next/cache \
+    npm run build
 
 # Remove the dev-only packages (TypeScript, ESLint, firebase-tools, ...).
 # The generated Prisma client is kept.
