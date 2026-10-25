@@ -9,7 +9,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { EmailAuthProvider, GoogleAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup } from 'firebase/auth';
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Loader2, Lock, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Loader2, Lock, RefreshCw, Search, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { StaadShell } from '@/components/staad/Shell';
 import { toast } from '@/components/practice/ui';
@@ -17,6 +17,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { auth } from '@/lib/firebase';
 import { adminFetch, registerReauthPrompt } from '@/lib/adminApi';
 import { caughtErrorMessage } from '@/lib/apiError';
+import { usePageRefresh } from '@/lib/pageRefresh';
 import { adminRoleOf, canAdmin, type AdminPermission } from '@/lib/adminRoles';
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
@@ -51,6 +52,7 @@ export function AdminPage({
 }) {
   const { uid, role, profile, can } = useAdmin();
   const router = useRouter();
+  const { refresh, refreshing } = usePageRefresh();
 
   useEffect(() => {
     if (!uid) router.push('/auth');
@@ -81,7 +83,15 @@ export function AdminPage({
           <h1 className="phead__title">{title}</h1>
           {description && <p className="phead__lead">{description}</p>}
         </div>
-        {allowed && actions && <div className="phead__acts">{actions}</div>}
+        {allowed && (
+          <div className="phead__acts">
+            {/* Same as the sidebar's Refresh: reloads all of this page's data. */}
+            <Btn variant="ghost" icon={<RefreshCw className={cx('h-4 w-4', refreshing && 'animate-spin')} />} onClick={refresh} title="Reload this page's data">
+              Refresh
+            </Btn>
+            {actions}
+          </div>
+        )}
       </div>
       {allowed ? (
         <div className="space-y-6">{children}</div>
