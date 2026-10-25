@@ -112,13 +112,17 @@ export async function PATCH(
           reopen: finalAction === 'start' && existing.status !== 'COMPLETED' && existing.status !== 'CANCELLED',
         });
       } catch (e) {
-        // Surfaced, not swallowed: without provisioning the participants will
-        // be locked out of their own session by the rules.
         console.error('Session provisioning failed:', e);
-        return NextResponse.json(
-          { error: "We couldn't open the session room. Please try again in a moment." },
-          { status: 500 }
-        );
+        // Surfaced on 'start', not swallowed: without provisioning the
+        // participants will be locked out of their own session by the rules.
+        // 'end' carries on: completing the session and expiring the patient's
+        // link must not depend on Firestore being reachable.
+        if (finalAction === 'start') {
+          return NextResponse.json(
+            { error: "We couldn't open the session room. Please try again in a moment." },
+            { status: 500 }
+          );
+        }
       }
     }
 

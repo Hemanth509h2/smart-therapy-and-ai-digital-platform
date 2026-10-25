@@ -110,8 +110,24 @@ export default function SessionBottomBar({
       }}
     >
       {/* ---- LEFT: end call / mic / camera ---- */}
-      <button title="End call" onClick={onEndCall} style={circle({ danger: true })}>
-        <PhoneOff size={19} />
+      {/* Labelled, not just an icon: ending the session also expires the
+          patient's join link, so it should be unmistakable. */}
+      <button
+        title="End the session for everyone. The patient's link stops working."
+        onClick={onEndCall}
+        style={{
+          ...circle({ danger: true }),
+          width: 'auto',
+          borderRadius: 22,
+          padding: '0 16px',
+          gap: 7,
+          fontSize: 13.5,
+          fontWeight: 600,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <PhoneOff size={18} />
+        End session
       </button>
 
       <div style={{ position: 'relative', flexShrink: 0 }}>

@@ -40,6 +40,7 @@ import CaptionsPopup from '@/components/session/CaptionsPopup';
 import WaitingLobby from '@/components/session/WaitingLobby';
 import GuestAdmissionGate from '@/components/session/GuestAdmissionGate';
 import LobbyRequests from '@/components/session/LobbyRequests';
+import LivePresence from '@/components/session/LivePresence';
 import TherapyModulesPanel from '@/components/session/TherapyModulesPanel';
 import { ShareWhiteboardModal } from '@/components/session/WhiteboardStage';
 import StaadWhiteboard from '@/components/session/StaadWhiteboard';
@@ -138,6 +139,9 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
   const isTherapist = role === 'THERAPIST';
 
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
+  // Firebase uids of the others connected to the video room, from LiveKit
+  // (see <LivePresence>); null until this browser is connected.
+  const [liveUids, setLiveUids] = useState<Set<string> | null>(null);
   const [activeModule, setActiveModule] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionEnded, setSessionEnded] = useState(false);
@@ -818,7 +822,16 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
     }
   };
 
-  const participants = sessionState?.participants || {};
+  // Who is online comes from the video room once it is connected: the
+  // Firestore isOnline flag stays true when the other person closes the tab
+  // or leaves faster than their "offline" write can finish, which kept
+  // showing a client who had left as still in the call.
+  const storedParticipants = sessionState?.participants || {};
+  const participants = liveUids
+    ? Object.fromEntries(
+        Object.entries(storedParticipants).map(([key, p]) => [key, { ...p, isOnline: p.uid === uid || liveUids.has(p.uid) }])
+      )
+    : storedParticipants;
   const onlineCount = Object.values(participants).filter((p) => p.isOnline).length;
   const clientParticipant = Object.values(participants).find((p) => p.role === 'client');
   const clientName = clientParticipant?.name || 'Client';
@@ -1083,6 +1096,8 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
       />
       {/* Applies caption-language changes to the room without reconnecting. */}
       {isTherapist && <TranslationSync sessionId={sessionId} settings={translationSettings} />}
+      {/* Reports who is really connected; drives every "online" display. */}
+      <LivePresence onChange={setLiveUids} />
       {/* Runs the Sarvam pipeline inside the room provider so it can access the
           LiveKit room; reports recording state up to this page for the chip. */}
       <TranscriptionBridge
@@ -1120,11 +1135,12 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
             />
           </SkillDevLayout>
           {/* No top bar in this layout: float the waiting-room control instead. */}
-          {isTherapist && <LobbyRequests sessionId={sessionId} floating />}
+          {isTherapist && <LobbyRequests sessionId={sessionId} liveUids={liveUids} floating />}
           {showConfirm && (
             <ConfirmEndDialog
               onCancel={() => setShowConfirm(false)}
               onConfirmed={handleLeaveSession}
+              isTherapist={isTherapist}
             />
           )}
         </>
@@ -1145,8 +1161,7 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
             isFullscreen={isFullscreen}
             isTherapist={isTherapist}
             participantsPopupAvailable={participantsPopupAvailable}
-            participantsCount={Object.keys(participants).length}
-            waitingRoom={isTherapist ? <LobbyRequests sessionId={sessionId} /> : undefined}
+            waitingRoom={isTherapist ? <LobbyRequests sessionId={sessionId} liveUids={liveUids} /> : undefined}
           />
 
             {isTherapist && participantsPopupAvailable && showParticipants && participantsPos && (
@@ -1476,6 +1491,7 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
           <ConfirmEndDialog
             onCancel={() => setShowConfirm(false)}
             onConfirmed={handleLeaveSession}
+            isTherapist={isTherapist}
           />
         )}
       </div>
@@ -1624,9 +1640,11 @@ function RemoteParticipantThumb({ name, online, width = 200, height = 120 }: { n
 function ConfirmEndDialog({
   onCancel,
   onConfirmed,
+  isTherapist,
 }: {
   onCancel: () => void;
   onConfirmed: () => void;
+  isTherapist: boolean;
 }) {
   const { disconnect } = useSessionRoom();
 
@@ -1658,9 +1676,15 @@ function ConfirmEndDialog({
           textAlign: 'center',
         }}
       >
-        <p style={{ color: 'var(--ink)', fontSize: 14, fontWeight: 500, marginBottom: 16 }}>
+        <p style={{ color: 'var(--ink)', fontSize: 14, fontWeight: 500, marginBottom: isTherapist ? 6 : 16 }}>
           End this session?
         </p>
+        {/* Only the therapist ending it expires the link (see handleLeaveSession). */}
+        {isTherapist && (
+          <p style={{ color: 'var(--ink-muted)', fontSize: 12, marginBottom: 16 }}>
+            The call ends for everyone and the patient&apos;s join link stops working.
+          </p>
+        )}
         <div className="flex gap-2 justify-center">
           <button
             onClick={onCancel}

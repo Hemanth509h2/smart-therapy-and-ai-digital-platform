@@ -50,9 +50,14 @@ const STOP_MESSAGES: Record<StopReason, string> = {
 
 export default function LobbyRequests({
   sessionId,
+  liveUids,
   floating,
 }: {
   sessionId: string
+  /** Uids connected to the video room right now (see <LivePresence>); null
+   *  while unknown. How a client leaving is noticed: the server keeps an
+   *  admitted client listed for up to 75s after their page stops polling. */
+  liveUids: Set<string> | null
   /** Pin the button above the bottom-right corner (layouts without the top bar);
    *  the panel then opens upwards. */
   floating?: boolean
@@ -75,6 +80,11 @@ export default function LobbyRequests({
   // Clients already seen in the call: only a newly joined one stops checking,
   // so Resume isn't undone by the client who is still there.
   const seenInCall = useRef<Set<string>>(new Set())
+  // Admitted clients seen in the video room, and those who have since left it.
+  // A left client is kept out of "In the call" even while the server still
+  // lists them, and doesn't count as newly joined.
+  const everLive = useRef<Set<string>>(new Set())
+  const left = useRef<Set<string>>(new Set())
 
   const stop = (reason: StopReason) => {
     pausedRef.current = true
@@ -91,7 +101,7 @@ export default function LobbyRequests({
       }
       const data = await res.json()
       const w: Person[] = Array.isArray(data.waiting) ? data.waiting : []
-      const c: Person[] = Array.isArray(data.inCall) ? data.inCall : []
+      const c: Person[] = (Array.isArray(data.inCall) ? data.inCall : []).filter((p: Person) => !left.current.has(p.uid))
       setWaiting(w)
       setInCall(c)
       setLoadError('')
@@ -146,6 +156,31 @@ export default function LobbyRequests({
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [load])
+
+  // A client in the call dropped out of the video room (left, or closed the
+  // tab): take them off "In the call", say so, and start checking again so
+  // their knock shows up if they open the link again.
+  useEffect(() => {
+    if (!liveUids) return
+    const gone: Person[] = []
+    for (const p of inCall) {
+      if (liveUids.has(p.uid)) everLive.current.add(p.uid)
+      else if (everLive.current.has(p.uid)) gone.push(p)
+    }
+    if (!gone.length) return
+    for (const p of gone) {
+      everLive.current.delete(p.uid)
+      seenInCall.current.delete(p.uid)
+      left.current.add(p.uid)
+      toast(`${p.name} left the call.`, 'info')
+    }
+    setInCall((c) => c.filter((p) => !left.current.has(p.uid)))
+    if (stopReason === 'joined') {
+      lastActiveAt.current = Date.now()
+      pausedRef.current = false
+      setStopReason(null)
+    }
+  }, [liveUids, inCall, stopReason])
 
   // Once per outage, not on every failed poll.
   useEffect(() => {

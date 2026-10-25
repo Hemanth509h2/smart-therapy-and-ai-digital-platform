@@ -30,11 +30,17 @@ export default function GuestJoinPage({ params }: { params: { token: string } })
   const [invite, setInvite] = useState<InviteInfo | null>(null);
   const [joining, setJoining] = useState(false);
   const [loading, setLoading] = useState(true);
+  // The session behind this link has ended (410): the link can't be used again.
+  const [ended, setEnded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     apiFetch(`/api/invites/${token}`)
       .then(async (res) => {
+        if (res.status === 410) {
+          if (!cancelled) setEnded(true);
+          return { invite: null };
+        }
         if (!res.ok) throw new Error(await apiErrorMessage(res, 'open this invite link'));
         return res.json();
       })
@@ -56,6 +62,11 @@ export default function GuestJoinPage({ params }: { params: { token: string } })
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
+      if (res.status === 410) {
+        setInvite(null);
+        setEnded(true);
+        return;
+      }
       if (!res.ok) throw new Error(await apiErrorMessage(res, 'join the session'));
       const data = await res.json().catch(() => ({}));
       await signInWithCustomToken(auth, data.guestToken);
@@ -141,7 +152,18 @@ export default function GuestJoinPage({ params }: { params: { token: string } })
             </>
           )}
 
-          {!loading && !invite && (
+          {!loading && !invite && ended && (
+            <div className="py-4 text-center">
+              <p className="text-base font-semibold" style={{ color: 'var(--ink)' }}>
+                This session has ended
+              </p>
+              <p className="mt-1 text-sm" style={{ color: 'var(--ink-muted)' }}>
+                This link can no longer be used. Your therapist will send you a new link for your next session.
+              </p>
+            </div>
+          )}
+
+          {!loading && !invite && !ended && (
             <p className="py-4 text-center text-sm font-medium" style={{ color: 'var(--ink-muted)' }}>
               This invite link is not valid. Ask your therapist for a new one.
             </p>
