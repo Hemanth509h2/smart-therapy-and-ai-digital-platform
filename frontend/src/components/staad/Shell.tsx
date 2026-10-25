@@ -11,6 +11,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { initials, fullName } from '@/lib/practice';
 import { adminNavFor } from '@/lib/adminNav';
 import { ADMIN_ROLE_LABELS, adminRoleOf } from '@/lib/adminRoles';
+import { usePageRefresh } from '@/lib/pageRefresh';
 import {
   IconClients,
   IconCollapse,
@@ -20,6 +21,7 @@ import {
   IconModules,
   IconPlans,
   IconProfile,
+  IconRefresh,
   IconSchedule,
   IconSessions,
   IconThemeA,
@@ -69,6 +71,7 @@ export function StaadShell({ children, className }: { children: React.ReactNode;
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggle: toggleTheme } = useTheme();
+  const { refresh, refreshing } = usePageRefresh();
 
   const [collapsed, setCollapsed] = useState(false);
   const [autoCollapsed, setAutoCollapsed] = useState(false);
@@ -168,6 +171,12 @@ export function StaadShell({ children, className }: { children: React.ReactNode;
               <span className="nav-label">Theme</span>
             </button>
           )}
+          <button className="nav-item" type="button" onClick={refresh} title="Reload this page's data">
+            <span className="nav-ic">
+              <IconRefresh className={refreshing ? 'animate-spin' : undefined} />
+            </span>
+            <span className="nav-label">Refresh</span>
+          </button>
           <button className="nav-item" type="button" onClick={handleLogout}>
             <span className="nav-ic">
               <IconLogout />

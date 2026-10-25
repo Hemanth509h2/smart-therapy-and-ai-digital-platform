@@ -69,6 +69,11 @@ async function fetchSnapshot(key: string, profileId: string, isTherapist: boolea
   return job;
 }
 
+/** Forget the shared data, so the next page to mount fetches it fresh. */
+export function clearPracticeData() {
+  cache.clear();
+}
+
 /**
  * Loads everything the practice pages show — sessions, bookings and, for
  * therapists, clients and pending invites — and exposes `refresh` so any

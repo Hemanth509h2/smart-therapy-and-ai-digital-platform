@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from '@/components/ThemeProvider';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
-import { Home, Users, CalendarDays, Puzzle, User, ClipboardList, LifeBuoy, CreditCard, Moon, Sun, LogOut, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Home, Users, CalendarDays, Puzzle, User, ClipboardList, LifeBuoy, CreditCard, Moon, Sun, LogOut, ChevronsLeft, ChevronsRight, RefreshCw } from 'lucide-react';
 import { cx, toast } from '@/components/practice/ui';
 import { initials as toInitials } from '@/lib/practice';
 import { adminNavFor } from '@/lib/adminNav';
@@ -21,6 +21,9 @@ interface SidebarProps {
   /** Desktop icon-only mode. */
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  /** Reloads the page's data (see lib/pageRefresh). */
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }
 
 const therapistNav = [
@@ -42,6 +45,8 @@ export default function Sidebar({
   onClose,
   collapsed = false,
   onToggleCollapse,
+  onRefresh,
+  refreshing,
 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -144,6 +149,12 @@ export default function Sidebar({
           {theme === 'light' ? <Sun className="h-[19px] w-[19px] shrink-0" /> : <Moon className="h-[19px] w-[19px] shrink-0" />}
           <span className={hideWhenCollapsed}>Theme</span>
         </button>
+        {onRefresh && (
+          <button type="button" onClick={onRefresh} className={cx('ds-side-link w-full', linkLayout)} title={collapsed ? 'Refresh' : "Reload this page's data"}>
+            <RefreshCw className={cx('h-[19px] w-[19px] shrink-0', refreshing && 'animate-spin')} />
+            <span className={hideWhenCollapsed}>Refresh</span>
+          </button>
+        )}
         <button type="button" onClick={handleLogout} className={cx('ds-side-link w-full', linkLayout)} title={collapsed ? 'Logout' : undefined}>
           <LogOut className="h-[19px] w-[19px] shrink-0" />
           <span className={hideWhenCollapsed}>Logout</span>

@@ -7,6 +7,7 @@ import { Lock, Menu } from 'lucide-react';
 import Sidebar from './Sidebar';
 import { cx } from '@/components/practice/ui';
 import { apiFetch, PLAN_REQUIRED_EVENT } from '@/lib/api';
+import { usePageRefresh } from '@/lib/pageRefresh';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -75,6 +76,7 @@ export default function DashboardLayout({ children, role, profile }: DashboardLa
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const noPlan = useNoActivePlan(role, profile?.id);
+  const { refresh, refreshing } = usePageRefresh();
 
   useEffect(() => {
     try {
@@ -99,6 +101,8 @@ export default function DashboardLayout({ children, role, profile }: DashboardLa
         onClose={() => setMobileOpen(false)}
         collapsed={collapsed}
         onToggleCollapse={toggleCollapse}
+        onRefresh={refresh}
+        refreshing={refreshing}
       />
 
       {/* Mobile backdrop */}

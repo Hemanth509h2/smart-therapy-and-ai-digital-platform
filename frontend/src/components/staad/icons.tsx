@@ -26,6 +26,7 @@ const mk = (viewBox: string, sw: string, inner: React.ReactNode, defSize: number
   };
 
 export const BrandMark = mk('0 0 26 26', '1.84', <><path d="M13 4.1c2 2.2 2 5.3 0 7.5-2-2.2-2-5.3 0-7.5z" /><path d="M4.4 10.4c2.9-.6 5.7.7 6.9 3.3-2.9.6-5.8-.7-6.9-3.3zM21.6 10.4c-1.1 2.6-4 3.9-6.9 3.3 1.2-2.6 4-3.9 6.9-3.3z" /><path d="M7.6 20.9h10.8" /></>, 26);
+export const IconRefresh = mk('0 0 20 20', '1.33', <><path d="M16.4 10a6.4 6.4 0 0 1-11.3 4.1M3.6 10a6.4 6.4 0 0 1 11.3-4.1" /><path d="M15.2 2.6v3.6h-3.6M4.8 17.4v-3.6h3.6" /></>, 20);
 export const IconDashboard = mk('0 0 20 20', '1.33', <><rect x="2.9" y="2.9" width="5.8" height="5.8" rx="1.4" /><rect x="11.3" y="2.9" width="5.8" height="5.8" rx="1.4" /><rect x="2.9" y="11.3" width="5.8" height="5.8" rx="1.4" /><rect x="11.3" y="11.3" width="5.8" height="5.8" rx="1.4" /></>, 20);
 export const IconClients = mk('0 0 20 20', '1.33', <><circle cx="7.6" cy="6.6" r="2.7" /><path d="M2.9 16.7v-1.4a3 3 0 0 1 3-3h3.4a3 3 0 0 1 3 3v1.4M13.6 5.5a2.6 2.6 0 0 1 0 5M15.3 12.4a3 3 0 0 1 2 2.8v1.5" /></>, 20);
 export const IconSessions = mk('0 0 20 20', '1.33', <><rect x="4.2" y="3.8" width="11.6" height="13.1" rx="2" /><path d="M7.1 8.3h5.8M7.1 11.7h3.9" /></>, 20);

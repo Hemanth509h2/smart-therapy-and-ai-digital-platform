@@ -1,6 +1,7 @@
 import React from 'react';
 import { Analytics } from '@vercel/analytics/next';
 import AuthProvider from '@/components/AuthProvider';
+import { PageRefreshProvider } from '@/lib/pageRefresh';
 import ThemeProvider from '@/components/ThemeProvider';
 import { Toaster } from '@/components/practice/ui';
 import './globals.css';
@@ -22,7 +23,8 @@ export default function RootLayout({
       <body className="bg-[#f6f0e3]">
         <ThemeProvider>
           <AuthProvider>
-            {children}
+            {/* The sidebar's Refresh button remounts the page from here. */}
+            <PageRefreshProvider>{children}</PageRefreshProvider>
           </AuthProvider>
           <Toaster />
         </ThemeProvider>
