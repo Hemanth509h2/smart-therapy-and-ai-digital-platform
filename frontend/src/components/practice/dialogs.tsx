@@ -211,6 +211,10 @@ export function StartSessionDialog({
   const [pickedModule, setPickedModule] = useState('');
   // '' = auto (reuse a due session or open a new one), 'new' = force a new room, else a session id.
   const [pickedSession, setPickedSession] = useState('');
+  // Live sessions ended from this dialog (hidden at once; the parent's list
+  // only refreshes on its next load), and the one being ended right now.
+  const [endedIds, setEndedIds] = useState<Set<string>>(new Set());
+  const [endingId, setEndingId] = useState<string | null>(null);
 
   const allowedModules = useMemo(() => new Set(resolveAllowedModuleIds(profile)), [profile]);
 
@@ -233,11 +237,12 @@ export function StartSessionDialog({
         .filter(
           (s) =>
             sessionClientId(s) === clientId &&
+            !endedIds.has(s.id) &&
             (s.status === 'ACTIVE' ||
               (s.status === 'SCHEDULED' && new Date(s.scheduledAt).getTime() > Date.now() - 60 * 60_000))
         )
         .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()),
-    [sessions, clientId]
+    [sessions, clientId, endedIds]
   );
 
   // Reuse a session that's live or due within the hour instead of opening a second room.
@@ -265,6 +270,27 @@ export function StartSessionDialog({
     } catch (e) {
       toast(caughtErrorMessage(e, 'start the session'), 'error');
       setStarting(false);
+    }
+  };
+
+  // A session left "Live" (the call was closed without ending it): complete
+  // it, which also expires the patient's link.
+  const endLive = async (id: string) => {
+    setEndingId(id);
+    try {
+      const res = await apiFetch(`/api/sessions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'end' }),
+      });
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'end the session'));
+      setEndedIds((prev) => new Set(prev).add(id));
+      if (pickedSession === id) setPickedSession('');
+      toast("Session ended. Its patient link no longer works.");
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'end the session'), 'error');
+    } finally {
+      setEndingId(null);
     }
   };
 
@@ -385,29 +411,43 @@ export function StartSessionDialog({
               <div className="space-y-2" role="radiogroup">
                 {[...clientSessions.map((s) => ({ id: s.id, session: s })), { id: 'new', session: undefined }].map(({ id, session }) => {
                   const selected = session ? existing?.id === id : !existing;
+                  const live = session?.status === 'ACTIVE';
                   return (
-                    <button
-                      key={id}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      onClick={() => setPickedSession(id)}
-                      className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-[13.5px]"
-                      style={{
-                        background: 'var(--ds-surface-2)',
-                        border: `1px solid ${selected ? 'var(--ds-ink)' : 'var(--ds-border)'}`,
-                        color: 'var(--ds-ink)',
-                      }}
-                    >
-                      <span className="truncate">
-                        {session ? fmtDayTime(session.scheduledAt) : 'New session now'}
-                      </span>
-                      {session?.status === 'ACTIVE' && (
-                        <span className="text-[12px] font-medium" style={{ color: 'var(--ds-green)' }}>
-                          Live
+                    <div key={id} className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => setPickedSession(id)}
+                        className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-[13.5px]"
+                        style={{
+                          background: 'var(--ds-surface-2)',
+                          border: `1px solid ${selected ? 'var(--ds-ink)' : 'var(--ds-border)'}`,
+                          color: 'var(--ds-ink)',
+                        }}
+                      >
+                        <span className="truncate">
+                          {session ? fmtDayTime(session.scheduledAt) : 'New session now'}
                         </span>
+                        {live && (
+                          <span className="text-[12px] font-medium" style={{ color: 'var(--ds-green)' }}>
+                            Live
+                          </span>
+                        )}
+                      </button>
+                      {live && (
+                        <button
+                          type="button"
+                          className="ds-btn ds-btn-sm ds-btn-ghost"
+                          onClick={() => endLive(id)}
+                          disabled={endingId !== null}
+                          title="End this session. The patient's link stops working."
+                        >
+                          {endingId === id && <Loader2 className="animate-spin" />}
+                          End
+                        </button>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>

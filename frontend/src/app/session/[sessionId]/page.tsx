@@ -762,6 +762,28 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
     setShowConsentBanner(false);
   };
 
+  // Therapist only: marks the session COMPLETED in the database (so it moves
+  // into the client's history and stops showing as "Live") and expires the
+  // client's invite link. Awaited by the confirm dialog BEFORE leaving: this
+  // used to be fire-and-forget right before the redirect, but apiFetch first
+  // waits for the sign-in token (a network refresh once the call has run for
+  // an hour), so the redirect usually won and the request was never sent.
+  const endSessionOnServer = async (): Promise<boolean> => {
+    try {
+      const res = await Promise.race([
+        apiFetch(`/api/sessions/${sessionId}?action=end`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'end' }),
+        }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 15_000)),
+      ]);
+      return res.ok;
+    } catch {
+      return false;
+    }
+  };
+
   const handleLeaveSession = () => {
     // Leave FIRST, clean up in the background. Every call below is
     // fire-and-forget: on slow/offline networks awaiting them can hang for a
@@ -777,18 +799,8 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
         'timestamps.updatedAt': new Date().toISOString(),
       }).catch(() => {});
     }
-    // Mark the scheduled session as COMPLETED in the database so it moves into
-    // the client's session history once the call is cut. This also expires the
-    // client's invite link server-side, so it is therapist-only. `keepalive`
-    // lets the request finish even while the browser navigates away below.
-    if (isTherapist) {
-      apiFetch(`/api/sessions/${sessionId}?action=end`, {
-        method: 'PATCH',
-        keepalive: true,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'end' }),
-      }).catch(() => {});
-    }
+    // The session itself was already completed on the server by
+    // endSessionOnServer (awaited in the confirm dialog before this runs).
     // Log transcription volume for the admin dashboard (therapist side, best-effort).
     if (isTherapist && profile?.id && transcription.chunkCount > 0) {
       apiFetch('/api/usage', {
@@ -1140,6 +1152,7 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
             <ConfirmEndDialog
               onCancel={() => setShowConfirm(false)}
               onConfirmed={handleLeaveSession}
+              onEndOnServer={isTherapist ? endSessionOnServer : undefined}
               isTherapist={isTherapist}
             />
           )}
@@ -1491,6 +1504,7 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
           <ConfirmEndDialog
             onCancel={() => setShowConfirm(false)}
             onConfirmed={handleLeaveSession}
+            onEndOnServer={isTherapist ? endSessionOnServer : undefined}
             isTherapist={isTherapist}
           />
         )}
@@ -1640,15 +1654,32 @@ function RemoteParticipantThumb({ name, online, width = 200, height = 120 }: { n
 function ConfirmEndDialog({
   onCancel,
   onConfirmed,
+  onEndOnServer,
   isTherapist,
 }: {
   onCancel: () => void;
   onConfirmed: () => void;
+  /** Therapist only: completes the session on the server; false = failed. */
+  onEndOnServer?: () => Promise<boolean>;
   isTherapist: boolean;
 }) {
   const { disconnect } = useSessionRoom();
+  const [ending, setEnding] = useState(false);
+  const [failed, setFailed] = useState(false);
 
-  const handleEnd = () => {
+  // The therapist stays in the call until the server confirms, so a failed
+  // request can be retried instead of leaving the session "Live" for good.
+  const handleEnd = async (skipServer = false) => {
+    if (onEndOnServer && !skipServer) {
+      setEnding(true);
+      setFailed(false);
+      const ok = await onEndOnServer();
+      setEnding(false);
+      if (!ok) {
+        setFailed(true);
+        return;
+      }
+    }
     disconnect();
     onConfirmed();
   };
@@ -1680,9 +1711,15 @@ function ConfirmEndDialog({
           End this session?
         </p>
         {/* Only the therapist ending it expires the link (see handleLeaveSession). */}
-        {isTherapist && (
+        {isTherapist && !failed && (
           <p style={{ color: 'var(--ink-muted)', fontSize: 12, marginBottom: 16 }}>
             The call ends for everyone and the patient&apos;s join link stops working.
+          </p>
+        )}
+        {failed && (
+          <p role="alert" style={{ color: '#e05252', fontSize: 12, marginBottom: 16 }}>
+            We couldn&apos;t reach the server to end the session, so it still shows as live and the
+            patient&apos;s link still works. Check your connection and try again.
           </p>
         )}
         <div className="flex gap-2 justify-center">
@@ -1700,8 +1737,26 @@ function ConfirmEndDialog({
           >
             Cancel
           </button>
+          {failed && (
+            <button
+              onClick={() => handleEnd(true)}
+              title="Leave the call. The session stays live: end it later from Start a new session."
+              style={{
+                padding: '8px 14px',
+                borderRadius: 8,
+                border: '1px solid var(--glass-border)',
+                background: 'transparent',
+                color: 'var(--ink-muted)',
+                fontSize: 12,
+                cursor: 'pointer',
+              }}
+            >
+              Leave anyway
+            </button>
+          )}
           <button
-            onClick={handleEnd}
+            onClick={() => handleEnd()}
+            disabled={ending}
             style={{
               padding: '8px 20px',
               borderRadius: 8,
@@ -1710,10 +1765,11 @@ function ConfirmEndDialog({
               color: 'var(--accent)',
               fontSize: 12,
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: ending ? 'default' : 'pointer',
+              opacity: ending ? 0.7 : 1,
             }}
           >
-            End
+            {ending ? 'Ending…' : failed ? 'Try again' : 'End'}
           </button>
         </div>
       </div>
