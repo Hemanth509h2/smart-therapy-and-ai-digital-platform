@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import Link from 'next/link';
+import { Play } from 'lucide-react';
 import { AdminPage, Badge, Card, Checkbox, EmptyState, ErrorBanner, SearchInput, Section, Select, Spinner, Toolbar, useAdminQuery } from '@/components/admin/kit';
 import { toast } from '@/components/practice/ui';
 import { adminFetch, num, timeAgo } from '@/lib/adminApi';
@@ -123,10 +125,20 @@ export default function AdminModulesPage() {
                     <Checkbox checked={m.enabled} onChange={(v) => busy !== m.id && update(m, { enabled: v })} label="Enabled" />
                     <Checkbox checked={m.featured} onChange={(v) => busy !== m.id && update(m, { featured: v })} label="Featured" />
                     {m.updatedAt && (
-                      <span className="ml-auto text-[11px]" style={{ color: 'var(--ink-muted)' }} title={m.updatedBy ?? undefined}>
+                      <span className="text-[11px]" style={{ color: 'var(--ink-muted)' }} title={m.updatedBy ?? undefined}>
                         Changed {timeAgo(m.updatedAt)}
                       </span>
                     )}
+                    {/* Opens the module on its own (no client, session or plan
+                        needed). Works while it is turned off, so it can be
+                        checked before turning it on for everyone. */}
+                    <Link
+                      href={`/admin/modules/try/${m.id}`}
+                      className="btn-press ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold"
+                      style={{ background: 'var(--glass-bg)', color: 'var(--ink)', border: '1px solid var(--glass-border)' }}
+                    >
+                      <Play className="h-3.5 w-3.5" /> Try
+                    </Link>
                   </div>
                 </Card>
               ))}

@@ -131,6 +131,35 @@ export async function provisionSessionDocs(
 }
 
 /**
+ * An admin's private "Try module" room: a liveSessions doc only this admin may
+ * use, with no Postgres session behind it. Reset on every call so each try
+ * starts from a clean module state. Returns the room's id.
+ */
+export async function provisionPreviewRoom(uid: string): Promise<string> {
+  const sessionId = `admin-preview-${uid}`
+  const db = adminDb()
+  await db.collection('liveSessions').doc(sessionId).set({
+    sessionId,
+    allowedUids: [uid],
+    activeModuleId: null,
+    therapistControl: false,
+    participants: {},
+    preview: true,
+    timestamps: {
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+  })
+  await db.collection('sessions').doc(sessionId).set({
+    sessionId,
+    aiConsent: {},
+    preview: true,
+    createdAt: new Date().toISOString(),
+  })
+  return sessionId
+}
+
+/**
  * Take one uid's access to the session away again (the therapist removed a
  * guest from the call): drop it from allowedUids and mark them offline.
  */
