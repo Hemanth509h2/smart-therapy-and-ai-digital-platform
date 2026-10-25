@@ -318,7 +318,7 @@ export default function AdminProfessionalsPage() {
       </div>
 
       <Toolbar>
-        <SearchInput value={list.q} onChange={list.setQ} placeholder="Search name or email…" />
+        <SearchInput value={list.q} onChange={list.setQ} placeholder="Search name, email or phone…" />
         <Select
           ariaLabel="Status"
           value={list.filters.status}

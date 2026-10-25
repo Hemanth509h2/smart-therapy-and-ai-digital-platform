@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
 const SORTABLE = ['name', 'createdAt', 'lastActive', 'sessions', 'clients'];
 
 // GET /api/admin/professionals — searchable, filterable, paginated therapist list.
-// ?q=name/email &status=active|inactive|suspended &plan=<planId>|none
+// ?q=name/email/phone &status=active|inactive|suspended &plan=<planId>|none
 // &from/&to=signup date &sort=name|createdAt|lastActive|sessions|clients &dir
 // "Active" = signed in or had a session in the last 30 days (and not suspended).
 export async function GET(request: Request) {
@@ -56,15 +56,23 @@ export async function GET(request: Request) {
 
     const and: AppPrisma.ProfileTherapistWhereInput[] = [];
     if (q) {
-      const words = q.split(/\s+/).filter(Boolean);
+      // Phone numbers are stored as digits with the country code, so a query
+      // that looks like a phone number ("+91 98765-43210") is matched as one
+      // run of digits; otherwise each word may also match part of the number.
+      const phoneDigits = /^[\d\s+()-]+$/.test(q) ? q.replace(/\D/g, '') : '';
+      const words = phoneDigits ? [phoneDigits] : q.split(/\s+/).filter(Boolean);
       and.push(
-        ...words.map((w) => ({
-          OR: [
-            { firstName: { contains: w, mode: 'insensitive' as const } },
-            { lastName: { contains: w, mode: 'insensitive' as const } },
-            { id: { in: pick((_, u) => u.email.toLowerCase().includes(w.toLowerCase())) } },
-          ],
-        }))
+        ...words.map((w) => {
+          const digits = w.replace(/\D/g, '');
+          return {
+            OR: [
+              { firstName: { contains: w, mode: 'insensitive' as const } },
+              { lastName: { contains: w, mode: 'insensitive' as const } },
+              { id: { in: pick((_, u) => u.email.toLowerCase().includes(w.toLowerCase())) } },
+              ...(digits.length >= 3 ? [{ phoneNumber: { contains: digits } }] : []),
+            ],
+          };
+        })
       );
     }
     const status = sp.get('status');
