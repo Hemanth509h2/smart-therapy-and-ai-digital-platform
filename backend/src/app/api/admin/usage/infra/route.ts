@@ -1,10 +1,9 @@
-import os from 'node:os';
-import { readFile, statfs } from 'node:fs/promises';
 import { NextResponse } from 'next/server';
 import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { getSettings } from '@/lib/core/settings';
 import { errorResponse } from '@/lib/http/apiError';
+import { hostStats, remoteHostStats, type ServerReport } from '@/lib/admin/host-stats';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,28 +12,27 @@ const TOP_TABLES = 10;
 
 type Client = { $queryRaw: typeof prisma.$queryRaw };
 
-// GET /api/admin/usage/infra — database storage and the server the backend
-// runs on. Everything is read live; nothing here is stored.
-//
-// The backend runs in a Docker container: os.* reports the host's CPUs, load
-// and memory, statfs('/') the disk Docker stores containers on, and the cgroup
-// files this container's own memory use and limit.
+// GET /api/admin/usage/infra — database storage and the machines the
+// frontend, backend and AI service run on (each reports its own; see
+// lib/admin/host-stats.ts). Everything is read live; nothing here is stored.
 export async function GET(request: Request) {
   try {
     const auth = await requireAdmin(request, 'settings');
     if (!auth.ok) return auth.response;
 
     const settings = await getSettings();
-    const [hipaa, app, server] = await Promise.all([
+    const [hipaa, app, ...servers] = await Promise.all([
       database('HIPAA database', 'Patient data: clients, sessions, notes, reports, messages', prisma, settings['limits.hipaaDbMb']),
       database('App database', 'Professionals, billing, usage log, settings, modules', appDb, settings['limits.appDbMb']),
-      hosting(),
+      remoteHostStats('Frontend', 'frontend'),
+      hostStats().then((stats): ServerReport => ({ name: 'Backend', ok: true, stats })),
+      remoteHostStats('AI service', 'ai'),
     ]);
 
     return NextResponse.json({
       checkedAt: new Date(),
       databases: [hipaa, app],
-      server,
+      servers,
       fixed: { hostingMonthlyInr: settings['costs.hostingMonthlyInr'], databaseMonthlyInr: settings['costs.databaseMonthlyInr'] },
     });
   } catch (error: any) {
@@ -67,27 +65,4 @@ async function database(label: string, holds: string, db: Client, limitMb: numbe
     console.error(`${label} size check failed:`, e.message);
     return { label, holds, ok: false, bytes: 0, limitBytes: limitMb * MB, connections: 0, tableCount: 0, rows: 0, tables: [] };
   }
-}
-
-async function hosting() {
-  const disk = await statfs('/').catch(() => null);
-  const mem = process.memoryUsage();
-  return {
-    platform: `${os.type()} ${os.release()}`,
-    cpus: os.cpus().length,
-    load: os.loadavg().map((n) => Math.round(n * 100) / 100),
-    uptimeSec: Math.round(os.uptime()),
-    memory: { total: os.totalmem(), free: os.freemem() },
-    disk: disk ? { total: disk.blocks * disk.bsize, free: disk.bavail * disk.bsize } : null,
-    container: await containerMemory(),
-    backend: { node: process.version, uptimeSec: Math.round(process.uptime()), rss: mem.rss, heapUsed: mem.heapUsed },
-  };
-}
-
-// cgroup v2 memory use and limit of this container; null outside Docker.
-async function containerMemory() {
-  const read = (f: string) => readFile(`/sys/fs/cgroup/${f}`, 'utf8').then((s) => s.trim()).catch(() => null);
-  const [current, max] = await Promise.all([read('memory.current'), read('memory.max')]);
-  if (!current) return null;
-  return { used: Number(current), limit: max && max !== 'max' ? Number(max) : null };
 }

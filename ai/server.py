@@ -27,6 +27,8 @@ import asyncio
 import json
 import logging
 import os
+import platform
+import shutil
 import time
 from http import HTTPStatus
 from pathlib import Path
@@ -40,6 +42,7 @@ import openrouter
 import stt
 
 log = logging.getLogger("ai")
+STARTED_AT = time.time()
 
 # Largest WebSocket message accepted: a notes file (call_plan.MAX_FILE_BYTES) plus
 # headroom. STT audio frames are far smaller.
@@ -182,15 +185,69 @@ def probe_response(parts):
     return headers.encode() + (b"" if method == b"HEAD" else body)
 
 
+# CPU, memory and disk of this machine for the admin "Database & hosting" page.
+# The backend asks with a 60-second token (sid and scope "server-stats") signed
+# with STT_TOKEN_SECRET; same shape as backend/src/lib/admin/host-stats.ts.
+STATS_PATH = "/server-stats"
+STATS_SID = STATS_SCOPE = "server-stats"
+
+
+def _read(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def _kib_field(text, name):
+    """A "Name:  1234 kB" line from /proc/meminfo or /proc/self/status, in bytes."""
+    for line in (text or "").splitlines():
+        if line.startswith(name + ":"):
+            return int(line.split()[1]) * 1024
+    return 0
+
+
+def host_stats():
+    meminfo = _read("/proc/meminfo")
+    disk = shutil.disk_usage("/")
+    current, limit = _read("/sys/fs/cgroup/memory.current"), _read("/sys/fs/cgroup/memory.max")
+    uptime = _read("/proc/uptime")
+    return {
+        "platform": f"{platform.system()} {platform.release()}",
+        "hosting": "server",
+        "cpus": os.cpu_count() or 1,
+        "load": [round(n, 2) for n in os.getloadavg()],
+        "uptimeSec": round(float(uptime.split()[0])) if uptime else 0,
+        # MemAvailable, like Node's os.freemem(): free memory plus reclaimable cache.
+        "memory": {"total": _kib_field(meminfo, "MemTotal"), "free": _kib_field(meminfo, "MemAvailable")},
+        "disk": {"total": disk.total, "free": disk.free},
+        "container": {"used": int(current), "limit": None if limit is None or limit.strip() == "max" else int(limit)}
+        if current else None,
+        "process": {"runtime": f"Python {platform.python_version()}", "uptimeSec": round(time.time() - STARTED_AT),
+                    "rss": _kib_field(_read("/proc/self/status"), "VmRSS")},
+    }
+
+
+def json_response(connection, status, body):
+    response = connection.respond(status, body)
+    del response.headers["Content-Type"]  # Headers is a multidict; replace, don't append
+    response.headers["Content-Type"] = "application/json"
+    return response
+
+
 def process_request(connection, request):
     connection.started_at = time.monotonic()
     # Never log request.path: the query string carries the STT token.
     path = urlsplit(request.path).path
     if path in HEALTH_PATHS:
-        response = connection.respond(HTTPStatus.OK, health_body())
-        del response.headers["Content-Type"]  # Headers is a multidict; replace, don't append
-        response.headers["Content-Type"] = "application/json"
-        return response
+        return json_response(connection, HTTPStatus.OK, health_body())
+    if path == STATS_PATH:
+        query = first_values(urlsplit(request.path).query)
+        secret = os.environ.get("STT_TOKEN_SECRET")
+        if not secret or not stt.verify_stt_token(query.get("token"), STATS_SID, secret, scope=STATS_SCOPE):
+            return connection.respond(HTTPStatus.FORBIDDEN, "Forbidden\n")
+        return json_response(connection, HTTPStatus.OK, json.dumps(host_stats()))
     if path not in stt.STREAM_PATHS and path not in call_plan.PATHS and path not in internal.PATHS:
         return connection.respond(HTTPStatus.FORBIDDEN, "Forbidden\n")
     return None  # continue with the WebSocket handshake

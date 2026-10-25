@@ -109,18 +109,24 @@ interface DbUsage {
 interface Infra {
   checkedAt: string;
   databases: DbUsage[];
-  server: {
-    platform: string;
-    cpus: number;
-    load: number[];
-    uptimeSec: number;
-    memory: { total: number; free: number };
-    disk: { total: number; free: number } | null;
-    container: { used: number; limit: number | null } | null;
-    backend: { node: string; uptimeSec: number; rss: number; heapUsed: number };
-  };
+  // Frontend, backend and AI service, each reporting its own machine.
+  servers: ServerReport[];
   fixed: { hostingMonthlyInr: number; databaseMonthlyInr: number };
 }
+
+interface HostStats {
+  platform: string;
+  hosting: 'server' | 'vercel';
+  cpus: number;
+  load: number[];
+  uptimeSec: number;
+  memory: { total: number; free: number };
+  disk: { total: number; free: number } | null;
+  container: { used: number; limit: number | null } | null;
+  process: { runtime: string; uptimeSec: number; rss: number };
+}
+
+type ServerReport = { name: string; ok: true; stats: HostStats } | { name: string; ok: false; reason: string };
 
 const RANGES = [
   { value: '7d', label: 'Last 7 days' },
@@ -459,11 +465,69 @@ export default function AdminUsagePage() {
   );
 }
 
+// One machine: the frontend's, the backend's or the AI service's.
+function ServerCard({ server }: { server: ServerReport }) {
+  const s = server.ok ? server.stats : null;
+  const vercel = s?.hosting === 'vercel';
+  return (
+    <Card className="space-y-4">
+      <div className="flex items-start gap-2">
+        <Server className="mt-0.5 h-4 w-4" style={{ color: 'var(--ink-muted)' }} />
+        <div className="flex-1">
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>{server.name} server</h3>
+          <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+            {!s
+              ? 'Not reporting'
+              : vercel
+                // Each request may run on a different short-lived function, so
+                // these numbers describe whichever one answered.
+                ? `Vercel serverless function · ${s.platform} · numbers are for the instance that answered`
+                : `${s.platform} · up ${duration(s.uptimeSec)}`}
+          </p>
+        </div>
+        {!server.ok && <Badge tone="warn">No data</Badge>}
+      </div>
+      {!s ? (
+        <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>{!server.ok && server.reason}</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+              <Cpu className="h-3.5 w-3.5" /> CPU
+            </div>
+            <Meter label={`Load (1 min) on ${s.cpus} cores`} used={s.load[0]} total={s.cpus} format={(n) => n.toFixed(2)} />
+            <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>5 min {s.load[1]} · 15 min {s.load[2]}</p>
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+              <MemoryStick className="h-3.5 w-3.5" /> Memory
+            </div>
+            <Meter label={vercel ? 'Function' : 'Whole server'} used={s.memory.total - s.memory.free} total={s.memory.total} format={bytes} />
+            {s.container && s.container.limit && <Meter label="Container" used={s.container.used} total={s.container.limit} format={bytes} />}
+            <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+              {s.process.runtime} process {bytes(s.process.rss)} · restarted {duration(s.process.uptimeSec)} ago
+            </p>
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+              <HardDrive className="h-3.5 w-3.5" /> Disk
+            </div>
+            {s.disk ? (
+              <Meter label="Server disk" used={s.disk.total - s.disk.free} total={s.disk.total} format={bytes} />
+            ) : (
+              <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+                {vercel ? 'None: Vercel functions have no disk of their own.' : 'Not available.'}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function InfraSection() {
   const { data, loading, error, reload } = useAdminQuery<Infra>('/api/admin/usage/infra', 'load database and hosting usage');
-  const s = data?.server;
-  const memUsed = s ? s.memory.total - s.memory.free : 0;
-  const diskUsed = s?.disk ? s.disk.total - s.disk.free : 0;
 
   return (
     <Section
@@ -517,44 +581,12 @@ function InfraSection() {
             ))}
           </div>
 
-          {s && (
-            <Card className="space-y-4">
-              <div className="flex items-start gap-2">
-                <Server className="mt-0.5 h-4 w-4" style={{ color: 'var(--ink-muted)' }} />
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Server</h3>
-                  <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-                    {s.platform} · up {duration(s.uptimeSec)} · {inr(data.fixed.hostingMonthlyInr)}/month
-                  </p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-                    <Cpu className="h-3.5 w-3.5" /> CPU
-                  </div>
-                  <Meter label={`Load (1 min) on ${s.cpus} cores`} used={s.load[0]} total={s.cpus} format={(n) => n.toFixed(2)} />
-                  <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>5 min {s.load[1]} · 15 min {s.load[2]}</p>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-                    <MemoryStick className="h-3.5 w-3.5" /> Memory
-                  </div>
-                  <Meter label="Whole server" used={memUsed} total={s.memory.total} format={bytes} />
-                  {s.container && s.container.limit && <Meter label="Backend container" used={s.container.used} total={s.container.limit} format={bytes} />}
-                  <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-                    Backend process {bytes(s.backend.rss)} · Node {s.backend.node} · restarted {duration(s.backend.uptimeSec)} ago
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-                    <HardDrive className="h-3.5 w-3.5" /> Disk
-                  </div>
-                  {s.disk ? <Meter label="Server disk" used={diskUsed} total={s.disk.total} format={bytes} /> : <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>Not available.</p>}
-                </div>
-              </div>
-            </Card>
-          )}
+          <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+            Hosting {inr(data.fixed.hostingMonthlyInr)}/month in total.
+          </p>
+          {data.servers.map((server) => (
+            <ServerCard key={server.name} server={server} />
+          ))}
         </>
       )}
     </Section>
