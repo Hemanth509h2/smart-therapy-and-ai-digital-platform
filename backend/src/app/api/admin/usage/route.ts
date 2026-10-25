@@ -38,15 +38,20 @@ export async function GET(request: Request) {
     const monthStart = startOfMonth();
     const now = new Date();
 
+    // Professionals an admin excluded from usage tracking are left out of
+    // every figure; they're listed separately so they can be switched back on.
+    const everyone = await appDb.profileTherapist.findMany({ select: { id: true, firstName: true, lastName: true, userId: true, createdAt: true, trackUsage: true } });
+    const untrackedIds = everyone.filter((t) => !t.trackUsage).map((t) => t.id);
+    const tracked = { therapistId: { notIn: untrackedIds } };
+
     // Every query starts at once; the two that need another's result chain off
     // it. Patient-side data (sessions, reports, messages, clients) lives in the
     // HIPAA database.
     const transcribedP = appDb.usageEvent.findMany({
-      where: { type: 'TRANSCRIPTION', sessionId: { not: null }, createdAt: { gte: since } },
+      where: { type: 'TRANSCRIPTION', sessionId: { not: null }, createdAt: { gte: since }, ...tracked },
       distinct: ['sessionId'],
       select: { sessionId: true },
     });
-    const therapistsP = appDb.profileTherapist.findMany({ select: { id: true, firstName: true, lastName: true, userId: true, createdAt: true } });
 
     const [
       settings,
@@ -70,23 +75,23 @@ export async function GET(request: Request) {
       getSettings(),
       appDb.$queryRaw<{ bucket: Date; type: string; n: number }[]>`
         SELECT date_trunc('day', "createdAt") AS bucket, type, sum(count)::int AS n
-        FROM "UsageEvent" WHERE "createdAt" >= ${seriesSince}
+        FROM "UsageEvent" WHERE "createdAt" >= ${seriesSince} AND "therapistId" <> ALL(${untrackedIds}::text[])
         GROUP BY 1, 2 ORDER BY 1`,
-      appDb.usageEvent.groupBy({ by: ['type'], where: { createdAt: { gte: since } }, _sum: { count: true } }),
-      appDb.usageEvent.groupBy({ by: ['therapistId', 'type'], where: { createdAt: { gte: since } }, _sum: { count: true } }),
+      appDb.usageEvent.groupBy({ by: ['type'], where: { createdAt: { gte: since }, ...tracked }, _sum: { count: true } }),
+      appDb.usageEvent.groupBy({ by: ['therapistId', 'type'], where: { createdAt: { gte: since }, ...tracked }, _sum: { count: true } }),
       appDb.usageEvent.groupBy({
         by: ['label'],
-        where: { type: 'MODULE_LAUNCH', createdAt: { gte: since }, label: { not: null } },
+        where: { type: 'MODULE_LAUNCH', createdAt: { gte: since }, label: { not: null }, ...tracked },
         _sum: { count: true },
       }),
-      appDb.usageEvent.groupBy({ by: ['label'], where: { type: 'MODULE_LAUNCH', label: { not: null } }, _sum: { count: true } }),
+      appDb.usageEvent.groupBy({ by: ['label'], where: { type: 'MODULE_LAUNCH', label: { not: null }, ...tracked }, _sum: { count: true } }),
       appDb.usageEvent.groupBy({
         by: ['therapistId'],
-        where: { type: 'AI_ANALYSIS', createdAt: { gte: monthStart } },
+        where: { type: 'AI_ANALYSIS', createdAt: { gte: monthStart }, ...tracked },
         _sum: { count: true },
       }),
-      therapistsP,
-      therapistsP.then((ts) => usersById(ts.map((t) => t.userId), { email: true, status: true, lastSeenAt: true })),
+      everyone.filter((t) => t.trackUsage),
+      usersById(everyone.map((t) => t.userId), { email: true, status: true, lastSeenAt: true }),
       appDb.payment.groupBy({
         by: ['therapistId'],
         where: { orderStatus: 'PAID', therapistId: { not: null }, paidAt: { gte: since } },
@@ -298,6 +303,10 @@ export async function GET(request: Request) {
       professionals,
       topModules,
       neverLaunched: ALL_MODULE_IDS.filter((id) => !launched.has(id)).map((id) => ({ moduleId: id, name: moduleName(id) })),
+      untracked: everyone
+        .filter((t) => !t.trackUsage)
+        .map((t) => ({ therapistId: t.id, name: `${t.firstName} ${t.lastName}`.trim() || 'Unnamed', email: users.get(t.userId)?.email ?? null }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
       notLaunchedInRange: ALL_MODULE_IDS.filter((id) => !inRange.has(id)).map((id) => ({ moduleId: id, name: moduleName(id) })),
       alerts: {
         threshold,

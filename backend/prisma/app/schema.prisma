@@ -55,6 +55,9 @@ model ProfileTherapist {
   // therapist may launch any module; otherwise only those listed in moduleAccess.
   allModulesAllowed Boolean  @default(true)
   moduleAccess      String[] @default([])
+  // Admin switch (Usage & cost page). Off: no usage events are stored for this
+  // therapist and they are left out of the usage and cost figures (test accounts).
+  trackUsage        Boolean  @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

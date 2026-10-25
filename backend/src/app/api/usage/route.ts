@@ -30,9 +30,10 @@ export async function POST(request: Request) {
       return notYourProfile('this therapist profile');
     }
 
-    // Ignore unknown therapists rather than erroring (logging must never break UX).
-    const therapist = await appDb.profileTherapist.findUnique({ where: { id: therapistId }, select: { id: true } });
-    if (!therapist) {
+    // Ignore unknown therapists rather than erroring (logging must never break UX),
+    // and store nothing for one an admin excluded from usage tracking.
+    const therapist = await appDb.profileTherapist.findUnique({ where: { id: therapistId }, select: { trackUsage: true } });
+    if (!therapist?.trackUsage) {
       return NextResponse.json({ ok: false });
     }
 

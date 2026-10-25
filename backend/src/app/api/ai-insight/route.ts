@@ -179,9 +179,9 @@ export async function POST(request: Request) {
     // is the Firebase uid; resolve to the therapist profile). Never block on this.
     let therapistProfileId: string | null = null
     try {
-      const t = await appDb.profileTherapist.findUnique({ where: { userId: therapistId }, select: { id: true } })
+      const t = await appDb.profileTherapist.findUnique({ where: { userId: therapistId }, select: { id: true, trackUsage: true } })
       therapistProfileId = t?.id ?? null
-      if (t) {
+      if (t?.trackUsage) {
         await appDb.usageEvent.create({ data: { therapistId: t.id, sessionId, type: 'AI_ANALYSIS' } })
       }
     } catch (e) {

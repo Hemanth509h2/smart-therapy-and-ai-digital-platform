@@ -24,7 +24,9 @@ import {
   type Column,
 } from '@/components/admin/kit';
 import { ChartCard, type Point } from '@/components/admin/charts';
-import { downloadCsv, fmtBytes as bytes, inr, num, timeAgo } from '@/lib/adminApi';
+import { adminFetch, downloadCsv, fmtBytes as bytes, inr, num, timeAgo } from '@/lib/adminApi';
+import { caughtErrorMessage } from '@/lib/apiError';
+import { toast } from '@/components/practice/ui';
 
 interface ProfessionalUsage {
   therapistId: string;
@@ -91,6 +93,7 @@ interface Usage {
   topModules: { moduleId: string; name: string; launches: number }[];
   neverLaunched: { moduleId: string; name: string }[];
   notLaunchedInRange: { moduleId: string; name: string }[];
+  untracked: { therapistId: string; name: string; email: string | null }[];
   alerts: { threshold: number; therapists: { therapistId: string; name: string; email: string | null; aiAnalyses: number }[] };
 }
 
@@ -371,6 +374,8 @@ export default function AdminUsagePage() {
             <Pagination page={page} pageSize={PAGE_SIZE} total={rows.length} onPage={setPage} />
           </Section>
 
+          <TrackingSection professionals={data.professionals} untracked={data.untracked} canEdit={can('people.write')} onChange={reload} />
+
           {can('settings') && <InfraSection />}
 
           {data.alerts.therapists.length > 0 && (
@@ -462,6 +467,91 @@ export default function AdminUsagePage() {
         <EmptyState title="Nothing to show" />
       ) : null}
     </AdminPage>
+  );
+}
+
+// Professionals excluded from usage tracking (test accounts and the like): no
+// usage is stored for them and they're left out of every figure on this page.
+function TrackingSection({
+  professionals,
+  untracked,
+  canEdit,
+  onChange,
+}: {
+  professionals: ProfessionalUsage[];
+  untracked: Usage['untracked'];
+  canEdit: boolean;
+  onChange: () => void;
+}) {
+  const [pick, setPick] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const setTracking = async (therapistId: string, name: string, trackUsage: boolean) => {
+    setBusy(therapistId);
+    try {
+      await adminFetch(`/api/admin/therapists/${therapistId}/track-usage`, {
+        method: 'PATCH',
+        json: { trackUsage },
+        action: 'change usage tracking',
+      });
+      toast(trackUsage ? `Tracking usage for ${name} again.` : `Usage for ${name} will no longer be stored.`);
+      setPick('');
+      onChange();
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'change usage tracking'), 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const options = [...professionals].sort((a, b) => a.name.localeCompare(b.name));
+  const picked = options.find((p) => p.therapistId === pick);
+
+  return (
+    <Section
+      title="Not tracked"
+      description="Usage and cost are not stored for these professionals, and they are left out of every figure on this page. Usage already stored is kept."
+    >
+      <Card className="space-y-3">
+        {canEdit && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              ariaLabel="Professional to stop tracking"
+              value={pick}
+              onChange={setPick}
+              options={[
+                { value: '', label: 'Choose a professional…' },
+                ...options.map((p) => ({ value: p.therapistId, label: p.email ? `${p.name} · ${p.email}` : p.name })),
+              ]}
+            />
+            <Btn
+              size="sm"
+              disabled={!picked}
+              loading={!!picked && busy === picked.therapistId}
+              onClick={() => picked && setTracking(picked.therapistId, picked.name, false)}
+            >
+              Stop tracking
+            </Btn>
+          </div>
+        )}
+        {untracked.length ? (
+          untracked.map((u) => (
+            <div key={u.therapistId} className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="font-semibold" style={{ color: 'var(--ink)' }}>{u.name}</span>
+              <span style={{ color: 'var(--ink-muted)' }}>{u.email}</span>
+              <span className="flex-1" />
+              {canEdit && (
+                <Btn size="sm" variant="ghost" loading={busy === u.therapistId} onClick={() => setTracking(u.therapistId, u.name, true)}>
+                  Track again
+                </Btn>
+              )}
+            </div>
+          ))
+        ) : (
+          <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>Every professional&rsquo;s usage is tracked.</p>
+        )}
+      </Card>
+    </Section>
   );
 }
 
