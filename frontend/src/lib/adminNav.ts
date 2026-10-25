@@ -16,6 +16,7 @@ import {
   Shield,
   TicketPercent,
   User,
+  UserCog,
   Users,
   Video,
   type LucideIcon,
@@ -46,6 +47,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin/health', label: 'System health', icon: HeartPulse, permission: 'settings' },
   { href: '/admin/settings', label: 'Settings', icon: Settings, permission: 'settings' },
   { href: '/admin/admins', label: 'Admins', icon: Shield, permission: 'admins.manage' },
+  { href: '/admin/profile', label: 'My profile', icon: UserCog },
 ];
 
 export function adminNavFor(profile: any) {

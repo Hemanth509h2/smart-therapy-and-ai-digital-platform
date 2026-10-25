@@ -200,6 +200,25 @@ export async function PUT(request: Request) {
       return NextResponse.json({ profile: updated });
     }
 
+    if (user.role === 'ADMIN') {
+      // Name only; the admin role is changed from Admin > Admins. Admins
+      // created before roles existed have no ProfileAdmin row yet, hence the
+      // upsert (the column defaults to SUPER_ADMIN, which is what they had).
+      const name = {
+        ...(firstName !== undefined && { firstName: String(firstName).trim() }),
+        ...(lastName !== undefined && { lastName: String(lastName).trim() }),
+      };
+      if (name.firstName === '') {
+        return NextResponse.json({ error: 'Enter your first name.' }, { status: 400 });
+      }
+      const updated = await appDb.profileAdmin.upsert({
+        where: { userId: uid },
+        create: { userId: uid, ...name },
+        update: name,
+      });
+      return NextResponse.json({ profile: updated });
+    }
+
     return NextResponse.json({ error: "Your account type can't be edited here." }, { status: 400 });
   } catch (error: any) {
     return errorResponse(error, 'Profile PUT error');
