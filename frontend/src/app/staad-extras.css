@@ -810,3 +810,19 @@ html[data-theme="dark"]:has(.admin-ui) {
 :root:has(.admin-ui) [role="dialog"] {
   font-family: "Manrope", "Segoe UI", system-ui, sans-serif;
 }
+/* The admin nav is longer than most screens; show its scroll bar so the
+   items below the fold are discoverable (the STAAD sidebar hides it). */
+.admin-ui .sb-nav {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-muted) transparent;
+  padding-right: 4px;
+}
+.admin-ui .sb-nav::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+  height: 6px;
+}
+.admin-ui .sb-nav::-webkit-scrollbar-thumb {
+  background: var(--ink-muted);
+  border-radius: 9999px;
+}
