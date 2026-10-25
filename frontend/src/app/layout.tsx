@@ -1,4 +1,5 @@
 import React from 'react';
+import { Analytics } from '@vercel/analytics/next';
 import AuthProvider from '@/components/AuthProvider';
 import ThemeProvider from '@/components/ThemeProvider';
 import { Toaster } from '@/components/practice/ui';
@@ -25,6 +26,7 @@ export default function RootLayout({
           </AuthProvider>
           <Toaster />
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
