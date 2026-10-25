@@ -1,4 +1,5 @@
 import React from 'react';
+import { Analytics } from '@vercel/analytics/next';
 import AuthProvider from '@/components/AuthProvider';
 import ThemeProvider from '@/components/ThemeProvider';
 import { Toaster } from '@/components/practice/ui';
@@ -25,6 +26,10 @@ export default function RootLayout({
           </AuthProvider>
           <Toaster />
         </ThemeProvider>
+        {/* Vercel Web Analytics (page views, visitors). Only on Vercel, which
+            sets NEXT_PUBLIC_VERCEL_ENV: elsewhere (Docker) its script doesn't
+            exist and every page would request it in vain. */}
+        {process.env.NEXT_PUBLIC_VERCEL_ENV && <Analytics />}
       </body>
     </html>
   );

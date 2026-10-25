@@ -10,7 +10,7 @@
 #   docker build -t staad-backend .
 #
 # How to run:
-#   docker run -p 4000:4000 -v "$PWD/.env:/app/.env:ro" staad-backend
+#   docker run -p 4000:4000 -v "$PWD/.env:/app/.env:ro" staad-backend 
 #
 #   -p 4000:4000          makes the API reachable at http://localhost:4000
 #   -v .env:/app/.env:ro  gives the container your settings (read-only)
