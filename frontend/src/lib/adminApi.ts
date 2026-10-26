@@ -123,16 +123,3 @@ export async function fetchAllPages<T>(path: string, key: string, params: Record
   }
   return out;
 }
-
-// ─── WhatsApp (click-to-chat, no API) ────────────────────────────────────────
-
-/**
- * A wa.me link that opens WhatsApp with `text` ready to send. With a phone
- * number it opens that chat (10 digits = Indian, like the backend); without
- * one, WhatsApp asks who to send it to.
- */
-export function whatsappLink(text: string, phone?: string | null) {
-  const digits = (phone ?? '').replace(/\D/g, '');
-  const to = digits.length === 10 ? `91${digits}` : digits;
-  return `https://wa.me/${to}?text=${encodeURIComponent(text)}`;
-}

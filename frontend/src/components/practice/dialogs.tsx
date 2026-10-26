@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Send } from 'lucide-react';
+import { Loader2, MessageCircle, Send } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { auth } from '@/lib/firebase';
 import { DsDialog, Drawer, Field, Spinner, toast } from './ui';
@@ -28,6 +28,7 @@ import {
 } from '@/lib/practice';
 import { apiFetch } from '@/lib/api';
 import { apiErrorMessage, caughtErrorMessage, toastWhatsApp } from '@/lib/apiError';
+import { whatsappLink } from '@/lib/whatsapp';
 import { MODULE_CATEGORIES, resolveAllowedModuleIds } from '@/lib/modules';
 
 const DURATIONS = [30, 45, 50, 60, 80];
@@ -298,6 +299,16 @@ export function StartSessionDialog({
     if (sessionId) router.push(sessionRoomUrl(sessionId, pickedModule || undefined));
   };
 
+  // Opens WhatsApp with the join link ready to send, in the client's chat when
+  // they have a number on file.
+  const sendOnWhatsApp = () => {
+    if (!patientLink) return;
+    const client = clients.find((c) => c.id === clientId);
+    const hi = client?.firstName ? `Hi ${client.firstName}, ` : '';
+    const text = `${hi}here's the link to join your STAAD therapy session: ${patientLink}`;
+    window.open(whatsappLink(text, client?.phoneNumber), '_blank', 'noopener');
+  };
+
   const copyLink = async () => {
     if (!patientLink) return;
     try {
@@ -356,6 +367,10 @@ export function StartSessionDialog({
               {copied ? 'Copied' : 'Copy'}
             </button>
           </div>
+          <button className="ds-btn ds-btn-ghost w-full" onClick={sendOnWhatsApp}>
+            <MessageCircle />
+            Send on WhatsApp
+          </button>
         </div>
       ) : clients.length === 0 ? (
         <NoClients onAddClient={onAddClient} />

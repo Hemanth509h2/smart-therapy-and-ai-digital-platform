@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { Copy, MessageCircle } from 'lucide-react';
 import { Btn, Checkbox, Field, Input, Modal } from '@/components/admin/kit';
-import { adminFetch, whatsappLink } from '@/lib/adminApi';
+import { adminFetch } from '@/lib/adminApi';
+import { whatsappLink } from '@/lib/whatsapp';
 import { caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 

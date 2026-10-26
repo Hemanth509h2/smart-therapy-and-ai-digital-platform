@@ -6,7 +6,8 @@ import {
   AdminPage, Badge, Btn, ConfirmDialog, DataTable, ErrorBanner, Field, Input, Modal, Section, Select,
   useAdmin, useAdminQuery, type Column,
 } from '@/components/admin/kit';
-import { adminFetch, fmtDate, timeAgo, whatsappLink } from '@/lib/adminApi';
+import { adminFetch, fmtDate, timeAgo } from '@/lib/adminApi';
+import { whatsappLink } from '@/lib/whatsapp';
 import { caughtErrorMessage } from '@/lib/apiError';
 import { ADMIN_ROLE_LABELS, type AdminRole } from '@/lib/adminRoles';
 import { toast } from '@/components/practice/ui';
