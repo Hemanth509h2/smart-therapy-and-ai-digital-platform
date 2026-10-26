@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Pencil, Plus, Power, PowerOff, TicketPercent, Trash2 } from 'lucide-react';
+import { Download, Pencil, Plus, Power, PowerOff, TicketPercent, Trash2 } from 'lucide-react';
 import {
   AdminPage, Badge, Btn, Checkbox, ConfirmDialog, DataTable, EmptyState, ErrorBanner, Field, Input, Modal, Select,
   Spinner, useAdmin, useAdminQuery, type Column, type Tone,
 } from '@/components/admin/kit';
-import { adminFetch, fmtDate, inr, num } from '@/lib/adminApi';
+import { adminFetch, downloadCsv, fmtDate, inr, num } from '@/lib/adminApi';
 import { caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 
@@ -44,6 +44,9 @@ const TERM_OPTIONS = [
 // "Who can use it" value for a code reserved for an email address.
 const BY_EMAIL = '__email__';
 
+const termText = (c: Pick<Coupon, 'minMonths' | 'maxMonths'>) =>
+  c.maxMonths === 1 ? 'Monthly only' : c.minMonths > 1 ? `${c.minMonths}+ months` : 'Any term';
+
 const discountText = (c: Pick<Coupon, 'type' | 'discountValue'>) =>
   c.type === 'PERCENT' ? `${c.discountValue}% off` : `${inr(c.discountValue)} off`;
 
@@ -68,6 +71,39 @@ export default function AdminCouponsPage() {
   const [editing, setEditing] = useState<Coupon | 'new' | null>(null);
   const [deleting, setDeleting] = useState<Coupon | null>(null);
   const [busy, setBusy] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Only coupons still in the list, so a deleted coupon drops out of the selection.
+  const picked = coupons.filter((c) => selected.has(c.id));
+  const allSelected = coupons.length > 0 && picked.length === coupons.length;
+  const toggleOne = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(coupons.map((c) => c.id)));
+
+  // Exports the given coupons, or every coupon when none are passed.
+  const exportCsv = (rows: Coupon[] = coupons) => {
+    downloadCsv(`coupons-${new Date().toISOString().slice(0, 10)}`, rows, [
+      { header: 'Code', value: (c) => c.code },
+      { header: 'Description', value: (c) => c.description ?? '' },
+      { header: 'Discount', value: (c) => (c.type === 'PERCENT' ? `${c.discountValue}%` : `₹${c.discountValue}`) },
+      { header: 'Plans', value: (c) => (c.planIds.length ? c.planIds.map(planName).join('; ') : 'All paid plans') },
+      { header: 'Term', value: (c) => termText(c) },
+      { header: 'Who can use it', value: (c) => c.email ?? c.therapistName ?? (c.therapistId ? 'One professional' : 'Any professional') },
+      { header: 'Once per professional', value: (c) => (c.oncePerTherapist ? 'Yes' : 'No') },
+      { header: 'Uses', value: (c) => c.redemptionCount },
+      { header: 'Use limit', value: (c) => c.maxRedemptions ?? 'Unlimited' },
+      { header: 'Discount given (₹)', value: (c) => c.discountTotal },
+      { header: 'Starts', value: (c) => c.startsAt ?? '' },
+      { header: 'Expires', value: (c) => c.expiresAt ?? '' },
+      { header: 'Status', value: (c) => couponStatus(c).label },
+      { header: 'Created', value: (c) => c.createdAt },
+    ]);
+    toast(`Exported ${rows.length} coupon${rows.length === 1 ? '' : 's'}.`);
+  };
 
   const setActive = async (c: Coupon, isActive: boolean) => {
     setBusy(c.id);
@@ -87,6 +123,14 @@ export default function AdminCouponsPage() {
   };
 
   const columns: Column<Coupon>[] = [
+    {
+      key: 'select',
+      header: <input type="checkbox" aria-label="Select all coupons" checked={allSelected} onChange={toggleAll} style={{ accentColor: 'var(--sage)', width: 15, height: 15 }} />,
+      render: (c) => (
+        <input type="checkbox" aria-label={`Select ${c.code}`} checked={selected.has(c.id)} onChange={() => toggleOne(c.id)} style={{ accentColor: 'var(--sage)', width: 15, height: 15 }} />
+      ),
+      className: 'w-8',
+    },
     {
       key: 'code',
       header: 'Code',
@@ -168,8 +212,21 @@ export default function AdminCouponsPage() {
       title="Coupons"
       description="Discount codes professionals can enter when paying for a plan through Cashfree. A use is counted once the payment succeeds."
       permission="billing.read"
-      actions={canWrite && <Btn icon={<Plus className="h-4 w-4" />} onClick={() => setEditing('new')}>New coupon</Btn>}
+      actions={
+        <>
+          <Btn variant="ghost" icon={<Download className="h-4 w-4" />} disabled={!coupons.length} onClick={() => exportCsv()}>Export CSV</Btn>
+          {canWrite && <Btn icon={<Plus className="h-4 w-4" />} onClick={() => setEditing('new')}>New coupon</Btn>}
+        </>
+      }
     >
+      {picked.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl px-4 py-2.5 text-sm" style={{ background: 'var(--sage-light)', border: '1px solid var(--glass-border)', color: 'var(--ink)' }}>
+          <span className="font-semibold">{picked.length} selected</span>
+          <span className="flex-1" />
+          <Btn size="sm" variant="ghost" icon={<Download className="h-3.5 w-3.5" />} onClick={() => exportCsv(picked)}>Export selected</Btn>
+          <Btn size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Btn>
+        </div>
+      )}
       {error && <ErrorBanner message={error} onRetry={reload} />}
       {loading && !data ? (
         <div className="flex justify-center py-20"><Spinner /></div>
