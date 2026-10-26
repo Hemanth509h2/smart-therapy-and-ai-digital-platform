@@ -1,8 +1,7 @@
 'use client'
 
 // Toast for a new AI insight (therapist only), shown over the video whenever
-// the copilot produces one: from "Analyse" or from the automatic check every
-// few minutes. Shows the gist and the first next steps, with the suggested
+// the therapist presses "Analyse". Shows the gist and the first next steps, with the suggested
 // module one click away. Risk changes its colour; an urgent risk stays until
 // the therapist closes it, anything else fades after AUTO_HIDE_MS (paused while
 // the pointer is over it).
