@@ -1,0 +1,9 @@
+field,meaning
+client_id,Stable internal identifier for a client; avoid names/PII.
+session_id,Stable internal identifier for a session.
+node_id,Unique identifier for a graph node.
+entity_type,Type of memory entity.
+relationship,Named relationship between two graph nodes.
+source_session_id,Session from which the memory item originated.
+provenance_type,"Observed, reported, inferred, or summarized."
+confidence,Optional system confidence; should not be interpreted as clinical certainty.

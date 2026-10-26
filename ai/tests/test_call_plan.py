@@ -102,7 +102,7 @@ def test_extracts_text_file():
     ("notes.docx", b"not a zip"),
     ("notes.txt", b"   "),
     ("notes.txt", b"x" * (5 * 1024 * 1024 + 1)),
-])
+], ids=["doc", "bad-pdf", "bad-docx", "blank-txt", "oversized-txt"])  # a 5 MB id breaks pytest on Windows
 def test_rejects_unreadable_files(name, data):
     with pytest.raises(ExtractError):
         extract_text(name, data)

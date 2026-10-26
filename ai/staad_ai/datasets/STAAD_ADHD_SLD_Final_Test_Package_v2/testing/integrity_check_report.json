@@ -1,0 +1,18 @@
+{
+  "build_name": "STAAD ADHD + SLD Final Testing Package",
+  "build_date": "2026-10-09",
+  "knowledge_record_count": 155,
+  "unique_record_ids": 155,
+  "duplicate_record_ids": 0,
+  "records_missing_source_document_or_paragraph_anchor": 0,
+  "records_flagged_for_quantitative_or_evidence_claim_review": 51,
+  "records_flagged_for_chunking_review": 21,
+  "records_flagged_for_markup_review": 14,
+  "graph_node_count": 19,
+  "graph_edge_count": 27,
+  "graph_edges_with_missing_node_reference": 0,
+  "all_graph_nodes_marked_synthetic_example": true,
+  "all_graph_edges_marked_synthetic_example": true,
+  "retrieval_test_case_count": 14,
+  "validation_boundary": "Structural integrity checks only; no clinical claim-by-claim validation and no measured retrieval accuracy are claimed."
+}

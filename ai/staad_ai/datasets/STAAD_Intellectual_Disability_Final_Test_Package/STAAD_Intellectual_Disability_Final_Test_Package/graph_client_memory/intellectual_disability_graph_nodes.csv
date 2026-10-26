@@ -1,0 +1,9 @@
+﻿node_id,node_type,label,synthetic,client_id,description,source_ids
+SYN-N001,ClientGoal,Practice asking for a break,True,SYN-CLIENT-001,Illustrative client-stated goal; replace with actual consented goal only in approved environment.,
+SYN-N002,SupportPreference,Short sentences and visual choices,True,SYN-CLIENT-001,Illustrative communication preference.,
+SYN-N003,ObservedEvent,More prompts needed than usual,True,SYN-CLIENT-001,Illustrative dated observation; cause unknown and requires human review.,
+SYN-N004,HealthConcern,Possible discomfort reported by support person,True,SYN-CLIENT-001,"Illustrative report, not a confirmed medical finding.",
+SYN-N005,ClinicalConcept,Consider physical health when behavior changes,True,,Knowledge node based on guideline topic; verify source passage before use.,"[""SRC-NICE-NG54""]"
+SYN-N006,SupportStrategy,Offer visual choices and check for discomfort,True,SYN-CLIENT-001,Illustrative suggestion requiring clinician/support-team approval.,
+SYN-N007,Source,NICE NG54 recommendations,True,,Source register reference.,"[""SRC-NICE-NG54""]"
+SYN-N008,Session,Synthetic session 001,True,SYN-CLIENT-001,Synthetic session metadata only.,

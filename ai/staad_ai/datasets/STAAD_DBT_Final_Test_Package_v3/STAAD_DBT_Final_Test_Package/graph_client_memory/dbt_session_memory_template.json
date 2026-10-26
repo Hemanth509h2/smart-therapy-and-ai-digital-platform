@@ -1,0 +1,16 @@
+{
+  "session_id": "SYNTHETIC_SESSION_ID",
+  "client_id": "SYNTHETIC_CLIENT_ID",
+  "date": "YYYY-MM-DD",
+  "client_reported_goals": [],
+  "client_reported_events": [],
+  "skills_discussed": [],
+  "skills_practised": [],
+  "client_reported_response_to_practice": [],
+  "clinician_observations": [],
+  "model_inferences_separate_from_facts": [],
+  "risk_flag": "not_assessed_by_this_template",
+  "human_review_status": "required",
+  "source_record_ids": [],
+  "note": "Template only. Do not populate with real client identifiers in test data; follow approved clinical documentation policy."
+}

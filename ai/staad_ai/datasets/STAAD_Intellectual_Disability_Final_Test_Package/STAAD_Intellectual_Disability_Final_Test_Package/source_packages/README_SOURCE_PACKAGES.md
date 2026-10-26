@@ -1,0 +1,1 @@
+This package was created as a new intellectual-disability dataset. No original intellectual-disability source ZIP was supplied in this conversation, so this folder contains no fabricated 'original source package'. Public source URLs are listed in knowledge_memory/sources_and_references.json.

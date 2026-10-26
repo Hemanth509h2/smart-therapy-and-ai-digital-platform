@@ -1,0 +1,14 @@
+﻿field,description
+record_id,Stable unique knowledge record identifier.
+therapy,Therapy approach label; DBT in this package.
+title,Short record title.
+category,Knowledge topic category.
+content,Knowledge statement or guardrail.
+source_ids,Source-register IDs supporting or contextualizing the record.
+source_locator,"Page line, guideline recommendation, or explicit gap statement."
+source_verification_status,Preliminary status; not clinical approval.
+candidate_action,Retain/revise/caveat/reclassify action in candidate version.
+clinical_review_status,Qualified clinician review state.
+retrieval_keywords,Candidate retrieval metadata.
+retrieval_questions,Example queries for retrieval testing.
+do_not_use_as_autonomous_decision,Safety boundary for clinical decision support.

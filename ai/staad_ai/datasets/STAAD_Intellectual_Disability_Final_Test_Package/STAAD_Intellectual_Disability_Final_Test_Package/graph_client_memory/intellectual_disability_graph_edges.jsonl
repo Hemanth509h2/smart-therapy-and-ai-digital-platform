@@ -1,0 +1,6 @@
+{"edge_id": "SYN-E001", "from_node": "SYN-N001", "to_node": "SYN-N008", "edge_type": "OBSERVED_DURING", "synthetic": true}
+{"edge_id": "SYN-E002", "from_node": "SYN-N002", "to_node": "SYN-N006", "edge_type": "PREFERS", "synthetic": true}
+{"edge_id": "SYN-E003", "from_node": "SYN-N003", "to_node": "SYN-N005", "edge_type": "MAY_BE_ASSOCIATED_WITH", "synthetic": true}
+{"edge_id": "SYN-E004", "from_node": "SYN-N005", "to_node": "SYN-N007", "edge_type": "SUPPORTED_BY", "synthetic": true}
+{"edge_id": "SYN-E005", "from_node": "SYN-N004", "to_node": "SYN-N003", "edge_type": "RELATES_TO", "synthetic": true}
+{"edge_id": "SYN-E006", "from_node": "SYN-N006", "to_node": "SYN-N001", "edge_type": "APPROVED_FOR_USE_IN", "synthetic": true}

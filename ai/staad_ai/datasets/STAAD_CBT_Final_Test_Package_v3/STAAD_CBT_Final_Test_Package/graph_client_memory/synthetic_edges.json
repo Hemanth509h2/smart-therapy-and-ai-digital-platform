@@ -1,0 +1,50 @@
+[
+  {
+    "source": "SYN-CLIENT-001",
+    "target": "SYN-SESSION-001",
+    "type": "CLIENT_HAS_SESSION",
+    "synthetic": true
+  },
+  {
+    "source": "SYN-CLIENT-001",
+    "target": "SYN-GOAL-001",
+    "type": "CLIENT_HAS_GOAL",
+    "synthetic": true
+  },
+  {
+    "source": "SYN-SESSION-001",
+    "target": "SYN-SITUATION-001",
+    "type": "SESSION_MENTIONS_SITUATION",
+    "synthetic": true
+  },
+  {
+    "source": "SYN-SITUATION-001",
+    "target": "SYN-THOUGHT-001",
+    "type": "SITUATION_ASSOCIATED_WITH_THOUGHT",
+    "synthetic": true
+  },
+  {
+    "source": "SYN-SITUATION-001",
+    "target": "SYN-EMOTION-001",
+    "type": "SITUATION_ASSOCIATED_WITH_EMOTION",
+    "synthetic": true
+  },
+  {
+    "source": "SYN-SITUATION-001",
+    "target": "SYN-BEHAVIOUR-001",
+    "type": "SITUATION_ASSOCIATED_WITH_BEHAVIOUR",
+    "synthetic": true
+  },
+  {
+    "source": "CBT-015",
+    "target": "SRC-003",
+    "type": "RECORD_CITES_SOURCE",
+    "synthetic": true
+  },
+  {
+    "source": "CBT-015",
+    "target": "SRC-004",
+    "type": "RECORD_CITES_SOURCE",
+    "synthetic": true
+  }
+]

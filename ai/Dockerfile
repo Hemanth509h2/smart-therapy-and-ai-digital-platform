@@ -71,12 +71,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 #   call_plan/        the call-plan AI agent
 #   copilot/          AI insights ("Analyse") and the safety scan
 #   report/           the end-of-session report
+#   staad_ai/         the STAAD retrieval and context pipeline (its datasets,
+#                     benchmark results and docs are left out by .dockerignore)
 # scripts/ (filling the search tables) is run by hand, not in the image.
 COPY server.py worker.py gunicorn.conf.py internal.py openrouter.py rag.py ./
 COPY stt ./stt
 COPY call_plan ./call_plan
 COPY copilot ./copilot
 COPY report ./report
+COPY staad_ai ./staad_ai
 
 # Create a normal user and stop running as root.
 RUN useradd --system --uid 10001 app

@@ -1,0 +1,16 @@
+﻿field,description
+record_id,Stable unique knowledge record identifier
+knowledge_type,Type of record; therapy_knowledge for this package
+therapy,Therapy approach: CBT
+category,Topic grouping for filtering
+title,Short human-readable concept title
+content,Concise summary intended for retrieval; not a full clinical protocol
+clinical_caution,"Boundary, adaptation, or safety note"
+source_ids,List of source register identifiers associated at topic level
+source_locator,Current locator status; exact passage locator pending
+review_status,Clinical review state
+retrieval_keywords,Candidate-only retrieval terms
+retrieval_questions,Candidate-only natural-language query examples
+applicability_tags,Candidate-only retrieval/context tags
+do_not_use_as_autonomous_decision,Safety metadata requiring professional review
+content_version,Candidate dataset version

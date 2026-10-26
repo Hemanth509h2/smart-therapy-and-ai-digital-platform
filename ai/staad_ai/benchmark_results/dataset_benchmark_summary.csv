@@ -1,0 +1,7 @@
+﻿package,knowledge_records,tests,records_without_id,duplicate_record_ids,tests_with_expected_ids,tests_needing_manual_behavior_review,mean_recall_at_5,mean_precision_at_5,retrieval_method
+ADHD_SLD,155,14,0,[],10,4,0.2183,0.18,deterministic lexical baseline (not live vector retrieval)
+Anxiety,60,18,0,[],18,0,0.6574,0.2667,deterministic lexical baseline (not live vector retrieval)
+Depression,64,24,0,[],0,24,,,deterministic lexical baseline (not live vector retrieval)
+Intellectual_Disability,45,20,0,[],20,0,0.825,0.2,deterministic lexical baseline (not live vector retrieval)
+CBT,36,24,0,[],24,0,0.5417,0.2167,deterministic lexical baseline (not live vector retrieval)
+DBT,36,24,0,[],24,0,0.9583,0.1917,deterministic lexical baseline (not live vector retrieval)

@@ -1,0 +1,34 @@
+{
+  "session_id": "",
+  "client_id": "",
+  "session_date": "",
+  "client_stated_focus": "",
+  "client_reported_situation": "",
+  "client_reported_thoughts": [],
+  "client_reported_emotions": [],
+  "client_reported_body_responses": [],
+  "client_reported_behaviours": [],
+  "client_stated_goal_refs": [],
+  "interventions_discussed": [
+    {
+      "knowledge_record_ids": [],
+      "source_ids": [],
+      "clinician_selected": false
+    }
+  ],
+  "practice_agreed_with_client": {
+    "task": "",
+    "barriers_to_review": []
+  },
+  "client_reported_response": "",
+  "professional_observations": [],
+  "model_inferences_separately_labelled": [],
+  "unknowns_or_questions": [],
+  "safety_concern": {
+    "present": null,
+    "source_type": "",
+    "human_review_status": "not_assessed"
+  },
+  "human_review_required": true,
+  "privacy_note": "Use only within approved access controls; this template is not a clinical assessment form."
+}

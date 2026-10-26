@@ -1,0 +1,37 @@
+[
+  {
+    "source_id": "WHO-DEP-FACTSHEET",
+    "status": "public_page_found_in_limited_web_check",
+    "checked_url": "https://www.who.int/en/news-room/fact-sheets/detail/depression",
+    "observation": "WHO depression fact sheet page was found; content includes definition, functional impact, treatment overview and suicide relevance. Numeric prevalence claims should be rechecked against the current page before use.",
+    "validation_limit": "No item-by-item matching of the 64 records to exact WHO passages was performed."
+  },
+  {
+    "source_id": "NICE-NG222",
+    "status": "public_guideline_found_in_limited_web_check",
+    "checked_url": "https://www.nice.org.uk/guidance/ng222/chapter/Recommendations",
+    "observation": "NICE adult depression recommendations page was found; includes recognition/assessment, treatment choice, monitoring, relapse prevention and crisis-care recommendations.",
+    "validation_limit": "No item-by-item matching of the 64 records to exact NICE recommendation numbers was performed."
+  },
+  {
+    "source_id": "NICE-NG134",
+    "status": "public_guideline_found_in_limited_web_check",
+    "checked_url": "https://www.nice.org.uk/guidance/ng134/chapter/recommendations",
+    "observation": "NICE children and young people depression recommendations page was found; includes developmental/contextual assessment and treatment considerations.",
+    "validation_limit": "No item-by-item matching of the 64 records to exact NICE recommendation numbers was performed."
+  },
+  {
+    "source_id": "NICE-CG192",
+    "status": "URL_registered_not_rechecked_in_this_limited_web_pass",
+    "checked_url": "https://www.nice.org.uk/guidance/cg192/chapter/Recommendations",
+    "observation": "Perinatal guideline URL is present in the source register. Recheck current status and applicability during clinical review.",
+    "validation_limit": "No live page check or exact passage mapping performed in this pass."
+  },
+  {
+    "source_id": "NIMH-DEP",
+    "status": "URL_registered_not_rechecked_in_this_limited_web_pass",
+    "checked_url": "https://www.nimh.nih.gov/health/publications/depression",
+    "observation": "NIMH source URL is present in the source register. Recheck current page and exact sections during clinical review.",
+    "validation_limit": "No live page check or exact passage mapping performed in this pass."
+  }
+]

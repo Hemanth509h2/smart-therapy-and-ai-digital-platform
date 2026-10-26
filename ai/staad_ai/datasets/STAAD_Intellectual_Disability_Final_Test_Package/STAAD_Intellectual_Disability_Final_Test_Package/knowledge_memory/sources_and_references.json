@@ -1,0 +1,58 @@
+[
+  {
+    "source_id": "SRC-AAIDD-DEF",
+    "title": "Defining Criteria for Intellectual Disability",
+    "publisher": "American Association on Intellectual and Developmental Disabilities (AAIDD)",
+    "url": "https://aaidd.org/intellectual-disability/definition",
+    "source_type": "Professional association guidance",
+    "notes": "Defines intellectual functioning, adaptive behavior, developmental-period onset, cultural/linguistic context, strengths, and personalized supports."
+  },
+  {
+    "source_id": "SRC-AAIDD-FAQ",
+    "title": "FAQs on Intellectual Disability",
+    "publisher": "AAIDD",
+    "url": "https://www.aaidd.org/intellectual-disability/faqs-on-intellectual-disability",
+    "source_type": "Professional association guidance",
+    "notes": "Summarizes diagnostic criteria and the role of clinical judgment and standardized measures."
+  },
+  {
+    "source_id": "SRC-WHO-CDDR",
+    "title": "Clinical descriptions and diagnostic requirements for ICD-11 mental, behavioural and neurodevelopmental disorders (CDDR)",
+    "publisher": "World Health Organization (WHO)",
+    "url": "https://www.who.int/publications/i/item/9789240077263/",
+    "source_type": "International clinical diagnostic guidance",
+    "notes": "Official WHO clinical descriptions and diagnostic requirements; the public page describes the publication, not the full diagnostic text."
+  },
+  {
+    "source_id": "SRC-NICE-NG11",
+    "title": "Challenging behaviour and learning disabilities: prevention and interventions (NG11), Recommendations",
+    "publisher": "National Institute for Health and Care Excellence (NICE)",
+    "url": "https://www.nice.org.uk/guidance/ng11/chapter/recommendations",
+    "source_type": "Clinical guideline",
+    "notes": "Person-centred support, accessible information, functional assessment, environmental factors, risk, and behaviour support planning."
+  },
+  {
+    "source_id": "SRC-NICE-NG54",
+    "title": "Mental health problems in people with learning disabilities: prevention, assessment and management (NG54), Recommendations",
+    "publisher": "NICE",
+    "url": "https://www.nice.org.uk/guidance/NG54/chapter/recommendations",
+    "source_type": "Clinical guideline",
+    "notes": "Mental and physical health assessment, adapted tools, changes in behaviour, multidisciplinary assessment, and referral."
+  },
+  {
+    "source_id": "SRC-NHS-HEALTH",
+    "title": "Learning disabilities: Annual health checks",
+    "publisher": "National Health Service (NHS)",
+    "url": "https://www.nhs.uk/conditions/learning-disabilities/annual-health-checks/",
+    "source_type": "Public health information",
+    "notes": "Reasonable adjustments, accessible communication, consent, and physical health checks; UK-specific service details."
+  },
+  {
+    "source_id": "SRC-CDC-ID",
+    "title": "Facts About Intellectual Disability",
+    "publisher": "Centers for Disease Control and Prevention (CDC)",
+    "url": "https://www.cdc.gov/disability-and-health/media/pdfs/2024/12/intellectualdisability.pdf",
+    "source_type": "Public health information",
+    "notes": "Accessible overview of development, learning, daily-life functioning, signs, and seeking professional evaluation."
+  }
+]

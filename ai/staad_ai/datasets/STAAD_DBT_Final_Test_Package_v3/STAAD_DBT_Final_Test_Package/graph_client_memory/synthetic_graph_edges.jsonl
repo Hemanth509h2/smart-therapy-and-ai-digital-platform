@@ -1,0 +1,6 @@
+{"source":"T-DBT","target":"SD-MINDFULNESS","type":"HAS_SKILL_DOMAIN","source_ids":["DBT-SRC-001"],"verified_status":"core_claim_supported_by_reviewed_passage","synthetic":true}
+{"source":"T-DBT","target":"SD-DT","type":"HAS_SKILL_DOMAIN","source_ids":["DBT-SRC-001"],"verified_status":"core_claim_supported_by_reviewed_passage","synthetic":true}
+{"source":"T-DBT","target":"SD-ER","type":"HAS_SKILL_DOMAIN","source_ids":["DBT-SRC-001"],"verified_status":"core_claim_supported_by_reviewed_passage","synthetic":true}
+{"source":"T-DBT","target":"SD-IE","type":"HAS_SKILL_DOMAIN","source_ids":["DBT-SRC-001"],"verified_status":"core_claim_supported_by_reviewed_passage","synthetic":true}
+{"source":"T-DBT","target":"COMP-INDIVIDUAL","type":"INCLUDES_COMPONENT","source_ids":["DBT-SRC-001"],"verified_status":"core_claim_supported_by_reviewed_passage","synthetic":true}
+{"source":"T-DBT","target":"COMP-SKILLS","type":"INCLUDES_COMPONENT","source_ids":["DBT-SRC-001"],"verified_status":"core_claim_supported_by_reviewed_passage","synthetic":true}

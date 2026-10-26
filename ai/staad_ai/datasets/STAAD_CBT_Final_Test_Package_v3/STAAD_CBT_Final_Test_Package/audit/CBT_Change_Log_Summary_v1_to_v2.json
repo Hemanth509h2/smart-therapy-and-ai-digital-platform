@@ -1,0 +1,21 @@
+{
+  "from": "CBT Initial Baseline v1 — AI-generated, unvalidated",
+  "to": "CBT Candidate v2 — source-mapped, review pending",
+  "date": "2026-10-09",
+  "record_count": 36,
+  "changes": [
+    "Created explicit immutable baseline filenames and metadata.",
+    "Preserved original 36 baseline record contents unchanged in the newly named baseline JSONL file.",
+    "Created separate candidate v2 files.",
+    "Added baseline_record_id, content_version, candidate status, retrieval keywords/questions/tags, and do_not_use_as_autonomous_decision flag.",
+    "Added source verification status, verified passage locator and support note from the current mapping.",
+    "Created per-record and summary change logs.",
+    "Did not rewrite clinical content or mark any record clinically validated."
+  ],
+  "not_done": [
+    "No qualified clinician review.",
+    "No claim-by-claim evidence validation beyond the recorded preliminary passage check.",
+    "No live RAG retrieval tests.",
+    "No change to original baseline contents."
+  ]
+}

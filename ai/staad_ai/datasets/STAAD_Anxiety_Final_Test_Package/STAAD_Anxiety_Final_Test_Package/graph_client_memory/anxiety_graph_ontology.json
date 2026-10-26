@@ -1,0 +1,339 @@
+{
+  "purpose": "STAAD anxiety-specific client/graph memory package. It extends the generic client-memory design with anxiety-relevant context, trigger, avoidance and risk relationships.",
+  "entity_types": [
+    {
+      "entity_type": "Client",
+      "description": "Internal client identifier; keep identifying information separate."
+    },
+    {
+      "entity_type": "Condition",
+      "description": "Documented condition or working clinical status."
+    },
+    {
+      "entity_type": "AnxietyPresentation",
+      "description": "GAD, social anxiety, panic disorder, phobia-related or other approved presentation."
+    },
+    {
+      "entity_type": "Symptom",
+      "description": "Documented/reported anxiety-related symptom or difficulty."
+    },
+    {
+      "entity_type": "Context",
+      "description": "Situation in which an observation occurs, such as school, work, social or performance context."
+    },
+    {
+      "entity_type": "Trigger",
+      "description": "Documented antecedent associated with anxiety; do not assume causality."
+    },
+    {
+      "entity_type": "FunctionalImpact",
+      "description": "Documented impact on academic, occupational, social or daily functioning."
+    },
+    {
+      "entity_type": "Goal",
+      "description": "Client-specific support or therapy goal."
+    },
+    {
+      "entity_type": "Session",
+      "description": "A session with timestamp, module and source reference."
+    },
+    {
+      "entity_type": "Observation",
+      "description": "Directly documented observation."
+    },
+    {
+      "entity_type": "ReportedExperience",
+      "description": "Client/parent/teacher/professional report, according to workflow."
+    },
+    {
+      "entity_type": "Intervention",
+      "description": "Clinician-guided strategy or intervention used."
+    },
+    {
+      "entity_type": "Activity",
+      "description": "Specific module/exercise/task used in a session."
+    },
+    {
+      "entity_type": "Response",
+      "description": "Documented client response to an intervention/activity."
+    },
+    {
+      "entity_type": "AvoidanceBehaviour",
+      "description": "Documented avoidance or reduced participation."
+    },
+    {
+      "entity_type": "ProgressMeasure",
+      "description": "Validated or approved measure/indicator."
+    },
+    {
+      "entity_type": "Pattern",
+      "description": "Repeated or clinically meaningful pattern with provenance."
+    },
+    {
+      "entity_type": "RiskEvent",
+      "description": "Documented safety/risk event requiring approved workflow."
+    },
+    {
+      "entity_type": "Accommodation",
+      "description": "Documented support/accommodation."
+    },
+    {
+      "entity_type": "Preference",
+      "description": "Documented delivery preference."
+    },
+    {
+      "entity_type": "SourceRecord",
+      "description": "Pointer to original transcript, note, event or assessment."
+    }
+  ],
+  "relationship_types": [
+    {
+      "source_type": "Client",
+      "relationship": "has_condition",
+      "target_type": "Condition"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_anxiety_presentation",
+      "target_type": "AnxietyPresentation"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_symptom",
+      "target_type": "Symptom"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_context",
+      "target_type": "Context"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_goal",
+      "target_type": "Goal"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_session",
+      "target_type": "Session"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_observation",
+      "target_type": "Observation"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_reported_experience",
+      "target_type": "ReportedExperience"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_pattern",
+      "target_type": "Pattern"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_risk_event",
+      "target_type": "RiskEvent"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_accommodation",
+      "target_type": "Accommodation"
+    },
+    {
+      "source_type": "Session",
+      "relationship": "belongs_to",
+      "target_type": "Client"
+    },
+    {
+      "source_type": "Session",
+      "relationship": "contains_observation",
+      "target_type": "Observation"
+    },
+    {
+      "source_type": "Session",
+      "relationship": "contains_report",
+      "target_type": "ReportedExperience"
+    },
+    {
+      "source_type": "Session",
+      "relationship": "contains_activity",
+      "target_type": "Activity"
+    },
+    {
+      "source_type": "Session",
+      "relationship": "uses_intervention",
+      "target_type": "Intervention"
+    },
+    {
+      "source_type": "Session",
+      "relationship": "records_response",
+      "target_type": "Response"
+    },
+    {
+      "source_type": "Session",
+      "relationship": "records_progress_measure",
+      "target_type": "ProgressMeasure"
+    },
+    {
+      "source_type": "Session",
+      "relationship": "records_risk_event",
+      "target_type": "RiskEvent"
+    },
+    {
+      "source_type": "Observation",
+      "relationship": "has_context",
+      "target_type": "Context"
+    },
+    {
+      "source_type": "Observation",
+      "relationship": "associated_with_trigger",
+      "target_type": "Trigger"
+    },
+    {
+      "source_type": "Observation",
+      "relationship": "indicates_symptom",
+      "target_type": "Symptom"
+    },
+    {
+      "source_type": "Observation",
+      "relationship": "shows_functional_impact",
+      "target_type": "FunctionalImpact"
+    },
+    {
+      "source_type": "Observation",
+      "relationship": "may_form_pattern",
+      "target_type": "Pattern"
+    },
+    {
+      "source_type": "ReportedExperience",
+      "relationship": "associated_with_context",
+      "target_type": "Context"
+    },
+    {
+      "source_type": "ReportedExperience",
+      "relationship": "reports_symptom",
+      "target_type": "Symptom"
+    },
+    {
+      "source_type": "ReportedExperience",
+      "relationship": "may_indicate_trigger",
+      "target_type": "Trigger"
+    },
+    {
+      "source_type": "Activity",
+      "relationship": "uses_intervention",
+      "target_type": "Intervention"
+    },
+    {
+      "source_type": "Intervention",
+      "relationship": "targets_symptom",
+      "target_type": "Symptom"
+    },
+    {
+      "source_type": "Intervention",
+      "relationship": "supports_goal",
+      "target_type": "Goal"
+    },
+    {
+      "source_type": "Response",
+      "relationship": "to_intervention",
+      "target_type": "Intervention"
+    },
+    {
+      "source_type": "Response",
+      "relationship": "associated_with_activity",
+      "target_type": "Activity"
+    },
+    {
+      "source_type": "Response",
+      "relationship": "shows_change_in",
+      "target_type": "Symptom"
+    },
+    {
+      "source_type": "Response",
+      "relationship": "shows_change_in",
+      "target_type": "FunctionalImpact"
+    },
+    {
+      "source_type": "ProgressMeasure",
+      "relationship": "measures_goal",
+      "target_type": "Goal"
+    },
+    {
+      "source_type": "ProgressMeasure",
+      "relationship": "measures_functional_impact",
+      "target_type": "FunctionalImpact"
+    },
+    {
+      "source_type": "Goal",
+      "relationship": "targets",
+      "target_type": "FunctionalImpact"
+    },
+    {
+      "source_type": "AvoidanceBehaviour",
+      "relationship": "occurs_in",
+      "target_type": "Context"
+    },
+    {
+      "source_type": "AvoidanceBehaviour",
+      "relationship": "associated_with",
+      "target_type": "Symptom"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_avoidance_behaviour",
+      "target_type": "AvoidanceBehaviour"
+    },
+    {
+      "source_type": "RiskEvent",
+      "relationship": "has_source",
+      "target_type": "SourceRecord"
+    },
+    {
+      "source_type": "Observation",
+      "relationship": "has_source",
+      "target_type": "SourceRecord"
+    },
+    {
+      "source_type": "ReportedExperience",
+      "relationship": "has_source",
+      "target_type": "SourceRecord"
+    },
+    {
+      "source_type": "Pattern",
+      "relationship": "supported_by",
+      "target_type": "Observation"
+    },
+    {
+      "source_type": "Pattern",
+      "relationship": "supported_by",
+      "target_type": "ReportedExperience"
+    },
+    {
+      "source_type": "Intervention",
+      "relationship": "has_source",
+      "target_type": "SourceRecord"
+    },
+    {
+      "source_type": "Session",
+      "relationship": "has_source",
+      "target_type": "SourceRecord"
+    }
+  ],
+  "rules": [
+    "Client-specific information is separate from general Anxiety RAG knowledge.",
+    "Do not infer causation merely because a trigger/context and symptom are linked.",
+    "Observed, reported, inferred and summarized information must be distinguishable.",
+    "Patterns require provenance and should not be treated as diagnoses.",
+    "Risk events use the approved STAAD safety workflow.",
+    "Medication decisions are not generated by the graph."
+  ],
+  "testing_status": "schema_and_synthetic_demo_only",
+  "production_eligible": false,
+  "pattern_rule": "A longitudinal pattern must not be established from one synthetic session. Require repeated source-linked events, transparent support counts, and review status.",
+  "source_rule": "Keep general clinical knowledge in the Knowledge Memory. Client graph nodes/edges must be derived only from authorized client/session sources in production.",
+  "synthetic_demo_warning": "All client/session/example graph facts in this package are synthetic. Canonical concept nodes are terminology concepts, not client facts."
+}

@@ -25,6 +25,10 @@ and all app data; it sends this service only what each AI task needs.
   parallel and decides the risk level.
 - `report/`: the end-of-session report, written from the whole transcript,
   activity log, notes and call plan.
+- `staad_ai/`: the STAAD retrieval and context pipeline, a library for the AI
+  features (no endpoint of its own). It builds a scoped, redacted prompt from
+  the HIPAA database (`DATABASE_URL_2`) and the live session data. See
+  `staad_ai/README.md`.
 - `internal.py`: the endpoint the backend calls for `copilot` and `report`
   (WebSocket `/internal`, not for browsers). The backend's `/api/ai-insight` and
   `/api/session-report` do their checks, send the session data, and save the

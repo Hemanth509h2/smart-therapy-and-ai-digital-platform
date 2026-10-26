@@ -1,0 +1,88 @@
+[
+  {
+    "id": "SYN-CLIENT-001",
+    "type": "Client",
+    "synthetic": true,
+    "properties": {
+      "client_id": "SYN-CLIENT-001",
+      "preferred_language": "en",
+      "accessibility_preferences": [
+        "plain_language"
+      ]
+    }
+  },
+  {
+    "id": "SYN-SESSION-001",
+    "type": "Session",
+    "synthetic": true,
+    "properties": {
+      "session_id": "SYN-SESSION-001",
+      "client_id": "SYN-CLIENT-001",
+      "session_date": "2026-01-01"
+    }
+  },
+  {
+    "id": "SYN-GOAL-001",
+    "type": "ClientGoal",
+    "synthetic": true,
+    "properties": {
+      "goal_id": "SYN-GOAL-001",
+      "client_id": "SYN-CLIENT-001",
+      "goal_text": "Participate in one personally meaningful activity this week",
+      "status": "active"
+    }
+  },
+  {
+    "id": "SYN-SITUATION-001",
+    "type": "Situation",
+    "synthetic": true,
+    "properties": {
+      "situation_id": "SYN-SITUATION-001",
+      "session_id": "SYN-SESSION-001",
+      "client_reported_description": "Fictional example: considered attending a community activity"
+    }
+  },
+  {
+    "id": "SYN-THOUGHT-001",
+    "type": "Thought",
+    "synthetic": true,
+    "properties": {
+      "thought_id": "SYN-THOUGHT-001",
+      "situation_id": "SYN-SITUATION-001",
+      "client_reported_text": "People might judge me"
+    }
+  },
+  {
+    "id": "SYN-EMOTION-001",
+    "type": "Emotion",
+    "synthetic": true,
+    "properties": {
+      "emotion_id": "SYN-EMOTION-001",
+      "situation_id": "SYN-SITUATION-001",
+      "client_reported_label": "anxiety"
+    }
+  },
+  {
+    "id": "SYN-BEHAVIOUR-001",
+    "type": "Behaviour",
+    "synthetic": true,
+    "properties": {
+      "behaviour_id": "SYN-BEHAVIOUR-001",
+      "situation_id": "SYN-SITUATION-001",
+      "client_reported_description": "Considered staying home"
+    }
+  },
+  {
+    "id": "CBT-015",
+    "type": "KnowledgeRecord",
+    "synthetic": true,
+    "properties": {
+      "record_id": "CBT-015",
+      "source_ids": [
+        "SRC-003",
+        "SRC-004"
+      ],
+      "review_status": "provisional_not_clinically_validated"
+    }
+  }
+]

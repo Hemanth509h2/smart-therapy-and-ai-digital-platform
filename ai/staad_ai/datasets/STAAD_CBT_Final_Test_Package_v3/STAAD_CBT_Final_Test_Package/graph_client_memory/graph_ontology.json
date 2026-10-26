@@ -1,0 +1,149 @@
+{
+  "package": "STAAD CBT Therapy Knowledge Memory + Graph/Client Memory",
+  "version": "v1",
+  "note": "Schema and synthetic examples only. These are not real client records and are not a clinical ontology standard.",
+  "node_types": [
+    {
+      "type": "Client",
+      "fields": [
+        "client_id",
+        "consent_scope",
+        "preferred_language",
+        "accessibility_preferences"
+      ]
+    },
+    {
+      "type": "Session",
+      "fields": [
+        "session_id",
+        "client_id",
+        "session_date",
+        "session_summary_ref"
+      ]
+    },
+    {
+      "type": "ClientGoal",
+      "fields": [
+        "goal_id",
+        "client_id",
+        "goal_text",
+        "status",
+        "review_date"
+      ]
+    },
+    {
+      "type": "Situation",
+      "fields": [
+        "situation_id",
+        "session_id",
+        "client_reported_description"
+      ]
+    },
+    {
+      "type": "Thought",
+      "fields": [
+        "thought_id",
+        "situation_id",
+        "client_reported_text",
+        "confidence_rating_optional"
+      ]
+    },
+    {
+      "type": "Emotion",
+      "fields": [
+        "emotion_id",
+        "situation_id",
+        "client_reported_label",
+        "intensity_optional"
+      ]
+    },
+    {
+      "type": "BodyResponse",
+      "fields": [
+        "body_response_id",
+        "situation_id",
+        "client_reported_description"
+      ]
+    },
+    {
+      "type": "Behaviour",
+      "fields": [
+        "behaviour_id",
+        "situation_id",
+        "client_reported_description",
+        "function_hypothesis_optional"
+      ]
+    },
+    {
+      "type": "Intervention",
+      "fields": [
+        "intervention_id",
+        "therapy",
+        "intervention_name",
+        "knowledge_record_id",
+        "source_ids"
+      ]
+    },
+    {
+      "type": "PracticeTask",
+      "fields": [
+        "task_id",
+        "session_id",
+        "client_agreed_task",
+        "barriers_optional",
+        "review_status"
+      ]
+    },
+    {
+      "type": "OutcomeObservation",
+      "fields": [
+        "observation_id",
+        "session_id",
+        "client_reported_change",
+        "source_type",
+        "date"
+      ]
+    },
+    {
+      "type": "SafetyConcern",
+      "fields": [
+        "concern_id",
+        "session_id",
+        "source_type",
+        "escalation_status",
+        "restricted_access"
+      ]
+    },
+    {
+      "type": "KnowledgeRecord",
+      "fields": [
+        "record_id",
+        "source_ids",
+        "review_status",
+        "content_version"
+      ]
+    }
+  ],
+  "edge_types": [
+    "CLIENT_HAS_SESSION",
+    "CLIENT_HAS_GOAL",
+    "SESSION_MENTIONS_SITUATION",
+    "SITUATION_ASSOCIATED_WITH_THOUGHT",
+    "SITUATION_ASSOCIATED_WITH_EMOTION",
+    "SITUATION_ASSOCIATED_WITH_BODY_RESPONSE",
+    "SITUATION_ASSOCIATED_WITH_BEHAVIOUR",
+    "INTERVENTION_LINKED_TO_KNOWLEDGE_RECORD",
+    "SESSION_AGREES_PRACTICE_TASK",
+    "SESSION_RECORDS_OUTCOME",
+    "SESSION_FLAGS_SAFETY_CONCERN",
+    "GOAL_SUPPORTED_BY_INTERVENTION",
+    "RECORD_CITES_SOURCE"
+  ],
+  "privacy_rules": [
+    "Use pseudonymous identifiers in graph examples and testing fixtures.",
+    "Apply client-level authorization and tenant isolation to every retrieval path.",
+    "Do not store real clinical text in test fixtures.",
+    "Separate inferred links from client-reported facts and professional observations.",
+    "Restrict safety-related nodes and audit access according to organizational policy."
+  ]
+}

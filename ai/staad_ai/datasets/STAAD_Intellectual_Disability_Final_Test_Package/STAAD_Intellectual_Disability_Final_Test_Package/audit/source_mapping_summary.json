@@ -1,0 +1,7 @@
+{
+  "total_records": 45,
+  "provisional_direct_topic_match": 37,
+  "partial_support": 8,
+  "unsupported_claims": 0,
+  "note": "No record is declared clinically validated. 'Provisional direct topic match' indicates a plausible source topic/section, not sentence-level verification. Engineering controls are derived safety requirements, not direct clinical claims."
+}

@@ -46,8 +46,8 @@ def _error(code, message):
     return {"type": "error", "code": code, "error": message}
 
 
-async def run(request, env=os.environ):
-    """One request dict -> one reply dict."""
+async def run(request, env=os.environ, sid=None):
+    """One request dict -> one reply dict. `sid` is the session the token was minted for."""
     kind = request.get("type") if isinstance(request, dict) else None
     if kind not in ("insight", "report"):
         return _error("bad_request", "Unknown request type.")
@@ -55,7 +55,7 @@ async def run(request, env=os.environ):
         return _error("not_configured", "OPENROUTER_API_KEY is not set on the AI service.")
     try:
         if kind == "insight":
-            return {"type": "insight", "insight": await copilot.run_analysis(request, env=env)}
+            return {"type": "insight", "insight": await copilot.run_analysis(request, env=env, session_id=sid)}
         inputs = request.get("inputs") if isinstance(request.get("inputs"), dict) else {}
         return {"type": "report", **await report.write_report(inputs, request.get("client"), env=env)}
     except openrouter.LLMError as e:
@@ -72,7 +72,7 @@ async def handle_connection(ws, query, env=os.environ):
             request = json.loads(await asyncio.wait_for(ws.recv(), RECEIVE_TIMEOUT))
         except (ValueError, TypeError):
             request = None
-        await ws.send(json.dumps(await run(request, env)))
+        await ws.send(json.dumps(await run(request, env, query.get("sid"))))
     except (ConnectionClosed, asyncio.TimeoutError):
         pass  # backend gave up or never sent the request
     finally:

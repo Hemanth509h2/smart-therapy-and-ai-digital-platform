@@ -1,0 +1,64 @@
+{
+  "condition": "intellectual_disability",
+  "purpose": "Illustrative schema for source-linked clinical knowledge and client-specific longitudinal context in STAAD.",
+  "node_types": [
+    {
+      "type": "ClinicalConcept",
+      "description": "Source-linked concept or support principle; not a client diagnosis."
+    },
+    {
+      "type": "ClientGoal",
+      "description": "Goal stated by or agreed with the client, in their preferred language."
+    },
+    {
+      "type": "SupportPreference",
+      "description": "Preferred communication format, pacing, or support approach."
+    },
+    {
+      "type": "ObservedEvent",
+      "description": "Dated, observable event or change; distinguish observation from interpretation."
+    },
+    {
+      "type": "HealthConcern",
+      "description": "Reported physical or mental health concern requiring human review."
+    },
+    {
+      "type": "SupportStrategy",
+      "description": "Human-approved support strategy with owner, context, review date, and status."
+    },
+    {
+      "type": "Source",
+      "description": "Guideline or professional source record."
+    },
+    {
+      "type": "Session",
+      "description": "Session metadata and references to approved session records."
+    }
+  ],
+  "edge_types": [
+    "SUPPORTED_BY",
+    "RELATES_TO",
+    "CLIENT_STATED_GOAL",
+    "PREFERS",
+    "OBSERVED_DURING",
+    "CHANGED_FROM_BASELINE",
+    "MAY_BE_ASSOCIATED_WITH",
+    "REVIEWED_BY",
+    "APPROVED_FOR_USE_IN",
+    "SUPERSEDES"
+  ],
+  "privacy_rules": [
+    "All client-specific nodes and edges must be tenant/client scoped.",
+    "Use least-privilege access and auditable reads/writes.",
+    "Do not place direct identifiers in embeddings or graph labels unless strictly necessary and approved.",
+    "Synthetic examples in this package are not real client records.",
+    "Do not infer diagnosis, consent, capacity, abuse, or risk level from graph links alone."
+  ],
+  "design_notes": [
+    "Knowledge Memory stores reusable evidence and guidance.",
+    "Client/Graph Memory stores client-specific facts, goals, preferences, and dated observations.",
+    "Session Memory stores current-session events and transcript references.",
+    "Specialized retrievers are retrieval mechanisms, not separate memory stores.",
+    "Context Manager selects source-linked, minimum-necessary context and preserves uncertainty."
+  ]
+}

@@ -1,0 +1,9 @@
+﻿edge_id,edge_type,from_node_id,synthetic,to_node_id
+demo_edge_001,HAS_SESSION,demo_client_001,True,demo_session_001
+demo_edge_002,HAS_SOURCE,demo_session_001,True,demo_source_001
+demo_edge_003,DOCUMENTS,demo_session_001,True,demo_exp_001
+demo_edge_004,REPORTS,demo_exp_001,True,demo_symptom_001
+demo_edge_005,AFFECTS_FUNCTION,demo_symptom_001,True,demo_impact_001
+demo_edge_006,WORKING_TOWARD,demo_client_001,True,demo_goal_001
+demo_edge_007,ADDRESSED_BY,demo_goal_001,True,demo_intervention_001
+demo_edge_008,RESPONDED_WITH,demo_session_001,True,demo_response_001

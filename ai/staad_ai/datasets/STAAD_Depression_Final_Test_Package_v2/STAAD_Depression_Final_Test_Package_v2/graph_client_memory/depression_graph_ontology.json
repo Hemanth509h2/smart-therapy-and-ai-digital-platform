@@ -1,0 +1,164 @@
+{
+  "package_name": "STAAD Depression Graph + Client Memory",
+  "purpose": "A STAAD-compatible schema for storing authorized, client-specific depression-related session observations and longitudinal context. Included example records are synthetic demonstrations only.",
+  "important_boundary": "This package does not contain real client information and must not be used to infer or diagnose depression. Clinical knowledge belongs in the separate Depression Knowledge Memory; client memory must contain only provenance-linked information from authorized client/session sources.",
+  "node_types": [
+    {
+      "type": "Client",
+      "description": "Pseudonymous client reference; avoid direct identifiers in the graph."
+    },
+    {
+      "type": "Session",
+      "description": "A specific authorized therapy/support session."
+    },
+    {
+      "type": "Observation",
+      "description": "Clinician/system-recorded observation, with source and timestamp."
+    },
+    {
+      "type": "ReportedExperience",
+      "description": "Experience explicitly reported by the client; preserve attribution."
+    },
+    {
+      "type": "MoodOrSymptom",
+      "description": "A documented mood/symptom concept, not a diagnosis by itself."
+    },
+    {
+      "type": "Context",
+      "description": "A documented contextual factor such as a life event or routine change."
+    },
+    {
+      "type": "TriggerOrAntecedent",
+      "description": "An event reported or observed before an experience; not proof of causation."
+    },
+    {
+      "type": "FunctionalImpact",
+      "description": "Documented effect on daily activities, school, work, relationships, or self-care."
+    },
+    {
+      "type": "Goal",
+      "description": "Client-agreed support or therapy goal."
+    },
+    {
+      "type": "Intervention",
+      "description": "An intervention or strategy discussed/delivered by a qualified professional."
+    },
+    {
+      "type": "Activity",
+      "description": "A between-session or in-session activity."
+    },
+    {
+      "type": "Response",
+      "description": "Client-reported or observed response to an intervention/activity."
+    },
+    {
+      "type": "ProgressMeasure",
+      "description": "A measure or progress note with method, date, and interpretation boundaries."
+    },
+    {
+      "type": "Preference",
+      "description": "Client-stated communication/support preferences."
+    },
+    {
+      "type": "PatternHypothesis",
+      "description": "A tentative longitudinal pattern requiring review; never a diagnosis or proven causal claim."
+    },
+    {
+      "type": "RiskEvent",
+      "description": "A safety-relevant statement/event, with careful access controls and approved escalation workflow."
+    },
+    {
+      "type": "SourceRecord",
+      "description": "Transcript span, event, clinician note, or other provenance source."
+    }
+  ],
+  "edge_types": [
+    {
+      "type": "HAS_SESSION",
+      "from": "Client",
+      "to": "Session"
+    },
+    {
+      "type": "HAS_SOURCE",
+      "from": "Session|Observation|ReportedExperience|RiskEvent",
+      "to": "SourceRecord"
+    },
+    {
+      "type": "DOCUMENTS",
+      "from": "Session",
+      "to": "Observation|ReportedExperience|MoodOrSymptom|Context|FunctionalImpact"
+    },
+    {
+      "type": "REPORTS",
+      "from": "Client|Session",
+      "to": "ReportedExperience|MoodOrSymptom|Context"
+    },
+    {
+      "type": "OCCURRED_BEFORE",
+      "from": "Context|TriggerOrAntecedent",
+      "to": "ReportedExperience|MoodOrSymptom",
+      "meaning": "Temporal association only; not causation."
+    },
+    {
+      "type": "AFFECTS_FUNCTION",
+      "from": "MoodOrSymptom|Context",
+      "to": "FunctionalImpact"
+    },
+    {
+      "type": "WORKING_TOWARD",
+      "from": "Client",
+      "to": "Goal"
+    },
+    {
+      "type": "ADDRESSED_BY",
+      "from": "Goal|FunctionalImpact",
+      "to": "Intervention|Activity"
+    },
+    {
+      "type": "RESPONDED_WITH",
+      "from": "Client|Session",
+      "to": "Response"
+    },
+    {
+      "type": "MEASURED_BY",
+      "from": "Goal|MoodOrSymptom",
+      "to": "ProgressMeasure"
+    },
+    {
+      "type": "HAS_PREFERENCE",
+      "from": "Client",
+      "to": "Preference"
+    },
+    {
+      "type": "SUGGESTS_PATTERN",
+      "from": "Observation|ReportedExperience|MoodOrSymptom",
+      "to": "PatternHypothesis"
+    },
+    {
+      "type": "DOCUMENTS_RISK",
+      "from": "Session",
+      "to": "RiskEvent"
+    }
+  ],
+  "required_provenance_fields": [
+    "client_id (pseudonymous)",
+    "session_id or event_id",
+    "source_record_id",
+    "source_type (client_reported / clinician_observed / transcript_derived / clinician_entered / system_summarized)",
+    "timestamp",
+    "author_or_system",
+    "confidence_or_review_status",
+    "created_at",
+    "updated_at"
+  ],
+  "design_rules": [
+    "Use only authorized STAAD client/session sources for actual client memory.",
+    "Do not put general clinical facts or guideline passages into the client graph; those belong in Knowledge Memory.",
+    "Keep reported experiences distinct from clinician observations and model-generated summaries.",
+    "A pattern hypothesis must link to supporting source events, carry confidence/review status, and remain tentative.",
+    "A trigger or preceding event does not prove cause.",
+    "A symptom mention is not a diagnosis; diagnosis requires an appropriate qualified professional workflow.",
+    "Risk-related content must follow STAAD's approved human escalation and access-control workflow; the graph must not autonomously triage emergencies.",
+    "Apply least-privilege access, pseudonymization, retention/deletion policies, audit logging, and applicable legal/privacy review."
+  ]
+}

@@ -1,0 +1,16 @@
+[
+  {
+    "source_id": "SRC-ADHD-SLD-01",
+    "source_document": "Conduct an exhaustive, evidence-based clinical analysis.docx",
+    "role": "Primary supplied research document",
+    "source_locator_note": "Record-level source_paragraph_index and source_context_at_index are carried into each KB record. Verify the passage itself before approving a clinical claim.",
+    "independent_external_validation": "Not performed in this package."
+  },
+  {
+    "source_id": "SRC-ADHD-SLD-02",
+    "source_document": "adhd,sld v1.docx",
+    "role": "Supplementary supplied ADHD/SLD research document",
+    "source_locator_note": "Record-level source_paragraph_index and source_context_at_index are carried into each KB record. Verify the passage itself before approving a clinical claim.",
+    "independent_external_validation": "Not performed in this package."
+  }
+]

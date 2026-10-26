@@ -1,0 +1,14 @@
+﻿field,meaning,notes,requirement
+client_id,Pseudonymous client key,Never use direct identity in graph exports.,Required
+session_id,Session key,Scope current-session retrieval.,Required where applicable
+event_id,Unique memory event identifier,Stable ID for updates/audit.,Required
+timestamp,Time the event occurred or was recorded,Use ISO-8601 with timezone.,Required
+source_record_id,"Transcript span, structured event, or note identifier",Enables traceability to source.,Required
+source_type,Provenance category,"Client-reported, clinician-observed, transcript-derived, clinician-entered, system-summarized.",Required
+content,Minimal faithful event text,Do not add unsupported interpretations.,Required
+attribution,Who reported/observed/generated the information,Preserve uncertainty and attribution.,Required
+confidence_or_review_status,Quality/review state,Separate model confidence from clinician approval.,Required
+risk_flag,Safety workflow marker,Use approved STAAD workflow; details need restricted access.,"Optional, controlled"
+retention_policy_ref,Applicable retention policy,Implement deletion/retention operationally.,Required in production
+edge_type,Named relationship between two nodes,A relationship is not proof of causation.,Required for graph edges
+supporting_event_ids,Source events behind a pattern hypothesis,Do not create patterns without repeated supported evidence and review.,Required for pattern hypotheses

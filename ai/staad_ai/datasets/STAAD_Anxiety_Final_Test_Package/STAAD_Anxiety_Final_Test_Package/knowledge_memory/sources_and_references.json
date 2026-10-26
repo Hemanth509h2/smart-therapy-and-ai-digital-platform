@@ -1,0 +1,93 @@
+[
+  {
+    "source_id": "WHO-ANX-2025",
+    "title": "WHO Anxiety disorders fact sheet",
+    "url": "https://www.who.int/news-room/fact-sheets/detail/anxiety-disorders",
+    "source_type": "authoritative"
+  },
+  {
+    "source_id": "NIMH-ANX",
+    "title": "NIMH Anxiety Disorders",
+    "url": "https://www.nimh.nih.gov/health/topics/anxiety-disorders",
+    "source_type": "authoritative"
+  },
+  {
+    "source_id": "NIMH-GAD",
+    "title": "NIMH Generalized Anxiety Disorder",
+    "url": "https://www.nimh.nih.gov/health/publications/generalized-anxiety-disorder-gad",
+    "source_type": "authoritative"
+  },
+  {
+    "source_id": "NIMH-SAD",
+    "title": "NIMH Social Anxiety Disorder",
+    "url": "https://www.nimh.nih.gov/health/publications/social-anxiety-disorder-more-than-just-shyness",
+    "source_type": "authoritative"
+  },
+  {
+    "source_id": "NIMH-PD",
+    "title": "NIMH Panic Disorder",
+    "url": "https://www.nimh.nih.gov/health/statistics/panic-disorder",
+    "source_type": "authoritative"
+  },
+  {
+    "source_id": "NICE-GAD-PD",
+    "title": "NICE CG113 GAD and Panic Disorder",
+    "url": "https://www.nice.org.uk/guidance/cg113/chapter/Recommendations",
+    "source_type": "guideline"
+  },
+  {
+    "source_id": "NICE-SAD",
+    "title": "NICE CG159 Social Anxiety Disorder",
+    "url": "https://www.nice.org.uk/guidance/cg159/chapter/recommendations",
+    "source_type": "guideline"
+  },
+  {
+    "source_id": "PUBMED-CBT-ADULT",
+    "title": "CBT for adult anxiety disorders meta-analysis",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/18363421/",
+    "source_type": "meta_analysis"
+  },
+  {
+    "source_id": "PUBMED-CBT-YOUTH",
+    "title": "CBT for child/adolescent anxiety meta-analysis",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/31738631/",
+    "source_type": "meta_analysis"
+  },
+  {
+    "source_id": "PUBMED-CBT-PHARM-YOUTH",
+    "title": "CBT vs pharmacotherapy childhood anxiety meta-analysis",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/28859190/",
+    "source_type": "meta_analysis"
+  },
+  {
+    "source_id": "PUBMED-COMPUTER-CBT",
+    "title": "Computerized CBT anxiety meta-analysis",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/25093485/",
+    "source_type": "meta_analysis"
+  },
+  {
+    "source_id": "PUBMED-CBT-SECONDARY",
+    "title": "Youth anxiety CBT secondary outcomes meta-analysis",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/30447493/",
+    "source_type": "meta_analysis"
+  },
+  {
+    "source_id": "PUBMED-MOD-2025",
+    "title": "2025 moderators of CBT in youth anxiety",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/39799802/",
+    "source_type": "meta_analysis"
+  },
+  {
+    "source_id": "PUBMED-ICBT-2026",
+    "title": "2026 internet CBT youth anxiety meta-analysis",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/42442767/",
+    "source_type": "meta_analysis"
+  },
+  {
+    "source_id": "STAAD-ARCH-DESIGN",
+    "title": "STAAD internal architecture/design guidance",
+    "url": "",
+    "source_type": "internal_design_note",
+    "scope_note": "Architecture recommendations for memory separation, Context Manager, provenance, and evaluation. Not a clinical evidence source."
+  }
+]

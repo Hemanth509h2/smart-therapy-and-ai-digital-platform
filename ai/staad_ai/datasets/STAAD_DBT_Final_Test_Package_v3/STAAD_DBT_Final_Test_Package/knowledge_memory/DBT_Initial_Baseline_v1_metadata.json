@@ -1,0 +1,10 @@
+{
+  "dataset_name": "DBT Initial Baseline v1 — AI-generated, unvalidated",
+  "origin": "Created by assistant for STAAD; not supplied by user and not copied from a pre-existing DBT dataset.",
+  "record_count": 36,
+  "created_date": "2026-10-09",
+  "validation_status": "AI-generated, unvalidated; not clinically approved.",
+  "immutability_rule": "Never edit baseline v1. Apply corrections only in a new candidate version and document them.",
+  "sha256_jsonl": "a821eaf51e3c7787868fd3a8fb8f001b05f31a4ffb1a44d19fb9263ee35ca3f0",
+  "sha256_csv": "cd9dd1d350f4ccec0ca6e6b4c32aac2082415c51d523dc29cc26b2756f9d49a2"
+}

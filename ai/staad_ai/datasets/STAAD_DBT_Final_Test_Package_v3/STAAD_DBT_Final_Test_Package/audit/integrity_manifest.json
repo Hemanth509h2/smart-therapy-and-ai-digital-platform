@@ -1,0 +1,102 @@
+[
+  {
+    "path": "README.md",
+    "bytes": 1805,
+    "sha256": "c1717c5c0b4bd64a70f38750e9f8b88fbc85872d0d0a78f8f84ce42fd17b3d90"
+  },
+  {
+    "path": "audit/DBT_Change_Log_v1_to_v2.csv",
+    "bytes": 34445,
+    "sha256": "54e2151b89b038774cb36474402c5c030b9d452e15a08a545cd488f29aa02706"
+  },
+  {
+    "path": "audit/DBT_Change_Log_v1_to_v2.jsonl",
+    "bytes": 41131,
+    "sha256": "c96d6e516b558576e04846242d878d436124bf61c59c88ec52762662b7e4d34b"
+  },
+  {
+    "path": "source_mapping/DBT_Candidate_v2_Source_Mapping.csv",
+    "bytes": 9814,
+    "sha256": "8980ca427d8cde3d7a8c8f05b8a437e7a203fa6a2493b11fe34eddcb09b332c0"
+  },
+  {
+    "path": "source_mapping/DBT_Candidate_v2_Source_Mapping.jsonl",
+    "bytes": 15948,
+    "sha256": "b0f76b5746c4a9ee9a854831898bb956b96c5027c424b901c56e4636e4e1db5d"
+  },
+  {
+    "path": "source_mapping/source_register.csv",
+    "bytes": 1840,
+    "sha256": "2eb80af125e34e4c538eacad7e4d265716b49dc25f67ceca8b146ddf7cf46675"
+  },
+  {
+    "path": "source_mapping/source_register.jsonl",
+    "bytes": 2180,
+    "sha256": "8dfcc224cb10f4a9f34e83662c51de6745000ab2d3b84f7c8cf265e0fb67118a"
+  },
+  {
+    "path": "graph_client_memory/dbt_graph_ontology.json",
+    "bytes": 845,
+    "sha256": "f9351538699f922cb49f418f0ec910e7ab004b63dba8e319a425e46349dc0871"
+  },
+  {
+    "path": "graph_client_memory/dbt_session_memory_template.json",
+    "bytes": 589,
+    "sha256": "1ec62185726b921d5e0dc596a559fbbdde0f8b560044c1a3f922867c42858c4d"
+  },
+  {
+    "path": "graph_client_memory/synthetic_graph_edges.jsonl",
+    "bytes": 1043,
+    "sha256": "d660733375933db95ec5f69e42a09e72b1948426636ddee532f5506206cbeece"
+  },
+  {
+    "path": "graph_client_memory/synthetic_graph_nodes.jsonl",
+    "bytes": 1168,
+    "sha256": "905e73cab836b1361f0e1bb002b63878833e3be35fb535d1c68f44a00e0820fd"
+  },
+  {
+    "path": "knowledge_memory/DBT_Candidate_v2.csv",
+    "bytes": 32023,
+    "sha256": "ca58145da5eb152480b336cae4ec0d76670e071e7291aab27cc9f2b9c1dea740"
+  },
+  {
+    "path": "knowledge_memory/DBT_Candidate_v2.jsonl",
+    "bytes": 43131,
+    "sha256": "403c05e93adb3e0481e7b18187e95aa8dfed6f8656c289660461698006cf89c1"
+  },
+  {
+    "path": "knowledge_memory/DBT_Initial_Baseline_v1_AI_generated_unvalidated.csv",
+    "bytes": 15024,
+    "sha256": "cd9dd1d350f4ccec0ca6e6b4c32aac2082415c51d523dc29cc26b2756f9d49a2"
+  },
+  {
+    "path": "knowledge_memory/DBT_Initial_Baseline_v1_AI_generated_unvalidated.jsonl",
+    "bytes": 18458,
+    "sha256": "a821eaf51e3c7787868fd3a8fb8f001b05f31a4ffb1a44d19fb9263ee35ca3f0"
+  },
+  {
+    "path": "knowledge_memory/DBT_Initial_Baseline_v1_metadata.json",
+    "bytes": 614,
+    "sha256": "f33c7d27c49e283ec85161e80e935ba9396fc19dc47ab1a990eced332ef9a14d"
+  },
+  {
+    "path": "knowledge_memory/data_dictionary.csv",
+    "bytes": 792,
+    "sha256": "3f094d1c6726a7f4f170d1b38f7d412d296dd1dc9782e324338c01494facc0f9"
+  },
+  {
+    "path": "reports/STAAD_DBT_Audit_and_Testing_Readiness_Report.docx",
+    "bytes": 37663,
+    "sha256": "14c671561e27c9670767ea1c98182c856ee72f1bc867f1b5b1f495b093a3176d"
+  },
+  {
+    "path": "test_cases/dbt_retrieval_test_cases.csv",
+    "bytes": 4807,
+    "sha256": "5a25b981366ae17559651f048301661c72b102406ea489eddfee343f94769d0b"
+  },
+  {
+    "path": "test_cases/dbt_retrieval_test_cases.jsonl",
+    "bytes": 6886,
+    "sha256": "6d0e874e1be38ea637313bee339628268d2a3ba913ada8cfc8bb9b7a5c4bc9d8"
+  }
+]

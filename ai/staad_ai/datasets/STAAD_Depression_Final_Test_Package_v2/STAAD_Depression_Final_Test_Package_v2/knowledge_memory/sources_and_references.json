@@ -1,0 +1,43 @@
+[
+  {
+    "source_id": "WHO-DEP-FACTSHEET",
+    "title": "Depressive disorder (depression)",
+    "organization": "World Health Organization",
+    "url": "https://www.who.int/news-room/fact-sheets/detail/depression",
+    "source_type": "authoritative_health_guidance",
+    "use": "Foundations, symptoms, functional impact, treatment overview, suicide relevance",
+    "review_note": "Use for broad public-health framing; verify any numeric prevalence statements against the current page before production."
+  },
+  {
+    "source_id": "NIMH-DEP",
+    "title": "Depression",
+    "organization": "National Institute of Mental Health",
+    "url": "https://www.nimh.nih.gov/health/publications/depression",
+    "source_type": "authoritative_health_information",
+    "use": "Symptoms, types, age/context presentations, treatment overview, differential considerations"
+  },
+  {
+    "source_id": "NICE-NG222",
+    "title": "Depression in adults: treatment and management (NG222)",
+    "organization": "National Institute for Health and Care Excellence",
+    "url": "https://www.nice.org.uk/guidance/ng222/chapter/Recommendations",
+    "source_type": "clinical_guideline",
+    "use": "Adult recognition, assessment, risk, treatment choices, monitoring, relapse prevention, escalation"
+  },
+  {
+    "source_id": "NICE-NG134",
+    "title": "Depression in children and young people: identification and management (NG134)",
+    "organization": "National Institute for Health and Care Excellence",
+    "url": "https://www.nice.org.uk/guidance/ng134/chapter/recommendations",
+    "source_type": "clinical_guideline",
+    "use": "Youth detection, developmental assessment, interventions, comorbidities and safeguarding"
+  },
+  {
+    "source_id": "NICE-CG192",
+    "title": "Antenatal and postnatal mental health: clinical management and service guidance (CG192)",
+    "organization": "National Institute for Health and Care Excellence",
+    "url": "https://www.nice.org.uk/guidance/cg192/chapter/Recommendations",
+    "source_type": "clinical_guideline",
+    "use": "Perinatal recognition, assessment, monitoring, risk and treatment considerations"
+  }
+]

@@ -1,0 +1,20 @@
+﻿entity_type,label,node_id,node_scope,note,real_client_data,synthetic_example
+Client,Synthetic Client 001,CLIENT-001,synthetic_client_or_session_example,Example-only record; not a real STAAD client record.,False,True
+Condition,ADHD,COND-ADHD,schema_concept_used_in_synthetic_demo,Example-only record; not a real STAAD client record.,False,True
+Condition,Specific Learning Disorder,COND-SLD,schema_concept_used_in_synthetic_demo,Example-only record; not a real STAAD client record.,False,True
+SLDDomain,Reading,SLD-READ,schema_concept_used_in_synthetic_demo,Example-only record; not a real STAAD client record.,False,True
+Symptom,Inattention,SYM-INATTENTION,schema_concept_used_in_synthetic_demo,Example-only record; not a real STAAD client record.,False,True
+Symptom,Working-memory difficulty,SYM-WORKING-MEMORY,schema_concept_used_in_synthetic_demo,Example-only record; not a real STAAD client record.,False,True
+Symptom,Reading difficulty,SYM-READING-DIFFICULTY,schema_concept_used_in_synthetic_demo,Example-only record; not a real STAAD client record.,False,True
+FunctionalImpact,Academic functioning difficulty,IMPACT-ACADEMIC,schema_concept_used_in_synthetic_demo,Example-only record; not a real STAAD client record.,False,True
+Goal,Improve reading performance,GOAL-READING,synthetic_client_or_session_example,Example-only record; not a real STAAD client record.,False,True
+Goal,Improve sustained task engagement,GOAL-ATTENTION,synthetic_client_or_session_example,Example-only record; not a real STAAD client record.,False,True
+Session,Synthetic Session 001,SESSION-001,synthetic_client_or_session_example,Example-only record; not a real STAAD client record.,False,True
+Observation,Difficulty sustaining attention during reading task,OBS-001,synthetic_client_or_session_example,Example-only record; not a real STAAD client record.,False,True
+Observation,Increased frustration during difficult reading activity,OBS-002,synthetic_client_or_session_example,Example-only record; not a real STAAD client record.,False,True
+Intervention,Structured reading activity,INT-STRUCTURED-READING,schema_concept_used_in_synthetic_demo,Example-only record; not a real STAAD client record.,False,True
+Activity,Guided reading exercise,ACT-READING-001,synthetic_client_or_session_example,Example-only record; not a real STAAD client record.,False,True
+Response,Completed task with structured support,RESP-001,synthetic_client_or_session_example,Example-only record; not a real STAAD client record.,False,True
+Pattern,Attention difficulty increases during demanding reading tasks,PATTERN-001,schema_concept_used_in_synthetic_demo,Example-only record; not a real STAAD client record.,False,True
+Accommodation,Structured task presentation,ACC-001,schema_concept_used_in_synthetic_demo,Example-only record; not a real STAAD client record.,False,True
+ProgressMeasure,Reading task completion / accuracy,PM-001,schema_concept_used_in_synthetic_demo,Example-only record; not a real STAAD client record.,False,True

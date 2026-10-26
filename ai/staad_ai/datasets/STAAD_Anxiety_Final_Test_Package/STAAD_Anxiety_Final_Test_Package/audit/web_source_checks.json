@@ -1,0 +1,56 @@
+[
+  {
+    "source_id": "WHO-ANX-2025",
+    "checked_url": "https://www.who.int/news-room/fact-sheets/detail/anxiety-disorders",
+    "check_status": "URL resolves to WHO Anxiety disorders fact sheet; page crawled/published 15 Sep 2026 in current web results",
+    "notes": "Supports broad definitions, symptoms, functional impact, common presentations, and treatment overview. Exact passage mapping for each record is still pending."
+  },
+  {
+    "source_id": "NICE-GAD-PD",
+    "checked_url": "https://www.nice.org.uk/guidance/cg113/chapter/Recommendations",
+    "check_status": "URL resolves to NICE CG113 recommendations",
+    "notes": "Supports adult GAD/panic recognition, assessment, functional impairment, comorbidity and treatment guidance. Do not use it as the sole source for child/youth recommendations or STAAD-specific architecture decisions."
+  },
+  {
+    "source_id": "NICE-SAD",
+    "checked_url": "https://www.nice.org.uk/guidance/cg159/chapter/recommendations",
+    "check_status": "URL resolves to NICE CG159 recommendations",
+    "notes": "Covers adults and children/young people; includes assessment, comorbidity, CBT, exposure components and outcome monitoring. Exact passage mapping remains pending."
+  },
+  {
+    "source_id": "PUBMED-CBT-ADULT",
+    "checked_url": "https://pubmed.ncbi.nlm.nih.gov/18363421/",
+    "check_status": "PubMed record verified",
+    "notes": "2008 meta-analysis of CBT versus placebo in adult anxiety disorders. Keep scope explicitly adult and note the paper's age/date and study limitations."
+  },
+  {
+    "source_id": "PUBMED-CBT-YOUTH",
+    "checked_url": "https://pubmed.ncbi.nlm.nih.gov/31738631/",
+    "check_status": "PubMed record verified",
+    "notes": "Systematic review/meta-analysis on CBT modalities for child/adolescent anxiety disorders."
+  },
+  {
+    "source_id": "PUBMED-CBT-PHARM-YOUTH",
+    "checked_url": "https://pubmed.ncbi.nlm.nih.gov/28859190/",
+    "check_status": "PubMed record verified",
+    "notes": "Systematic review/meta-analysis comparing CBT and pharmacotherapy in childhood anxiety disorders. Medication statements remain clinician-reference only."
+  },
+  {
+    "source_id": "PUBMED-COMPUTER-CBT",
+    "checked_url": "https://pubmed.ncbi.nlm.nih.gov/25093485/",
+    "check_status": "PubMed record verified",
+    "notes": "2014 meta-analysis of computerized CBT; applicability to routine real-world care and comorbid populations needs careful qualification."
+  },
+  {
+    "source_id": "PUBMED-MOD-2025",
+    "checked_url": "https://pubmed.ncbi.nlm.nih.gov/39799802/",
+    "check_status": "PubMed record verified",
+    "notes": "2025 systematic review/meta-analysis of moderators of cognitive and behavioural therapies for anxiety in children/adolescents."
+  },
+  {
+    "source_id": "PUBMED-ICBT-2026",
+    "checked_url": "https://pubmed.ncbi.nlm.nih.gov/42442767/",
+    "check_status": "PubMed record verified",
+    "notes": "2026 systematic review/meta-analysis of internet CBT in youth anxiety. PubMed abstract reports 11 included studies and low overall GRADE evidence; the record should explicitly preserve this limitation and avoid overstating certainty."
+  }
+]

@@ -1,0 +1,9 @@
+﻿field,meaning,required,privacy
+client_id,Pseudonymous client identifier; tenant-scoped,yes for client memory,high
+session_id,Session identifier,when session-linked,high
+item_type,"Goal, preference, observation, concern, strategy, etc.",yes,moderate
+source_ref,Source record or original note reference,when evidence exists,moderate
+observed_at,Time of observed/reported event,when applicable,high
+review_status,"Draft, reviewed, approved, superseded",yes,moderate
+approved_by,Authorized reviewer identifier,for approved strategies,high
+synthetic,Marks example as synthetic,for examples,low

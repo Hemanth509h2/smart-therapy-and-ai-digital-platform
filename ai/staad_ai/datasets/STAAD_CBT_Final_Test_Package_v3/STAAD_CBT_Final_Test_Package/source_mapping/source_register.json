@@ -1,0 +1,65 @@
+[
+  {
+    "source_id": "SRC-001",
+    "title": "NICE: Depression in adults: treatment and management — Recommendations",
+    "organization": "National Institute for Health and Care Excellence (NICE)",
+    "source_type": "clinical_guideline",
+    "url": "https://www.nice.org.uk/guidance/ng222/chapter/Recommendations",
+    "scope": "CBT and related psychological interventions for depression; delivery and relapse-prevention considerations.",
+    "limitations": "UK guideline; recommendations are condition- and context-specific. Section-level locator only; exact passage mapping has not yet been independently verified."
+  },
+  {
+    "source_id": "SRC-002",
+    "title": "NHS: Cognitive behavioural therapy (CBT)",
+    "organization": "National Health Service (NHS)",
+    "source_type": "public_health_information",
+    "url": "https://www.nhs.uk/mental-health/talking-therapies-medicine-treatments/talking-therapies-and-counselling/cognitive-behavioural-therapy-cbt/",
+    "scope": "General CBT overview, typical session activities, between-session practice, assessment and treatment follow-up.",
+    "limitations": "UK public-facing overview; not a substitute for a clinical treatment manual or local protocol."
+  },
+  {
+    "source_id": "SRC-003",
+    "title": "Beck Institute: Understanding CBT",
+    "organization": "Beck Institute for Cognitive Behavior Therapy",
+    "source_type": "professional_education",
+    "url": "https://beckinstitute.org/about/understanding-cbt/",
+    "scope": "Cognitive model, collaborative therapeutic relationship, individualized formulation and treatment principles.",
+    "limitations": "Professional education resource; exact passage mapping and independent clinical review remain pending."
+  },
+  {
+    "source_id": "SRC-004",
+    "title": "Beck Institute: Cognitive Model",
+    "organization": "Beck Institute for Cognitive Behavior Therapy",
+    "source_type": "professional_education",
+    "url": "https://beckinstitute.org/cognitive-model",
+    "scope": "Perceptions and automatic thoughts in relation to emotional, behavioural and physiological responses; evaluating thoughts and beliefs.",
+    "limitations": "Professional education resource; use as a conceptual source, not as sole evidence for efficacy or treatment selection."
+  },
+  {
+    "source_id": "SRC-005",
+    "title": "Beck Institute: Resources from Cognitive Behavior Therapy: Basics and Beyond",
+    "organization": "Beck Institute for Cognitive Behavior Therapy",
+    "source_type": "professional_education_toolkit",
+    "url": "https://beckinstitute.org/cbt-resources/resources-for-professionals-and-students/cbtresources/",
+    "scope": "Examples of CBT worksheets and tools, including thought records and testing thoughts.",
+    "limitations": "Resource index; individual worksheet content and licensing/use conditions should be checked before product integration."
+  },
+  {
+    "source_id": "SRC-006",
+    "title": "NICE: Depression in adults with a chronic physical health problem — Recommendations",
+    "organization": "National Institute for Health and Care Excellence (NICE)",
+    "source_type": "clinical_guideline",
+    "url": "https://www.nice.org.uk/guidance/cg91/chapter/Recommendations",
+    "scope": "Guided CBT-based self-help, accessibility, practitioner support and monitoring in a specified clinical context.",
+    "limitations": "Older guideline and specific to depression with chronic physical health problems; do not generalize all details to every population."
+  },
+  {
+    "source_id": "SRC-007",
+    "title": "APA: Depression Treatments for Adults — Cognitive-Behavioral Therapy",
+    "organization": "American Psychological Association",
+    "source_type": "professional_guideline_overview",
+    "url": "https://www.apa.org/depression-guideline/adults",
+    "scope": "Overview of CBT for adult depression.",
+    "limitations": "Direct page content was not available in this pass; not used as sole support for candidate claims."
+  }
+]

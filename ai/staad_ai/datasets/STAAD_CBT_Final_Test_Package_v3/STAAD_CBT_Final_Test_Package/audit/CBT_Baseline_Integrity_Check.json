@@ -1,0 +1,8 @@
+{
+  "dataset_name": "CBT Initial Baseline v1 — AI-generated, unvalidated",
+  "jsonl_sha256": "a4b2261bdd665ccd24eca01f6d7b386734dfd12ad1cb02d08985b9be8a7e02b2",
+  "csv_sha256": "5c270b7a3ea493a2bdebd83533779c1a5fc8b84c9261b91ef76472dfa78e71ae",
+  "record_count": 36,
+  "baseline_immutable": true,
+  "verified_against_in_memory_initial_records": true
+}

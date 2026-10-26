@@ -8,6 +8,8 @@ JSON message:
   {"type": "plan", "modules": [{id, name, category, desc}], "clientName"?,
    "notesText"?: "...", "file"?: {"name": "notes.pdf"}}
       With "file", the next message is the file's bytes (binary).
+      The agent also reads the client's records for this session (earlier reports,
+      progress notes, metrics) from the STAAD pipeline, when the database is set up.
       Replies: {"type": "status", "step": "reading" | "planning" | "revising"} ...
                then {"type": "plan", "plan": {...}}
 
@@ -28,6 +30,7 @@ from websockets.exceptions import ConnectionClosed
 
 from call_plan import agent, llm
 from call_plan.extract import MAX_TEXT_CHARS, ExtractError, extract_text
+from staad_ai import service as staad
 from stt import verify_stt_token
 
 log = logging.getLogger("call-plan")
@@ -67,6 +70,15 @@ async def _notes_from(ws, request):
     return text.strip()[:MAX_TEXT_CHARS]
 
 
+async def with_client_records(notes, sid, env=os.environ, history=None):
+    """The therapist's notes plus the client's records from the STAAD pipeline,
+    for the session the token was verified for. Unchanged when there are none."""
+    records = await (history or staad.session_history)(sid, env)
+    if not records:
+        return notes
+    return f"{notes}\n\nFROM THE CLIENT'S RECORDS (earlier reports, progress notes and metrics):\n{records}"
+
+
 async def handle_connection(ws, query, env=os.environ):
     denied = authorize(query, env)
     if denied:
@@ -83,7 +95,7 @@ async def handle_connection(ws, query, env=os.environ):
 
         try:
             if request.get("type") == "plan":
-                notes = await _notes_from(ws, request)
+                notes = await with_client_records(await _notes_from(ws, request), query.get("sid"), env)
                 plan = await agent.make_plan(
                     notes, request.get("modules"), str(request.get("clientName") or "")[:80],
                     on_step=lambda step: _send(ws, {"type": "status", "step": step}),

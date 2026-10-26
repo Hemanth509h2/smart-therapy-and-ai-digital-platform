@@ -1,0 +1,44 @@
+{
+  "WHO-DEP-FACTSHEET": {
+    "title": "Depressive disorder (depression)",
+    "organization": "World Health Organization",
+    "url": "https://www.who.int/news-room/fact-sheets/detail/depression",
+    "locator_note": "Page sections: Overview; Symptoms and patterns; Contributing factors and prevention; Diagnosis and treatment; Self-care.",
+    "review_note": "Public page opened in this pass. Search result and opened-page metadata showed inconsistent dates; do not rely on the displayed publication date without rechecking. Use stable section headings and verify numeric claims against the live page."
+  },
+  "NIMH-DEP": {
+    "title": "Depression",
+    "organization": "National Institute of Mental Health",
+    "url": "https://www.nimh.nih.gov/health/publications/depression",
+    "locator_note": "Page sections: What is depression?; Types; Signs and symptoms; How is depression diagnosed?; Does depression look the same in everyone?; How is depression treated?",
+    "review_note": "Public page opened in this pass; page states revised 2024. US public-health information; does not replace local clinical guidance."
+  },
+  "NICE-NG222": {
+    "title": "Depression in adults: treatment and management",
+    "organization": "National Institute for Health and Care Excellence",
+    "url": "https://www.nice.org.uk/guidance/ng222/chapter/Recommendations",
+    "locator_note": "Recommendation numbers used in mapping: 1.2.1–1.2.7 recognition/assessment; 1.2.8–1.2.12 risk; 1.4.1–1.4.7 treatment planning/delivery/monitoring; 1.5–1.6 treatment pathways; 1.8 relapse prevention; 1.12 psychotic depression.",
+    "review_note": "Search result exposed recommendation text; direct page open returned 403. Mapped by recommendation number and indexed result text, but exact full-page version should be checked before clinical release."
+  },
+  "NICE-NG134": {
+    "title": "Depression in children and young people: identification and management",
+    "organization": "National Institute for Health and Care Excellence",
+    "url": "https://www.nice.org.uk/guidance/ng134/chapter/recommendations",
+    "locator_note": "Recommendation numbers used: 1.1.5–1.1.8; 1.1.25; 1.3.1; 1.5.4–1.5.5; 1.6.3–1.6.4 and related treatment sections.",
+    "review_note": "Search result exposed recommendation text; direct page open returned 403. Verify exact current recommendation text and jurisdiction before clinical release."
+  },
+  "NICE-CG192": {
+    "title": "Antenatal and postnatal mental health: clinical management and service guidance",
+    "organization": "National Institute for Health and Care Excellence",
+    "url": "https://www.nice.org.uk/guidance/cg192/chapter/Recommendations",
+    "locator_note": "Recommendation numbers used: 1.5.4–1.5.8 for depression identification/monitoring; 1.8.1 for facilitated self-help in specified perinatal presentations; other record claims need more detailed factor-by-factor mapping.",
+    "review_note": "Search result exposed recommendation text; direct page open returned 403. Verify current status and exact recommendation text before clinical release."
+  },
+  "STAAD-ARCH-DESIGN": {
+    "title": "STAAD project architecture/design requirement (not a clinical source)",
+    "organization": "Project context supplied by user in prior conversation",
+    "url": "",
+    "locator_note": "No source document/repository was available in this turn to verify implementation. Architecture mapping below is a proposal or project-context assertion, not externally source-verified.",
+    "review_note": "Must be checked against the actual STAAD repository, approved architecture document and owner decisions. Do not represent as deployed functionality."
+  }
+}

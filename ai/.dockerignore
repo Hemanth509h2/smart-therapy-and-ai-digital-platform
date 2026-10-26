@@ -8,5 +8,11 @@ tests
 scripts
 requirements-dev.txt
 ai-notes
+staad_ai/datasets
+staad_ai/benchmark_results
+staad_ai/docs
+staad_ai/README.md
+staad_ai/dataset_benchmark.py
+staad_ai/diagnose_retrieval.py
 Dockerfile
 .dockerignore

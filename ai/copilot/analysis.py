@@ -16,6 +16,7 @@ import time
 import openrouter
 from copilot import safety, study_material
 from copilot.prompt import SYSTEM_PROMPT, build_analysis_prompt
+from staad_ai import service as staad
 
 log = logging.getLogger("copilot")
 
@@ -87,14 +88,18 @@ def normalise_notes(raw):
     return notes[:PREVIOUS_NOTES]
 
 
-async def build_context(request, search=None, env=os.environ, now_ms=None):
-    """Everything the prompt needs, from the backend's request plus the study material."""
+async def build_context(request, search=None, env=os.environ, now_ms=None, session_id=None, history=None):
+    """Everything the prompt needs: the backend's request, the study material, and
+    the client's records from the STAAD pipeline (staad_ai.service.session_history)."""
     search = search or study_material.search
+    history = history or staad.session_history
     minutes = _number(request.get("windowMinutes")) or 5
     transcript = format_transcript(request.get("transcript") if isinstance(request.get("transcript"), list)
                                    else [], minutes, now_ms)
-    material = await search(str(request.get("therapistUid") or ""), transcript, env)
+    material, records = await asyncio.gather(search(str(request.get("therapistUid") or ""), transcript, env),
+                                             history(session_id, env))
     return {
+        "client_records": records,
         "client": normalise_client(request.get("client")),
         "transcript": transcript,
         "window_minutes": minutes,
@@ -126,15 +131,17 @@ def parse_insight(raw, window_minutes):
     }
 
 
-async def run_analysis(request, chat=None, search=None, env=os.environ, now_ms=None):
-    """`request` is the backend's insight request (see internal.py). Returns the
-    insight the frontend shows. `chat(messages, max_tokens)` defaults to the
-    copilot model; raises openrouter.LLMError when the model can't be reached."""
+async def run_analysis(request, chat=None, search=None, env=os.environ, now_ms=None, session_id=None, history=None):
+    """`request` is the backend's insight request (see internal.py), `session_id` the
+    session its token was minted for. Returns the insight the frontend shows.
+    `chat(messages, max_tokens)` defaults to the copilot model; raises
+    openrouter.LLMError when the model can't be reached."""
     chat = chat or (lambda messages, max_tokens: openrouter.chat(messages, openrouter.copilot_model(env),
                                                                   max_tokens, env=env))
-    context = await build_context(request, search, env, now_ms)
-    log.info("[copilot] context: transcript %d chars, %d material chunks, %d previous notes",
-             len(context["transcript"]), len(context["study_material"]), len(context["previous_notes"]))
+    context = await build_context(request, search, env, now_ms, session_id, history)
+    log.info("[copilot] context: transcript %d chars, %d material chunks, %d previous notes, %d chars of records",
+             len(context["transcript"]), len(context["study_material"]), len(context["previous_notes"]),
+             len(context["client_records"]))
 
     started = time.monotonic()
     raw, verdict = await asyncio.gather(

@@ -1,0 +1,8 @@
+{"edge_id": "demo_edge_001", "from_node_id": "demo_client_001", "edge_type": "HAS_SESSION", "to_node_id": "demo_session_001", "synthetic": true}
+{"edge_id": "demo_edge_002", "from_node_id": "demo_session_001", "edge_type": "HAS_SOURCE", "to_node_id": "demo_source_001", "synthetic": true}
+{"edge_id": "demo_edge_003", "from_node_id": "demo_session_001", "edge_type": "DOCUMENTS", "to_node_id": "demo_exp_001", "synthetic": true}
+{"edge_id": "demo_edge_004", "from_node_id": "demo_exp_001", "edge_type": "REPORTS", "to_node_id": "demo_symptom_001", "synthetic": true}
+{"edge_id": "demo_edge_005", "from_node_id": "demo_symptom_001", "edge_type": "AFFECTS_FUNCTION", "to_node_id": "demo_impact_001", "synthetic": true}
+{"edge_id": "demo_edge_006", "from_node_id": "demo_client_001", "edge_type": "WORKING_TOWARD", "to_node_id": "demo_goal_001", "synthetic": true}
+{"edge_id": "demo_edge_007", "from_node_id": "demo_goal_001", "edge_type": "ADDRESSED_BY", "to_node_id": "demo_intervention_001", "synthetic": true}
+{"edge_id": "demo_edge_008", "from_node_id": "demo_session_001", "edge_type": "RESPONDED_WITH", "to_node_id": "demo_response_001", "synthetic": true}

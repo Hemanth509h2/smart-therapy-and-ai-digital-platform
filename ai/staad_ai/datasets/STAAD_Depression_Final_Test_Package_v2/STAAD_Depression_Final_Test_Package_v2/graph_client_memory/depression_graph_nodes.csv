@@ -1,0 +1,12 @@
+﻿attribution,client_id,confidence,confidence_or_review_status,content,domain,label,node_id,node_type,note,review_status,session_id,source_record_id,source_type,status,supporting_event_ids,synthetic,text_excerpt,timestamp
+,demo_client_001,,,,,,demo_client_001,Client,Synthetic example only; not a real client.,,,,,,,True,,
+,demo_client_001,,,,,,demo_session_001,Session,,,demo_session_001,,,,,True,,2026-01-12T10:00:00+05:30
+,,,,,,,demo_source_001,SourceRecord,,,,demo_source_001,client_reported,,,True,Synthetic demonstration: client reports difficulty starting a study task on several evenings.,
+client_reported,demo_client_001,,illustrative_unreviewed,Reports difficulty initiating a study task on several evenings.,,,demo_exp_001,ReportedExperience,,,demo_session_001,demo_source_001,,,,True,,2026-01-12T10:00:00+05:30
+,demo_client_001,,,,,low motivation / task initiation difficulty,demo_symptom_001,MoodOrSymptom,,,demo_session_001,demo_source_001,,reported_experience_not_diagnosis,,True,,
+client_reported,demo_client_001,,,Reports a change in study workload during the same period.,,,demo_context_001,Context,,,demo_session_001,demo_source_001,,,,True,,
+,demo_client_001,,,Reports delayed start to study tasks.,study_routine,,demo_impact_001,FunctionalImpact,,,demo_session_001,demo_source_001,,,,True,,
+,demo_client_001,,,Agree on a manageable first step for a study task.,,,demo_goal_001,Goal,,,demo_session_001,demo_source_001,,client_and_professional_to_confirm,,True,,
+,demo_client_001,,,Illustrative planning strategy: break one task into a small first step; use only if agreed with the professional/client.,,,demo_intervention_001,Intervention,,,demo_session_001,demo_source_001,,example_not_prescription,,True,,
+,demo_client_001,,,No response recorded yet; do not infer outcome.,,,demo_response_001,Response,,,demo_session_001,demo_source_001,,not_yet_observed,,True,,
+,demo_client_001,none,,No pattern established. A single synthetic example is insufficient for longitudinal inference.,,,demo_pattern_001,PatternHypothesis,,not_established,,,,,"[""demo_exp_001""]",True,,

@@ -1,0 +1,26 @@
+{
+  "SRC-001": {
+    "locator": "NICE NG222, Recommendations 1.4.1–1.4.3; Table 1 under 1.5.2; Recommendations 1.8.1 and 1.8.6–1.8.7",
+    "review_note": "Search result text exposed these recommendation numbers and their content; page open returned 403, so verification is based on the indexed guideline text visible in search output."
+  },
+  "SRC-002": {
+    "locator": "NHS CBT page, 'Before you have CBT' and 'What happens in CBT' sections; retrieved page lines 79–116",
+    "review_note": "Page text directly reviewed; see the source page lines for assessment, treatment choice, session content, practice and follow-up."
+  },
+  "SRC-003": {
+    "locator": "Beck Institute 'Cognitive Model' PDF, page 1, lines 4–23",
+    "review_note": "PDF text directly reviewed; supports the cognitive model, automatic thoughts, Socratic questioning, behavioural experiments, problem-solving and acceptance when thoughts are valid."
+  },
+  "SRC-004": {
+    "locator": "Beck Institute 'Cognitive Model' PDF, page 1, lines 4–23 and page 2, lines 24–29",
+    "review_note": "Same retrieved PDF as SRC-003; the previous source-register URL is a redirect to this PDF. Treat as one underlying source, not independent corroboration."
+  },
+  "SRC-005": {
+    "locator": "No exact passage verified in this pass",
+    "review_note": "The resource-index URL could not be retrieved in this pass; do not count it as verified support."
+  },
+  "SRC-006": {
+    "locator": "No exact passage verified in this pass",
+    "review_note": "The NICE CG91 page was not retrieved and checked in this pass; do not count it as verified support."
+  }
+}

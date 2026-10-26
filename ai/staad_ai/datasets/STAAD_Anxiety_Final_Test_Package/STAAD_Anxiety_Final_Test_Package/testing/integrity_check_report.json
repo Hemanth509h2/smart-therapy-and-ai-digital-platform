@@ -1,0 +1,27 @@
+{
+  "package": "STAAD Anxiety Final Testing Package",
+  "build_date": "2026-10-09",
+  "baseline_record_count": 60,
+  "candidate_record_count": 60,
+  "unique_record_ids": 60,
+  "records_missing_keywords_after_candidate_enrichment": 0,
+  "records_missing_retrieval_questions_after_candidate_enrichment": 0,
+  "records_with_exact_source_passage_mapped": 0,
+  "records_pending_qualified_clinical_review": 60,
+  "graph_nodes": 20,
+  "graph_edges": 41,
+  "graph_edges_with_missing_source_node": 0,
+  "graph_edges_with_missing_target_node": 0,
+  "duplicate_graph_edges": 0,
+  "retrieval_test_cases": 18,
+  "test_case_status": "starter test set created; not executed against STAAD retrieval implementation",
+  "clinical_validation_status": "pending qualified clinical review",
+  "production_eligible": false,
+  "limitations": [
+    "Keywords and retrieval questions were generated for testability and have not been clinically validated.",
+    "Clinical claim-to-passage mapping has not been completed for all records.",
+    "This package does not demonstrate measured retrieval precision/recall because it has not been run against the actual STAAD retrieval implementation.",
+    "Graph client/session examples are synthetic.",
+    "The package primarily covers general anxiety, GAD, social anxiety and panic; scope decision needed for additional anxiety presentations."
+  ]
+}

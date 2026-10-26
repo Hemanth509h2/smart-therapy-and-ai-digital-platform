@@ -1,0 +1,182 @@
+[
+  {
+    "path": "README.md",
+    "bytes": 2605,
+    "sha256": "35d567e3088abd660da9775570519b952ae24d9f7e4b8e356ec7eae5269b6f9e"
+  },
+  {
+    "path": "audit/CBT_Baseline_Integrity_Check.json",
+    "bytes": 353,
+    "sha256": "74f410515f97005ff6be4f93e20976463f73200d6524b2ae55beef25a91114b3"
+  },
+  {
+    "path": "audit/CBT_Change_Log_Summary_v1_to_v2.json",
+    "bytes": 1033,
+    "sha256": "e44441ee17d34976386b693c8c9697e514bd3a799f7bf542879a13aee8252bca"
+  },
+  {
+    "path": "audit/CBT_Change_Log_v1_to_v2.csv",
+    "bytes": 18806,
+    "sha256": "85db988912008af120423e0a50665ca3a1bee084585cbe338a20be2d254012e6"
+  },
+  {
+    "path": "audit/CBT_Change_Log_v1_to_v2.jsonl",
+    "bytes": 26170,
+    "sha256": "eaca0610508662269c2718708d362d9f1936f9cacc6489284ab5baf5bf7ea26c"
+  },
+  {
+    "path": "audit/CBT_Change_Log_v2_to_v3.csv",
+    "bytes": 28270,
+    "sha256": "bfc6ff3471fa656426dec0cb19d36e968b83ff5fccd572d8d6f36268a7c7bf11"
+  },
+  {
+    "path": "audit/CBT_Change_Log_v2_to_v3.jsonl",
+    "bytes": 37259,
+    "sha256": "fdc48fb1cefccbcf8c7d095df1cd0e7c7bd58cf477210ad227ba3d43538a4272"
+  },
+  {
+    "path": "audit/record_level_audit.csv",
+    "bytes": 6627,
+    "sha256": "56b6061a48c4879966ab9d5a8db32169d96fbcd63fda39432c7bf38568d7d93f"
+  },
+  {
+    "path": "source_mapping/CBT_Candidate_v3_Source_Verification.csv",
+    "bytes": 10123,
+    "sha256": "37a1ab62317e38c00c92e9c573f62c1d1bd617a2adeb8301c4dbc1a3a9ffecd5"
+  },
+  {
+    "path": "source_mapping/CBT_Candidate_v3_Source_Verification.jsonl",
+    "bytes": 16538,
+    "sha256": "2f2bb567e34a127714fc5adc6f00718a20ccea35764041edcf91a06ea3f04c67"
+  },
+  {
+    "path": "source_mapping/record_source_mapping.csv",
+    "bytes": 15777,
+    "sha256": "37a3f8c1145e7e0b3b7683d9df5d7fc1bf10edcaf2aa828056777f102bc247de"
+  },
+  {
+    "path": "source_mapping/record_source_mapping.jsonl",
+    "bytes": 22692,
+    "sha256": "cee8d09769c1e357a6600f28be59f6b61a2d34c7a127c4182cfd3931543ad0a0"
+  },
+  {
+    "path": "source_mapping/source_passage_verification_notes.json",
+    "bytes": 1626,
+    "sha256": "0e95a1cba6696f60d6567dac7c94f1ab980a466aa81cd5983eea126420d54fcf"
+  },
+  {
+    "path": "source_mapping/source_register.csv",
+    "bytes": 3075,
+    "sha256": "7238f1fe3678de42ba91c21afbebfb1e7ed65b99457bc2dd93f5a450d03932b0"
+  },
+  {
+    "path": "source_mapping/source_register.json",
+    "bytes": 3978,
+    "sha256": "a568175d3ab14bf6d7c3af7201a0f2d6a273fb062826e540d8162993d0017171"
+  },
+  {
+    "path": "graph_client_memory/graph_ontology.json",
+    "bytes": 3456,
+    "sha256": "b865e2b5582a3d6febda08303d26c1f662669167a91cb3e2a13777c13bcee210"
+  },
+  {
+    "path": "graph_client_memory/session_memory_template.json",
+    "bytes": 933,
+    "sha256": "52865c4ffaac6c4bec45f071f7e5c8328d3046a68e99ad8ba836bb2c10a3c24a"
+  },
+  {
+    "path": "graph_client_memory/synthetic_edges.json",
+    "bytes": 1077,
+    "sha256": "95ca04d29d2450d5afcb66956b89c506bacbbfb52340cd4bbe99869577dc768d"
+  },
+  {
+    "path": "graph_client_memory/synthetic_nodes.json",
+    "bytes": 2067,
+    "sha256": "e6e965cc045333d1fb6013b4c2a6089a8b56d4fdf70c32ff3ec4c918cb20151c"
+  },
+  {
+    "path": "knowledge_memory/CBT_Candidate_v2.csv",
+    "bytes": 44218,
+    "sha256": "4ef93b957cc8482c377d831e5a11822dd9116b03e57ec36902b9450f47ff9e4c"
+  },
+  {
+    "path": "knowledge_memory/CBT_Candidate_v2.jsonl",
+    "bytes": 59911,
+    "sha256": "da1c8fc26bdca462a2a1f4c7e9434d8887759f98c1667e5dc9a2f9c66812c05f"
+  },
+  {
+    "path": "knowledge_memory/CBT_Candidate_v3.csv",
+    "bytes": 51762,
+    "sha256": "23ab636795f23d763ac7628ac89d9e927aea213f91b063b1a38e06fce2a638d3"
+  },
+  {
+    "path": "knowledge_memory/CBT_Candidate_v3.jsonl",
+    "bytes": 68985,
+    "sha256": "634f1fb2f155ced8b63cf44f8e08aadd273151fa3ed019d8a67f827aeaf37e53"
+  },
+  {
+    "path": "knowledge_memory/CBT_Initial_Baseline_v1_AI_generated_unvalidated.csv",
+    "bytes": 21892,
+    "sha256": "5c270b7a3ea493a2bdebd83533779c1a5fc8b84c9261b91ef76472dfa78e71ae"
+  },
+  {
+    "path": "knowledge_memory/CBT_Initial_Baseline_v1_AI_generated_unvalidated.jsonl",
+    "bytes": 28184,
+    "sha256": "a4b2261bdd665ccd24eca01f6d7b386734dfd12ad1cb02d08985b9be8a7e02b2"
+  },
+  {
+    "path": "knowledge_memory/CBT_Initial_Baseline_v1_metadata.json",
+    "bytes": 1426,
+    "sha256": "e9f5a2571c1ea9d0d58d84f2c6da4ea5a73c195239535ee010f606d7721a8040"
+  },
+  {
+    "path": "knowledge_memory/cbt_knowledge_base_baseline_snapshot_v1.csv",
+    "bytes": 21892,
+    "sha256": "5c270b7a3ea493a2bdebd83533779c1a5fc8b84c9261b91ef76472dfa78e71ae"
+  },
+  {
+    "path": "knowledge_memory/cbt_knowledge_base_baseline_snapshot_v1.jsonl",
+    "bytes": 29065,
+    "sha256": "7499a407632d2891dbd5e03fe9d796999b21a03e5007294a72c32cc7b002e054"
+  },
+  {
+    "path": "knowledge_memory/cbt_knowledge_base_candidate_v1.csv",
+    "bytes": 34245,
+    "sha256": "636db60fe1c8f4c856fe0566174eb9a967649f11b0cd2fba48881fd9927470bc"
+  },
+  {
+    "path": "knowledge_memory/cbt_knowledge_base_candidate_v1.jsonl",
+    "bytes": 45130,
+    "sha256": "6b1bb2a7160bdecc1aa39ef67edbcf98019a87a79fc4c4a0012bc610b3192d5f"
+  },
+  {
+    "path": "knowledge_memory/data_dictionary.csv",
+    "bytes": 871,
+    "sha256": "758e99e039336fb66cdbd8fa851bc90c22dd11febad126a7f7e6244b4e44bcee"
+  },
+  {
+    "path": "reports/STAAD_CBT_Audit_and_Testing_Readiness_Report.docx",
+    "bytes": 39581,
+    "sha256": "e2830a6fd73fb87f7eedbe9a411392efdf05d1dff184ceb64fe9b4e6aa89d50a"
+  },
+  {
+    "path": "reports/STAAD_CBT_Candidate_v3_Source_Verification_and_Change_Report.docx",
+    "bytes": 37737,
+    "sha256": "a93bc12fb52143bdcbb434c679a67852cad5f736eb48c84a70970362b31f05d3"
+  },
+  {
+    "path": "reports/STAAD_CBT_Source_Passage_Verification_Report.docx",
+    "bytes": 38537,
+    "sha256": "095c14619f6c601013547de1ce869f0ae9c56e8b1edc22555c091711bd1bb933"
+  },
+  {
+    "path": "test_cases/cbt_retrieval_test_cases.csv",
+    "bytes": 8472,
+    "sha256": "9496846f1c44f8fdd53ff33071fccb24b2c1379e2e5bbb1ba810ee034fd5bdd6"
+  },
+  {
+    "path": "test_cases/cbt_retrieval_test_cases.jsonl",
+    "bytes": 12778,
+    "sha256": "ff3e8e69d15e132a5e476693aab169697e1469ea4878b3b78b639ccf98fa84ec"
+  }
+]

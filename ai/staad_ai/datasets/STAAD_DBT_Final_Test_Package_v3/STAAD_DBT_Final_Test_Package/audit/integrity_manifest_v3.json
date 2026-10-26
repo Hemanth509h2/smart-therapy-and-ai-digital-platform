@@ -1,0 +1,20 @@
+{
+  "package": "STAAD DBT Final Test Package",
+  "candidate_version": "v3",
+  "generated_utc": "2026-10-09T06:21:09.227187+00:00",
+  "baseline_v1_immutable": true,
+  "baseline_hashes_sha256": {
+    "knowledge_memory/DBT_Initial_Baseline_v1_AI_generated_unvalidated.jsonl": "a821eaf51e3c7787868fd3a8fb8f001b05f31a4ffb1a44d19fb9263ee35ca3f0",
+    "knowledge_memory/DBT_Initial_Baseline_v1_AI_generated_unvalidated.csv": "cd9dd1d350f4ccec0ca6e6b4c32aac2082415c51d523dc29cc26b2756f9d49a2",
+    "knowledge_memory/DBT_Initial_Baseline_v1_metadata.json": "f33c7d27c49e283ec85161e80e935ba9396fc19dc47ab1a990eced332ef9a14d"
+  },
+  "record_count": 36,
+  "test_case_count": 24,
+  "clinical_review_status": "pending_qualified_DBT_clinician_review",
+  "live_pipeline_tests_run": false,
+  "limitations": [
+    "Six detailed skill/worksheet records remain unverified against actual manual content.",
+    "Qualified DBT clinician review is pending for all clinical records.",
+    "No live STAAD RAG retrieval test execution was performed."
+  ]
+}

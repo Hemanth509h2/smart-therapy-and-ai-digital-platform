@@ -1,0 +1,37 @@
+﻿record_id,title,baseline_present,candidate_present,baseline_has_keywords,candidate_has_retrieval_questions,source_ids_exist,mapping_status,clinical_review_status,notes
+CBT-001,CBT cognitive-behavioural model,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-002,Collaborative formulation,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-003,Collaborative goal setting,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-004,Baseline and progress review,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-005,Structured session with flexibility,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-006,Automatic thoughts,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-007,Thought record,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-008,Socratic questioning,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-009,Balanced alternative perspective,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-010,Cognitive distortions as hypotheses,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-011,Core beliefs and assumptions,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-012,Behavioural activation,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-013,Activity monitoring,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-014,Graded task planning,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-015,Behavioural experiment,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-016,Avoidance and maintenance cycles,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-017,Structured problem solving,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-018,Coping strategy review,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-019,Between-session practice,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-020,Reviewing practice barriers,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-021,Therapeutic alliance and collaboration,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-022,Adapt language and materials,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-023,Cultural and contextual adaptation,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-024,Choice of delivery format,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-025,Reviewing progress and fit,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-026,Relapse-prevention planning,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-027,CBT is not a universal solution,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-028,Professional assessment and treatment decisions,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-029,Urgent risk or crisis disclosure,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-030,Physical symptoms need appropriate assessment,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-031,No forced positive reframing,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-032,Concise session summary,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-033,Source-aware clinical context,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-034,Use evidence with context,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-035,Thought-emotion-behaviour links are individual,True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.
+CBT-036,"Small, observable next step",True,True,True,True,True,pending_exact_passage_verification,pending_qualified_clinical_review,Structural audit only; no clinical validation.

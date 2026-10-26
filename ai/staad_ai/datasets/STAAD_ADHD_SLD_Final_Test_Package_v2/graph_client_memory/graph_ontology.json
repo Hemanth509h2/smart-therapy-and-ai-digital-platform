@@ -1,0 +1,242 @@
+{
+  "purpose": "Graph/client-memory ontology for STAAD ADHD/SLD support architecture",
+  "entity_types": [
+    {
+      "entity_type": "Client",
+      "description": "A client receiving therapy/support; use an internal client_id, not identifying information."
+    },
+    {
+      "entity_type": "Condition",
+      "description": "A documented or working condition such as ADHD or SLD."
+    },
+    {
+      "entity_type": "SLDDomain",
+      "description": "Specific learning domain such as reading, written expression, or mathematics."
+    },
+    {
+      "entity_type": "Symptom",
+      "description": "Observed/reported symptom or difficulty."
+    },
+    {
+      "entity_type": "FunctionalImpact",
+      "description": "Impact on academic, occupational, social, emotional, or daily functioning."
+    },
+    {
+      "entity_type": "Goal",
+      "description": "Client-specific therapy/learning/support goal."
+    },
+    {
+      "entity_type": "Session",
+      "description": "A therapy/support session identified by session_id."
+    },
+    {
+      "entity_type": "Observation",
+      "description": "Observed behaviour, performance, emotion, or participation pattern."
+    },
+    {
+      "entity_type": "Intervention",
+      "description": "An intervention/strategy used during support."
+    },
+    {
+      "entity_type": "Activity",
+      "description": "A module, exercise, task, or activity used in a session."
+    },
+    {
+      "entity_type": "Response",
+      "description": "Client response to an intervention/activity."
+    },
+    {
+      "entity_type": "ProgressMeasure",
+      "description": "A structured measure or indicator used to monitor progress."
+    },
+    {
+      "entity_type": "Pattern",
+      "description": "A repeated or clinically relevant pattern inferred from documented observations."
+    },
+    {
+      "entity_type": "RiskEvent",
+      "description": "A documented safety/risk event requiring appropriate professional handling."
+    },
+    {
+      "entity_type": "Accommodation",
+      "description": "An educational/workplace support or accommodation."
+    },
+    {
+      "entity_type": "Preference",
+      "description": "A documented client preference relevant to delivery of support."
+    }
+  ],
+  "relationship_types": [
+    {
+      "source_type": "Client",
+      "relationship": "has_condition",
+      "target_type": "Condition"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_SLD_domain",
+      "target_type": "SLDDomain"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_symptom",
+      "target_type": "Symptom"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "experiences_functional_impact",
+      "target_type": "FunctionalImpact"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_goal",
+      "target_type": "Goal"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_session",
+      "target_type": "Session"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_observation",
+      "target_type": "Observation"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_pattern",
+      "target_type": "Pattern"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_risk_event",
+      "target_type": "RiskEvent"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_accommodation",
+      "target_type": "Accommodation"
+    },
+    {
+      "source_type": "Client",
+      "relationship": "has_preference",
+      "target_type": "Preference"
+    },
+    {
+      "source_type": "Session",
+      "relationship": "belongs_to",
+      "target_type": "Client"
+    },
+    {
+      "source_type": "Session",
+      "relationship": "contains_observation",
+      "target_type": "Observation"
+    },
+    {
+      "source_type": "Session",
+      "relationship": "contains_activity",
+      "target_type": "Activity"
+    },
+    {
+      "source_type": "Session",
+      "relationship": "uses_intervention",
+      "target_type": "Intervention"
+    },
+    {
+      "source_type": "Session",
+      "relationship": "records_response",
+      "target_type": "Response"
+    },
+    {
+      "source_type": "Session",
+      "relationship": "records_progress_measure",
+      "target_type": "ProgressMeasure"
+    },
+    {
+      "source_type": "Observation",
+      "relationship": "indicates_symptom",
+      "target_type": "Symptom"
+    },
+    {
+      "source_type": "Observation",
+      "relationship": "shows_functional_impact",
+      "target_type": "FunctionalImpact"
+    },
+    {
+      "source_type": "Observation",
+      "relationship": "may_form_pattern",
+      "target_type": "Pattern"
+    },
+    {
+      "source_type": "Activity",
+      "relationship": "uses_intervention",
+      "target_type": "Intervention"
+    },
+    {
+      "source_type": "Intervention",
+      "relationship": "targets_symptom",
+      "target_type": "Symptom"
+    },
+    {
+      "source_type": "Intervention",
+      "relationship": "targets_functional_impact",
+      "target_type": "FunctionalImpact"
+    },
+    {
+      "source_type": "Response",
+      "relationship": "to_intervention",
+      "target_type": "Intervention"
+    },
+    {
+      "source_type": "Response",
+      "relationship": "associated_with_activity",
+      "target_type": "Activity"
+    },
+    {
+      "source_type": "ProgressMeasure",
+      "relationship": "measures_goal",
+      "target_type": "Goal"
+    },
+    {
+      "source_type": "ProgressMeasure",
+      "relationship": "measures_functional_impact",
+      "target_type": "FunctionalImpact"
+    },
+    {
+      "source_type": "Condition",
+      "relationship": "has_symptom",
+      "target_type": "Symptom"
+    },
+    {
+      "source_type": "Condition",
+      "relationship": "has_SLD_domain",
+      "target_type": "SLDDomain"
+    },
+    {
+      "source_type": "SLDDomain",
+      "relationship": "has_symptom",
+      "target_type": "Symptom"
+    },
+    {
+      "source_type": "Symptom",
+      "relationship": "affects",
+      "target_type": "FunctionalImpact"
+    },
+    {
+      "source_type": "Goal",
+      "relationship": "targets",
+      "target_type": "FunctionalImpact"
+    },
+    {
+      "source_type": "Goal",
+      "relationship": "targets_symptom",
+      "target_type": "Symptom"
+    },
+    {
+      "source_type": "Accommodation",
+      "relationship": "supports",
+      "target_type": "FunctionalImpact"
+    }
+  ],
+  "design_rule": "Client-specific records must be isolated from the general clinical RAG knowledge base."
+}

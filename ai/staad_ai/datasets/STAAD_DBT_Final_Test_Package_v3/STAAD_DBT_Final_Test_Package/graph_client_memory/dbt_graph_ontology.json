@@ -1,0 +1,35 @@
+{
+  "node_types": [
+    "TherapyApproach",
+    "SkillDomain",
+    "Skill",
+    "Session",
+    "TargetBehaviour",
+    "PromptingEvent",
+    "VulnerabilityFactor",
+    "Consequence",
+    "ClientGoal",
+    "PracticeTask",
+    "RiskEvent",
+    "Source"
+  ],
+  "edge_types": [
+    "HAS_SKILL_DOMAIN",
+    "INCLUDES_COMPONENT",
+    "TARGETS",
+    "PRECEDES",
+    "FOLLOWS",
+    "PRACTISED_IN",
+    "SUPPORTS_GOAL",
+    "HAS_SOURCE",
+    "REQUIRES_HUMAN_REVIEW",
+    "RELATED_TO"
+  ],
+  "guardrails": [
+    "Graph examples are synthetic only.",
+    "Do not infer diagnosis from skill use or graph links.",
+    "Do not store identifiable client data in test fixtures.",
+    "Risk assessment and crisis escalation must follow approved human-led local protocols.",
+    "Clinical evidence edges must include a source locator and verification status."
+  ]
+}

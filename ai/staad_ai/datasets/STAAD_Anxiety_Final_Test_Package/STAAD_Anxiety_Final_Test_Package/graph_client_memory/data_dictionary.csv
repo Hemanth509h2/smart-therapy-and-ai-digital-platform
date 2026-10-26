@@ -1,0 +1,10 @@
+field,meaning
+client_id,Internal client identifier; do not use a name as the graph key.
+session_id,Internal session identifier.
+node_id,Unique graph node identifier.
+entity_type,Type of memory entity.
+relationship,Named relationship between two nodes.
+source_session_id,Session that supports the memory item.
+provenance_type,Observed/reported/inferred/summarized.
+confidence,System confidence; not clinical certainty.
+timestamp,When the event or observation occurred.

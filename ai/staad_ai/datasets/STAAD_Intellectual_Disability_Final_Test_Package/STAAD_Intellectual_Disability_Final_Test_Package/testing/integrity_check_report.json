@@ -1,0 +1,26 @@
+{
+  "condition": "intellectual_disability",
+  "baseline_record_count": 45,
+  "candidate_record_count": 45,
+  "unique_baseline_ids": 45,
+  "duplicate_ids": 0,
+  "all_records_have_claims": true,
+  "all_records_have_sources": true,
+  "all_records_have_source_locators": true,
+  "retrieval_starter_test_count": 20,
+  "graph_synthetic_node_count": 8,
+  "graph_synthetic_edge_count": 6,
+  "baseline_sha256": "03ada7928efb381fa5ef8e4380403fb6f45bc5e50e4040260205289121200528",
+  "candidate_sha256": "0a80ecdcb43923ea3e9a690a26e41ef2e966598b56f7b220314c5bd61d7f0a4f",
+  "tests_executed_against_staAD": false,
+  "clinical_validation_complete": false,
+  "source_passage_verification_complete": false,
+  "limitations": [
+    "Records are source-linked paraphrases with provisional topic/section mapping, not line-by-line verified clinical claims.",
+    "WHO CDDR landing page identifies the official diagnostic manual but does not provide the full criteria text in the landing-page snippet.",
+    "No qualified clinical review has been completed.",
+    "No live STAAD retrieval/generation pipeline was available to execute the starter tests.",
+    "Graph examples are synthetic; SQL schema is illustrative, not production-ready.",
+    "NHS service and legal details are UK-specific and must not be generalized to India or another jurisdiction without local review."
+  ]
+}
