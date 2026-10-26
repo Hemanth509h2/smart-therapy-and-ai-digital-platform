@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 
 export function useCaptionsOnVideo(sessionId: string): boolean {
   const [on, setOn] = useState(true)

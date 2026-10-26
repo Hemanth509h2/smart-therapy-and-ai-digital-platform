@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { CSSProperties } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { Plus, Search, Shield, Scale, ArrowDown, Lightbulb, Pencil, Check, ArrowRight } from 'lucide-react'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { apiFetch } from '@/lib/api';
 import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';

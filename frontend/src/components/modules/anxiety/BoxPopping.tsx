@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore'
 import { Clock, Target, Sparkles, Volume2, Send, Rocket, RotateCcw, Lightbulb } from 'lucide-react'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { toast } from '@/components/practice/ui'
 

@@ -8,7 +8,7 @@ import {
   EllipsisVertical, Check, Trash2, Target, GlassWater, FileText, Phone,
   BookOpen, ListChecks, Footprints, Sparkles,
 } from 'lucide-react'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { toast } from '@/components/practice/ui'
 import { writeModuleState } from '@/lib/modules/writeModuleState'

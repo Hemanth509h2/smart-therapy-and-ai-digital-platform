@@ -12,7 +12,7 @@
 
 import { useEffect, useState } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { isTranslationLanguage } from '@/lib/translationLanguages'
 
 export {

@@ -6,7 +6,7 @@ import {
   Leaf as LeafIcon, MessageCircle, Eye, Sparkles, Waves, Cloud, Heart,
   Lightbulb, HelpCircle, Pause, Play, ArrowRight, Wind, RotateCcw, Volume2,
 } from 'lucide-react'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { staadSpeak, type VoiceLanguage } from '@/lib/voice/staadVoice'
 import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'

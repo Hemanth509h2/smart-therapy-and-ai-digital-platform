@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { toast } from '@/components/practice/ui'
 import { AnimatePresence, motion } from 'motion/react'

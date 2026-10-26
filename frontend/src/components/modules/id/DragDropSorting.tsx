@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { toast } from '@/components/practice/ui'
 import { staadSpeak, randomPraise } from '@/lib/voice/staadVoice'

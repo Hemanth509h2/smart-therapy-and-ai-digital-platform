@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { apiFetch } from '@/lib/api';
 import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, arrayUnion } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { writeModuleState } from '@/lib/modules/writeModuleState'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { toast } from '@/components/practice/ui'

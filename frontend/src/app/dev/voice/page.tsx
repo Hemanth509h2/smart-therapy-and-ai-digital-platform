@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react'
 import { notFound } from 'next/navigation'
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import {
   staadSpeak,
   staadCancel,

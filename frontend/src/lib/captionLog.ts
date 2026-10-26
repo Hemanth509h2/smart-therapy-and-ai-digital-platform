@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from 'react'
 import { arrayUnion, doc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 
 export interface StoredCaption {
   /** lk.segment_id — one per utterance. */

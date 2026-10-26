@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { Brain, FileText, Heart, MessageCircle, SquarePen } from 'lucide-react'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { toast } from '@/components/practice/ui'
 import { logModuleEvent } from '@/lib/sessionEvents'
 

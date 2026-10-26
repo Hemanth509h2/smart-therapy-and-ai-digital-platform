@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react'
 import { notFound } from 'next/navigation'
 import { doc, setDoc, getDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import WhackAMoleMath from '@/components/modules/sld/WhackAMoleMath'
 import SimonSays from '@/components/modules/adhd/SimonSays'
 import PixelArtCoding from '@/components/modules/sld/PixelArtCoding'

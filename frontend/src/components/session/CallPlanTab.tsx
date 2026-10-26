@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { doc, updateDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { CheckCircle2, Circle, FileText, Play, RefreshCw, Sparkles, Upload } from 'lucide-react'
 import { GLASS } from './roomTheme'
 import { toast } from '@/components/practice/ui'

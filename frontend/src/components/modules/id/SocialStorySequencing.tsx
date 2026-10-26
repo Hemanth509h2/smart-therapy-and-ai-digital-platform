@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, useContext } from 'r
 import { createPortal } from 'react-dom'
 import dynamic from 'next/dynamic'
 import { deleteField, doc, onSnapshot, updateDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { toast } from '@/components/practice/ui'
 import type { KidMood, SceneSpot } from './SocialStoryScene3D'

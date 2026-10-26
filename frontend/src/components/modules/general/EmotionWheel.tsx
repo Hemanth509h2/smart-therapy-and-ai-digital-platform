@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { ChevronLeft, Lightbulb } from 'lucide-react'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface EmotionWheelProps {

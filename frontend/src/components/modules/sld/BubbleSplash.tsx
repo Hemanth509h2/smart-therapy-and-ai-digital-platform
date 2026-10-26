@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { Eye, Headphones, Music4, BookOpen, Sparkles, Timer, Gauge, Zap, Pause, Play } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { writeModuleState } from '@/lib/modules/writeModuleState'
 

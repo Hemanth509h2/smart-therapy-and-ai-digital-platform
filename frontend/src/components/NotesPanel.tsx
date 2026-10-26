@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { doc, updateDoc, arrayUnion, onSnapshot, serverTimestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { X } from 'lucide-react'
 import { toast } from '@/components/practice/ui'
 

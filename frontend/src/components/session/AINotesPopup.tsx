@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { doc, onSnapshot, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import {
   CheckCircle2, Bookmark, Star, Flag, MoreHorizontal,
   Bold, Italic, Underline, List, ListOrdered, Link2, Undo2, Redo2,

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { Track, RoomEvent, RemoteParticipant, RemoteTrack } from 'livekit-client'
 import { doc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { useSessionRoom } from '@/components/StaadVideo'
 import type { TranscriptChunk } from '@/lib/rag/types'
 import { apiFetch } from '@/lib/api';

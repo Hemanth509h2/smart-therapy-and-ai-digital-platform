@@ -7,7 +7,7 @@ import {
   Target, BookOpen, Lightbulb, X, Heart, Plus, RotateCcw,
   Trophy, Lock, ArrowRight, Users, Hand,
 } from 'lucide-react'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface ValuesCardSortProps {

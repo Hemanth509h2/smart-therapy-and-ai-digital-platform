@@ -1,6 +1,6 @@
 'use client'
 import { doc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 
 // A single meaningful thing the client/therapist did inside a therapy module.
 // These accumulate on the persistent `sessions/{id}` doc (alongside the

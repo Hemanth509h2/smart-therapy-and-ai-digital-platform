@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore'
 import { Shuffle, MessageCircle, Lightbulb } from 'lucide-react'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
 
 interface EmotionalCharadesProps {

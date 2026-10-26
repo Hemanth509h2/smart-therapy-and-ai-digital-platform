@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { ChevronLeft, ChevronRight, Target, Wand2 } from 'lucide-react'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { staadPraise, staadCancel } from '@/lib/voice/staadVoice'
 import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'

@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { Star, BarChart3, SlidersHorizontal, Volume2, RotateCcw, Check, ChevronRight, Play, RefreshCw } from 'lucide-react'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { staadSpeak, randomPraise } from '@/lib/voice/staadVoice'
 import type { VoiceLanguage } from '@/lib/voice/staadVoice'

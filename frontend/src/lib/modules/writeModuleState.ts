@@ -12,7 +12,7 @@
 // deliberate cleanup task — not something to migrate quietly.
 
 import { doc, updateDoc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 
 export interface WriteModuleStateOptions {
   /** Module name used to attribute warnings, e.g. 'BubbleSplash'. */

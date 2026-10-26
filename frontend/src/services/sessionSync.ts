@@ -1,5 +1,5 @@
 import { doc, setDoc, onSnapshot, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firestore';
 import { SessionState } from '@/types';
 
 // Listen to session synchronization

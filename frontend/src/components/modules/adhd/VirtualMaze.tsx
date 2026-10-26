@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { Leaf, Waves, Moon, Timer, Box, Ban, Footprints, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Lock, RotateCcw, Square, Route } from 'lucide-react';
-import { db } from '@/lib/firebase'
+import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { staadPraise, staadSpeak } from '@/lib/voice/staadVoice'
 import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'
