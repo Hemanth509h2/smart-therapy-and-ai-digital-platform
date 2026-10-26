@@ -45,7 +45,8 @@ export async function GET(request: Request) {
 
 // POST /api/admin/coupons — create a coupon.
 // Body: { code, type: PERCENT|FLAT, discountValue, description?, planIds?, minMonths?,
-//         maxRedemptions?, oncePerTherapist?, therapistId?, startsAt?, expiresAt?, isActive? }
+//         maxRedemptions?, oncePerTherapist?, therapistId? | email?, startsAt?, expiresAt?, isActive? }
+// email reserves the code for whoever signs up (or has signed up) with that address.
 export async function POST(request: Request) {
   try {
     const auth = await requireAdmin(request, 'billing.write');

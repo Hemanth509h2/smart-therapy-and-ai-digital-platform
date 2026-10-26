@@ -215,6 +215,9 @@ model Coupon {
   // Set = a personal code only this therapist can redeem; null = anyone.
   therapistId      String?
   therapist        ProfileTherapist? @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  // Set = a personal code for whoever has this account email (lower-case),
+  // so it can be made before they sign up. Never set together with therapistId.
+  email            String?
   startsAt         DateTime?
   expiresAt        DateTime?
   isActive         Boolean           @default(true)

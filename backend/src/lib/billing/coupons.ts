@@ -1,6 +1,8 @@
 // Coupon (discount code) rules for paid plan checkout. Admins manage coupons
 // at /admin/coupons; therapists enter a code in the plan checkout dialog.
 // A coupon with a therapistId is personal: only that therapist can redeem it.
+// A coupon with an email is personal too, for whoever's account has that email,
+// so it can be made before the professional signs up.
 //
 // A redemption is a PAID Payment with the coupon attached (a ₹0 purchase gets
 // a PAID ₹0 Payment too). A request an admin approved but that isn't paid yet
@@ -9,12 +11,21 @@
 // both get the last use of a limited code — acceptable for discount codes, and
 // an abandoned checkout never burns a use.
 import type { Coupon, CouponType, Plan } from '.prisma/app-client';
-import { appDb } from '@/lib/core/db';
+import { appDb, prisma } from '@/lib/core/db';
 
 export const MAX_CODE_LENGTH = 32;
 
 export const normalizeCode = (code: unknown) =>
   String(code ?? '').trim().toUpperCase().replace(/\s+/g, '');
+
+export const normalizeEmail = (email: unknown) => String(email ?? '').trim().toLowerCase();
+
+/** The account email of a therapist, lower-case, or '' if not found. */
+async function therapistEmail(therapistId: string) {
+  const t = await appDb.profileTherapist.findUnique({ where: { id: therapistId }, select: { userId: true } });
+  const u = t ? await prisma.user.findUnique({ where: { id: t.userId }, select: { email: true } }) : null;
+  return normalizeEmail(u?.email);
+}
 
 /**
  * Rupees off an order of `subtotal`, at most the whole order. A ₹0 total skips
@@ -46,7 +57,9 @@ export async function applyCoupon(
   const coupon = await appDb.coupon.findUnique({ where: { code: normalized } });
   const now = new Date();
   // Someone else's personal code reads as unknown, so its existence isn't revealed.
-  const notYours = !!coupon?.therapistId && coupon.therapistId !== opts.therapistId;
+  const notYours =
+    (!!coupon?.therapistId && coupon.therapistId !== opts.therapistId) ||
+    (!!coupon?.email && coupon.email !== (await therapistEmail(opts.therapistId)));
   if (!coupon || notYours || !coupon.isActive || (coupon.startsAt && coupon.startsAt > now)) {
     return { ok: false, error: 'That coupon code is not valid.' };
   }
@@ -134,6 +147,14 @@ export function parseCouponBody(body: any, partial = false): Record<string, any>
   }
   if (has('oncePerTherapist')) data.oncePerTherapist = Boolean(body.oncePerTherapist);
   if (has('therapistId')) data.therapistId = body.therapistId ? String(body.therapistId) : null;
+  if (has('email')) {
+    const email = normalizeEmail(body.email);
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Enter a valid email address.';
+    data.email = email || null;
+  }
+  // A code is for one professional or one email, never both.
+  if (data.therapistId) data.email = null;
+  else if (data.email) data.therapistId = null;
   if (has('isActive')) data.isActive = Boolean(body.isActive);
   for (const k of ['startsAt', 'expiresAt'] as const) {
     if (!has(k)) continue;

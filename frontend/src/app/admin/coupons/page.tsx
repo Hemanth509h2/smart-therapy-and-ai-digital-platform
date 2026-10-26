@@ -22,6 +22,7 @@ interface Coupon {
   oncePerTherapist: boolean;
   therapistId: string | null;
   therapistName: string | null;
+  email: string | null;
   startsAt: string | null;
   expiresAt: string | null;
   isActive: boolean;
@@ -33,6 +34,8 @@ interface Plan { id: string; name: string; priceMonthly: number; isActive: boole
 interface Professional { id: string; name: string; email?: string }
 
 const MONTH_OPTIONS = [1, 3, 6, 12];
+// "Who can use it" value for a code reserved for an email address.
+const BY_EMAIL = '__email__';
 
 const discountText = (c: Pick<Coupon, 'type' | 'discountValue'>) =>
   c.type === 'PERCENT' ? `${c.discountValue}% off` : `${inr(c.discountValue)} off`;
@@ -87,6 +90,7 @@ export default function AdminCouponsPage() {
           {c.therapistId && (
             <p className="mt-1"><Badge tone="info">Only {c.therapistName || 'one professional'}</Badge></p>
           )}
+          {c.email && <p className="mt-1"><Badge tone="info">Only {c.email}</Badge></p>}
         </div>
       ),
     },
@@ -207,7 +211,8 @@ const blankForm = {
   minMonths: '1',
   maxRedemptions: '',
   oncePerTherapist: true,
-  therapistId: '', // '' = anyone
+  therapistId: '', // '' = anyone, BY_EMAIL = whoever has `email`
+  email: '',
   startsAt: '',
   expiresAt: '',
   isActive: true,
@@ -230,7 +235,8 @@ function toForm(c: Coupon | 'new' | null): Form {
     minMonths: String(c.minMonths),
     maxRedemptions: c.maxRedemptions == null ? '' : String(c.maxRedemptions),
     oncePerTherapist: c.oncePerTherapist,
-    therapistId: c.therapistId || '',
+    therapistId: c.therapistId || (c.email ? BY_EMAIL : ''),
+    email: c.email || '',
     startsAt: toDay(c.startsAt),
     expiresAt: toDay(c.expiresAt),
     isActive: c.isActive,
@@ -263,7 +269,7 @@ function CouponModal({ coupon, plans, onClose, onSaved }: { coupon: Coupon | 'ne
     label: p.email ? `${p.name} (${p.email})` : p.name,
   }));
   // Keep the saved professional selectable even if they're outside the loaded list.
-  if (form.therapistId && !proOptions.some((o) => o.value === form.therapistId)) {
+  if (form.therapistId && form.therapistId !== BY_EMAIL && !proOptions.some((o) => o.value === form.therapistId)) {
     proOptions.unshift({
       value: form.therapistId,
       label: editingCoupon?.therapistId === form.therapistId ? editingCoupon.therapistName || 'Assigned professional' : 'Assigned professional',
@@ -279,6 +285,8 @@ function CouponModal({ coupon, plans, onClose, onSaved }: { coupon: Coupon | 'ne
       toast('Usage limit must be a whole number of at least 1, or blank for unlimited.', 'error');
       return;
     }
+    const byEmail = form.therapistId === BY_EMAIL;
+    if (byEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) { toast('Enter the email address the professional will sign up with.', 'error'); return; }
     if (form.startsAt && form.expiresAt && form.expiresAt < form.startsAt) { toast('Expiry must be on or after the start date.', 'error'); return; }
     setSaving(true);
     const json = {
@@ -290,7 +298,8 @@ function CouponModal({ coupon, plans, onClose, onSaved }: { coupon: Coupon | 'ne
       minMonths: Number(form.minMonths) || 1,
       maxRedemptions: form.maxRedemptions.trim() ? Number(form.maxRedemptions) : null,
       oncePerTherapist: form.oncePerTherapist,
-      therapistId: form.therapistId || null,
+      therapistId: byEmail ? null : form.therapistId || null,
+      email: byEmail ? form.email.trim().toLowerCase() : null,
       startsAt: startOfDay(form.startsAt),
       expiresAt: endOfDay(form.expiresAt),
       isActive: form.isActive,
@@ -358,11 +367,22 @@ function CouponModal({ coupon, plans, onClose, onSaved }: { coupon: Coupon | 'ne
       </div>
       <Field
         label="Who can use it"
-        hint={form.therapistId ? 'Personal code: anyone else who enters it is told the code is not valid.' : 'Any professional who has the code.'}
+        hint={
+          form.therapistId === BY_EMAIL
+            ? 'Personal code for whoever signs up, or has signed up, with this email. Anyone else is told the code is not valid.'
+            : form.therapistId
+              ? 'Personal code: anyone else who enters it is told the code is not valid.'
+              : 'Any professional who has the code.'
+        }
       >
         {!can('people.read') ? (
           <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
-            {form.therapistId ? `Only ${editingCoupon?.therapistName || 'one professional'}` : 'Any professional'}. You need people access to change this.
+            {form.therapistId === BY_EMAIL
+              ? `Only ${form.email}`
+              : form.therapistId
+                ? `Only ${editingCoupon?.therapistName || 'one professional'}`
+                : 'Any professional'}
+            . You need people access to change this.
           </p>
         ) : (
           <>
@@ -370,10 +390,24 @@ function CouponModal({ coupon, plans, onClose, onSaved }: { coupon: Coupon | 'ne
             <Select
               value={form.therapistId}
               onChange={(v) => set('therapistId', v)}
-              options={[{ value: '', label: pros.loading && !pros.data ? 'Loading professionals…' : 'Any professional' }, ...proOptions]}
+              options={[
+                { value: '', label: pros.loading && !pros.data ? 'Loading professionals…' : 'Any professional' },
+                { value: BY_EMAIL, label: 'Someone not signed up yet (by email)' },
+                ...proOptions,
+              ]}
               className="w-full"
               ariaLabel="Who can use it"
             />
+            {form.therapistId === BY_EMAIL && (
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => set('email', e.target.value)}
+                placeholder="name@example.com"
+                aria-label="Email address"
+                className="mt-2"
+              />
+            )}
           </>
         )}
       </Field>
