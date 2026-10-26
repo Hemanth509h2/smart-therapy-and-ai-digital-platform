@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Copy } from 'lucide-react';
+import { Copy, MessageCircle } from 'lucide-react';
 import { Btn, Checkbox, Field, Input, Modal } from '@/components/admin/kit';
-import { adminFetch } from '@/lib/adminApi';
+import { adminFetch, whatsappLink } from '@/lib/adminApi';
 import { caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 
@@ -18,7 +18,7 @@ const blank = { firstName: '', lastName: '', email: '', phoneNumber: '', special
 /**
  * Creates a professional (therapist) account. By default the professional is
  * emailed a link to set their own password; the admin can set one instead.
- * If the email couldn't be sent, the set-password link is shown to copy.
+ * The set-password link is then shown to copy or send on WhatsApp.
  */
 export function AddProfessionalDialog({
   open,
@@ -31,8 +31,10 @@ export function AddProfessionalDialog({
 }) {
   const [form, setForm] = useState(blank);
   const [busy, setBusy] = useState(false);
-  // Set after creating, when the link still has to reach the professional.
+  // Set after creating, when there's a set-password link to share.
   const [pending, setPending] = useState<Created | null>(null);
+  // The phone number entered, for the WhatsApp chat (the form is reset on open, not on create).
+  const [phone, setPhone] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -71,17 +73,19 @@ export function AddProfessionalDialog({
         onClose();
       } else if (res.emailed) {
         toast(`${name}'s account was created. We emailed ${res.professional.email} a link to set their password.`);
-        onClose();
+        // Keep the link up so it can go out on WhatsApp too.
+        if (res.setupLink) { setPhone(form.phoneNumber); setPending(res); }
+        else onClose();
       } else {
         // Account exists, but the link didn't go out: keep the dialog open with it.
         toast(
           res.setupLink
-            ? `${name}'s account was created, but the email couldn't be sent. Copy the set-password link and send it to them.`
+            ? `${name}'s account was created, but the email couldn't be sent. Send them the set-password link on WhatsApp or copy it.`
             : `${name}'s account was created, but we couldn't make a set-password link. They can use "Forgot password" on the sign-in page.`,
           'warning',
           { duration: 9000 }
         );
-        if (res.setupLink) setPending(res);
+        if (res.setupLink) { setPhone(form.phoneNumber); setPending(res); }
         else onClose();
       }
     } catch (e) {
@@ -102,13 +106,27 @@ export function AddProfessionalDialog({
   };
 
   if (pending) {
+    const message =
+      `Hi ${pending.professional.name}, your STAAD account is ready. ` +
+      `Set your password here: ${pending.setupLink}\n\nThen sign in with ${pending.professional.email}.`;
     return (
       <Modal
         open={open}
         onClose={onClose}
         title="Send the set-password link"
-        description={`${pending.professional.name}'s account is ready. Send them this link so they can set a password, then sign in with ${pending.professional.email}.`}
-        footer={<Btn onClick={onClose}>Done</Btn>}
+        description={
+          pending.emailed
+            ? `We emailed this link to ${pending.professional.email}. You can also send it on WhatsApp.`
+            : `${pending.professional.name}'s account is ready. Send them this link so they can set a password, then sign in with ${pending.professional.email}.`
+        }
+        footer={
+          <>
+            <Btn variant="ghost" onClick={onClose}>Done</Btn>
+            <Btn icon={<MessageCircle className="h-4 w-4" />} onClick={() => window.open(whatsappLink(message, phone), '_blank', 'noopener')}>
+              Send on WhatsApp
+            </Btn>
+          </>
+        }
       >
         <div className="flex gap-2">
           <Input readOnly value={pending.setupLink ?? ''} onFocus={(e) => e.currentTarget.select()} className="font-mono text-xs" />

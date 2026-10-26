@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Copy, Lock, Mail, UserPlus } from 'lucide-react';
+import { Copy, Lock, Mail, MessageCircle, UserPlus } from 'lucide-react';
 import {
   AdminPage, Badge, Btn, ConfirmDialog, DataTable, ErrorBanner, Field, Input, Modal, Section, Select,
   useAdmin, useAdminQuery, type Column,
 } from '@/components/admin/kit';
-import { adminFetch, fmtDate, timeAgo } from '@/lib/adminApi';
+import { adminFetch, fmtDate, timeAgo, whatsappLink } from '@/lib/adminApi';
 import { caughtErrorMessage } from '@/lib/apiError';
 import { ADMIN_ROLE_LABELS, type AdminRole } from '@/lib/adminRoles';
 import { toast } from '@/components/practice/ui';
@@ -258,7 +258,21 @@ function InviteModal({ open, onClose, onInvited }: { open: boolean; onClose: () 
       }
       footer={
         result ? (
-          <Btn onClick={close}>Done</Btn>
+          <>
+            <Btn variant="ghost" onClick={close}>Done</Btn>
+            <Btn
+              icon={<MessageCircle className="h-4 w-4" />}
+              onClick={() =>
+                window.open(
+                  whatsappLink(`You've been invited to the STAAD admin portal. Sign in with ${result.email} and accept the invite here (valid for 7 days): ${result.link}`),
+                  '_blank',
+                  'noopener'
+                )
+              }
+            >
+              Send on WhatsApp
+            </Btn>
+          </>
         ) : (
           <>
             <Btn variant="ghost" onClick={close}>Cancel</Btn>
