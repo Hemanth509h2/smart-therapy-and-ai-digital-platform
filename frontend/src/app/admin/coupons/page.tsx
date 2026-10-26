@@ -18,6 +18,7 @@ interface Coupon {
   discountValue: number;
   planIds: string[];
   minMonths: number;
+  maxMonths: number | null;
   maxRedemptions: number | null;
   oncePerTherapist: boolean;
   therapistId: string | null;
@@ -33,7 +34,13 @@ interface Coupon {
 interface Plan { id: string; name: string; priceMonthly: number; isActive: boolean }
 interface Professional { id: string; name: string; email?: string }
 
-const MONTH_OPTIONS = [1, 3, 6, 12];
+// "Term" choices: '1' = any term, MONTHLY = 1-month purchases only, else that many months or more.
+const MONTHLY = 'monthly';
+const TERM_OPTIONS = [
+  { value: '1', label: 'Any term' },
+  { value: MONTHLY, label: 'Monthly only' },
+  ...[3, 6, 12].map((m) => ({ value: String(m), label: `${m}+ months` })),
+];
 // "Who can use it" value for a code reserved for an email address.
 const BY_EMAIL = '__email__';
 
@@ -101,7 +108,7 @@ export default function AdminCouponsPage() {
       render: (c) => (
         <span className="text-xs">
           {c.planIds.length ? c.planIds.map(planName).join(', ') : 'All paid plans'}
-          {c.minMonths > 1 && ` · ${c.minMonths}+ months`}
+          {c.maxMonths === 1 ? ' · Monthly only' : c.minMonths > 1 && ` · ${c.minMonths}+ months`}
         </span>
       ),
     },
@@ -208,7 +215,7 @@ const blankForm = {
   type: 'PERCENT' as Coupon['type'],
   discountValue: '',
   planIds: [] as string[],
-  minMonths: '1',
+  term: '1',
   maxRedemptions: '',
   oncePerTherapist: true,
   therapistId: '', // '' = anyone, BY_EMAIL = whoever has `email`
@@ -232,7 +239,7 @@ function toForm(c: Coupon | 'new' | null): Form {
     type: c.type,
     discountValue: String(c.discountValue),
     planIds: [...c.planIds],
-    minMonths: String(c.minMonths),
+    term: c.maxMonths === 1 ? MONTHLY : String(c.minMonths),
     maxRedemptions: c.maxRedemptions == null ? '' : String(c.maxRedemptions),
     oncePerTherapist: c.oncePerTherapist,
     therapistId: c.therapistId || (c.email ? BY_EMAIL : ''),
@@ -295,7 +302,8 @@ function CouponModal({ coupon, plans, onClose, onSaved }: { coupon: Coupon | 'ne
       type: form.type,
       discountValue: value,
       planIds: form.planIds,
-      minMonths: Number(form.minMonths) || 1,
+      minMonths: form.term === MONTHLY ? 1 : Number(form.term) || 1,
+      maxMonths: form.term === MONTHLY ? 1 : null,
       maxRedemptions: form.maxRedemptions.trim() ? Number(form.maxRedemptions) : null,
       oncePerTherapist: form.oncePerTherapist,
       therapistId: byEmail ? null : form.therapistId || null,
@@ -347,11 +355,11 @@ function CouponModal({ coupon, plans, onClose, onSaved }: { coupon: Coupon | 'ne
         <Field label={form.type === 'PERCENT' ? 'Percent off' : 'Rupees off'}>
           <Input type="number" min={1} max={form.type === 'PERCENT' ? 100 : undefined} value={form.discountValue} onChange={(e) => set('discountValue', e.target.value)} />
         </Field>
-        <Field label="Minimum term">
+        <Field label="Term">
           <Select
-            value={form.minMonths}
-            onChange={(v) => set('minMonths', v)}
-            options={MONTH_OPTIONS.map((m) => ({ value: String(m), label: m === 1 ? 'Any term' : `${m}+ months` }))}
+            value={form.term}
+            onChange={(v) => set('term', v)}
+            options={TERM_OPTIONS}
             className="w-full"
           />
         </Field>

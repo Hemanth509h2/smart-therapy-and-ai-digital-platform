@@ -72,6 +72,12 @@ export async function applyCoupon(
   if (opts.months < coupon.minMonths) {
     return { ok: false, error: `That coupon needs a term of at least ${coupon.minMonths} months.` };
   }
+  if (coupon.maxMonths != null && opts.months > coupon.maxMonths) {
+    return {
+      ok: false,
+      error: coupon.maxMonths === 1 ? 'That coupon only works for monthly billing.' : `That coupon works for terms of up to ${coupon.maxMonths} months.`,
+    };
+  }
 
   // Paid uses plus approved requests still waiting for payment (except the one being priced).
   const held = { couponId: coupon.id, status: 'AWAITING_PAYMENT' as const, ...(opts.excludeRequestId ? { id: { not: opts.excludeRequestId } } : {}) };
@@ -138,6 +144,15 @@ export function parseCouponBody(body: any, partial = false): Record<string, any>
     const v = Number(body.minMonths);
     if (!Number.isInteger(v) || v < 1 || v > 36) return 'Minimum term must be 1–36 months.';
     data.minMonths = v;
+  }
+  if (has('maxMonths')) {
+    const v = body.maxMonths;
+    if (v === null || v === '') data.maxMonths = null;
+    else if (!Number.isInteger(Number(v)) || Number(v) < 1 || Number(v) > 36) return 'Longest term must be 1–36 months, or blank for no limit.';
+    else data.maxMonths = Number(v);
+  }
+  if (data.minMonths != null && data.maxMonths != null && data.maxMonths < data.minMonths) {
+    return 'Longest term must be at least the minimum term.';
   }
   if (has('maxRedemptions')) {
     const v = body.maxRedemptions;

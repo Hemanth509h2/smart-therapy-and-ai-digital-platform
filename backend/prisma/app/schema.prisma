@@ -210,6 +210,7 @@ model Coupon {
   discountValue    Int
   planIds          String[]          @default([]) // empty = every paid plan
   minMonths        Int               @default(1) // shortest term the code works for
+  maxMonths        Int? // longest term the code works for; null = no limit (1 = monthly only)
   maxRedemptions   Int? // null = unlimited
   oncePerTherapist Boolean           @default(true)
   // Set = a personal code only this therapist can redeem; null = anyone.
