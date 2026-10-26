@@ -211,7 +211,8 @@ function InviteModal({ open, onClose, onInvited }: { open: boolean; onClose: () 
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<AdminRole>('SUPPORT');
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ link: string; emailed: boolean; email: string } | null>(null);
+  const [result, setResult] = useState<{ link: string; emailed: boolean; email: string; role: AdminRole } | null>(null);
+  const { email: invitedBy } = useAdmin();
 
   const close = () => {
     onClose();
@@ -226,7 +227,7 @@ function InviteModal({ open, onClose, onInvited }: { open: boolean; onClose: () 
         json: { email: email.trim(), adminRole: role },
         action: 'send the invite',
       });
-      setResult({ link: d.link, emailed: d.emailed, email: email.trim() });
+      setResult({ link: d.link, emailed: d.emailed, email: email.trim(), role });
       if (d.emailed) toast(`Invite emailed to ${email.trim()}.`);
       else toast(`Email isn't set up on the server, so send this link to ${email.trim()} yourself.`, 'warning');
       onInvited();
@@ -265,7 +266,22 @@ function InviteModal({ open, onClose, onInvited }: { open: boolean; onClose: () 
               icon={<MessageCircle className="h-4 w-4" />}
               onClick={() =>
                 window.open(
-                  whatsappLink(`You've been invited to the STAAD admin portal. Sign in with ${result.email} and accept the invite here (valid for 7 days): ${result.link}`),
+                  whatsappLink(
+                    [
+                      'Hi,',
+                      '',
+                      `You've been invited to the *STAAD admin portal* as *${ADMIN_ROLE_LABELS[result.role].label}*${invitedBy ? ` by ${invitedBy}` : ''}.`,
+                      ADMIN_ROLE_LABELS[result.role].description,
+                      '',
+                      '*Accept the invite:*',
+                      result.link,
+                      '',
+                      `• Sign in (or sign up) with *${result.email}*. The invite only works for this email.`,
+                      '• The link works once and expires in 7 days.',
+                      '',
+                      '– Team STAAD',
+                    ].join('\n')
+                  ),
                   '_blank',
                   'noopener'
                 )

@@ -107,9 +107,26 @@ export function AddProfessionalDialog({
   };
 
   if (pending) {
-    const message =
-      `Hi ${pending.professional.name}, your STAAD account is ready. ` +
-      `Set your password here: ${pending.setupLink}\n\nThen sign in with ${pending.professional.email}.`;
+    const signIn = `${window.location.origin}/auth`;
+    const message = [
+      `Hi ${pending.professional.name || 'there'},`,
+      '',
+      'Welcome to *STAAD*! Your professional account is ready.',
+      '',
+      '*1. Set your password*',
+      pending.setupLink,
+      'This link works once and expires soon. If it stops working, use "Forgot password" on the sign-in page.',
+      '',
+      '*2. Sign in*',
+      signIn,
+      `Email: ${pending.professional.email}`,
+      '',
+      '*3. Get started*',
+      'Complete your profile, add your clients, and start or book sessions from your dashboard.',
+      '',
+      'Questions? Reply to this message.',
+      '– Team STAAD',
+    ].join('\n');
     return (
       <Modal
         open={open}

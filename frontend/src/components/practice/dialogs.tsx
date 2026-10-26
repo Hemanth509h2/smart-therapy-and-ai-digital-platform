@@ -207,6 +207,8 @@ export function StartSessionDialog({
   const [starting, setStarting] = useState(false);
   const [patientLink, setPatientLink] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // When the started session is (or was) scheduled for, for the WhatsApp message.
+  const [sessionAt, setSessionAt] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [pickedModule, setPickedModule] = useState('');
   // '' = auto (reuse a due session or open a new one), 'new' = force a new room, else a session id.
@@ -226,6 +228,7 @@ export function StartSessionDialog({
     setStarting(false);
     setPatientLink(null);
     setSessionId(null);
+    setSessionAt(null);
     setCopied(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -262,6 +265,7 @@ export function StartSessionDialog({
       if (!res.ok) throw new Error(await apiErrorMessage(res, 'create the session link'));
       const data = await res.json().catch(() => ({}));
       setSessionId(id);
+      setSessionAt(existing?.scheduledAt ?? new Date().toISOString());
       setPatientLink(`${window.location.origin}/join/${data.token}`);
       setStarting(false);
       toast('Session link is ready. Send it to the client on WhatsApp or copy it.');
@@ -301,8 +305,25 @@ export function StartSessionDialog({
   const sendOnWhatsApp = () => {
     if (!patientLink) return;
     const client = clients.find((c) => c.id === clientId);
-    const hi = client?.firstName ? `Hi ${client.firstName}, ` : '';
-    const text = `${hi}here's the link to join your STAAD therapy session: ${patientLink}`;
+    const therapist = fullName(profile);
+    const when = sessionAt ? fmtDayTime(sessionAt) : null;
+    const text = [
+      `Hi ${client?.firstName || 'there'},`,
+      '',
+      `${therapist ? `*${therapist}*` : 'Your therapist'} is ready for your STAAD therapy session${when ? ` (${when})` : ''}.`,
+      '',
+      `*Join here:* ${patientLink}`,
+      '',
+      '*Before you join:*',
+      '• Use a phone or laptop with a working camera and microphone.',
+      '• Open the link in Chrome or Safari and allow camera and microphone access.',
+      '• Sit somewhere quiet and private with a good internet connection.',
+      '',
+      'This link is only for you and this session, so please don\'t share it. It stops working when the session ends.',
+      'If you have trouble joining, reply to this message.',
+      '',
+      therapist ? `– ${therapist}, STAAD` : '– STAAD',
+    ].join('\n');
     window.open(whatsappLink(text, client?.phoneNumber), '_blank', 'noopener');
   };
 
