@@ -3,7 +3,7 @@ import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin } from '@/lib/http/apiAuth';
 import { getSettings } from '@/lib/core/settings';
 import { moduleName } from '@/lib/modules/modules';
-import { SENT_STATUSES, minutesBetween, round2, therapistStorage, usageCost, usageRange, usageRates } from '@/lib/admin/usage';
+import { minutesBetween, round2, therapistStorage, usageCost, usageRange, usageRates } from '@/lib/admin/usage';
 import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +12,7 @@ const MAX_SESSIONS = 500;
 
 // GET /api/admin/usage/:therapistId?range=30d — one professional's usage and
 // estimated cost, counted the same way as their row on /api/admin/usage, plus
-// a daily breakdown, cost per session, modules, WhatsApp, payments and
+// a daily breakdown, cost per session, modules, payments and
 // storage per table. Sessions are listed by time and length only: no client
 // names or other patient data.
 export async function GET(request: Request, { params }: { params: { therapistId: string } }) {
@@ -31,7 +31,7 @@ export async function GET(request: Request, { params }: { params: { therapistId:
     const { since } = range;
     const now = new Date();
 
-    const [settings, user, subscription, events, sessions, reports, whatsapp, payments, [clients], storage] = await Promise.all([
+    const [settings, user, subscription, events, sessions, reports, payments, [clients], storage] = await Promise.all([
       getSettings(),
       prisma.user.findUnique({ where: { id: therapist.userId }, select: { email: true, status: true, lastSeenAt: true } }),
       appDb.subscription.findFirst({
@@ -52,10 +52,6 @@ export async function GET(request: Request, { params }: { params: { therapistId:
       prisma.sessionReport.findMany({
         where: { therapistId, aiGenerated: true, generatedAt: { gte: since } },
         select: { sessionId: true, generatedAt: true },
-      }),
-      prisma.whatsAppMessage.findMany({
-        where: { therapistId, OR: [{ sentAt: { gte: since } }, { sentAt: null, createdAt: { gte: since } }] },
-        select: { sessionId: true, messageType: true, status: true, sentAt: true },
       }),
       appDb.payment.findMany({
         where: { therapistId, createdAt: { gte: since } },
@@ -85,7 +81,6 @@ export async function GET(request: Request, { params }: { params: { therapistId:
     const videoMinutes = Math.round(held.reduce((a, s) => a + minutesBetween(s), 0));
     const transcriptionMinutes = Math.round([...transcribedIds].reduce((a, id) => a + minutesBetween(sessionById.get(id) ?? { startedAt: null, endedAt: null }), 0));
     const sumType = (type: string) => events.filter((e) => e.type === type).reduce((a, e) => a + e.count, 0);
-    const sent = whatsapp.filter((m) => m.sentAt && (SENT_STATUSES as readonly string[]).includes(m.status));
     const paid = payments.filter((p) => p.orderStatus === 'PAID' && p.paidAt && p.paidAt >= since);
 
     const counts = {
@@ -97,8 +92,6 @@ export async function GET(request: Request, { params }: { params: { therapistId:
       transcriptSegments: sumType('TRANSCRIPTION'),
       transcriptionMinutes,
       moduleLaunches: sumType('MODULE_LAUNCH'),
-      whatsappMessages: sent.length,
-      whatsappFailed: whatsapp.filter((m) => m.status === 'FAILED').length,
       payments: paid.length,
       revenueInr: round2(paid.reduce((a, p) => a + Number(p.amount), 0)),
       storageBytes: storage.reduce((a, r) => a + r.bytes, 0),
@@ -107,10 +100,10 @@ export async function GET(request: Request, { params }: { params: { therapistId:
 
     // ── Daily estimated cost by type ──
     const dayKey = (d: Date) => d.toISOString().slice(0, 10);
-    const daily = new Map<string, { ai: number; reports: number; transcription: number; video: number; whatsapp: number; sessions: number }>();
+    const daily = new Map<string, { ai: number; reports: number; transcription: number; video: number; sessions: number }>();
     const day = (d: Date) => {
       const k = dayKey(d);
-      if (!daily.has(k)) daily.set(k, { ai: 0, reports: 0, transcription: 0, video: 0, whatsapp: 0, sessions: 0 });
+      if (!daily.has(k)) daily.set(k, { ai: 0, reports: 0, transcription: 0, video: 0, sessions: 0 });
       return daily.get(k)!;
     };
     for (const e of events) {
@@ -123,7 +116,6 @@ export async function GET(request: Request, { params }: { params: { therapistId:
       d.sessions += 1;
     }
     for (const r of reports) day(r.generatedAt).reports += rates.aiReportInr;
-    for (const m of sent) day(m.sentAt!).whatsapp += rates.whatsappMessageInr;
 
     const series = Array.from({ length: range.seriesDays }, (_, i) => {
       const d = new Date(now.getTime() - (range.seriesDays - 1 - i) * 864e5);
@@ -131,7 +123,7 @@ export async function GET(request: Request, { params }: { params: { therapistId:
       const label = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
       return {
         label,
-        costInr: v ? round2(v.ai + v.reports + v.transcription + v.video + v.whatsapp) : 0,
+        costInr: v ? round2(v.ai + v.reports + v.transcription + v.video) : 0,
         sessions: v?.sessions ?? 0,
       };
     });
@@ -147,8 +139,6 @@ export async function GET(request: Request, { params }: { params: { therapistId:
       perSession.set(e.sessionId, r);
     }
     const reported = new Set(reports.map((r) => r.sessionId));
-    const sentFor = new Map<string, number>();
-    for (const m of sent) if (m.sessionId) sentFor.set(m.sessionId, (sentFor.get(m.sessionId) ?? 0) + 1);
     const sessionRows = sessions.map((s) => {
       const u = perSession.get(s.id) ?? { ai: 0, segments: 0, modules: 0 };
       const minutes = Math.round(minutesBetween(s));
@@ -159,7 +149,6 @@ export async function GET(request: Request, { params }: { params: { therapistId:
           aiReports: reported.has(s.id) ? 1 : 0,
           transcriptionMinutes: transcribed ? minutes : 0,
           videoMinutes: s.startedAt && s.startedAt >= since ? minutes : 0,
-          whatsappMessages: sentFor.get(s.id) ?? 0,
         },
         rates
       );
@@ -178,18 +167,10 @@ export async function GET(request: Request, { params }: { params: { therapistId:
       };
     });
 
-    // ── Modules, WhatsApp, payments, storage ──
+    // ── Modules, payments, storage ──
     const moduleCounts = new Map<string, number>();
     for (const e of events) if (e.type === 'MODULE_LAUNCH' && e.label) moduleCounts.set(e.label, (moduleCounts.get(e.label) ?? 0) + e.count);
     const modules = [...moduleCounts].map(([id, launches]) => ({ moduleId: id, name: moduleName(id), launches })).sort((a, b) => b.launches - a.launches);
-
-    const waTypes = new Map<string, { sent: number; failed: number }>();
-    for (const m of whatsapp) {
-      const r = waTypes.get(m.messageType) ?? { sent: 0, failed: 0 };
-      if (m.sentAt && (SENT_STATUSES as readonly string[]).includes(m.status)) r.sent += 1;
-      else if (m.status === 'FAILED') r.failed += 1;
-      waTypes.set(m.messageType, r);
-    }
 
     const plans = await appDb.plan.findMany({
       where: { id: { in: [...new Set(payments.map((p) => p.planId).filter((id): id is string => !!id))] } },
@@ -216,7 +197,6 @@ export async function GET(request: Request, { params }: { params: { therapistId:
       sessions: sessionRows,
       sessionsTruncated: sessions.length === MAX_SESSIONS,
       modules,
-      whatsapp: [...waTypes].map(([type, v]) => ({ type, ...v })),
       payments: payments.map((p) => ({
         id: p.id,
         status: p.orderStatus,

@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     const auth = await requireAdmin(request, 'settings');
     if (!auth.ok) return auth.response;
 
-    const checks = await Promise.all([checkDb(), checkAppDb(), checkLiveKit(), ...(await checkAiService()), checkWhatsAppBot(), checkAutomation(), checkSmtp(), checkFirebase()]);
+    const checks = await Promise.all([checkDb(), checkAppDb(), checkLiveKit(), ...(await checkAiService()), checkAutomation(), checkSmtp(), checkFirebase()]);
 
     const jobs = await appDb.cronRun.findMany({ distinct: ['job'], select: { job: true } });
     const names = Array.from(new Set(['cleanup-transcripts', ...jobs.map((j) => j.job)]));
@@ -166,23 +166,6 @@ async function checkAiService(): Promise<Check[]> {
     feature(assistant, data.assistantConfigured ?? data.callPlanConfigured, `${llmMissing}, so AI insights and session reports are off.`, 'Running and the OpenRouter key is set.'),
     feature(notes, data.callPlanConfigured, `${llmMissing}, so the AI Notes call plan is off.`, 'Running and the OpenRouter key is set.'),
   ];
-}
-
-async function checkWhatsAppBot(): Promise<Check> {
-  const base = { id: 'whatsapp', label: 'WhatsApp bot' };
-  const url = process.env.WHATSAPP_BOT_URL;
-  if (!url) return { ...base, status: 'warn', latencyMs: null, message: 'Bot URL not configured.' };
-  try {
-    const { value: res, ms } = await reach(`${url.replace(/\/+$/, '')}/health`);
-    if (res.status === 404) return { ...base, status: 'warn', latencyMs: ms, message: 'Reachable, but this bot version has no /health endpoint.' };
-    if (!res.ok) return { ...base, status: 'down', latencyMs: ms, message: `Health check answered ${res.status}.` };
-    const data = await res.json().catch(() => ({}));
-    return data.connected === false
-      ? { ...base, status: 'warn', latencyMs: ms, message: 'Bot is running but WhatsApp is not paired/connected.' }
-      : { ...base, status: 'ok', latencyMs: ms, message: 'Running and connected.' };
-  } catch (e) {
-    return { ...base, status: 'down', latencyMs: null, message: isTimeout(e) ? 'No answer within 4s.' : 'Unreachable.' };
-  }
 }
 
 // n8n runs the scheduled WhatsApp workflows; they call /api/automation/* with

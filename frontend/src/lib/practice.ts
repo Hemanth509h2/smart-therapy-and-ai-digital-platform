@@ -3,7 +3,7 @@
 // Session / Booking / ProfileClient rows — there are no extra schema fields for
 // status, duration or session numbers, so they are computed.
 import { apiFetch } from '@/lib/api';
-import { apiErrorMessage, type WhatsAppOutcome } from '@/lib/apiError';
+import { apiErrorMessage } from '@/lib/apiError';
 
 export type SessionStatus = 'SCHEDULED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 
@@ -408,15 +408,14 @@ async function jsonOrThrow(res: Response, action: string) {
 }
 
 /** Creates the Session row (what every view reads) and a matching Booking that
- *  records the planned duration. A booking also WhatsApps the client a
- *  confirmation; `whatsapp` says whether that was sent. */
+ *  records the planned duration. */
 export async function createSession(
   therapistId: string,
   clientId: string,
   when: Date,
   duration?: number,
   booking = false
-): Promise<{ session: PracticeSession; whatsapp?: WhatsAppOutcome }> {
+): Promise<{ session: PracticeSession }> {
   const data = await jsonOrThrow(
     await apiFetch('/api/sessions', {
       method: 'POST',
@@ -432,7 +431,7 @@ export async function createSession(
       body: JSON.stringify({ therapistId, clientId, dateTime: when.toISOString(), duration }),
     }).catch(() => {});
   }
-  return { session: data.session, whatsapp: data.whatsapp };
+  return { session: data.session };
 }
 
 export async function updateSchedule(sessionId: string, action: 'cancel' | 'reschedule', scheduledAt?: Date) {

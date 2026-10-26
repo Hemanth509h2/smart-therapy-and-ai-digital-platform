@@ -37,7 +37,7 @@ export const FAQS: Faq[] = [
   {
     category: 'Clients',
     q: 'How do I add a client?',
-    a: 'Use Add Client on the Dashboard or Clients page. You get a private sign-up link, and if you add their WhatsApp number the invite is sent to them automatically.',
+    a: 'Use Add Client on the Dashboard or Clients page. Add their WhatsApp number so you can send them session links with Send on WhatsApp.',
   },
   {
     category: 'Clients',

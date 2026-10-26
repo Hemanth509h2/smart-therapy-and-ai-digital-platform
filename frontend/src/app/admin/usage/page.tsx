@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, Blocks, Brain, Cpu, Database, Download, FileText, HardDrive, IndianRupee, MemoryStick, MessageCircle, Mic, Server, TrendingUp, Users, Video } from 'lucide-react';
+import { AlertTriangle, Blocks, Brain, Cpu, Database, Download, FileText, HardDrive, IndianRupee, MemoryStick, Mic, Server, TrendingUp, Users, Video } from 'lucide-react';
 import {
   AdminPage,
   Badge,
@@ -44,11 +44,10 @@ interface ProfessionalUsage {
   transcriptSegments: number;
   transcriptionMinutes: number;
   moduleLaunches: number;
-  whatsappMessages: number;
   storageBytes: number;
   payments: number;
   revenueInr: number;
-  cost: { aiAnalysisInr: number; aiReportInr: number; transcriptionInr: number; videoInr: number; whatsappInr: number };
+  cost: { aiAnalysisInr: number; aiReportInr: number; transcriptionInr: number; videoInr: number };
   estCostInr: number;
   netInr: number;
 }
@@ -60,7 +59,6 @@ interface Usage {
     transcriptionMinuteInr: number;
     aiReportInr: number;
     videoMinuteInr: number;
-    whatsappMessageInr: number;
     hostingMonthlyInr: number;
     databaseMonthlyInr: number;
   };
@@ -74,7 +72,6 @@ interface Usage {
     transcriptSegments: number;
     transcriptionMinutes: number;
     moduleLaunches: number;
-    whatsappMessages: number;
     storageBytes: number;
     revenueInr: number;
     estCostInr: number;
@@ -86,7 +83,6 @@ interface Usage {
     aiReportCostInr: number;
     transcriptionCostInr: number;
     videoCostInr: number;
-    whatsappCostInr: number;
   };
   series: Record<'AI_ANALYSIS' | 'TRANSCRIPTION' | 'MODULE_LAUNCH', Point[]>;
   professionals: ProfessionalUsage[];
@@ -157,14 +153,12 @@ const SORT_VALUE: Record<string, (r: ProfessionalUsage) => number | string> = {
   reports: (r) => r.aiReports,
   transcribed: (r) => r.transcriptionMinutes,
   modules: (r) => r.moduleLaunches,
-  whatsapp: (r) => r.whatsappMessages,
   storage: (r) => r.storageBytes,
   lastSeen: (r) => (r.lastSeenAt ? new Date(r.lastSeenAt).getTime() : 0),
   costAi: (r) => r.cost.aiAnalysisInr,
   costReports: (r) => r.cost.aiReportInr,
   costTranscription: (r) => r.cost.transcriptionInr,
   costVideo: (r) => r.cost.videoInr,
-  costWhatsapp: (r) => r.cost.whatsappInr,
   cost: (r) => r.estCostInr,
   revenue: (r) => r.revenueInr,
   net: (r) => r.netInr,
@@ -223,13 +217,11 @@ export default function AdminUsagePage() {
       { header: 'Transcription minutes', value: (r) => r.transcriptionMinutes },
       { header: 'Transcript segments', value: (r) => r.transcriptSegments },
       { header: 'Module launches', value: (r) => r.moduleLaunches },
-      { header: 'WhatsApp messages', value: (r) => r.whatsappMessages },
       { header: 'Storage (bytes)', value: (r) => r.storageBytes },
       { header: 'AI analysis cost (INR)', value: (r) => r.cost.aiAnalysisInr },
       { header: 'AI report cost (INR)', value: (r) => r.cost.aiReportInr },
       { header: 'Transcription cost (INR)', value: (r) => r.cost.transcriptionInr },
       { header: 'Video cost (INR)', value: (r) => r.cost.videoInr },
-      { header: 'WhatsApp cost (INR)', value: (r) => r.cost.whatsappInr },
       { header: 'Total est. cost (INR)', value: (r) => r.estCostInr },
       { header: 'Payments', value: (r) => r.payments },
       { header: 'Revenue (INR)', value: (r) => r.revenueInr },
@@ -271,7 +263,6 @@ export default function AdminUsagePage() {
     right('reports', 'AI reports', 'reports', (r) => num(r.aiReports)),
     right('transcribed', 'Transcribed', 'transcribed', (r) => `${num(r.transcriptionMinutes)} min`),
     right('modules', 'Modules', 'modules', (r) => num(r.moduleLaunches)),
-    right('whatsapp', 'WhatsApp', 'whatsapp', (r) => num(r.whatsappMessages)),
     right('storage', 'Storage', 'storage', (r) => bytes(r.storageBytes)),
     right('lastSeen', 'Last seen', 'lastSeen', (r) => <span style={{ color: 'var(--ink-muted)' }}>{timeAgo(r.lastSeenAt)}</span>),
     right('cost', 'Est. cost', 'cost', (r) => <span className="font-semibold">{inr(r.estCostInr)}</span>),
@@ -283,7 +274,6 @@ export default function AdminUsagePage() {
     right('costReports', 'AI reports', 'costReports', (r) => inr(r.cost.aiReportInr)),
     right('costTranscription', 'Transcription', 'costTranscription', (r) => inr(r.cost.transcriptionInr)),
     right('costVideo', 'Video', 'costVideo', (r) => inr(r.cost.videoInr)),
-    right('costWhatsapp', 'WhatsApp', 'costWhatsapp', (r) => inr(r.cost.whatsappInr)),
     right('cost', 'Total cost', 'cost', (r) => <span className="font-semibold">{inr(r.estCostInr)}</span>),
     right('revenue', 'Paid', 'revenue', (r) => inr(r.revenueInr)),
     right('net', 'Net', 'net', (r) => <span className="font-semibold" style={{ color: r.netInr < 0 ? '#dc2626' : 'var(--ink)' }}>{inr(r.netInr)}</span>),
@@ -294,7 +284,7 @@ export default function AdminUsagePage() {
   return (
     <AdminPage
       title="Usage & cost"
-      description="Everything every professional uses — sessions, AI, transcription, video, WhatsApp — with estimated cost and what they paid."
+      description="Everything every professional uses — sessions, AI, transcription, video — with estimated cost and what they paid."
       permission="people.read"
       actions={
         <div className="flex flex-wrap gap-2">
@@ -330,7 +320,6 @@ export default function AdminUsagePage() {
               hint={`${inr(t.transcriptionCostInr)} at ${inr(data.rates.transcriptionMinuteInr)}/min`}
               icon={<Mic className="h-4 w-4" />}
             />
-            <StatCard label="WhatsApp sent" value={num(t.whatsappMessages)} hint={`${inr(t.whatsappCostInr)} at ${inr(data.rates.whatsappMessageInr)} each`} icon={<MessageCircle className="h-4 w-4" />} />
             <StatCard label="Module launches" value={num(t.moduleLaunches)} hint="No direct cost" icon={<Blocks className="h-4 w-4" />} />
           </div>
           <p className="text-xs" style={{ color: 'var(--ink-muted)' }}>
@@ -411,7 +400,6 @@ export default function AdminUsagePage() {
                 { label: 'AI analyses', value: t.aiCostInr },
                 { label: 'AI reports', value: t.aiReportCostInr },
                 { label: 'Transcription', value: t.transcriptionCostInr },
-                { label: 'WhatsApp', value: t.whatsappCostInr },
                 { label: 'Hosting', value: t.fixed.hostingInr },
                 { label: 'Databases', value: t.fixed.databaseInr },
               ]}

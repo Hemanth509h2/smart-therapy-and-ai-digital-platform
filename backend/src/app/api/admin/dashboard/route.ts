@@ -98,11 +98,8 @@ export async function GET(request: Request) {
     }
 
     if (support) {
-      const [openTickets, failedMessages] = await Promise.all([
-        prisma.supportTicket.count({ where: { status: { not: 'RESOLVED' } } }),
-        prisma.whatsAppMessage.count({ where: { status: 'FAILED', updatedAt: { gte: weekAgo } } }),
-      ]);
-      result.support = { openTickets, failedMessages };
+      const openTickets = await prisma.supportTicket.count({ where: { status: { not: 'RESOLVED' } } });
+      result.support = { openTickets };
     }
 
     return NextResponse.json(result);

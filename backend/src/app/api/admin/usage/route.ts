@@ -5,7 +5,7 @@ import { requireAdmin } from '@/lib/http/apiAuth';
 import { startOfMonth } from '@/lib/admin/adminList';
 import { getSettings } from '@/lib/core/settings';
 import { ALL_MODULE_IDS, moduleName } from '@/lib/modules/modules';
-import { SENT_STATUSES, minutesBetween, round2, therapistStorage, usageCost, usageRange, usageRates } from '@/lib/admin/usage';
+import { minutesBetween, round2, therapistStorage, usageCost, usageRange, usageRates } from '@/lib/admin/usage';
 import { errorResponse } from '@/lib/http/apiError';
 
 export const dynamic = 'force-dynamic';
@@ -24,8 +24,7 @@ const TYPES = ['AI_ANALYSIS', 'TRANSCRIPTION', 'MODULE_LAUNCH'] as const;
 //    for the cost estimate are therefore the started→ended length of the
 //    sessions that logged a TRANSCRIPTION event.
 // The rest comes from the tables themselves: video minutes from sessions
-// started in the range, AI reports from SessionReport, WhatsApp from messages
-// sent, revenue from PAID Cashfree orders, storage from the size of each
+// started in the range, AI reports from SessionReport, revenue from PAID Cashfree orders, storage from the size of each
 // therapist's rows. Fixed hosting/database bills (Settings) count only in the
 // platform totals; a professional's netInr is revenue minus their usage cost.
 export async function GET(request: Request) {
@@ -68,7 +67,6 @@ export async function GET(request: Request) {
       transcribedSessions,
       heldSessions,
       reports,
-      whatsapp,
       clientCounts,
       storage,
     ] = await Promise.all([
@@ -114,11 +112,6 @@ export async function GET(request: Request) {
         select: { therapistId: true, startedAt: true, endedAt: true },
       }),
       prisma.sessionReport.groupBy({ by: ['therapistId'], where: { aiGenerated: true, generatedAt: { gte: since } }, _count: { _all: true } }),
-      prisma.whatsAppMessage.groupBy({
-        by: ['therapistId'],
-        where: { therapistId: { not: null }, status: { in: [...SENT_STATUSES] }, sentAt: { gte: since } },
-        _count: { _all: true },
-      }),
       // Clients either added directly by the therapist or seen in a session.
       prisma.$queryRaw<{ therapistId: string; n: number }[]>`
         SELECT "therapistId", count(DISTINCT "clientId")::int AS n FROM (
@@ -164,7 +157,6 @@ export async function GET(request: Request) {
       transcriptSegments: 0,
       transcriptionMinutes: 0,
       moduleLaunches: 0,
-      whatsappMessages: 0,
       payments: 0,
       revenueInr: 0,
     });
@@ -193,10 +185,6 @@ export async function GET(request: Request) {
     for (const g of reports) {
       const r = row(g.therapistId);
       if (r) r.aiReports = g._count._all;
-    }
-    for (const g of whatsapp) {
-      const r = row(g.therapistId);
-      if (r) r.whatsappMessages = g._count._all;
     }
     for (const g of clientCounts) {
       const r = row(g.therapistId);
@@ -245,14 +233,12 @@ export async function GET(request: Request) {
     const aiAnalyses = sumOf('AI_ANALYSIS');
     const videoMinutes = sum((p) => p.videoMinutes);
     const aiReports = sum((p) => p.aiReports);
-    const whatsappMessages = sum((p) => p.whatsappMessages);
 
     const costTotals = {
       aiCostInr: round2(aiAnalyses * rates.aiAnalysisInr),
       aiReportCostInr: round2(aiReports * rates.aiReportInr),
       transcriptionCostInr: round2(transcriptionMinutes * rates.transcriptionMinuteInr),
       videoCostInr: round2(videoMinutes * rates.videoMinuteInr),
-      whatsappCostInr: round2(whatsappMessages * rates.whatsappMessageInr),
     };
     const estCostInr = round2(Object.values(costTotals).reduce((a, b) => a + b, 0));
     const revenueInr = sum((p) => p.revenueInr);
@@ -289,7 +275,6 @@ export async function GET(request: Request) {
         transcriptSegments: sumOf('TRANSCRIPTION'),
         transcriptionMinutes,
         moduleLaunches: sumOf('MODULE_LAUNCH'),
-        whatsappMessages,
         storageBytes: sum((p) => p.storageBytes),
         revenueInr,
         estCostInr,

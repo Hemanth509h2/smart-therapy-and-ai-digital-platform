@@ -27,7 +27,7 @@ import {
   type PracticeSession,
 } from '@/lib/practice';
 import { apiFetch } from '@/lib/api';
-import { apiErrorMessage, caughtErrorMessage, toastWhatsApp } from '@/lib/apiError';
+import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
 import { whatsappLink } from '@/lib/whatsapp';
 import { MODULE_CATEGORIES, resolveAllowedModuleIds } from '@/lib/modules';
 
@@ -108,9 +108,8 @@ export function BookSessionDialog({
     if (when.getTime() < Date.now() - 60_000) return void toast('Pick a time in the future.', 'warning');
     setSaving(true);
     try {
-      const { session, whatsapp } = await createSession(profile.id, clientId, when, duration, true);
+      const { session } = await createSession(profile.id, clientId, when, duration, true);
       toast(`Session booked for ${fmtDayTime(when)}.`);
-      toastWhatsApp(whatsapp, fullName(clients.find((c) => c.id === clientId)), 'the booking confirmation');
       onOpenChange(false);
       onBooked?.(session);
     } catch (e) {
@@ -258,16 +257,14 @@ export function StartSessionDialog({
     setStarting(true);
     try {
       const id = existing?.id ?? (await createSession(profile.id, clientId, new Date())).session.id;
-      // Get (or create) the patient join link for this session first. The
-      // server also WhatsApps it to the client and says whether that worked.
+      // Get (or create) the patient join link for this session.
       const res = await apiFetch(`/api/sessions/${id}/guest-link`, { method: 'POST' });
       if (!res.ok) throw new Error(await apiErrorMessage(res, 'create the session link'));
       const data = await res.json().catch(() => ({}));
       setSessionId(id);
       setPatientLink(`${window.location.origin}/join/${data.token}`);
       setStarting(false);
-      toast('Session link is ready.');
-      toastWhatsApp(data.whatsapp, fullName(clients.find((c) => c.id === clientId)), 'the session link');
+      toast('Session link is ready. Send it to the client on WhatsApp or copy it.');
     } catch (e) {
       toast(caughtErrorMessage(e, 'start the session'), 'error');
       setStarting(false);
@@ -592,7 +589,7 @@ export function AddClientDialog({
           <Field label="Conditions" htmlFor="client-dx" hint="Separate with commas, e.g. Anxiety, ADHD">
             <input id="client-dx" className="ds-input" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} placeholder="Anxiety, ADHD" />
           </Field>
-          <Field label="WhatsApp number" htmlFor="client-phone" hint="Include the country code. The session link is sent here when you start the session.">
+          <Field label="WhatsApp number" htmlFor="client-phone" hint="Include the country code. Used for Send on WhatsApp when you share the session link.">
             <input
               id="client-phone"
               className="ds-input"

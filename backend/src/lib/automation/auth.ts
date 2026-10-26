@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { timingSafeEqual } from 'crypto'
-import { requireTherapist } from '@/lib/http/progressAuth'
 
 /** Constant-time string compare that tolerates different lengths. */
 export function safeEqual(a: string, b: string): boolean {
@@ -23,12 +22,4 @@ function hasValidKey(request: Request): boolean {
 export function rejectUnlessAutomation(request: Request): NextResponse | null {
   if (hasValidKey(request)) return null
   return NextResponse.json({ error: 'This endpoint needs a valid automation API key in the x-api-key header.' }, { status: 401 })
-}
-
-/** For /api/whatsapp/send: the automation key, or a logged-in therapist. */
-export async function requireAutomationOrTherapist(request: Request) {
-  if (hasValidKey(request)) return { ok: true as const, kind: 'service' as const }
-  const auth = await requireTherapist(request)
-  if (!auth.ok) return auth
-  return { ok: true as const, kind: 'therapist' as const, therapist: auth.therapist }
 }

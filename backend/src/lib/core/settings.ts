@@ -5,7 +5,6 @@ import { appDb } from '@/lib/core/db';
 export const SETTING_DEFAULTS = {
   'features.aiInsights': true,
   'features.transcription': true,
-  'features.whatsapp': true,
   // Therapists request a plan (with any coupon), an admin approves it, then
   // they pay. Off: they pay at once. A ₹0 total never goes to Cashfree.
   'billing.approvalBeforePayment': true,
@@ -16,7 +15,6 @@ export const SETTING_DEFAULTS = {
   'costs.transcriptionMinuteInr': 0.5,
   'costs.aiReportInr': 5,
   'costs.videoMinuteInr': 0.25, // per session minute, all participants together
-  'costs.whatsappMessageInr': 0.12,
   'usage.alertMonthlyAnalyses': 500,
   // Fixed monthly bills (INR), added to platform totals on the Usage page.
   'costs.hostingMonthlyInr': 0,

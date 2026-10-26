@@ -4,7 +4,7 @@ import { appUrl } from '@/lib/core/app-url'
 import { errorResponse } from '@/lib/http/apiError'
 import { rejectUnlessAutomation } from '@/lib/automation/auth'
 import { joinLinkMessage } from '@/lib/automation/messages'
-import { getOrCreateGuestInvite } from '@/lib/sessions/session-whatsapp'
+import { getOrCreateGuestInvite } from '@/lib/sessions/guest-invite'
 
 export const dynamic = 'force-dynamic'
 

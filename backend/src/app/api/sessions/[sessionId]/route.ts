@@ -4,7 +4,6 @@ import { withTherapists } from '@/lib/core/links';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { provisionSessionDocs } from '@/lib/sessions/session-provisioning';
 import { markSessionEnded } from '@/lib/sessions/session-provisioning';
-import { sendSessionLinkWhatsApp } from '@/lib/sessions/session-whatsapp';
 import { errorResponse } from '@/lib/http/apiError';
 
 // GET /api/sessions/[sessionId] — fetch a single session (with client + therapist).
@@ -161,13 +160,6 @@ export async function PATCH(
       }),
     ]);
 
-    // Send the patient join link when the session starts. Skipped if the
-    // "Start a new session" dialog already sent it for this session.
-    const whatsapp =
-      finalAction === 'start' && session.status === 'ACTIVE'
-        ? await sendSessionLinkWhatsApp(session.id, request)
-        : undefined;
-
     // When the therapist ends the call, expire the invite link(s) that led to
     // this client so the link can never be used to rejoin after the session,
     // and flag the room as ended so the other participant's screen exits too.
@@ -188,7 +180,7 @@ export async function PATCH(
       }
     }
 
-    return NextResponse.json({ session, whatsapp });
+    return NextResponse.json({ session });
   } catch (error: any) {
     return errorResponse(error, 'Session PATCH error');
   }

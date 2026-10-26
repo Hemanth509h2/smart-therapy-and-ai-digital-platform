@@ -19,7 +19,6 @@ Monorepo with three deployables that talk **only over HTTP/WebSocket**:
 │   │   ├── progress/         #   progress measurement + reports
 │   │   ├── ai/rag/           #   in-call copilot (retrieval, safety, prompt, ingest)
 │   │   ├── ai/report/        #   end-of-session report generation (OpenRouter)
-│   │   ├── messaging/        #   WhatsApp Cloud API + bot
 │   │   └── automation/       #   n8n automation endpoints' logic
 │   ├── prisma/               # DB schema + migrations
 │   ├── scripts/              # seed/, maintenance/, checks/ (RAG/provider smoke tests), reports/

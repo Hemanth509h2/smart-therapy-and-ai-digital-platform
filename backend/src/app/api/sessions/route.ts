@@ -3,7 +3,6 @@ import { prisma, appDb } from '@/lib/core/db';
 import { therapistIdForUser, withTherapists } from '@/lib/core/links';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { requireAuth } from '@/lib/http/apiAuth';
-import { sendSessionBookedWhatsApp } from '@/lib/sessions/session-whatsapp';
 import { errorResponse, notYourProfile } from '@/lib/http/apiError';
 
 // The caller must own the referenced therapist/client profile or be an ADMIN.
@@ -114,11 +113,7 @@ export async function POST(request: Request) {
     });
     const [session] = await withTherapists([created]);
 
-    // A booking gets a date/time confirmation (no link). Instant sessions get
-    // nothing here — the join link is sent when the session is started.
-    const whatsapp = booking ? await sendSessionBookedWhatsApp(session.id) : undefined;
-
-    return NextResponse.json({ session, whatsapp });
+    return NextResponse.json({ session });
   } catch (error: any) {
     return errorResponse(error, 'Session creation error');
   }

@@ -94,11 +94,6 @@ function integrationStatus() {
       configured: !!(env.CASHFREE_APP_ID && env.CASHFREE_SECRET_KEY),
       mode: cashfreeEnv === 'production' || cashfreeEnv === 'prod' ? 'production' : cashfreeEnv ? 'sandbox' : null,
     },
-    whatsapp: {
-      bot: !!(env.WHATSAPP_BOT_URL && env.WHATSAPP_BOT_SECRET),
-      cloudApi: !!(env.WHATSAPP_ACCESS_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID),
-      twilio: !!(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN),
-    },
     smtp: { configured: !!(env.SMTP_USER && env.SMTP_PASS) },
     livekit: { configured: !!(env.LIVEKIT_API_KEY && env.LIVEKIT_API_SECRET) },
     transcription: { configured: !!env.STT_TOKEN_SECRET },

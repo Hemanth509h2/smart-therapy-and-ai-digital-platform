@@ -7,7 +7,6 @@ import type { Settings } from '@/lib/core/settings';
 // null = all time. The daily charts never go back further than a year.
 export const USAGE_RANGES: Record<string, number | null> = { '7d': 7, '30d': 30, '90d': 90, '365d': 365, all: null };
 export const MAX_SERIES_DAYS = 365;
-export const SENT_STATUSES = ['SENT', 'DELIVERED', 'READ'] as const;
 
 export function usageRange(sp: URLSearchParams) {
   const key = (sp.get('range') || '') in USAGE_RANGES ? sp.get('range')! : '30d';
@@ -22,7 +21,6 @@ export function usageRates(settings: Settings) {
     transcriptionMinuteInr: settings['costs.transcriptionMinuteInr'],
     aiReportInr: settings['costs.aiReportInr'],
     videoMinuteInr: settings['costs.videoMinuteInr'],
-    whatsappMessageInr: settings['costs.whatsappMessageInr'],
   };
 }
 export type UsageRates = ReturnType<typeof usageRates>;
@@ -32,7 +30,6 @@ export interface UsageCounts {
   aiReports: number;
   transcriptionMinutes: number;
   videoMinutes: number;
-  whatsappMessages: number;
 }
 
 export function usageCost(u: UsageCounts, rates: UsageRates) {
@@ -41,7 +38,6 @@ export function usageCost(u: UsageCounts, rates: UsageRates) {
     aiReportInr: round2(u.aiReports * rates.aiReportInr),
     transcriptionInr: round2(u.transcriptionMinutes * rates.transcriptionMinuteInr),
     videoInr: round2(u.videoMinutes * rates.videoMinuteInr),
-    whatsappInr: round2(u.whatsappMessages * rates.whatsappMessageInr),
   };
   return { cost, estCostInr: round2(Object.values(cost).reduce((a, b) => a + b, 0)) };
 }

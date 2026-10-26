@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Blocks, Brain, Database, FileText, IndianRupee, MessageCircle, Mic, TrendingUp, User, Users, Video } from 'lucide-react';
+import { ArrowLeft, Blocks, Brain, Database, FileText, IndianRupee, Mic, TrendingUp, User, Users, Video } from 'lucide-react';
 import {
   AdminPage,
   Badge,
@@ -28,7 +28,6 @@ interface Cost {
   aiReportInr: number;
   transcriptionInr: number;
   videoInr: number;
-  whatsappInr: number;
 }
 
 interface SessionRow {
@@ -59,7 +58,7 @@ interface PaymentRow {
 
 interface ProfessionalUsage {
   range: { key: string; days: number | null; seriesDays: number };
-  rates: { aiAnalysisInr: number; transcriptionMinuteInr: number; aiReportInr: number; videoMinuteInr: number; whatsappMessageInr: number };
+  rates: { aiAnalysisInr: number; transcriptionMinuteInr: number; aiReportInr: number; videoMinuteInr: number };
   professional: {
     therapistId: string;
     name: string;
@@ -80,8 +79,6 @@ interface ProfessionalUsage {
     transcriptSegments: number;
     transcriptionMinutes: number;
     moduleLaunches: number;
-    whatsappMessages: number;
-    whatsappFailed: number;
     payments: number;
     revenueInr: number;
     storageBytes: number;
@@ -93,7 +90,6 @@ interface ProfessionalUsage {
   sessions: SessionRow[];
   sessionsTruncated: boolean;
   modules: { moduleId: string; name: string; launches: number }[];
-  whatsapp: { type: string; sent: number; failed: number }[];
   payments: PaymentRow[];
   storage: { table: string; rows: number; bytes: number }[];
 }
@@ -108,11 +104,6 @@ const RANGES = [
 
 const SESSION_TONE: Record<SessionRow['status'], Tone> = { COMPLETED: 'good', ACTIVE: 'info', SCHEDULED: 'neutral', CANCELLED: 'bad' };
 const PAYMENT_TONE: Record<string, Tone> = { PAID: 'good', ACTIVE: 'neutral', EXPIRED: 'warn', TERMINATED: 'bad' };
-const WHATSAPP_LABEL: Record<string, string> = {
-  CLIENT_INVITE: 'Client invites',
-  SESSION_SCHEDULED: 'Session scheduled',
-  SESSION_STARTED: 'Session started',
-};
 const SESSIONS_PAGE = 20;
 
 export default function ProfessionalUsagePage() {
@@ -185,12 +176,6 @@ export default function ProfessionalUsagePage() {
               hint={`${num(t.transcriptSegments)} segments · ${inr(t.cost.transcriptionInr)}`}
               icon={<Mic className="h-4 w-4" />}
             />
-            <StatCard
-              label="WhatsApp sent"
-              value={num(t.whatsappMessages)}
-              hint={`${inr(t.cost.whatsappInr)}${t.whatsappFailed ? ` · ${num(t.whatsappFailed)} failed` : ''}`}
-              icon={<MessageCircle className="h-4 w-4" />}
-            />
             <StatCard label="Module launches" value={num(t.moduleLaunches)} hint="No direct cost" icon={<Blocks className="h-4 w-4" />} />
           </div>
 
@@ -207,7 +192,6 @@ export default function ProfessionalUsagePage() {
                 { label: 'AI analyses', value: t.cost.aiAnalysisInr },
                 { label: 'AI reports', value: t.cost.aiReportInr },
                 { label: 'Transcription', value: t.cost.transcriptionInr },
-                { label: 'WhatsApp', value: t.cost.whatsappInr },
               ]}
             />
             <ChartCard title="Estimated cost per day" subtitle={seriesLabel} kind="bar" format={(n) => inr(n)} data={data.series.map((d) => ({ label: d.label, value: d.costInr }))} />
@@ -253,18 +237,6 @@ export default function ProfessionalUsagePage() {
               ) : (
                 <Card><p className="text-sm" style={{ color: 'var(--ink-muted)' }}>No modules launched in this period.</p></Card>
               )}
-            </Section>
-            <Section title="WhatsApp messages" description={`${rangeLabel} · ${inr(data.rates.whatsappMessageInr)} per message sent`}>
-              <DataTable<{ type: string; sent: number; failed: number }>
-                rows={data.whatsapp}
-                rowKey={(r) => r.type}
-                empty="No WhatsApp messages in this period."
-                columns={[
-                  { key: 'type', header: 'Message', render: (r) => WHATSAPP_LABEL[r.type] ?? r.type },
-                  { key: 'sent', header: 'Sent', align: 'right', className: 'tabular-nums', render: (r) => num(r.sent) },
-                  { key: 'failed', header: 'Failed', align: 'right', className: 'tabular-nums', render: (r) => (r.failed ? <Badge tone="bad">{num(r.failed)}</Badge> : '0') },
-                ]}
-              />
             </Section>
           </div>
 

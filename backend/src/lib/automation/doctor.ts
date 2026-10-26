@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { appDb } from '@/lib/core/db'
-import { normalizeWhatsAppNumber } from '@/lib/messaging/whatsapp-cloud-api'
+import { normalizePhoneNumber } from '@/lib/core/phone'
 import { PublicError } from '@/lib/http/apiError'
 import { rejectUnlessAutomation } from './auth'
 
@@ -54,7 +54,7 @@ export async function requireDoctorByPhone(request: Request) {
 
   let normalized: string
   try {
-    normalized = normalizeWhatsAppNumber(phone)
+    normalized = normalizePhoneNumber(phone)
   } catch (e) {
     const status = e instanceof PublicError ? e.status : 400
     return { ok: false as const, response: NextResponse.json({ error: 'phone is not a valid number' }, { status }) }

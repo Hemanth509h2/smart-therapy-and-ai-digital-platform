@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { AlertTriangle, CalendarClock, Inbox, MessageSquareWarning, Users, Video, CreditCard, UserCheck } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Inbox, Users, Video, CreditCard, UserCheck } from 'lucide-react';
 import { AdminPage, Badge, Card, EmptyState, ErrorBanner, Section, Spinner, StatCard, useAdminQuery } from '@/components/admin/kit';
 import { ChartCard, type Point } from '@/components/admin/charts';
 import { fmtDate, fmtDateTime, inr, num } from '@/lib/adminApi';
@@ -10,7 +10,7 @@ import { fmtDate, fmtDateTime, inr, num } from '@/lib/adminApi';
 interface Dashboard {
   people?: { therapists: number; activeTherapists: number; clients: number; sessionsToday: number; sessionsMonth: number; openRiskFlags: number };
   billing?: { subscribed: number; listMrr: number; pendingRequests: number };
-  support?: { openTickets: number; failedMessages: number };
+  support?: { openTickets: number };
   signupsWeekly?: Point[];
   sessionsDaily?: Point[];
   planMix?: Point[];
@@ -89,14 +89,6 @@ function NeedsAttention({ data }: { data: Dashboard }) {
   }
   if (data.support?.openTickets) {
     items.push({ key: 'tickets', icon: <Inbox className="h-4 w-4" />, text: `${data.support.openTickets} open support ticket${data.support.openTickets === 1 ? '' : 's'}`, href: '/admin/support' });
-  }
-  if (data.support?.failedMessages) {
-    items.push({
-      key: 'wa',
-      icon: <MessageSquareWarning className="h-4 w-4" />,
-      text: `${data.support.failedMessages} WhatsApp message${data.support.failedMessages === 1 ? '' : 's'} failed this week`,
-      href: '/admin/messages?status=FAILED',
-    });
   }
 
   return (

@@ -49,7 +49,7 @@ import { ModuleContent } from '@/components/GlassModulePanel';
 import { apiFetch } from '@/lib/api';
 import ErrorScreen from '@/components/ErrorScreen';
 import { toast } from '@/components/practice/ui';
-import { apiErrorMessage, caughtErrorMessage, toastWhatsApp } from '@/lib/apiError';
+import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
 
 // Automatic AI suggestions: how often the copilot re-checks the call (when
 // something new was said), and how often that condition is looked at. The
@@ -521,14 +521,6 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
         if (res.status === 402) {
           setPlanBlocked(true);
           return;
-        }
-        // Starting the room WhatsApps the join link to the client (unless the
-        // Start dialog already did); tell the therapist whether it went out.
-        if (res.ok && isTherapist) {
-          const data = await res.clone().json().catch(() => null);
-          if (data?.whatsapp && data.whatsapp.status !== 'ALREADY_SENT') {
-            toastWhatsApp(data.whatsapp, data.session?.client?.firstName ?? '', 'the session link');
-          }
         }
       } catch {
         // Provisioning failure is surfaced by the participant write below

@@ -18,7 +18,6 @@ interface SettingRow {
 }
 interface Integrations {
   cashfree: { configured: boolean; mode: string | null };
-  whatsapp: { bot: boolean; cloudApi: boolean; twilio: boolean };
   smtp: { configured: boolean };
   livekit: { configured: boolean };
   transcription: { configured: boolean };
@@ -33,7 +32,6 @@ const GROUPS: { title: string; description: string; fields: { key: string; label
     fields: [
       { key: 'features.aiInsights', label: 'AI insights during sessions' },
       { key: 'features.transcription', label: 'Live transcription', hint: 'When off, new transcription connections are refused.' },
-      { key: 'features.whatsapp', label: 'WhatsApp messages' },
     ],
   },
   {
@@ -65,7 +63,6 @@ const GROUPS: { title: string; description: string; fields: { key: string; label
       { key: 'costs.transcriptionMinuteInr', label: 'Cost per transcription minute', unit: '₹' },
       { key: 'costs.aiReportInr', label: 'Cost per AI session report', unit: '₹' },
       { key: 'costs.videoMinuteInr', label: 'Cost per video session minute', unit: '₹', hint: 'For the whole call, all participants together.' },
-      { key: 'costs.whatsappMessageInr', label: 'Cost per WhatsApp message sent', unit: '₹' },
       { key: 'usage.alertMonthlyAnalyses', label: 'Flag professionals above', unit: 'AI analyses / month' },
     ],
   },
@@ -175,9 +172,6 @@ export default function AdminSettingsPage() {
               <KV
                 items={[
                   { label: 'Payments (Cashfree)', value: <Configured ok={data.integrations.cashfree.configured} extra={data.integrations.cashfree.mode ? `${data.integrations.cashfree.mode} mode` : undefined} /> },
-                  { label: 'WhatsApp bot', value: <Configured ok={data.integrations.whatsapp.bot} /> },
-                  { label: 'WhatsApp Cloud API', value: <Configured ok={data.integrations.whatsapp.cloudApi} /> },
-                  { label: 'Twilio', value: <Configured ok={data.integrations.whatsapp.twilio} /> },
                   { label: 'Email (SMTP)', value: <Configured ok={data.integrations.smtp.configured} /> },
                   { label: 'Video (LiveKit)', value: <Configured ok={data.integrations.livekit.configured} /> },
                   { label: 'Transcription relay token', value: <Configured ok={data.integrations.transcription.configured} /> },
