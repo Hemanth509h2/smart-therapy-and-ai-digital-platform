@@ -302,7 +302,7 @@ async def main():
     async with make_server(port) as server:
         print(f"> AI service ready on http://localhost:{port} (STT WebSocket at /sarvam-stream, "
               f"call-plan agent at /call-plan)", flush=True)
-        await server.serve_forever()
+        await server.serve_forever() 
 
 
 if __name__ == "__main__":
