@@ -1,0 +1,79 @@
+import { Router } from 'express';
+import nodemailer from 'nodemailer';
+import type { Prisma } from '@prisma/client';
+import { prisma } from '@/lib/core/db';
+import { requireAdmin, requireRecentLogin } from '@/lib/http/apiAuth';
+import { audit } from '@/lib/admin/audit';
+import { errorResponse } from '@/lib/http/apiError';
+import { handle, send } from '@/lib/http/reply';
+
+export const router = Router();
+
+// ---- /api/admin/messages/broadcast ---------------------------------------------
+
+const BATCH = 50;
+
+const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// POST /api/admin/messages/broadcast { audience: 'therapists'|'all', subject, body, dryRun? }
+// Emails an announcement to every active user in the audience, BCC'd in
+// batches of 50. dryRun returns the recipient count without sending.
+router.post('/admin/messages/broadcast', handle(async (req, res) => {
+  try {
+    const auth = await requireAdmin(req, 'support');
+    if (!auth.ok) return send(res, auth.response);
+
+    const body = req.body;
+    const audience = body.audience === 'all' ? 'all' : body.audience === 'therapists' ? 'therapists' : null;
+    const subject = typeof body.subject === 'string' ? body.subject.trim().slice(0, 200) : '';
+    const text = typeof body.body === 'string' ? body.body.trim().slice(0, 20_000) : '';
+    const dryRun = body.dryRun === true;
+    if (!audience) return res.status(400).json({ error: 'Choose who should receive this broadcast.' });
+
+    // Guest / placeholder accounts use *.local addresses that can't receive mail.
+    const where: Prisma.UserWhereInput = {
+      status: 'ACTIVE',
+      role: audience === 'therapists' ? 'THERAPIST' : { in: ['THERAPIST', 'CLIENT'] },
+      NOT: { email: { endsWith: '.local' } },
+    };
+
+    if (dryRun) {
+      const recipients = await prisma.user.count({ where });
+      return res.json({ dryRun: true, audience, recipients });
+    }
+
+    if (!subject || !text) return res.status(400).json({ error: 'Enter a subject and a message.' });
+    const stepUp = requireRecentLogin(auth);
+    if (stepUp) return send(res, stepUp);
+
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+    if (!user || !pass) return res.status(503).json({ error: "Email isn't set up on the server yet, so nothing was sent. Ask whoever manages hosting to set it up." });
+    const port = Number(process.env.SMTP_PORT || 587);
+    const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST || 'smtp.gmail.com', port, secure: port === 465, auth: { user, pass } });
+    const from = process.env.SMTP_FROM || `STAAD <${user}>`;
+
+    const emails = (await prisma.user.findMany({ where, select: { email: true } })).map((u) => u.email);
+    const html = `<div style="font-family:system-ui,Arial,sans-serif;color:#1f2937;line-height:1.5;white-space:pre-wrap">${escapeHtml(text)}</div>`;
+
+    let sent = 0;
+    const failures: string[] = [];
+    for (let i = 0; i < emails.length; i += BATCH) {
+      const bcc = emails.slice(i, i + BATCH);
+      try {
+        await transporter.sendMail({ from, to: from, bcc, subject, text, html });
+        sent += bcc.length;
+      } catch (e: any) {
+        console.error(`Broadcast batch ${i / BATCH + 1} failed:`, e?.message);
+        failures.push(`batch ${i / BATCH + 1}: ${e?.message || 'send failed'}`);
+      }
+    }
+
+    await audit(req, auth, 'broadcast.send', { type: 'Broadcast' }, {
+      after: { audience, subject, recipients: emails.length, sent, failedBatches: failures.length },
+    });
+    return res.json({ ok: failures.length === 0, audience, recipients: emails.length, sent, failures });
+  } catch (e: any) {
+    return send(res, errorResponse(e, 'POST /api/admin/messages/broadcast failed', "We couldn't send the broadcast. Please try again."));
+  }
+}));

@@ -1,0 +1,48 @@
+{
+  "name": "staad-backend-express",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/server.js",
+  "scripts": {
+    "db:generate": "prisma generate && prisma generate --schema prisma/app/schema.prisma",
+    "predev": "npm run db:generate",
+    "dev": "tsx watch src/server.ts",
+    "build": "npm run db:generate && tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
+    "postinstall": "npm run db:generate",
+    "start": "node dist/server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "seed:admin": "node --env-file=.env scripts/seed/seed-admin.cjs",
+    "seed:plans": "node --env-file=.env scripts/seed/seed-plans.cjs",
+    "emulators": "firebase emulators:start --only firestore --project staad-rules-test",
+    "rules:backfill-claims": "node --env-file=.env scripts/maintenance/backfill-role-claims.mjs",
+    "rules:deploy": "firebase deploy --only firestore:rules"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "firebase-admin": "^13.10.0",
+    "jspdf": "^4.2.1",
+    "livekit-server-sdk": "^2.15.3",
+    "nodemailer": "^8.0.11",
+    "undici": "^6.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^20.19.41",
+    "@types/nodemailer": "^8.0.1",
+    "firebase-tools": "^15.28.1",
+    "livekit-client": "^2.19.0",
+    "prisma": "^6.19.3",
+    "tsc-alias": "^1.8.10",
+    "tsx": "^4.22.4",
+    "typescript": "^5"
+  },
+  "allowScripts": {
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "esbuild@0.28.2": true,
+    "prisma@6.19.3": true,
+    "protobufjs@7.6.6": true
+  }
+}

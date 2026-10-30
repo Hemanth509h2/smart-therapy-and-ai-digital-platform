@@ -1,0 +1,380 @@
+// HIPAA database (paid Neon account, DATABASE_URL_2): patient data and
+// anything that may contain it. Therapist, admin, billing and settings tables
+// live in the app database (prisma/app/schema.prisma). Links between the two
+// are plain id columns (therapistId, userId) with no foreign key, so look the
+// other side up with the other client.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL_2")
+  extensions = [vector]
+}
+
+enum Role {
+  THERAPIST
+  CLIENT
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum SessionStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum InviteStatus {
+  PENDING
+  CLAIMED
+  EXPIRED
+}
+
+enum WhatsAppMessageStatus {
+  PENDING
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  SKIPPED
+}
+
+enum WhatsAppMessageType {
+  CLIENT_INVITE
+  SESSION_SCHEDULED
+  SESSION_STARTED
+}
+
+enum TicketStatus {
+  OPEN
+  PENDING // waiting on the user
+  RESOLVED
+}
+
+model User {
+  id            String     @id // Firebase Auth UID
+  email         String     @unique
+  role          Role       @default(CLIENT)
+  // Admin-controlled. SUSPENDED users are rejected by requireAuth.
+  status        UserStatus @default(ACTIVE)
+  suspendedAt   DateTime?
+  suspendReason String?
+  lastSeenAt    DateTime? // last authenticated API call (throttled)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  client    ProfileClient?
+}
+
+model ProfileClient {
+  id               String            @id @default(uuid())
+  userId           String            @unique
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName        String
+  lastName         String
+  dateOfBirth      DateTime
+  gender           String?
+  diagnosis        String[]
+  parentEmail      String?
+  phoneNumber      String? // E.164; used as the patient's WhatsApp recipient
+  therapistId      String? // set when the therapist adds the client directly
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  bookings         Booking[]
+  sessions         Session[]
+  claimedInvites   Invite[]          @relation("ClaimedInvite")
+  whatsAppMessages WhatsAppMessage[]
+
+  progressMetrics ProgressMetric[]
+  progressReports ProgressReport[]
+  progressNotes   ProgressNote[]
+
+  @@index([therapistId])
+}
+
+model Invite {
+  id               String            @id @default(uuid())
+  token            String            @unique
+  therapistId      String
+  firstName        String
+  lastName         String
+  diagnosis        String[]
+  phoneNumber      String? // E.164; retained after claim for delivery audit
+  scheduledAt      DateTime          @default(now())
+  status           InviteStatus      @default(PENDING)
+  claimedClientId  String?
+  createdAt        DateTime          @default(now())
+  expiresAt        DateTime?
+  claimedClient    ProfileClient?    @relation("ClaimedInvite", fields: [claimedClientId], references: [id])
+  whatsAppMessages WhatsAppMessage[]
+
+  @@index([therapistId])
+  @@index([claimedClientId])
+}
+
+model Booking {
+  id          String           @id @default(uuid())
+  therapistId String
+  clientId    String
+  client      ProfileClient    @relation(fields: [clientId], references: [id])
+  dateTime    DateTime
+  duration    Int              @default(50) // duration in minutes
+  status      String           @default("pending") // pending, confirmed, cancelled
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([therapistId, dateTime])
+  @@index([clientId, dateTime])
+}
+
+model Session {
+  id                 String           @id @default(uuid())
+  therapistId        String
+  clientId           String
+  client             ProfileClient    @relation(fields: [clientId], references: [id])
+  status             SessionStatus    @default(SCHEDULED)
+  scheduledAt        DateTime
+  startedAt          DateTime?
+  endedAt            DateTime?
+  confirmedByPatient Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  notes            TherapistNote[]
+  report           SessionReport?
+  whatsAppMessages WhatsAppMessage[]
+
+  @@index([therapistId, scheduledAt])
+  @@index([clientId, scheduledAt])
+}
+
+// End-of-session AI clinical report. One per session. Generated from the full
+// transcript + in-session module activity + therapist's in-call notes, then
+// editable by the therapist. `visibleToClient` is false for now (therapist-only)
+// but lets us expose reports to clients later without a schema change.
+model SessionReport {
+  id                String    @id @default(uuid())
+  sessionId         String    @unique
+  session           Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  therapistId       String
+  clientId          String
+  content           String // report body (Markdown, English) — editable by therapist
+  language          String    @default("en")
+  model             String? // which LLM produced the draft
+  aiGenerated       Boolean   @default(true)
+  editedByTherapist Boolean   @default(false)
+  editedAt          DateTime?
+  visibleToClient   Boolean   @default(false)
+  generatedAt       DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([therapistId])
+  @@index([clientId])
+}
+
+model TherapistNote {
+  id          String           @id @default(uuid())
+  sessionId   String
+  session     Session          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  therapistId String
+  content     String // Calming notes, clinical progress logs
+  isPrivate   Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+// A single quantitative data point tracked for a client over time
+// (e.g. mood score, anxiety level, focus score, engagement %). Can
+// optionally be tied to the session it was recorded during.
+model ProgressMetric {
+  id          String           @id @default(uuid())
+  clientId    String
+  client      ProfileClient    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  therapistId String
+  sessionId   String? // optional link to the Session this was recorded in (no FK, mirrors UsageEvent)
+  metricType  String // e.g. MOOD_SCORE, ANXIETY_LEVEL, FOCUS_SCORE, ENGAGEMENT
+  value       Float
+  unit        String? // e.g. "scale_1_10", "%"
+  notes       String?
+  recordedAt  DateTime         @default(now())
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([clientId])
+  @@index([therapistId])
+  @@index([metricType])
+}
+
+// A periodic, therapist-authored progress report for a client, built from
+// a summary plus a snapshot of the metrics over the reporting period.
+model ProgressReport {
+  id              String           @id @default(uuid())
+  clientId        String
+  client          ProfileClient    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  therapistId     String
+  title           String           @default("Progress Report")
+  periodStart     DateTime
+  periodEnd       DateTime
+  summary         String // narrative summary written/edited by the therapist
+  metricsSnapshot Json             @default("{}") // aggregated metric values captured at generation time
+  status          String           @default("DRAFT") // DRAFT | FINAL
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  progressNotes ProgressNote[]
+
+  @@index([clientId])
+  @@index([therapistId])
+}
+
+// Free-text therapist notes about a client's progress. Independent of
+// TherapistNote (which is scoped to a single session) — these are scoped to
+// the client's overall progress tracking and can optionally attach to a
+// specific ProgressReport.
+model ProgressNote {
+  id          String           @id @default(uuid())
+  reportId    String?
+  report      ProgressReport?  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  clientId    String
+  client      ProfileClient    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  therapistId String
+  content     String
+  isPrivate   Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([clientId])
+  @@index([reportId])
+}
+
+// AI risk flags (self-harm / violence) raised during a session, persisted so
+// an admin can confirm someone followed up.
+model RiskFlag {
+  id             String    @id @default(uuid())
+  sessionId      String
+  therapistId    String? // ProfileTherapist.id
+  level          String // watch | urgent
+  detail         String?
+  raisedAt       DateTime  @default(now())
+  acknowledgedAt DateTime?
+  acknowledgedBy String? // admin uid
+  note           String?
+
+  @@index([acknowledgedAt])
+  @@index([sessionId])
+}
+
+model DocumentChunk {
+  id          String                       @id @default(uuid())
+  therapistId String                       @map("therapist_id")
+  sessionId   String?                      @map("session_id")
+  fileName    String                       @map("file_name")
+  chunkIndex  Int                          @map("chunk_index")
+  chunkText   String                       @map("chunk_text")
+  embedding   Unsupported("vector(1024)")?
+  createdAt   DateTime                     @default(now()) @map("created_at")
+  metadata    Json                         @default("{}")
+
+  @@index([therapistId])
+  @@map("document_chunks")
+}
+
+model WhatsAppMessage {
+  id                String                @id
+  inviteId          String?
+  sessionId         String?
+  clientId          String?
+  therapistId       String?
+  phoneNumber       String
+  generatedLink     String
+  messageType       WhatsAppMessageType   @default(CLIENT_INVITE)
+  status            WhatsAppMessageStatus @default(PENDING)
+  providerMessageId String?               @unique
+  errorCode         String?
+  errorMessage      String?
+  attempts          Int                   @default(0)
+  lastAttemptAt     DateTime?
+  nextAttemptAt     DateTime?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  providerStatusAt  DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime
+  invite            Invite?               @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  session           Session?              @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  client            ProfileClient?        @relation(fields: [clientId], references: [id])
+
+  // Nullable columns don't collide under Postgres uniqueness (NULL != NULL),
+  // so CLIENT_INVITE rows (inviteId set, sessionId null) and
+  // SESSION_SCHEDULED rows (sessionId set, inviteId null) each get their own
+  // effective dedup constraint from these two indexes.
+  @@unique([inviteId, messageType])
+  @@unique([sessionId, messageType])
+  @@index([clientId])
+  @@index([therapistId])
+  @@index([status, nextAttemptAt])
+}
+
+model SupportTicket {
+  id          String         @id @default(uuid())
+  ref         String         @unique // STAAD-XXXX shown to the user
+  userId      String? // Firebase uid when signed in
+  name        String?
+  email       String
+  role        String?
+  category    String
+  subject     String
+  message     String
+  status      TicketStatus   @default(OPEN)
+  assigneeUid String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  replies     SupportReply[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SupportReply {
+  id          String        @id @default(uuid())
+  ticketId    String
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorUid   String
+  authorEmail String?
+  body        String
+  internal    Boolean       @default(false) // internal note, not emailed
+  emailed     Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+
+  @@index([ticketId])
+}
+
+// Append-only record of every admin mutation and PHI reveal. Never updated
+// or deleted by the app.
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorUid   String
+  actorEmail String?
+  action     String // e.g. 'plan.update', 'user.suspend', 'phi.reveal'
+  targetType String // e.g. 'Plan', 'User', 'Subscription'
+  targetId   String?
+  before     Json?
+  after      Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorUid])
+  @@index([targetType, targetId])
+}

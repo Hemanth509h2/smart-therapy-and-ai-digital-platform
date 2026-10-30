@@ -1,0 +1,116 @@
+import { Router } from 'express';
+import { prisma, appDb } from '@/lib/core/db';
+import { requireAdmin } from '@/lib/http/apiAuth';
+import { ALL_MODULE_IDS } from '@/lib/modules/modules';
+import { normalizePhoneNumber } from '@/lib/core/phone';
+import { errorResponse } from '@/lib/http/apiError';
+import { usersById } from '@/lib/core/links';
+import { handle, send } from '@/lib/http/reply';
+
+export const router = Router();
+
+// ---- /api/admin/overview -------------------------------------------------------
+
+// A malformed stored number must not break the whole overview.
+function toE164(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    return normalizePhoneNumber(raw);
+  } catch {
+    return null;
+  }
+}
+
+// GET /api/admin/overview — per-therapist resource usage for the admin dashboard.
+router.get('/admin/overview', handle(async (req, res) => {
+  try {
+    const auth = await requireAdmin(req, 'people.read');
+    if (!auth.ok) return send(res, auth.response);
+    const therapists = await appDb.profileTherapist.findMany({
+      orderBy: { createdAt: 'asc' },
+    });
+    const users = await usersById(therapists.map((t) => t.userId), { email: true });
+
+    const rows = await Promise.all(
+      therapists.map(async (t) => {
+        const [sessions, clientGroups, invites, docCount, usage, moduleUsage] = await Promise.all([
+          prisma.session.findMany({
+            where: { therapistId: t.id },
+            select: { status: true, startedAt: true, endedAt: true, updatedAt: true },
+          }),
+          prisma.session.findMany({
+            where: { therapistId: t.id },
+            select: { clientId: true },
+            distinct: ['clientId'],
+          }),
+          prisma.invite.groupBy({ by: ['status'], where: { therapistId: t.id }, _count: true }),
+          prisma.documentChunk.count({ where: { therapistId: t.id } }),
+          appDb.usageEvent.groupBy({ by: ['type'], where: { therapistId: t.id }, _sum: { count: true } }),
+          appDb.usageEvent.groupBy({
+            by: ['label'],
+            where: { therapistId: t.id, type: 'MODULE_LAUNCH' },
+            _sum: { count: true },
+          }),
+        ]);
+
+        const total = sessions.length;
+        const active = sessions.filter((s) => s.status === 'ACTIVE').length;
+        const completed = sessions.filter((s) => s.status === 'COMPLETED').length;
+        const scheduled = sessions.filter((s) => s.status === 'SCHEDULED').length;
+
+        let totalMinutes = 0;
+        let lastActive: Date | null = null;
+        for (const s of sessions) {
+          if (s.startedAt && s.endedAt) {
+            totalMinutes += Math.max(0, (s.endedAt.getTime() - s.startedAt.getTime()) / 60000);
+          }
+          if (!lastActive || s.updatedAt > lastActive) lastActive = s.updatedAt;
+        }
+
+        const usageByType = (type: string) =>
+          usage.find((u) => u.type === type)?._sum.count ?? 0;
+
+        const invitesPending = invites.find((i) => i.status === 'PENDING')?._count ?? 0;
+        const invitesClaimed = invites.find((i) => i.status === 'CLAIMED')?._count ?? 0;
+
+        const topModules = moduleUsage
+          .map((m) => ({ id: m.label ?? 'unknown', count: m._sum.count ?? 0 }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+
+        return {
+          id: t.id,
+          userId: t.userId,
+          name: `${t.firstName} ${t.lastName}`.trim(),
+          firstName: t.firstName,
+          lastName: t.lastName,
+          phoneNumber: toE164(t.phoneNumber),
+          email: users.get(t.userId)?.email ?? '',
+          specialty: t.specialty,
+          clients: clientGroups.length,
+          sessions: { total, active, completed, scheduled },
+          totalMinutes: Math.round(totalMinutes),
+          invites: { pending: invitesPending, claimed: invitesClaimed },
+          documents: docCount,
+          ai: {
+            analyses: usageByType('AI_ANALYSIS'),
+            transcriptLines: usageByType('TRANSCRIPTION'),
+            moduleLaunches: usageByType('MODULE_LAUNCH'),
+          },
+          topModules,
+          access: {
+            allModulesAllowed: t.allModulesAllowed,
+            moduleAccess: t.moduleAccess,
+            allowedCount: t.allModulesAllowed ? ALL_MODULE_IDS.length : t.moduleAccess.length,
+            totalModules: ALL_MODULE_IDS.length,
+          },
+          lastActive,
+        };
+      })
+    );
+
+    return res.json({ therapists: rows });
+  } catch (error: any) {
+    return send(res, errorResponse(error, 'Admin overview error'));
+  }
+}));
