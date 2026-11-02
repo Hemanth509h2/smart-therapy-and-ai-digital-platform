@@ -56,7 +56,7 @@ html[data-theme="dark"] .staad-ui{
 
 .main{margin-left:calc(var(--side-w) + 48px);padding:20px 28px 56px 0;transition:margin .32s cubic-bezier(.2,.7,.2,1);}
 
-.wrap{max-width:1500px;display:flex;flex-direction:column;gap:26px;}
+.wrap{display:flex;flex-direction:column;gap:26px;}
 
 /* ---------- Sidebar ---------- */
 .sb{position:fixed;top:20px;bottom:20px;left:20px;width:var(--side-w);z-index:20;box-sizing:border-box;
@@ -128,7 +128,11 @@ html[data-theme="dark"] .staad-ui{
 .av--xxl{width:104px;height:104px;font-size:34px;font-weight:400;letter-spacing:.68px;}
 
 /* ---------- Top pill bar ---------- */
-.topbar{display:flex;align-items:center;gap:14px;}
+/* Sticks to the top while the page scrolls. The negative margins pull it into
+   .main's top padding and .wrap's gap, so at rest the layout is unchanged; the
+   padding + background keep scrolled content from showing around the pills. */
+.topbar{display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:15;
+  margin:-20px 0 -12px;padding:20px 0 12px;background:var(--bg);}
 
 .pill-bar{flex:1;min-width:0;height:68px;box-sizing:border-box;padding:8px;border-radius:999px;background:var(--pill);
   border:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:12px;}
