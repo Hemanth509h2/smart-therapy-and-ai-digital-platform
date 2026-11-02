@@ -125,8 +125,9 @@ model Subscription {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 
-  @@index([therapistId])
-  @@index([status])
+  @@index([therapistId, status, currentPeriodEnd])
+  @@index([status, currentPeriodEnd])
+  @@index([planId])
 }
 
 // A therapist's request to take/upgrade a plan, pending admin approval. Carries
@@ -154,7 +155,8 @@ model SubscriptionRequest {
   reviewedAt  DateTime?
   createdAt   DateTime         @default(now())
 
-  @@index([therapistId])
+  @@index([therapistId, status])
+  @@index([planId])
   @@index([status])
   @@index([couponId])
 }
@@ -194,7 +196,7 @@ model Payment {
   updatedAt      DateTime  @updatedAt
 
   @@index([userId])
-  @@index([orderStatus])
+  @@index([orderStatus, paidAt])
   @@index([therapistId])
   @@index([couponId])
   @@index([requestId])
@@ -245,8 +247,9 @@ model UsageEvent {
   count       Int              @default(1)
   createdAt   DateTime         @default(now())
 
-  @@index([therapistId])
-  @@index([type])
+  @@index([therapistId, createdAt])
+  @@index([type, createdAt])
+  @@index([createdAt])
 }
 
 // Admin-editable app settings (feature flags, retention, contact details).

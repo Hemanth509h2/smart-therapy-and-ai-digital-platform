@@ -74,6 +74,9 @@ model User {
   updatedAt     DateTime   @updatedAt
 
   client    ProfileClient?
+
+  @@index([role, createdAt])
+  @@index([lastSeenAt])
 }
 
 model ProfileClient {
@@ -118,7 +121,7 @@ model Invite {
   claimedClient    ProfileClient?    @relation("ClaimedInvite", fields: [claimedClientId], references: [id])
   whatsAppMessages WhatsAppMessage[]
 
-  @@index([therapistId])
+  @@index([therapistId, createdAt])
   @@index([claimedClientId])
 }
 
@@ -156,6 +159,9 @@ model Session {
 
   @@index([therapistId, scheduledAt])
   @@index([clientId, scheduledAt])
+  @@index([scheduledAt])
+  @@index([status, scheduledAt])
+  @@index([startedAt])
 }
 
 // End-of-session AI clinical report. One per session. Generated from the full
@@ -178,7 +184,8 @@ model SessionReport {
   generatedAt       DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  @@index([therapistId])
+  @@index([therapistId, generatedAt])
+  @@index([generatedAt])
   @@index([clientId])
 }
 
@@ -191,6 +198,9 @@ model TherapistNote {
   isPrivate   Boolean          @default(true)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
+
+  @@index([sessionId, createdAt])
+  @@index([therapistId, createdAt])
 }
 
 // A single quantitative data point tracked for a client over time
@@ -210,7 +220,7 @@ model ProgressMetric {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  @@index([clientId])
+  @@index([clientId, recordedAt])
   @@index([therapistId])
   @@index([metricType])
 }
@@ -233,7 +243,7 @@ model ProgressReport {
 
   progressNotes ProgressNote[]
 
-  @@index([clientId])
+  @@index([clientId, createdAt])
   @@index([therapistId])
 }
 
@@ -253,7 +263,8 @@ model ProgressNote {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  @@index([clientId])
+  @@index([clientId, createdAt])
+  @@index([therapistId])
   @@index([reportId])
 }
 
@@ -272,6 +283,7 @@ model RiskFlag {
 
   @@index([acknowledgedAt])
   @@index([sessionId])
+  @@index([therapistId])
 }
 
 model DocumentChunk {
@@ -344,6 +356,7 @@ model SupportTicket {
 
   @@index([status])
   @@index([createdAt])
+  @@index([userId])
 }
 
 model SupportReply {
@@ -377,4 +390,5 @@ model AuditLog {
   @@index([createdAt])
   @@index([actorUid])
   @@index([targetType, targetId])
+  @@index([action])
 }
