@@ -14,6 +14,15 @@ npm run build && npm start   # compiled: node dist/server.js
 npm run typecheck
 ```
 
+## Deploy to Vercel
+
+Set the Vercel project's **Root Directory** to `backend-express` and add the
+same environment variables as `.env`. `vercel.json` sets `framework: null`, so
+Vercel does not treat it as a Next.js app (the "No Next.js version detected"
+error), runs `npm run build`, and sends every request to `api/index.js`, which
+serves the compiled Express app from `dist/`. `public/` is an intentionally
+empty output directory.
+
 ## Layout
 
 ```
@@ -52,7 +61,8 @@ Each router declares its full path, so `GET /api/admin/users/:uid` lives in
 
 ## Differences from the Next.js backend
 
-- Scheduled jobs: `vercel.json` crons do not apply here. Call
+- Scheduled jobs: on Vercel, `vercel.json` runs them (with
+  `Authorization: Bearer $CRON_SECRET`). Elsewhere (Docker), call
   `GET /api/cleanup-transcripts` (daily 02:00) and `GET /api/cron/subscriptions`
   (daily 02:30) from any scheduler with `x-cron-secret: $CRON_SECRET`.
 - `.env` is loaded with dotenv (`.env` only, not `.env.local` /
