@@ -5,6 +5,7 @@ import { adminAuth } from '@/lib/core/firebaseAdmin';
 import { appDb, prisma } from '@/lib/core/db';
 import { can, type AdminPermission } from '@/lib/admin/adminRoles';
 import { logPath, queryParams, reply } from '@/lib/http/reply';
+import { markAuthenticated } from '@/lib/http/accessLog';
 
 /**
  * Verifies the Firebase ID token sent by the client in the
@@ -25,6 +26,8 @@ import { logPath, queryParams, reply } from '@/lib/http/reply';
 export async function requireAuth(request: Request) {
   const auth = await verifyIdentity(request);
   if (!auth.ok) return auth;
+  // Recorded in the security access log once the response is sent.
+  markAuthenticated(request, auth.uid);
   const blocked = await accountBlock(auth.uid);
   if (blocked) return { ok: false as const, response: blocked };
   return auth;
@@ -65,13 +68,31 @@ async function accountBlock(uid: string) {
   return null;
 }
 
+/**
+ * DEV-ONLY bypass: when AUTH_DISABLED=true in .env, token verification is
+ * skipped and identity is taken from the x-dev-uid header (sent by the
+ * frontend's apiFetch). Needed when the local network blocks Node's access to
+ * Google APIs.
+ *
+ * It would let anyone act as any user, so it is refused in production: when
+ * NODE_ENV is 'production' or the app runs on Vercel, the flag is ignored and
+ * an error is logged once.
+ */
+let bypassRefusalLogged = false;
+export function authBypassActive(): boolean {
+  if (process.env.AUTH_DISABLED !== 'true') return false;
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+    if (!bypassRefusalLogged) {
+      bypassRefusalLogged = true;
+      console.error('[auth] AUTH_DISABLED=true is ignored in production. Remove it from the environment.');
+    }
+    return false;
+  }
+  return true;
+}
+
 async function verifyIdentity(request: Request) {
-  // DEV-ONLY bypass: when AUTH_DISABLED=true in .env, token verification is
-  // skipped and identity is taken from the x-dev-uid header (sent by the
-  // frontend's apiFetch). Needed when the local network blocks Node's access
-  // to Google APIs. NEVER enable in production — routes then trust
-  // client-supplied identity again.
-  if (process.env.AUTH_DISABLED === 'true') {
+  if (authBypassActive()) {
     const uid = request.get('x-dev-uid') || queryParams(request).get('uid');
     const email = request.get('x-dev-email') ?? null;
     if (!uid) {
@@ -194,7 +215,7 @@ function rateLimited(uid: string) {
  * Step-up check for destructive admin actions (removing admins, suspending
  * accounts, refunds): the admin must have signed in within `maxAgeMinutes`.
  * The frontend answers REAUTH_REQUIRED by asking for the password again.
- * Skipped under AUTH_DISABLED (no token to inspect).
+ * Skipped under the dev AUTH_DISABLED bypass (no token to inspect).
  */
 export function requireRecentLogin(auth: { decoded: any }, maxAgeMinutes = 15) {
   const authTime = Number(auth.decoded?.auth_time);

@@ -13,7 +13,7 @@
 // than drawing an empty chart.
 
 import { moduleName } from '@/lib/modules'
-import type { ReportInputs } from './session-data'
+import type { ReportInputs } from './types'
 
 export interface TalkStats {
   captured: boolean

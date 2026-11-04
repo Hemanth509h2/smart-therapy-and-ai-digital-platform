@@ -6,8 +6,12 @@ import { adminAuth } from '@/lib/core/firebaseAdmin';
 import { therapistForUser } from '@/lib/core/links';
 import { errorResponse } from '@/lib/http/apiError';
 import { handle, send } from '@/lib/http/reply';
+import { limitByIp } from '@/lib/http/rateLimit';
 
 export const router = Router();
+
+// Per IP, against guessing admin invite tokens.
+const adminInviteLimit = limitByIp({ name: 'admin-invite-token', limit: 20, windowMs: 10 * 60 * 1000 });
 
 // ---- /api/admin-invites/:token -------------------------------------------------
 
@@ -23,7 +27,7 @@ function inviteState(invite: { acceptedAt: Date | null; revokedAt: Date | null; 
 }
 
 // GET /api/admin-invites/[token] — what the invite page shows. No sign-in needed.
-router.get('/admin-invites/:token', handle(async (req, res) => {
+router.get('/admin-invites/:token', adminInviteLimit, handle(async (req, res) => {
   try {
     const invite = await appDb.adminInvite.findUnique({ where: { token: req.params.token } });
     if (!invite) return res.status(404).json({ error: 'That invite link is not valid. Ask the admin who invited you for a new invite.' });
@@ -44,7 +48,7 @@ router.get('/admin-invites/:token', handle(async (req, res) => {
 // The signed-in account's email must match the invite. An unverified email
 // is accepted: holding a link that was sent to that address is the proof of
 // ownership (the app has no email-verification step for password signups).
-router.post('/admin-invites/:token', handle(async (req, res) => {
+router.post('/admin-invites/:token', adminInviteLimit, handle(async (req, res) => {
   try {
     const auth = await requireAuth(req);
     if (!auth.ok) return send(res, auth.response);

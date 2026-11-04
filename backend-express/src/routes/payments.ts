@@ -1,5 +1,8 @@
 import { Router } from 'express';
-import { requireAuth } from '@/lib/http/apiAuth';
+import { requireAdmin, requireAuth } from '@/lib/http/apiAuth';
+import { logError } from '@/lib/http/apiError';
+import { safeReturnUrl } from '@/lib/http/returnUrl';
+import { optEmail, optStr } from '@/lib/http/validate';
 import { cashfreeConfigured, createCashfreeOrder, syncCashfreeOrder, verifyCashfreeSignature } from '@/lib/billing/cashfree';
 import { appDb } from '@/lib/core/db';
 import type { Plan } from '.prisma/app-client';
@@ -7,6 +10,7 @@ import { cleanPlanModules } from '@/lib/billing/subscriptions';
 import { activateFreePurchase, pricePurchase, type Priced } from '@/lib/billing/purchase';
 import { getSetting } from '@/lib/core/settings';
 import { handle, send } from '@/lib/http/reply';
+import { rejectIfLimited } from '@/lib/http/rateLimit';
 
 export const router = Router();
 
@@ -15,10 +19,11 @@ export const router = Router();
 // POST /api/payments/cashfree/order — create a Cashfree order for an arbitrary
 // amount and return the payment_session_id for the browser checkout. Used by
 // the hidden /payment-test page; real plan purchases go through
-// /api/payments/cashfree/subscription.
+// /api/payments/cashfree/subscription. The amount comes from the caller, so
+// only admins who manage billing may use it.
 router.post('/payments/cashfree/order', handle(async (req, res) => {
   try {
-    const auth = await requireAuth(req);
+    const auth = await requireAdmin(req, 'billing.write');
     if (!auth.ok) return send(res, auth.response);
 
     if (!cashfreeConfigured()) {
@@ -28,9 +33,11 @@ router.post('/payments/cashfree/order', handle(async (req, res) => {
     const { amount, customerName, customerEmail, customerPhone, returnUrl } = req.body;
 
     const orderAmount = Number(amount);
-    if (!Number.isFinite(orderAmount) || orderAmount < 1) {
-      return res.status(400).json({ error: 'Enter an amount of at least ₹1.' });
+    if (!Number.isFinite(orderAmount) || orderAmount < 1 || orderAmount > 100_000) {
+      return res.status(400).json({ error: 'Enter an amount between ₹1 and ₹1,00,000.' });
     }
+    const name = optStr(customerName, 'The customer name', 100);
+    const email = optEmail(customerEmail, 'The customer email');
     const phone = String(customerPhone || '').replace(/\D/g, '').slice(-10);
     if (phone.length !== 10) {
       return res.status(400).json({ error: 'Enter a 10-digit phone number.' });
@@ -41,21 +48,21 @@ router.post('/payments/cashfree/order', handle(async (req, res) => {
       uid: auth.uid,
       amount: orderAmount,
       phone,
-      customerName,
-      customerEmail: customerEmail || auth.email,
-      returnUrl: returnUrl ? String(returnUrl) : undefined,
+      customerName: name,
+      customerEmail: email || auth.email,
+      returnUrl: safeReturnUrl(returnUrl),
       note: 'STAAD payment integration test',
     });
 
     return res.json(order);
   } catch (error: any) {
-    console.error('Cashfree create order error:', error.details || error);
+    // Cashfree's error body can echo customer details: log a summary only.
+    logError('Cashfree create order error', error);
     return res.status(error.status && error.status < 500 ? 400 : 500).json({
         error:
           error.status && error.status < 500
             ? 'The payment provider rejected this payment. Check the amount and phone number and try again.'
             : "We couldn't start the payment. Please try again in a few minutes.",
-        details: error.details,
       });
   }
 }));
@@ -99,13 +106,13 @@ router.get('/payments/cashfree/order/:orderId', handle(async (req, res) => {
       })),
     });
   } catch (error: any) {
-    console.error('Cashfree get order error:', error.details || error);
+    // Cashfree's error body can echo customer details: log a summary only.
+    logError('Cashfree get order error', error);
     return res.status(error.status === 404 ? 404 : 500).json({
         error:
           error.status === 404
             ? "We couldn't find that payment. If money was taken, contact support with your order ID."
             : "We couldn't check this payment's status. Refresh the page in a minute.",
-        details: error.details,
       });
   }
 }));
@@ -127,6 +134,8 @@ router.post('/payments/cashfree/subscription', handle(async (request, res) => {
   try {
     const auth = await requireAuth(request);
     if (!auth.ok) return send(res, auth.response);
+    if (await rejectIfLimited(res, { name: 'payment-create', limit: 10, windowMs: 60 * 60 * 1000 }, auth.uid,
+      'You have started several payments in the last hour. Please wait a little and try again.')) return;
 
     const { requestId, planId, months, modules, customerPhone, returnUrl, couponCode } = request.body;
 
@@ -213,7 +222,7 @@ router.post('/payments/cashfree/subscription', handle(async (request, res) => {
       phone,
       customerName: `${therapist.firstName} ${therapist.lastName}`.trim(),
       customerEmail: auth.email,
-      returnUrl: returnUrl ? String(returnUrl) : undefined,
+      returnUrl: safeReturnUrl(returnUrl),
       note: `${plan.name} plan, ${months_} month${months_ === 1 ? '' : 's'}${priced.coupon ? `, coupon ${priced.coupon.couponCode}` : ''}`,
       plan: { planId: plan.id, therapistId: therapist.id, months: months_, modules: purchase.modules, requestId: purchase.requestId },
       coupon: priced.coupon ? { ...priced.coupon, discount: priced.discount } : undefined,
@@ -221,13 +230,13 @@ router.post('/payments/cashfree/subscription', handle(async (request, res) => {
 
     return res.json(order);
   } catch (error: any) {
-    console.error('Cashfree subscription checkout error:', error.details || error);
+    // Cashfree's error body can echo customer details: log a summary only.
+    logError('Cashfree subscription checkout error', error);
     return res.status(error.status && error.status < 500 ? 400 : 500).json({
         error:
           error.status && error.status < 500
             ? 'The payment provider rejected this payment. Check your phone number and try again.'
             : "We couldn't start the payment. Please try again in a few minutes.",
-        details: error.details,
       });
   }
 }));
@@ -284,7 +293,8 @@ router.post('/payments/cashfree/webhook', handle(async (req, res) => {
   } catch (error: any) {
     // Non-200 makes Cashfree retry later, which is what we want for a
     // transient DB/network failure.
-    console.error('[cashfree] webhook processing failed:', error.details || error);
+    // Cashfree's error body can echo customer details: log a summary only.
+    logError('[cashfree] webhook processing failed', error);
     return res.status(500).json({ error: 'Processing failed' });
   }
 }));

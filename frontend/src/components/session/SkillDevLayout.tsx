@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTracks, useLocalParticipant, VideoTrack } from '@livekit/components-react'
 import type { TrackReference } from '@livekit/components-react'
 import { Track } from 'livekit-client'
@@ -152,6 +152,8 @@ function ExpandedVideo({
         </div>
       )}
       <button
+        type="button"
+        aria-label={`Close ${name || 'expanded'} video`}
         onClick={(e) => { e.stopPropagation(); onClose(); }}
         style={{
           position: 'absolute', top: 10, right: 10, width: 30, height: 30, borderRadius: 8,
@@ -177,6 +179,13 @@ export default function SkillDevLayout({
   children,
 }: SkillDevLayoutProps) {
   const [expanded, setExpanded] = useState<null | 'self' | 'other'>(null)
+  // Escape closes the expanded video, like its close button.
+  useEffect(() => {
+    if (!expanded) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpanded(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [expanded])
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant()
 
   // Use useTracks for both local and remote — local tracks work because
@@ -258,6 +267,9 @@ export default function SkillDevLayout({
       {/* Expanded video modal */}
       {expanded && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Expanded video"
           onClick={() => setExpanded(null)}
           style={{
             position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.75)',

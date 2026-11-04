@@ -47,7 +47,7 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
     iconBorder: 'rgba(220,150,40,0.3)',
     accent: '#3730D8',
     modules: [
-      { id: 'n-back-challenge', name: 'N-Back Challenge', emoji: '🧠', desc: 'Working memory · clinically validated' },
+      { id: 'n-back-challenge', name: 'N-Back Challenge', emoji: '🧠', desc: 'Working memory · n-back practice' },
       { id: 'maze', name: 'Virtual Maze', emoji: '🌀', desc: 'Sustained attention · motor planning' },
       { id: 'simon-says', name: 'Simon Says', emoji: '🎮', desc: 'Executive function · inhibitory control' },
     ],
@@ -92,7 +92,7 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
     modules: [
       { id: 'emotion-wheel', name: 'Emotion Wheel', emoji: '🎡', desc: 'Emotion identification · granular awareness' },
       { id: 'defusion-river', name: 'Defusion River', emoji: '🌊', desc: 'Cognitive defusion · thought observation' },
-      { id: 'thought-challenger', name: 'Thought Challenger', emoji: '⚖️', desc: 'CBT · evidence-based thought restructuring' },
+      { id: 'thought-challenger', name: 'Thought Challenger', emoji: '⚖️', desc: 'CBT · weighing the evidence for a thought' },
       { id: 'micro-quest-board', name: 'Micro Quest Board', emoji: '🗺️', desc: 'Behavioral activation · micro-goals' },
       { id: 'values-card-sort', name: 'Values Card Sort', emoji: '🃏', desc: 'ACT · values clarification & commitment' },
       { id: 'worry-vault', name: 'Worry Vault', emoji: '🗄️', desc: 'Worry containment · scheduled worry time' },

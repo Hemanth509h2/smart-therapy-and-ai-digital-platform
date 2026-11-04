@@ -1,4 +1,5 @@
 import { adminDb } from '@/lib/core/firebaseAdmin'
+import { logError } from '@/lib/http/apiError'
 
 export interface ModuleEvent {
   module: string
@@ -47,7 +48,7 @@ export async function saveReportStats(sessionId: string, stats: unknown): Promis
     await adminDb().collection('sessions').doc(sessionId).set({ reportStats: stats }, { merge: true })
   } catch (e) {
     // A stats failure must never block the report itself.
-    console.warn('[report] Failed to save session stats:', e)
+    logError('report: failed to save session stats', e)
   }
 }
 
@@ -56,7 +57,7 @@ export async function getReportStats(sessionId: string): Promise<unknown | null>
     const snap = await adminDb().collection('sessions').doc(sessionId).get()
     return snap.exists ? (snap.data()?.reportStats ?? null) : null
   } catch (e) {
-    console.warn('[report] Failed to read session stats:', e)
+    logError('report: failed to read session stats', e)
     return null
   }
 }

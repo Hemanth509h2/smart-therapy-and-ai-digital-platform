@@ -60,10 +60,95 @@ service cloud.firestore {
       return signedIn() && request.auth.token.get('role', '') == role;
     }
 
+    // The professional side of a session: the therapist, or an admin in their
+    // private "Try module" room. Everyone else in allowedUids (the client, or a
+    // guest's anonymous uid) is the client side.
+    function isProfessional() {
+      return hasRole('THERAPIST') || hasRole('ADMIN');
+    }
+
+    // Top-level fields this write changes.
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // A list field may only grow: every existing entry must still be there.
+    // Deletion (the retention job) runs server-side through the Admin SDK,
+    // which bypasses these rules.
+    function appendOnly(field) {
+      return !(field in changedKeys())
+        || (request.resource.data.get(field, []) is list
+            && request.resource.data.get(field, []).hasAll(resource.data.get(field, [])));
+    }
+
+    // aiConsent: each side may set only its OWN flag, to a boolean. The server
+    // gates transcription and AI calls on both flags, so one participant must
+    // never be able to consent for the other.
+    function consentKey() {
+      return isProfessional() ? 'therapist' : 'client';
+    }
+    function ownConsentOnly() {
+      return !('aiConsent' in changedKeys())
+        || (request.resource.data.aiConsent is map
+            && request.resource.data.aiConsent
+                 .diff(resource.data.get('aiConsent', {}))
+                 .affectedKeys().hasOnly([consentKey()])
+            && request.resource.data.aiConsent.get(consentKey(), null) is bool);
+    }
+
+    // liveSessions: a participant may change only their own entry in
+    // `participants`, with a valid shape and a role that matches their claim.
+    function ownParticipantOnly() {
+      return !('participants' in changedKeys())
+        || (request.resource.data.participants is map
+            && request.resource.data.participants
+                 .diff(resource.data.get('participants', {}))
+                 .affectedKeys().hasOnly([request.auth.uid])
+            && validParticipant(request.resource.data.participants.get(request.auth.uid, null)));
+    }
+    function validParticipant(p) {
+      return p is map
+        && p.keys().hasOnly(['uid', 'name', 'role', 'isOnline', 'lastSeen'])
+        && p.get('uid', request.auth.uid) == request.auth.uid
+        && p.get('name', '') is string && p.get('name', '').size() <= 120
+        && p.get('role', 'client') in ['therapist', 'client']
+        && (p.get('role', 'client') == 'client' || isProfessional())
+        && p.get('isOnline', false) is bool
+        && (p.get('lastSeen', null) == null || (p.lastSeen is string && p.lastSeen.size() <= 40));
+    }
+    // liveSessions: types and sizes of the other fields browsers write.
+    function validLiveFields() {
+      let d = request.resource.data;
+      return (!('activeModuleId' in changedKeys())
+               || d.activeModuleId == null
+               || (d.activeModuleId is string && d.activeModuleId.size() <= 100))
+        && (!('therapistControl' in changedKeys()) || d.therapistControl is bool)
+        && (!('whiteboard' in changedKeys())
+            || (d.whiteboard is map
+                && d.whiteboard.keys().hasOnly(['active', 'shared'])
+                && d.whiteboard.get('active', false) is bool
+                && d.whiteboard.get('shared', false) is bool))
+        && (!('status' in changedKeys()) || d.status == 'ended')
+        && (!('lastReaction' in changedKeys())
+            || (d.lastReaction is map
+                && d.lastReaction.keys().hasOnly(['emoji', 'timestamp'])
+                && d.lastReaction.get('emoji', '') is string && d.lastReaction.get('emoji', '').size() <= 16
+                && d.lastReaction.get('timestamp', '') is string && d.lastReaction.get('timestamp', '').size() <= 40))
+        && (!('moduleState' in changedKeys()) || d.moduleState is map)
+        && (!('timestamps' in changedKeys()) || d.timestamps is map);
+    }
+
     // ── liveSessions/{sessionId} ────────────────────────────────────────────
     // Real-time room state: participants, active module, module state,
     // whiteboard flags, reactions. Both participants read and write it
     // constantly during a call.
+    //
+    // Field-level limits. Written from the browser (see frontend/src):
+    //   both sides  moduleState (therapy modules), lastReaction (ReactionOverlay),
+    //               their own participants entry (session page), timestamps
+    //   therapist   activeModuleId, whiteboard, therapistControl, status:'ended'
+    //               (session page; all gated on isTherapist there)
+    // allowedUids and everything else are server-only (session-provisioning.ts).
     //
     // Provisioned server-side. A client that could create this document could
     // mint its own `allowedUids` and thereby grant itself access to any
@@ -76,7 +161,14 @@ service cloud.firestore {
 
       // Members may update room state, but never the entitlement itself.
       allow update: if isSessionMember(sessionId)
-        && request.resource.data.allowedUids == resource.data.allowedUids;
+        && request.resource.data.allowedUids == resource.data.allowedUids
+        && changedKeys().hasOnly([
+             'activeModuleId', 'therapistControl', 'whiteboard', 'status',
+             'participants', 'lastReaction', 'moduleState', 'timestamps'])
+        && (isProfessional()
+            || !changedKeys().hasAny(['activeModuleId', 'therapistControl', 'whiteboard', 'status']))
+        && ownParticipantOnly()
+        && validLiveFields();
     }
 
     // ── sessions/{sessionId} ────────────────────────────────────────────────
@@ -91,7 +183,29 @@ service cloud.firestore {
       allow create: if false;
       allow delete: if false;
 
-      allow update: if isSessionMember(sessionId);
+      // Field-level limits. Written from the browser (see frontend/src):
+      //   both sides  captions, transcript (useSessionTranscription, CaptionOverlay),
+      //               moduleEvents (lib/sessionEvents), whiteboard* (StaadWhiteboard),
+      //               their own aiConsent flag (session page)
+      //   therapist   therapistNotes (NotesPanel, AINotesPanel/Popup), callPlan
+      //               (CallPlanTab)
+      // aiInsight, reportStats, sessionId, preview and the rest are written by the
+      // server only (Admin SDK). Logs only grow from the browser.
+      allow update: if isSessionMember(sessionId)
+        && changedKeys().hasOnly(
+             isProfessional()
+               ? ['aiConsent', 'captions', 'transcript', 'transcriptLastUpdated',
+                  'moduleEvents', 'moduleEventsLastUpdated',
+                  'whiteboardElements', 'whiteboardUpdatedBy', 'whiteboardUpdatedAt',
+                  'therapistNotes', 'therapistNotesLastUpdated', 'callPlan']
+               : ['aiConsent', 'captions', 'transcript', 'transcriptLastUpdated',
+                  'moduleEvents', 'moduleEventsLastUpdated',
+                  'whiteboardElements', 'whiteboardUpdatedBy', 'whiteboardUpdatedAt'])
+        && ownConsentOnly()
+        && appendOnly('captions')
+        && appendOnly('transcript')
+        && appendOnly('moduleEvents')
+        && appendOnly('therapistNotes');
 
       // ── rawSessionLog: the session diary ─────────────────────────────────
       // Append-only time series of attention scores (and, once the deferred
@@ -127,7 +241,15 @@ service cloud.firestore {
     // regardless of what the module id contains.
     match /moduleStates/{stateId} {
       allow get, list: if isSessionMember(stateId.split('_')[0]);
-      allow create, update: if isSessionMember(stateId.split('_')[0]);
+      // Written only by updateModuleState() (frontend/src/services/sessionSync.ts):
+      // { state, updatedBy, updatedAt }, merged. updatedBy is the writer's own
+      // uid ('anonymous' when the page has none).
+      allow create, update: if isSessionMember(stateId.split('_')[0])
+        && request.resource.data.keys().hasOnly(['state', 'updatedBy', 'updatedAt'])
+        && request.resource.data.get('state', {}) is map
+        && request.resource.data.get('updatedBy', request.auth.uid) in [request.auth.uid, 'anonymous']
+        && request.resource.data.get('updatedAt', '') is string
+        && request.resource.data.get('updatedAt', '').size() <= 40;
       allow delete: if false;
     }
 
@@ -135,20 +257,35 @@ service cloud.firestore {
     // Cross-session per-patient data (currently MicroQuestBoard's quest list).
     // Keyed by the patient's Firebase UID.
     //
-    // Not session-scoped, so allowedUids cannot authorise it. The patient
-    // themselves always has access; therapists are permitted via role claim.
-    //
-    // KNOWN RESIDUAL GAP: this grants ANY therapist access to ANY patient's
-    // quests, not just their own patients. That is a large improvement on "any
-    // authenticated user", but it is not the end state. Closing it needs an
-    // explicit assignment list on the document (e.g. `therapistUids`), seeded
-    // server-side from Postgres the same way allowedUids is. Tracked as
-    // follow-up work; see SECURITY-RULES.md.
+    // The patient always has access to their own document. A therapist has
+    // access only through a session they share with the patient: every write
+    // carries `sessionId`, and the rule checks that the live session's
+    // allowedUids (server-provisioned from Postgres) contains BOTH the therapist
+    // and the patient. Reads check the session stored on the document. This
+    // replaces "any THERAPIST may read and write every patient's document".
+    function sharesSessionWith(sid, patientUid) {
+      return sid is string && sid.size() > 0
+        && liveSessionExists(sid)
+        && liveSessionData(sid).keys().hasAny(['allowedUids'])
+        && request.auth.uid in liveSessionData(sid).allowedUids
+        && patientUid in liveSessionData(sid).allowedUids;
+    }
+
     match /patients/{patientUid} {
-      allow get, list: if signedIn()
-        && (request.auth.uid == patientUid || hasRole('THERAPIST'));
-      allow create, update: if signedIn()
-        && (request.auth.uid == patientUid || hasRole('THERAPIST'));
+      allow get: if signedIn() && (
+        request.auth.uid == patientUid
+        // A missing document reveals nothing; lets the therapist's first
+        // load succeed before anything has been saved.
+        || resource == null
+        || (isProfessional()
+            && sharesSessionWith(resource.data.get('sessionId', ''), patientUid))
+      );
+      allow list: if false;
+      allow create, update: if signedIn() && (
+        request.auth.uid == patientUid
+        || (isProfessional()
+            && sharesSessionWith(request.resource.data.get('sessionId', ''), patientUid))
+      );
       allow delete: if false;
     }
 

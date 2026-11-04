@@ -1,4 +1,5 @@
 'use client'
+import { notFound } from 'next/navigation'
 
 // Hidden Cashfree payment test page. Not linked from any navigation —
 // open /payment-test directly. Sign-in is required (the backend creates
@@ -22,6 +23,8 @@ interface OrderStatus {
 }
 
 export default function PaymentTestPage() {
+  // Test page: creates real Cashfree orders. Never served in production.
+  if (process.env.NODE_ENV === 'production') notFound()
   const email = useAuthStore((s) => s.email)
   const [amount, setAmount] = useState('1')
   const [name, setName] = useState('Test User')

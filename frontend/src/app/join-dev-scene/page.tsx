@@ -1,4 +1,5 @@
 'use client'
+import { notFound } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
@@ -13,4 +14,8 @@ function Inner() {
   const spots: SceneSpot[] = Object.keys(STORY_DATA[story]?.spots ?? {}).map(id => ({ id, emoji: '⭐', caption: id, color: '#5fa8e0', status: 'open', badge: null, ring: false, playing: false, clickable: false, burst: false, burstKey: id }))
   return (<div style={{ width: 1280, height: 720, position: 'relative' }}><Scene storyId={story} spots={spots} kidAt={at} mood={mood} kidSays="" guideId={null} showCaptions={false} walkMs={0} onSpot={() => {}} doneIds={[]} actionId={mood === 'act' ? at : null} /></div>)
 }
-export default function Page() { return <Suspense fallback={null}><Inner /></Suspense> }
+export default function Page() {
+  // Development tool only.
+  if (process.env.NODE_ENV === 'production') notFound()
+  return <Suspense fallback={null}><Inner /></Suspense>
+}

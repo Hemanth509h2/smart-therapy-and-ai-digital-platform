@@ -1411,6 +1411,7 @@ export default function StoryChoiceAdventure({ sessionId, role, isLocked }: Stor
             <>
               {/* outside-click catcher */}
               <div
+                aria-hidden="true"
                 onClick={() => setFacOpen(false)}
                 style={{ position: 'fixed', inset: 0, zIndex: 48 }}
               />

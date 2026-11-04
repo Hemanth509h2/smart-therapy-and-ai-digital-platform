@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
-import { Sparkles, ShieldCheck } from 'lucide-react'
+import type React from 'react'
+import { Sparkles } from 'lucide-react'
 
 // AI session consent gate.
 //
@@ -13,6 +14,19 @@ interface AIConsentBannerProps {
   userRole: 'therapist' | 'client'
   onConsent: (given: boolean) => void
   otherPartyConsented: boolean
+}
+
+const choiceButton: React.CSSProperties = {
+  minWidth: 140,
+  fontSize: 12.5,
+  fontWeight: 600,
+  padding: '10px 18px',
+  borderRadius: 10,
+  border: '1px solid rgba(255,255,255,0.45)',
+  background: 'rgba(255,255,255,0.1)',
+  color: '#ffffff',
+  cursor: 'pointer',
+  fontFamily: '"DM Sans", sans-serif',
 }
 
 export default function AIConsentBanner({
@@ -79,14 +93,17 @@ export default function AIConsentBanner({
           AI Session Consent
         </div>
 
-        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, marginBottom: 6 }}>
+        {/* Plain, neutral wording: what runs, where the audio goes, how long the
+            transcript is kept. Nothing here nudges toward "yes". */}
+        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.82)', lineHeight: 1.6, marginBottom: 6 }}>
           {userRole === 'therapist'
-            ? 'Enables live transcription and AI insights visible only to you. Audio is deleted within 24 hours.'
-            : 'Your therapist uses AI to improve session quality. Audio is transcribed and automatically deleted within 24 hours.'}
+            ? 'Turns on live captions and a transcript, AI insights shown only to you, and an AI-drafted session report. Audio is sent live to our speech-to-text provider and is not recorded. Transcripts are deleted automatically, by default within 48 hours.'
+            : 'Your therapist would like to use AI in this session for live captions, a transcript and notes that only your therapist sees. Audio is sent live to our speech-to-text provider and is not recorded. Transcripts are deleted automatically, by default within 48 hours.'}
         </p>
-        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6, marginBottom: 20 }}>
-          The AI only observes and summarises — it makes no clinical decisions. Your privacy is
-          protected and you can decline without affecting the session.{' '}
+        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.74)', lineHeight: 1.6, marginBottom: 20 }}>
+          AI can make mistakes. It only observes and summarises, makes no clinical decisions, and
+          your therapist reviews what it produces. Saying no doesn&apos;t change anything else in
+          the session.{' '}
           <a href="/privacy#ai" target="_blank" rel="noopener" style={{ color: '#a89ae8', textDecoration: 'underline' }}>
             How AI uses session data
           </a>
@@ -94,50 +111,21 @@ export default function AIConsentBanner({
 
         {!decided ? (
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-            <button
-              onClick={() => handleChoice(false)}
-              style={{
-                fontSize: 12,
-                fontWeight: 500,
-                padding: '9px 20px',
-                borderRadius: 10,
-                border: '1px solid rgba(255,255,255,0.15)',
-                background: 'transparent',
-                color: 'rgba(255,255,255,0.5)',
-                cursor: 'pointer',
-                fontFamily: 'DM Sans, sans-serif',
-              }}
-            >
-              Decline
+            {/* Both choices look the same, so neither is the "obvious" one. */}
+            <button type="button" onClick={() => handleChoice(false)} style={choiceButton}>
+              No, don&apos;t use AI
             </button>
-            <button
-              onClick={() => handleChoice(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 7,
-                fontSize: 12,
-                fontWeight: 600,
-                padding: '9px 20px',
-                borderRadius: 10,
-                border: '1px solid rgba(30,53,48,0.25)',
-                background: '#A8C9BE',
-                color: '#1E3530',
-                cursor: 'pointer',
-                fontFamily: 'DM Sans, sans-serif',
-              }}
-            >
-              <ShieldCheck size={14} />
-              I Consent
+            <button type="button" onClick={() => handleChoice(true)} style={choiceButton}>
+              Yes, use AI
             </button>
           </div>
         ) : (
-          <div style={{ fontSize: 11, color: choice ? '#4caf86' : 'rgba(255,255,255,0.35)' }}>
+          <div role="status" style={{ fontSize: 11, color: choice ? '#7fdcb0' : 'rgba(255,255,255,0.74)' }}>
             {choice
               ? otherPartyConsented
                 ? 'Both parties consented — AI features active'
                 : `Waiting for ${userRole === 'therapist' ? 'client' : 'therapist'} to consent...`
-              : 'Declined'}
+              : 'You said no. AI features stay off for this session.'}
           </div>
         )}
       </div>

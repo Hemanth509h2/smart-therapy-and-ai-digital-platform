@@ -551,7 +551,7 @@ export function Drawer({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" onClick={onClose} />
+      <div aria-hidden="true" className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" onClick={onClose} />
       <div
         className={cx('staad-ui animate-fade-in relative flex h-full w-full flex-col', wide ? 'max-w-xl' : 'max-w-md')}
         style={{ background: 'var(--ds-surface)', borderLeft: '1px solid var(--ds-border)' }}

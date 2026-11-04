@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { MODULE_CATEGORIES, type ModuleItem } from '@/lib/modules'
+import { pressable } from '@/lib/a11y'
 
 interface ModuleSelectorPanelProps {
   open: boolean
@@ -79,7 +80,9 @@ export default function ModuleSelectorPanel({ open, onClose, onLaunch, allowedMo
           </span>
         </div>
         <button
+          type="button"
           onClick={onClose}
+          aria-label="Close therapy modules"
           style={{
             width: 22,
             height: 22,
@@ -112,6 +115,7 @@ export default function ModuleSelectorPanel({ open, onClose, onLaunch, allowedMo
           <>
             <span
               onClick={handleBack}
+              {...pressable(handleBack, 'Back to all module categories')}
               style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.5)' }}
             >
               All
@@ -226,6 +230,7 @@ export default function ModuleSelectorPanel({ open, onClose, onLaunch, allowedMo
               <div
                 key={cat.id}
                 onClick={() => setCurrentCategory(cat.id)}
+                {...pressable(() => setCurrentCategory(cat.id))}
                 className="hover:bg-white-12"
                 style={{
                   display: 'flex',

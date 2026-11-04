@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSessionStore } from '@/store/useSessionStore';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { auth } from '@/lib/firebase';
 import { db } from '@/lib/firestore';
@@ -40,6 +40,7 @@ import AINotesPopup from '@/components/session/AINotesPopup';
 import CaptionsPopup from '@/components/session/CaptionsPopup';
 import WaitingLobby from '@/components/session/WaitingLobby';
 import GuestAdmissionGate from '@/components/session/GuestAdmissionGate';
+import { DeviceConsentProvider } from '@/components/session/DeviceConsent';
 import LobbyRequests from '@/components/session/LobbyRequests';
 import LivePresence from '@/components/session/LivePresence';
 import TherapyModulesPanel from '@/components/session/TherapyModulesPanel';
@@ -109,19 +110,29 @@ function AttentionBridge({
   return null;
 }
 
-export default function SessionRoomPage({ params }: { params: { sessionId: string } }) {
+export default function SessionRoomPage() {
+  // Next 15+ passes `params` as a Promise; read the route segment directly.
+  const params = useParams<{ sessionId: string }>();
   const uid = useAuthStore((s) => s.uid);
   // Invite-link guests wait in the waiting room until the therapist admits
   // them; the room (and its Firestore/LiveKit access) only mounts after that.
+  // Camera and microphone stay untouched until the participant chooses on the
+  // "Before you join" step (DeviceConsent.tsx), shown by the gate or the call.
   if (uid?.startsWith('guest:')) {
     const name = (typeof window !== 'undefined' && sessionStorage.getItem('guestName')) || 'Guest';
     return (
-      <GuestAdmissionGate sessionId={params.sessionId} selfName={name}>
-        <SessionRoom params={params} />
-      </GuestAdmissionGate>
+      <DeviceConsentProvider sessionId={params.sessionId}>
+        <GuestAdmissionGate sessionId={params.sessionId} selfName={name}>
+          <SessionRoom params={params} />
+        </GuestAdmissionGate>
+      </DeviceConsentProvider>
     );
   }
-  return <SessionRoom params={params} />;
+  return (
+    <DeviceConsentProvider sessionId={params.sessionId}>
+      <SessionRoom params={params} />
+    </DeviceConsentProvider>
+  );
 }
 
 function SessionRoom({ params }: { params: { sessionId: string } }) {
@@ -478,7 +489,7 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
     setActiveSessionId(sessionId);
 
     // The room documents are provisioned SERVER-SIDE (see
-    // src/lib/session-provisioning.ts, called from PATCH /api/sessions/{id}).
+    // backend-express/src/lib/sessions/session-provisioning.ts, called from PATCH /api/sessions/{id}).
     //
     // They used to be created here, in the browser. They no longer can be:
     // security rules authorise every session read/write against
@@ -862,6 +873,15 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
   // dev-convenience trade. Attention scoring therefore requires real consent
   // from both sides, in every environment.
   const attentionEnabled = bothConsented;
+  // Live translation sends each participant's audio to a speech-to-text agent,
+  // so it is an AI feature too: it runs only once both sides have consented,
+  // whatever the therapist's translation toggle says. Until then no language
+  // attributes go into the token or to the room, which keeps the agent off.
+  const translationActive = translationSettings.enabled && bothConsented;
+  const effectiveTranslation = useMemo(
+    () => ({ ...translationSettings, enabled: translationActive }),
+    [translationSettings, translationActive]
+  );
   const [attention, setAttention] = useState<AttentionState>({
     status: 'idle',
     score: null,
@@ -1036,9 +1056,10 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
       // Omitted while captions are off, which is also the agent's off switch:
       // with no language attribute it skips the track entirely rather than
       // transcribing on a GPU for output nobody is showing.
-      sourceLang={translationSettings.enabled ? translationPair.source : undefined}
-      targetLang={translationSettings.enabled ? translationPair.target : undefined}
+      sourceLang={translationActive ? translationPair.source : undefined}
+      targetLang={translationActive ? translationPair.target : undefined}
       waitingScreen={<WaitingLobby therapistName={participantName} selfName={displayName} />}
+      peerName={participantName}
     >
       {/* Renders translated captions published by the translation agent on the
           lk.transcription topic. Inside the room provider, like the bridges. */}
@@ -1046,7 +1067,7 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
           translation agent is on. Previously gated on the translation toggle
           alone (default off), which hid every Sarvam caption. */}
       <CaptionOverlay
-        enabled={transcriptionEnabled || translationSettings.enabled}
+        enabled={transcriptionEnabled || translationActive}
         sessionId={sessionId}
         store={isTherapist}
         // "Live captions on video" in the therapist's Captions popup, for both
@@ -1055,7 +1076,7 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
         viewerRole={userRole}
       />
       {/* Applies caption-language changes to the room without reconnecting. */}
-      {isTherapist && <TranslationSync sessionId={sessionId} settings={translationSettings} />}
+      {isTherapist && <TranslationSync sessionId={sessionId} settings={effectiveTranslation} />}
       {/* Reports who is really connected; drives every "online" display. */}
       <LivePresence onChange={setLiveUids} />
       {/* Runs the Sarvam pipeline inside the room provider so it can access the
@@ -1109,7 +1130,7 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
       <div style={{ width: '100vw', height: '100vh', background: RC.pageBg, overflow: 'hidden', position: 'relative', display: 'flex' }}>
         {/* ===== MAIN COLUMN ===== */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '12px 16px', gap: 12 }}>
-          {/* ---- STEP 1: top bar — logo · E2E badge · spacer · timer · session info ---- */}
+          {/* ---- STEP 1: top bar — logo · encrypted-connection badge · spacer · timer · session info ---- */}
           <SessionTopBar
             timerStr={timerStr}
             startedAt={startTime.current}
@@ -1396,7 +1417,7 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
         {isTherapist && showCaptionsPopup && (
           <CaptionsPopup
             sessionId={sessionId}
-            live={transcription.isRecording || translationSettings.enabled}
+            live={transcription.isRecording || translationActive}
             translation={translationSettings}
             onTranslationChange={(patch) => writeTranslationSettings(sessionId, patch)}
             liveOnVideo={captionsOnVideo}

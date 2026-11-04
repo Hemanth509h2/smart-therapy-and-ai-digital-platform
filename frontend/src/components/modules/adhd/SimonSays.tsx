@@ -256,7 +256,7 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
   const [isPlaySeq, setIsPlaySeq] = useState(false)
   const [activeLitColor, setActiveLitColor] = useState<string | null>(null)
   const [tapFlash, setTapFlash] = useState<string | null>(null)
-  const tapT = useRef<ReturnType<typeof setTimeout>>()
+  const tapT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const [cmdIdx, setCmdIdx] = useState(-1)
   const [cmdList, setCmdList] = useState<Command[]>([])
   const [trapsAv, setTrapsAv] = useState(0)
@@ -272,9 +272,9 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
   // Sound toggle
   const [muted, setMuted] = useState(false)
 
-  const tmr = useRef<ReturnType<typeof setInterval>>()
+  const tmr = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
   const stepTimeouts = useRef<ReturnType<typeof setTimeout>[]>([])
-  const fbT = useRef<ReturnType<typeof setTimeout>>()
+  const fbT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const write = useCallback(async (d: Record<string, unknown>) => {
     try {
@@ -800,7 +800,6 @@ export default function SimonSays({ sessionId, role, isLocked }: SimonSaysProps)
       boxShadow: '0 12px 40px rgba(91,33,182,0.10)',
     }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap');
         @keyframes ci{0%{transform:scale(.9)translateY(10px);opacity:0}100%{transform:scale(1)translateY(0);opacity:1}}
         @keyframes hl{0%{transform:scale(1.4);opacity:1}100%{transform:scale(0);opacity:0}}
         @keyframes ssWave{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}

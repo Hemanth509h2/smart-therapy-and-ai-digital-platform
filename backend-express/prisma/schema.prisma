@@ -80,23 +80,29 @@ model User {
 }
 
 model ProfileClient {
-  id               String            @id @default(uuid())
-  userId           String            @unique
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  firstName        String
-  lastName         String
-  dateOfBirth      DateTime
-  gender           String?
-  diagnosis        String[]
-  parentEmail      String?
-  phoneNumber      String? // E.164; used as the patient's WhatsApp recipient
-  therapistId      String? // set when the therapist adds the client directly
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  bookings         Booking[]
-  sessions         Session[]
-  claimedInvites   Invite[]          @relation("ClaimedInvite")
-  whatsAppMessages WhatsAppMessage[]
+  id                 String            @id @default(uuid())
+  userId             String            @unique
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName          String
+  lastName           String
+  dateOfBirth        DateTime
+  gender             String?
+  diagnosis          String[]
+  parentEmail        String?
+  phoneNumber        String? // E.164; used as the patient's WhatsApp recipient
+  therapistId        String? // set when the therapist adds the client directly
+  // The therapist's confirmation, when adding the client, that they have the
+  // consent needed to store this client's data; for a minor, the parent or
+  // lawful guardian's verifiable consent (DPDP Act s.9), with their name.
+  consentConfirmedAt DateTime?
+  guardianName       String?
+  guardianConsentAt  DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  bookings           Booking[]
+  sessions           Session[]
+  claimedInvites     Invite[]          @relation("ClaimedInvite")
+  whatsAppMessages   WhatsAppMessage[]
 
   progressMetrics ProgressMetric[]
   progressReports ProgressReport[]
@@ -391,4 +397,25 @@ model AuditLog {
   @@index([actorUid])
   @@index([targetType, targetId])
   @@index([action])
+}
+
+// Security access log (DPDP Rules 2025, rule 6: keep logs that let us detect
+// and investigate unauthorised access for at least one year). One row per
+// authenticated API call; repeats of the same call within 10 minutes are
+// collapsed. Holds who called what and when, never request or response
+// bodies. Deleted after ACCESS_LOG_DAYS by the daily retention job.
+model AccessLog {
+  id         String   @id @default(uuid())
+  uid        String
+  method     String
+  route      String // route template, e.g. /api/sessions/:sessionId
+  resourceId String? // the first route parameter, e.g. the session id
+  status     Int
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([uid, createdAt])
+  @@index([resourceId, createdAt])
 }

@@ -78,14 +78,18 @@ def first_values(query_string):
     return out
 
 
+LOCAL_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+
 def allowed_origins(env=os.environ):
-    # Optional comma-separated allow-list, e.g. "https://app.staad.in". Unset = any
-    # origin (local dev); the HMAC token is still required when the secret is set.
+    # Comma-separated allow-list of the website's origins, e.g.
+    # "https://app.staad.in". Unset = the local dev site only, never any origin:
+    # a deployment that forgets it fails visibly instead of accepting every site.
     # None (no Origin header) is always allowed: the backend's calls to /internal
     # come from Node, which sends none. Only browsers send Origin, and anything
     # else can set it to whatever it likes, so the token is what protects us.
     origins = [o.strip() for o in env.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
-    return [*origins, None] if origins else None
+    return [*(origins or LOCAL_ORIGINS), None]
 
 
 class HandshakeFailureFilter(logging.Filter):
@@ -117,9 +121,11 @@ def setup_logging():
 
 
 def client_ip(connection, request=None):
+    # The last X-Forwarded-For entry is the one our own proxy added; earlier
+    # ones come from the client and can be anything. Logging only.
     forwarded = request.headers.get("X-Forwarded-For") if request is not None else None
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        return forwarded.split(",")[-1].strip()
     try:
         return connection.remote_address[0]
     except (AttributeError, IndexError, TypeError):
@@ -127,6 +133,15 @@ def client_ip(connection, request=None):
 
 
 HEALTH_PATHS = ("/health", "/")
+
+# Added to every plain HTTP response (health, server-stats, refusals). The
+# WebSocket upgrade gets them too; browsers ignore them there.
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
+    "Cache-Control": "no-store",
+}
 
 
 # Per-feature readiness for the admin System health page. Booleans only, never
@@ -181,7 +196,9 @@ def probe_response(parts):
         status, body, ctype = "200 OK", health_body().encode(), "application/json"
     else:
         status, body, ctype = "400 Bad Request", b"Bad Request\n", "text/plain"
-    headers = f"HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {len(body)}\r\nConnection: close\r\n\r\n"
+    extra = "".join(f"{k}: {v}\r\n" for k, v in SECURITY_HEADERS.items())
+    headers = (f"HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {len(body)}\r\n"
+               f"{extra}Connection: close\r\n\r\n")
     return headers.encode() + (b"" if method == b"HEAD" else body)
 
 
@@ -261,6 +278,9 @@ def process_response(connection, request, response):
     agent = request.headers.get("User-Agent", "-") if request else "-"
     access_log.info('%s "%s %s" %s %.0fms "%s"', client_ip(connection, request), "WS" if is_ws else "GET",
                     path, response.status_code, ms, agent)
+    for key, value in SECURITY_HEADERS.items():
+        if key not in response.headers:
+            response.headers[key] = value
     return None
 
 
@@ -290,8 +310,10 @@ def make_server(port=None, host=None, sock=None):
 
 
 def warn_if_misconfigured():
-    if os.environ.get("NODE_ENV") == "production" and not os.environ.get("STT_TOKEN_SECRET"):
+    if not os.environ.get("STT_TOKEN_SECRET") and not stt.no_auth_allowed():
         log.warning("[ai] STT_TOKEN_SECRET is not set - every STT, call-plan and internal connection will be refused.")
+    if not os.environ.get("ALLOWED_ORIGINS"):
+        log.warning("[ai] ALLOWED_ORIGINS is not set - browsers may connect only from %s.", ", ".join(LOCAL_ORIGINS))
     if not call_plan.is_configured():
         log.warning("[ai] OPENROUTER_API_KEY is not set - the call-plan agent, AI insights and reports are off.")
 

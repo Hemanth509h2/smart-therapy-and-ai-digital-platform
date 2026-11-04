@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { apiFetch } from '@/lib/api';
 import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
+import { LEGAL_VERSION } from '@/content/legal';
 
 function OnboardingForm() {
   const { uid, email, setRoleAndProfile } = useAuthStore();
@@ -22,6 +23,10 @@ function OnboardingForm() {
   const [lastName, setLastName] = useState('');
   const [specialtyInput, setSpecialtyInput] = useState('');
   const [phone, setPhone] = useState('');
+  // Required: Privacy Policy + Terms (and 18+). Optional and separate:
+  // marketing emails. Both start unticked.
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
 
   const [loading, setLoading] = useState(false);
 
@@ -38,6 +43,10 @@ function OnboardingForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!acceptedTerms) {
+      toast('Please accept the Privacy Policy and Terms & Conditions to continue.', 'warning');
+      return;
+    }
     setLoading(true);
 
     const specialty = specialtyInput.split(',').map(s => s.trim()).filter(s => s.length > 0);
@@ -54,6 +63,9 @@ function OnboardingForm() {
           lastName,
           specialty,
           phoneNumber: phone,
+          acceptedTerms,
+          termsVersion: LEGAL_VERSION,
+          marketingOptIn,
         }),
       });
 
@@ -152,9 +164,47 @@ function OnboardingForm() {
               </div>
 
 
+            <div className="space-y-3 rounded-xl border p-4" style={{ borderColor: 'var(--glass-border)' }}>
+              <label htmlFor="accept-terms" className="flex items-start gap-3 text-sm" style={{ color: 'var(--ink)' }}>
+                <input
+                  id="accept-terms"
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  required
+                  className="mt-0.5 h-4 w-4 shrink-0"
+                  style={{ accentColor: 'var(--sage)' }}
+                />
+                <span>
+                  I am 18 or older, and I have read and agree to the{' '}
+                  <a href="/privacy" target="_blank" rel="noopener" className="font-semibold underline" style={{ color: 'var(--sage)' }}>
+                    Privacy Policy
+                  </a>{' '}
+                  and{' '}
+                  <a href="/terms" target="_blank" rel="noopener" className="font-semibold underline" style={{ color: 'var(--sage)' }}>
+                    Terms &amp; Conditions
+                  </a>
+                  . <span style={{ color: 'var(--ink-muted)' }}>(Required)</span>
+                </span>
+              </label>
+              <label htmlFor="marketing-opt-in" className="flex items-start gap-3 text-sm" style={{ color: 'var(--ink)' }}>
+                <input
+                  id="marketing-opt-in"
+                  type="checkbox"
+                  checked={marketingOptIn}
+                  onChange={(e) => setMarketingOptIn(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0"
+                  style={{ accentColor: 'var(--sage)' }}
+                />
+                <span>
+                  Email me product updates and news from STAAD.{' '}
+                  <span style={{ color: 'var(--ink-muted)' }}>(Optional — you can unsubscribe any time.)</span>
+                </span>
+              </label>
+            </div>
             <Button 
               type="submit" 
-              disabled={loading}
+              disabled={loading || !acceptedTerms}
               className="w-full transition-all rounded-xl py-5 font-semibold"
               style={{ background: 'var(--sage)', color: '#fff', border: 'none' }}
             >

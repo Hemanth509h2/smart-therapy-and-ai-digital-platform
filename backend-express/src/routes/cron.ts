@@ -1,10 +1,16 @@
 import { Router } from 'express';
-import nodemailer from 'nodemailer';
+import { mailConfigured, sendMail } from '@/lib/core/mail';
 import { prisma, appDb } from '@/lib/core/db';
 import { audit } from '@/lib/admin/audit';
 import { FREE_TIER_ACCESS, daysUntil, resolveCurrent } from '@/lib/billing/subscriptions';
 import { usersById } from '@/lib/core/links';
 import { handle, queryParams } from '@/lib/http/reply';
+import { logError, safeErrorSummary } from '@/lib/http/apiError';
+import { escapeHtml, safeHref } from '@/lib/http/html';
+import { hasCronSecret } from '@/lib/http/secrets';
+import { alertAdmins, notify } from '@/lib/email/notify';
+import { planEndedEmail } from '@/lib/email/templates';
+import { jobFailedAlert, plansEndedSummaryAlert } from '@/lib/email/alerts';
 
 export const router = Router();
 
@@ -22,9 +28,7 @@ const SYSTEM = { uid: 'system', email: null };
 //    current term ends — once per term + period end + kind, tracked in AuditLog.
 // ?dryRun=1 reports what it would do without writing or emailing.
 router.get('/cron/subscriptions', handle(async (req, res) => {
-  const secret = process.env.CRON_SECRET;
-  const bearer = req.get('authorization')?.replace(/^Bearer\s+/i, '');
-  if (!secret || (req.get('x-cron-secret') !== secret && bearer !== secret)) {
+  if (!hasCronSecret(req)) {
     return res.status(401).json({ error: 'Only the scheduled subscription job can run this.' });
   }
 
@@ -36,7 +40,11 @@ router.get('/cron/subscriptions', handle(async (req, res) => {
     // ── 1. Expire ended terms ────────────────────────────────────────────────
     const ended = await appDb.subscription.findMany({
       where: { status: 'ACTIVE', currentPeriodEnd: { lte: now } },
-      select: { id: true, therapistId: true, currentPeriodEnd: true, plan: { select: { name: true } } },
+      select: {
+        id: true, therapistId: true, currentPeriodEnd: true,
+        plan: { select: { name: true } },
+        therapist: { select: { userId: true, firstName: true, lastName: true } },
+      },
     });
     const therapistIds = Array.from(new Set(ended.map((s) => s.therapistId)));
 
@@ -58,6 +66,29 @@ router.get('/cron/subscriptions', handle(async (req, res) => {
           before: { status: 'ACTIVE', currentPeriodEnd: s.currentPeriodEnd },
           after: { status: 'EXPIRED', revertedToFreeTier: !covered.has(s.therapistId) },
         });
+      }
+
+      // The therapists now on the free tier get one email each (a term that
+      // ended while another one continues changes nothing for them), and the
+      // admins get one summary for the whole run.
+      if (mailConfigured()) {
+        const emails = await usersById(ended.map((s) => s.therapist.userId), { email: true });
+        const told = new Set<string>();
+        for (const s of ended) {
+          if (covered.has(s.therapistId) || told.has(s.therapistId)) continue;
+          told.add(s.therapistId);
+          await notify('billing', emails.get(s.therapist.userId)?.email, planEndedEmail({
+            firstName: s.therapist.firstName, planName: s.plan.name, endedAt: s.currentPeriodEnd,
+          }));
+        }
+        await alertAdmins('billing', plansEndedSummaryAlert({
+          at: now,
+          items: ended.map((s) => ({
+            therapistName: `${s.therapist.firstName} ${s.therapist.lastName}`.trim() || 'A therapist',
+            planName: s.plan.name,
+            toFreeTier: !covered.has(s.therapistId),
+          })),
+        }));
       }
     }
 
@@ -95,21 +126,12 @@ router.get('/cron/subscriptions', handle(async (req, res) => {
       if (!sent) due.push({ sub: current, kind, days });
     }
 
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
-    const smtpReady = !!(smtpUser && smtpPass);
+    const smtpReady = mailConfigured();
     let emailed = 0;
     const failed: string[] = [];
     const skipped: string[] = [];
 
     if (!dryRun && due.length && smtpReady) {
-      const port = Number(process.env.SMTP_PORT || 587);
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port,
-        secure: port === 465,
-        auth: { user: smtpUser, pass: smtpPass },
-      });
       // No APP_URL ⇒ no link (the cron has no req origin to fall back on).
       const plansUrl = process.env.APP_URL ? `${process.env.APP_URL.replace(/\/$/, '')}/plans` : null;
       const emails = await usersById(due.map(({ sub }) => sub.therapist.userId), { email: true });
@@ -117,8 +139,7 @@ router.get('/cron/subscriptions', handle(async (req, res) => {
         const to = emails.get(sub.therapist.userId)?.email;
         if (!to) { skipped.push(sub.id); continue; }
         try {
-          await transporter.sendMail({
-            from: process.env.SMTP_FROM || `STAAD <${smtpUser}>`,
+          await sendMail('billing', {
             to,
             ...reminderEmail(sub.therapist.firstName, sub.plan.name, sub.currentPeriodEnd, days, plansUrl),
           });
@@ -127,7 +148,8 @@ router.get('/cron/subscriptions', handle(async (req, res) => {
           });
           emailed++;
         } catch (e: any) {
-          console.error(`[cron/subscriptions] reminder to ${to} failed:`, e?.message);
+          // Subscription id only: the recipient's address stays out of the logs.
+          logError(`cron/subscriptions reminder for subscription ${sub.id} failed`, e);
           failed.push(sub.id);
         }
       }
@@ -156,17 +178,18 @@ router.get('/cron/subscriptions', handle(async (req, res) => {
     }
     return res.json({ ok: true, ...detail });
   } catch (error: any) {
-    console.error('Cron subscriptions error:', error);
+    logError('Cron subscriptions error', error);
+    await alertAdmins('system', jobFailedAlert({ job: 'subscriptions (daily plan expiry and reminders)', error: JSON.stringify(safeErrorSummary(error)), at: new Date() }));
     if (run) {
       await appDb.cronRun
-        .update({ where: { id: run.id }, data: { ok: false, detail: { error: error.message }, finishedAt: new Date() } })
+        .update({ where: { id: run.id }, data: { ok: false, detail: { error: safeErrorSummary(error) } as any, finishedAt: new Date() } })
         .catch(() => {});
     }
     return res.status(500).json({ error: 'The subscription job failed. It will run again on the next schedule.' });
   }
 }));
 
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const esc = escapeHtml;
 
 function reminderEmail(firstName: string, planName: string, end: Date, days: number, url: string | null) {
   const when = days === 1 ? 'tomorrow' : `in ${days} days`;
@@ -186,9 +209,9 @@ function reminderEmail(firstName: string, planName: string, end: Date, days: num
   const html = `
     <div style="font-family:system-ui,Arial,sans-serif;color:#1f2937;line-height:1.5">
       <p>Hi ${esc(name)},</p>
-      <p>Your STAAD <strong>${esc(planName)}</strong> plan ends <strong>${when}</strong> (${endText}).</p>
+      <p>Your STAAD <strong>${esc(planName)}</strong> plan ends <strong>${esc(when)}</strong> (${esc(endText)}).</p>
       <p>To keep your therapy tools without a break, request a renewal from the Plans page in STAAD.</p>
-      ${url ? `<p><a href="${url}" style="display:inline-block;background:#4a7c6b;color:#fff;padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:600">Renew my plan</a></p>` : ''}
+      ${url && safeHref(url) ? `<p><a href="${safeHref(url)}" style="display:inline-block;background:#4a7c6b;color:#fff;padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:600">Renew my plan</a></p>` : ''}
       <p style="color:#6b7280;font-size:13px">If you have already arranged a renewal, you can ignore this email.</p>
       <p>— Team STAAD</p>
     </div>

@@ -1,4 +1,5 @@
 import { FieldValue } from 'firebase-admin/firestore'
+import { logError } from '@/lib/http/apiError'
 import { adminDb } from '@/lib/core/firebaseAdmin'
 
 // Session data on the persistent `sessions/{id}` Firestore doc that the AI
@@ -88,6 +89,6 @@ export async function appendCopilotEvent(
       { merge: true }
     )
   } catch (e) {
-    console.warn('[transcript-store] Failed to log copilot event:', e)
+    logError('transcript-store: failed to log copilot event', e)
   }
 }

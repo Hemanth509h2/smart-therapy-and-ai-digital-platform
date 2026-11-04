@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
+import { pressable } from '@/lib/a11y'
 
 interface WhackAMoleMathProps {
   sessionId: string
@@ -496,7 +497,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
     ? moles.find((m) => m.number === question.answer)?.holeIndex ?? -1
     : -1
 
-  const timerRef = useRef<ReturnType<typeof setInterval>>()
+  const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
   const gameRef = useRef({ question, moles, isPlaying, operation, difficulty, speed, score, streak, wrongCount, answerHoleIndex })
   gameRef.current = { question, moles, isPlaying, operation, difficulty, speed, score, streak, wrongCount, answerHoleIndex }
   const reactIdRef = useRef(0)
@@ -870,6 +871,7 @@ export default function WhackAMoleMath({ sessionId, role, isLocked }: WhackAMole
       <div
         key={holeIdx}
         onClick={() => handleMoleClick(holeIdx)}
+        {...pressable(() => handleMoleClick(holeIdx), `Hole ${holeIdx + 1}`, !live)}
         className={live ? 'wam-cell wam-live' : 'wam-cell'}
         style={{
           position: 'relative',

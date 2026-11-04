@@ -17,6 +17,8 @@ interface ReactionOverlayProps {
 }
 
 const EMOJIS = ['👏', '⭐', '💪', '😊', '🎉']
+// Spoken names for screen readers (the buttons show only the emoji).
+const EMOJI_NAMES: Record<string, string> = { '👏': 'applause', '⭐': 'star', '💪': 'strong', '😊': 'smile', '🎉': 'celebrate' }
 
 export default function ReactionOverlay({ sessionId, open = false, onOpenChange }: ReactionOverlayProps) {
   const barOpen = open
@@ -98,6 +100,8 @@ export default function ReactionOverlay({ sessionId, open = false, onOpenChange 
         {EMOJIS.map((emoji) => (
           <button
             key={emoji}
+            type="button"
+            aria-label={`Send ${EMOJI_NAMES[emoji] ?? 'reaction'} reaction`}
             onClick={() => sendReaction(emoji)}
             style={{
               background: 'transparent',

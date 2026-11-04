@@ -629,6 +629,14 @@ export function DataTable<T>({
                 <tr
                   key={rowKey(r)}
                   onClick={onRowClick ? () => onRowClick(r) : undefined}
+                  // Rows stay table rows (no role="button"); Tab + Enter opens them.
+                  tabIndex={onRowClick ? 0 : undefined}
+                  onKeyDown={onRowClick ? (e) => {
+                    if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault();
+                      onRowClick(r);
+                    }
+                  } : undefined}
                   className={cx('transition-colors', onRowClick && 'cursor-pointer hover:bg-[var(--sage-light)]', loading && 'opacity-60')}
                   style={{ borderBottom: '1px solid var(--glass-border)' }}
                 >

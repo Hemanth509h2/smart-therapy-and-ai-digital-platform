@@ -5,12 +5,16 @@
 // withholds the video token. Styled with the website's STAAD design system
 // (.staad-ui tokens), so it follows the site's light/dark theme.
 //
-// The camera preview lets the client check how they look before the call. Its
-// stream is stopped on unmount so LiveKit can take the camera when they join.
+// The camera preview lets the client check how they look before the call. It
+// starts only if they chose to join with their camera on the "Before you join"
+// step, or when they press the camera button here themselves; it is off
+// otherwise. Its stream is stopped on unmount so LiveKit can take the camera
+// when they join.
 
 import { useEffect, useRef, useState } from 'react'
 import { Camera, CameraOff } from 'lucide-react'
 import { toast } from '@/components/practice/ui'
+import { useDeviceChoice } from './DeviceConsent'
 
 const TIPS = [
   'Find a quiet, private place for your session.',
@@ -32,7 +36,8 @@ export default function WaitingLobby({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const [cameraOn, setCameraOn] = useState(true)
+  const { choice } = useDeviceChoice()
+  const [cameraOn, setCameraOn] = useState(() => choice?.camera === true)
   const [cameraError, setCameraError] = useState(false)
   const [waited, setWaited] = useState(0)
 
@@ -129,7 +134,7 @@ export default function WaitingLobby({
               }}
             >
               <CameraOff size={28} />
-              {cameraError ? 'Camera unavailable' : 'Camera is off'}
+              {cameraError ? 'Camera unavailable' : 'Camera is off. Press the camera button to preview it.'}
             </div>
           )}
           {selfName && (
@@ -140,8 +145,8 @@ export default function WaitingLobby({
           <button
             type="button"
             onClick={() => setCameraOn((v) => !v)}
-            title={cameraOn ? 'Turn camera off' : 'Turn camera on'}
-            aria-label={cameraOn ? 'Turn camera off' : 'Turn camera on'}
+            title={cameraOn ? 'Turn camera preview off' : 'Preview your camera'}
+            aria-label={cameraOn ? 'Turn camera preview off' : 'Preview your camera'}
             style={{
               position: 'absolute',
               right: 14,

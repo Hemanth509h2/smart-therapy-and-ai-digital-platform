@@ -362,10 +362,10 @@ export default function NBackChallenge({ sessionId, role, isLocked }: NBackChall
   const [practiceHits, setPracticeHits] = useState(0)
   const [practiceTapped, setPracticeTapped] = useState<number[]>([])
   const [practiceFeedback, setPracticeFeedback] = useState<{ ok: boolean; text: string } | null>(null)
-  const practiceTimer = useRef<ReturnType<typeof setInterval>>()
-  const practiceFbTimer = useRef<ReturnType<typeof setTimeout>>()
+  const practiceTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+  const practiceFbTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  const timerRef = useRef<ReturnType<typeof setInterval>>()
+  const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
   const gameRef = useRef({ isPlaying, sequence, currentIndex, n, hits, misses, responded })
   gameRef.current = { isPlaying, sequence, currentIndex, n, hits, misses, responded }
 

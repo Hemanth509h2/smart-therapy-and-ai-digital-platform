@@ -6,7 +6,8 @@
         "httpMethod": "POST",
         "path": "staad-send-session-link",
         "responseMode": "onReceived",
-        "options": {}
+        "options": {},
+        "authentication": "headerAuth"
       },
       "id": "6ec104cf-e6af-40e1-aacf-45af2d91d372",
       "name": "Webhook: send session link",
@@ -16,12 +17,18 @@
         0,
         0
       ],
-      "webhookId": "6b1bb72f-03d3-4461-bf7a-047f83aa1953"
+      "webhookId": "6b1bb72f-03d3-4461-bf7a-047f83aa1953",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "STAAD Webhook Secret"
+        }
+      }
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://YOUR-BACKEND-URL/api/automation/sessions/{{ $json.body.sessionId }}/join-link",
+        "url": "=https://YOUR-BACKEND-URL/api/automation/sessions/{{ encodeURIComponent(String($json.body.sessionId ?? \"\")) }}/join-link",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}

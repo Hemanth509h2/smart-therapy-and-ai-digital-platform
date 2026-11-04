@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useTheme } from '@/components/ThemeProvider';
 import { initials, fullName } from '@/lib/practice';
 import { adminNavFor } from '@/lib/adminNav';
+import TermsUpdateGate from '@/components/TermsUpdateGate';
 import { ADMIN_ROLE_LABELS, adminRoleOf } from '@/lib/adminRoles';
 import { usePageRefresh } from '@/lib/pageRefresh';
 import {
@@ -200,6 +201,9 @@ export function StaadShell({ children, className }: { children: React.ReactNode;
       <main className="main">
         <div className="wrap">{children}</div>
       </main>
+
+      {/* Therapists without an accepted, current Privacy Policy + Terms. */}
+      <TermsUpdateGate />
     </div>
   );
 }

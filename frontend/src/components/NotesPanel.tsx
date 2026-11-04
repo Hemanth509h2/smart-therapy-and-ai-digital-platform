@@ -80,7 +80,9 @@ export default function NotesPanel({ open, onClose, sessionId }: NotesPanelProps
           Session notes{notes.length > 0 ? ` (${notes.length})` : ''}
         </span>
         <button
+          type="button"
           onClick={onClose}
+          aria-label="Close session notes"
           style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
         >
           <X size={16} />

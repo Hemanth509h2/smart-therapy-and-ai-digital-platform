@@ -42,24 +42,32 @@ enum CouponType {
 }
 
 model ProfileTherapist {
-  id                String   @id @default(uuid())
-  userId            String   @unique
+  id                String    @id @default(uuid())
+  userId            String    @unique
   firstName         String
   lastName          String
   specialty         String[] // SLD, ADHD, Anxiety, Depression, ID, Dyslexia, Autism etc.
   qualification     String?
   experience        String?
   bio               String?
-  phoneNumber       String?  @unique // E.164 format; used for WhatsApp notifications
+  phoneNumber       String?   @unique // E.164 format; used for WhatsApp notifications
   // Per-therapist module/tool access. When allModulesAllowed is true the
   // therapist may launch any module; otherwise only those listed in moduleAccess.
-  allModulesAllowed Boolean  @default(true)
-  moduleAccess      String[] @default([])
+  allModulesAllowed Boolean   @default(true)
+  moduleAccess      String[]  @default([])
   // Admin switch (Usage & cost page). Off: no usage events are stored for this
   // therapist and they are left out of the usage and cost figures (test accounts).
-  trackUsage        Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  trackUsage        Boolean   @default(true)
+  // Privacy Policy + Terms acceptance (see lib/core/legal.ts). Null for
+  // accounts created before acceptance was recorded: they are asked on sign-in.
+  termsAcceptedAt   DateTime?
+  termsVersion      String?
+  // Separate, optional consent to product-update / marketing emails. Off by
+  // default; the admin broadcast only reaches therapists who opted in.
+  marketingOptIn    Boolean   @default(false)
+  marketingOptInAt  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   usageEvents          UsageEvent[]
   subscriptions        Subscription[]
@@ -317,4 +325,33 @@ model ModuleReportChunk {
   @@index([category], map: "module_report_chunks_category_idx")
   @@index([moduleName], map: "module_report_chunks_module_name_idx")
   @@map("module_report_chunks")
+}
+
+// History of every consent given or withdrawn (Terms + Privacy acceptance,
+// marketing emails), kept as evidence of what was agreed and when. userId is
+// the Firebase uid. Rows are never updated, only added.
+model ConsentRecord {
+  id        String   @id @default(uuid())
+  userId    String
+  kind      String // TERMS_PRIVACY | MARKETING (lib/core/legal.ts)
+  version   String? // legal version accepted, for TERMS_PRIVACY
+  granted   Boolean
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// Shared fixed-window rate-limit counters (lib/http/rateLimit.ts), so limits
+// hold across server instances. `key` is a SHA-256 hash of the uid or IP, never
+// the raw value. Buckets older than a day are deleted by the daily cleanup job.
+model RateLimitBucket {
+  name        String
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@id([name, key, windowStart])
+  @@index([windowStart])
 }

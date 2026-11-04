@@ -235,7 +235,7 @@ export default function AIAssistantPanel({
           }}
         >
           <Lock size={10} />
-          AI insights are private and secure
+          Shown only to you. AI can be wrong, so review before acting.
         </div>
       </div>
     </PanelShell>

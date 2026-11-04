@@ -2,7 +2,14 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { deleteUser, sendPasswordResetEmail } from 'firebase/auth';
+import {
+  EmailAuthProvider,
+  GoogleAuthProvider,
+  deleteUser,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
+  sendPasswordResetEmail,
+} from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useAuthStore } from '@/store/useAuthStore';
 import { usePracticeData } from '@/hooks/usePracticeData';
@@ -52,7 +59,13 @@ export default function ProfilePage() {
   const [pwSending, setPwSending] = useState(false);
   const [dangerOpen, setDangerOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [marketingSaving, setMarketingSaving] = useState(false);
+  // Password accounts confirm deletion with their password; Google accounts
+  // with a Google popup.
+  const usesPassword = !!auth.currentUser?.providerData.some((p) => p.providerId === 'password');
 
   useEffect(() => {
     if (!uid) router.push('/auth');
@@ -172,6 +185,41 @@ export default function ProfilePage() {
     setPwSending(false);
   };
 
+  // Everything STAAD holds about this account and its clients, as JSON
+  // (GET /api/users/export).
+  const exportAllData = async () => {
+    setExporting(true);
+    try {
+      const res = await apiFetch('/api/users/export');
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'download your data'));
+      downloadFile(`staad-my-data-${new Date().toISOString().slice(0, 10)}.json`, await res.text(), 'application/json');
+      toast('A copy of all your data has been downloaded.');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'download your data'), 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const setMarketing = async (granted: boolean) => {
+    setMarketingSaving(true);
+    try {
+      const res = await apiFetch('/api/users/consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'MARKETING', granted }),
+      });
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'update your email preferences'));
+      const data = await res.json();
+      setRoleAndProfile('THERAPIST', data.profile);
+      toast(granted ? 'You will receive product updates by email.' : 'You will no longer receive product update emails.');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'update your email preferences'), 'error');
+    } finally {
+      setMarketingSaving(false);
+    }
+  };
+
   const exportData = () => {
     const header = ['Client', 'Date', 'Status', 'Notes filed'];
     const rows = sessions.map((s) => [
@@ -180,8 +228,8 @@ export default function ProfilePage() {
       s.status,
       hasDocs(s) ? 'Yes' : 'No',
     ]);
-    downloadFile('staad-my-data.csv', toCsv([header, ...rows]), 'text/csv');
-    toast('Your session data has been downloaded.');
+    downloadFile('staad-sessions.csv', toCsv([header, ...rows]), 'text/csv');
+    toast('Your session list has been downloaded.');
   };
 
   const deleteAccount = async () => {
@@ -189,19 +237,36 @@ export default function ProfilePage() {
     setDeleting(true);
     try {
       const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error('You are signed out. Sign in again, then delete your account.');
+      // Sign in again first. Firebase only deletes a sign-in account within a
+      // few minutes of signing in, and the server refuses to delete the data
+      // otherwise (REAUTH_REQUIRED), so the data is never removed while the
+      // sign-in account survives.
+      if (usesPassword) {
+        if (!currentUser.email || !deletePassword) throw new Error('Enter your password to confirm.');
+        await reauthenticateWithCredential(currentUser, EmailAuthProvider.credential(currentUser.email, deletePassword));
+      } else {
+        await reauthenticateWithPopup(currentUser, new GoogleAuthProvider());
+      }
+      // A fresh ID token carries the new sign-in time to the server.
+      await currentUser.getIdToken(true);
       // Delete server-side data FIRST: the backend verifies the Firebase ID
       // token, which becomes invalid once the Firebase user is deleted.
       const res = await apiFetch('/api/users/profile', { method: 'DELETE' });
       if (!res.ok) throw new Error(await apiErrorMessage(res, 'delete your account'));
-      if (currentUser) await deleteUser(currentUser);
+      await deleteUser(currentUser);
       clearAuth();
       toast('Your account has been deleted.');
       router.push('/auth');
     } catch (err: any) {
+      const code = err?.code as string | undefined;
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
       toast(
-        err?.code === 'auth/requires-recent-login'
-          ? 'For security, please log out and log back in, then try again.'
-          : caughtErrorMessage(err, 'delete your account'),
+        code === 'auth/wrong-password' || code === 'auth/invalid-credential'
+          ? 'That password is not correct. Nothing was deleted.'
+          : code === 'auth/requires-recent-login'
+            ? 'For security, please log out and log back in, then try again.'
+            : caughtErrorMessage(err, 'delete your account'),
         'error'
       );
     } finally {
@@ -456,12 +521,40 @@ export default function ProfilePage() {
             </>
           )}
 
+          {isTherapist && (
+            <article className="pcard" style={{ marginTop: 14 }}>
+              <span className="pcard__name">Email preferences</span>
+              <p className="prow__s">
+                Account, billing and session emails are always sent. Product updates and news are optional.
+              </p>
+              <label
+                htmlFor="p-marketing"
+                style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 12, fontSize: 14, color: 'var(--ink)' }}
+              >
+                <input
+                  id="p-marketing"
+                  type="checkbox"
+                  checked={!!profile?.marketingOptIn}
+                  disabled={marketingSaving}
+                  onChange={(e) => setMarketing(e.target.checked)}
+                  style={{ marginTop: 3, width: 16, height: 16, flex: 'none' }}
+                />
+                <span>Email me product updates and news from STAAD</span>
+              </label>
+            </article>
+          )}
+
           <article className="pcard" style={{ marginTop: 14 }}>
-            <span className="pcard__name">Danger zone</span>
-            <p className="prow__s">Export everything, or close the account for good.</p>
+            <span className="pcard__name">Your data</span>
+            <p className="prow__s">
+              Download a copy of everything STAAD holds about you and your clients, or close the account for good.
+            </p>
             <div className="rowflex" style={{ marginTop: 12 }}>
+              <button type="button" className="chip" onClick={exportAllData} disabled={exporting}>
+                {exporting ? 'Preparing…' : 'Download all my data (JSON)'}
+              </button>
               <button type="button" className="chip" onClick={exportData}>
-                Export data
+                Session list (CSV)
               </button>
               <button type="button" className="chip" onClick={() => setDangerOpen(true)}>
                 Delete account
@@ -477,10 +570,11 @@ export default function ProfilePage() {
           setDangerOpen(o);
           if (!o) {
             setDeleteConfirm('');
+            setDeletePassword('');
           }
         }}
         title="Delete your account"
-        description="This removes your profile, sessions, notes and invites. It cannot be undone."
+        description="This removes your profile, clients, sessions, notes, reports and invites. It cannot be undone. Payment records are kept as tax law requires. Download your data first if you need a copy."
         footer={
           <>
             <button className="ds-btn ds-btn-ghost" onClick={() => setDangerOpen(false)}>
@@ -489,7 +583,7 @@ export default function ProfilePage() {
             <button
               className="ds-btn ds-btn-clay"
               onClick={deleteAccount}
-              disabled={deleteConfirm !== 'DELETE' || deleting}
+              disabled={deleteConfirm !== 'DELETE' || (usesPassword && !deletePassword) || deleting}
             >
               {deleting ? 'Deleting…' : 'Delete permanently'}
             </button>
@@ -505,6 +599,22 @@ export default function ProfilePage() {
             onChange={(e) => setDeleteConfirm(e.target.value)}
             placeholder="DELETE"
           />
+        </div>
+        <div className="field" style={{ marginTop: 12 }}>
+          {usesPassword ? (
+            <>
+              <label htmlFor="p-delete-password">Your password</label>
+              <input
+                id="p-delete-password"
+                type="password"
+                autoComplete="current-password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+              />
+            </>
+          ) : (
+            <p className="prow__s">You will be asked to sign in with Google again to confirm.</p>
+          )}
         </div>
       </DsDialog>
     </StaadShell>

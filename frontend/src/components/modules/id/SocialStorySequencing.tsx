@@ -251,7 +251,7 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
   const [acting, setActing] = useState(false)
 
   const chain = useRef<ReturnType<typeof setTimeout>[]>([])
-  const revertT = useRef<ReturnType<typeof setTimeout>>()
+  const revertT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   // Bumped whenever a replay is superseded (new story, reset, skip, unmount) so
   // timers and speech callbacks still in flight from the old run bail out.
   const replayRun = useRef(0)
@@ -899,13 +899,14 @@ export default function SocialStorySequencing({ sessionId, role, isLocked }: Soc
             <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
               <span style={{ color: 'rgba(0,0,0,0.3)', fontSize: 13, minWidth: 14 }}>{i + 1}.</span>
               <div style={{ position: 'relative' }}>
-                <span style={{ fontSize: 23.5, cursor: 'pointer' }}
+                <button type="button" aria-label={`Change picture for panel ${i + 1}`}
+                  style={{ fontSize: 23.5, cursor: 'pointer', background: 'none', border: 'none', padding: 0, lineHeight: 1 }}
                   onClick={() => {
                     const current = PICKER_EMOJIS.indexOf(p.emoji)
                     const next = PICKER_EMOJIS[(current + 1) % PICKER_EMOJIS.length]
                     const cp = [...customPanels]; cp[i] = { ...cp[i], emoji: next }; setCustomPanels(cp)
                   }}
-                >{p.emoji}</span>
+                >{p.emoji}</button>
               </div>
               <input value={p.caption} onChange={e => { const cp = [...customPanels]; cp[i] = { ...cp[i], caption: e.target.value.slice(0, 40) }; setCustomPanels(cp) }}
                 placeholder="Caption (max 40 chars)" maxLength={40}

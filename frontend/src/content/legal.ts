@@ -12,3 +12,11 @@ export interface PolicySection {
   title: string;
   body: PolicyBlock[];
 }
+
+/**
+ * Version of the Privacy Policy + Terms a therapist accepts at onboarding.
+ * Must match LEGAL_VERSION in backend-express/src/lib/core/legal.ts. Bump both
+ * (to the date of the change) when either document changes materially:
+ * therapists who accepted an older version are asked to accept again.
+ */
+export const LEGAL_VERSION = '2026-11-04';

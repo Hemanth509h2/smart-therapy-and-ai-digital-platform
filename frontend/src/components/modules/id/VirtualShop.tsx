@@ -8,6 +8,7 @@ import { logModuleEvent } from '@/lib/sessionEvents'
 import { toast } from '@/components/practice/ui'
 import { staadPraise, staadCancel } from '@/lib/voice/staadVoice'
 import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'
+import { pressable } from '@/lib/a11y'
 
 // Store-aisle backdrop for the shop canvas. Washed-out photography, so the
 // product tiles and wallet sit on translucent white panels above it.
@@ -483,6 +484,8 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
                   const qty = editQty[item.id] || 0
                   return (
                     <div key={item.id} onClick={() => toggleEditItem(item.id)}
+                      {...pressable(() => toggleEditItem(item.id))}
+                      aria-pressed={qty > 0}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 3, padding: '3px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 17,
                         background: qty > 0 ? 'rgba(74,124,111,0.2)' : 'rgba(0,0,0,0.05)',
@@ -494,9 +497,9 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
                       <span>{item.name}</span>
                       {qty > 0 && (
                         <span style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 2 }}>
-                          <span onClick={e => { e.stopPropagation(); changeEditQty(item.id, -1) }} style={{ cursor: 'pointer', color: '#48544D', fontSize: 19 }}>−</span>
+                          <span onClick={e => { e.stopPropagation(); changeEditQty(item.id, -1) }} {...pressable(() => changeEditQty(item.id, -1), `One fewer ${item.name}`)} style={{ cursor: 'pointer', color: '#48544D', fontSize: 19 }}>−</span>
                           <span style={{ color: '#1F7A44', fontWeight: 600 }}>{qty}</span>
-                          <span onClick={e => { e.stopPropagation(); changeEditQty(item.id, 1) }} style={{ cursor: 'pointer', color: '#48544D', fontSize: 19 }}>+</span>
+                          <span onClick={e => { e.stopPropagation(); changeEditQty(item.id, 1) }} {...pressable(() => changeEditQty(item.id, 1), `One more ${item.name}`)} style={{ cursor: 'pointer', color: '#48544D', fontSize: 19 }}>+</span>
                         </span>
                       )}
                     </div>
@@ -627,6 +630,15 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
                     const r = (e.target as HTMLElement).getBoundingClientRect()
                     addToBasket(item.id, r.left + r.width / 2, r.top)
                   }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Add ${item.name} to basket`}
+                  onKeyDown={e => {
+                    if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
+                    e.preventDefault()
+                    const r = e.currentTarget.getBoundingClientRect()
+                    addToBasket(item.id, r.left + r.width / 2, r.top)
+                  }}
                   style={{
                     borderRadius: 16, padding: '18px 12px',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9, cursor: canInteract && !completed ? 'pointer' : 'default',
@@ -660,6 +672,8 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
         {/* Basket */}
         <div style={{ flexShrink: 0, borderTop: '1px solid var(--glass-border)' }}>
           <div onClick={() => setBasketOpen(!basketOpen)}
+            {...pressable(() => setBasketOpen(!basketOpen))}
+            aria-expanded={basketOpen}
             style={{
               padding: '8px 12px', cursor: 'pointer',
               background: basketOpen ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.04)',
@@ -680,6 +694,7 @@ export default function VirtualShop({ sessionId, role, isLocked }: VirtualShopPr
                     if (!item) return null
                     return (
                       <div key={b.itemId} onClick={() => removeFromBasket(b.itemId)}
+                        {...pressable(() => removeFromBasket(b.itemId), `Remove ${item.name} from basket`)}
                         style={{
                           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, cursor: canInteract ? 'pointer' : 'default',
                           padding: '6px 8px', background: 'rgba(0,0,0,0.05)', borderRadius: 8, border: '1px solid rgba(0,0,0,0.08)',

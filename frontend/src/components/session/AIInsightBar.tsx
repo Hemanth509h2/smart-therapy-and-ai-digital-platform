@@ -76,6 +76,7 @@ export default function AIInsightBar({
   return (
     <>
       <div
+        aria-hidden="true"
         onClick={onDismiss}
         style={{
           position: 'absolute',

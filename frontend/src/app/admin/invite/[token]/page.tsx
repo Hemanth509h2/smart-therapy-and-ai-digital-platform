@@ -5,7 +5,7 @@
 // lets this path through signed out and skips onboarding for it.
 
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { ShieldCheck } from 'lucide-react';
 import { auth } from '@/lib/firebase';
@@ -39,7 +39,9 @@ const STATE_BADGE: Record<Exclude<InviteInfo['state'], 'valid'>, string> = {
   expired: 'Expired',
 };
 
-export default function AdminInvitePage({ params }: { params: { token: string } }) {
+export default function AdminInvitePage() {
+  // Next 15+ passes `params` as a Promise; read the route segment directly.
+  const params = useParams<{ token: string }>();
   const { token } = params;
   const router = useRouter();
   const { uid, email, setRoleAndProfile } = useAuthStore();

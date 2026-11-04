@@ -4,6 +4,7 @@ import { appDb } from '@/lib/core/db';
 import { applyCoupon } from '@/lib/billing/coupons';
 import { errorResponse } from '@/lib/http/apiError';
 import { handle, send } from '@/lib/http/reply';
+import { rejectIfLimited } from '@/lib/http/rateLimit';
 
 export const router = Router();
 
@@ -16,6 +17,9 @@ router.post('/coupons/validate', handle(async (req, res) => {
   try {
     const auth = await requireAuth(req);
     if (!auth.ok) return send(res, auth.response);
+    // Stops guessing coupon codes by trying many.
+    if (await rejectIfLimited(res, { name: 'coupon-validate', limit: 20, windowMs: 60 * 60 * 1000 }, auth.uid,
+      'You have tried many coupon codes. Please wait a while before trying again.')) return;
     const { code, planId, months } = req.body;
 
     const therapist = await appDb.profileTherapist.findUnique({ where: { userId: auth.uid } });

@@ -2,6 +2,10 @@ import { Router } from 'express';
 import { prisma, appDb } from '@/lib/core/db';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { requireTherapist } from '@/lib/http/progressAuth';
+import { alertAdmins, deliver } from '@/lib/email/notify';
+import { safetyFlagAlert } from '@/lib/email/alerts';
+import { rejectIfLimited } from '@/lib/http/rateLimit';
+import { optStr, strList } from '@/lib/http/validate';
 import { callAIService } from '@/lib/ai-service';
 import { appendCopilotEvent, checkAIConsent, getSessionActivity, getSessionTranscript } from '@/lib/sessions/transcript-store';
 import { getSetting } from '@/lib/core/settings';
@@ -18,6 +22,9 @@ router.post('/ai-insight', handle(async (req, res) => {
     // Authenticate before any consent/transcript/notes read, LLM call or write.
     const auth = await requireTherapist(req)
     if (!auth.ok) return send(res, auth.response)
+    // Runs when the therapist presses Analyse; each call is an LLM request.
+    if (await rejectIfLimited(res, { name: 'ai-insight', limit: 30, windowMs: 10 * 60 * 1000 }, auth.uid,
+      'You have run AI analysis many times in the last few minutes. Wait a moment and try again.')) return
 
     if (!(await getSetting('features.aiInsights'))) {
       return res.status(503).json({ error: 'AI insights are turned off by an admin.' })
@@ -64,13 +71,15 @@ router.post('/ai-insight', handle(async (req, res) => {
 
     // name/age/conditions are the owning therapist's descriptive input for the
     // prompt only — not identity.
+    const age = Number(clientProfile.age ?? 0)
+    const sessionNumber = Number(clientProfile.sessionNumber ?? 1)
     const client = {
-      name: String(clientProfile.name ?? 'Unknown'),
-      age: Number(clientProfile.age ?? 0),
+      name: optStr(clientProfile.name, "The client's name", 120) ?? 'Unknown',
+      age: Number.isFinite(age) && age >= 0 && age <= 130 ? age : 0,
       conditions: Array.isArray(clientProfile.conditions)
-        ? clientProfile.conditions.map(String)
+        ? strList(clientProfile.conditions.map(String), "The client's conditions", 30, 100) ?? []
         : [],
-      sessionNumber: Number(clientProfile.sessionNumber ?? 1),
+      sessionNumber: Number.isFinite(sessionNumber) && sessionNumber >= 1 && sessionNumber <= 100_000 ? sessionNumber : 1,
     }
 
     // Dev test mode bypasses the both-consent gate so the copilot can be verified
@@ -184,9 +193,13 @@ router.post('/ai-insight', handle(async (req, res) => {
           await prisma.riskFlag.create({
             data: { sessionId, therapistId: therapistProfileId, level, detail: insight.riskDetail || null },
           })
+          // Therapist name and severity only: the flag's detail, the
+          // transcript and the client stay in the admin console.
+          const therapistName = `${auth.therapist.firstName ?? ''} ${auth.therapist.lastName ?? ''}`.trim() || 'a therapist'
+          await deliver(alertAdmins('safety', safetyFlagAlert({ therapistName, severity: level, at: new Date() })))
         }
       } catch (e) {
-        console.error('Failed to record risk flag:', e)
+        logError('Failed to record risk flag', e)
       }
     }
 

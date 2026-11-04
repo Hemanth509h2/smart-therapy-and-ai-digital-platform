@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { signInWithCustomToken } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { apiFetch } from '@/lib/api';
@@ -23,7 +23,9 @@ interface InviteInfo {
  * Firestore/LiveKit access), claim the invite server-side, and drop them
  * straight into the session room.
  */
-export default function GuestJoinPage({ params }: { params: { token: string } }) {
+export default function GuestJoinPage() {
+  // Next 15+ passes `params` as a Promise; read the route segment directly.
+  const params = useParams<{ token: string }>();
   const { token } = params;
   const router = useRouter();
 
@@ -131,7 +133,7 @@ export default function GuestJoinPage({ params }: { params: { token: string } })
                   <Heart className="h-4 w-4" style={{ color: 'var(--sage)' }} /> Gentle, playful activities together
                 </div>
                 <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4" style={{ color: 'var(--sage)' }} /> Private — only you two can join
+                  <ShieldCheck className="h-4 w-4" style={{ color: 'var(--sage)' }} /> Private — your therapist decides who can join
                 </div>
               </div>
 
@@ -149,6 +151,21 @@ export default function GuestJoinPage({ params }: { params: { token: string } })
                   'Join session'
                 )}
               </Button>
+              <p className="text-center text-xs" style={{ color: 'var(--ink-muted)' }}>
+                By joining you agree to STAAD&apos;s{' '}
+                <a href="/terms" target="_blank" rel="noopener" className="font-semibold underline" style={{ color: 'var(--sage)' }}>
+                  Terms &amp; Conditions
+                </a>{' '}
+                and{' '}
+                <a href="/privacy" target="_blank" rel="noopener" className="font-semibold underline" style={{ color: 'var(--sage)' }}>
+                  Privacy Policy
+                </a>
+                . AI features only run if you agree to them in the session. Questions or complaints about your data:{' '}
+                <a href="/privacy#contact" target="_blank" rel="noopener" className="font-semibold underline" style={{ color: 'var(--sage)' }}>
+                  Grievance Officer
+                </a>
+                .
+              </p>
             </>
           )}
 

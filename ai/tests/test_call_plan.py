@@ -92,6 +92,19 @@ def test_extracts_docx_paragraphs():
     assert extract_text("Notes.DOCX", make_docx("Session 3", "Client slept better")) == "Session 3\nClient slept better"
 
 
+def test_rejects_docx_with_a_dtd():
+    import io
+    import zipfile
+    evil = ('<?xml version="1.0"?><!DOCTYPE d [<!ENTITY a "aaaaaaaaaa"><!ENTITY b "&a;&a;&a;&a;">]>'
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            '<w:body><w:p><w:r><w:t>&b;</w:t></w:r></w:p></w:body></w:document>')
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("word/document.xml", evil)
+    with pytest.raises(ExtractError):
+        extract_text("notes.docx", buf.getvalue())
+
+
 def test_extracts_text_file():
     assert extract_text("notes.txt", "  hello\n".encode()) == "hello"
 
@@ -118,8 +131,11 @@ def test_scoped_tokens_do_not_cross_features():
     assert not verify_stt_token(plan_token, "s2", "secret", scope="call-plan")
 
 
-def test_authorize_fails_closed_in_production():
+def test_authorize_fails_closed_without_a_secret():
     assert authorize({}, {"NODE_ENV": "production"}) == "Agent auth not configured"
+    assert authorize({}, {}) == "Agent auth not configured"
+    assert authorize({}, {"AI_DEV_NO_AUTH": "true"}) is None
+    assert authorize({}, {"AI_DEV_NO_AUTH": "true", "NODE_ENV": "production"}) == "Agent auth not configured"
     assert authorize({"sid": "s1", "token": mint("s1", "k", "call-plan")}, {"STT_TOKEN_SECRET": "k"}) is None
     assert authorize({"sid": "s1", "token": "bad"}, {"STT_TOKEN_SECRET": "k"}) == "Unauthorized"
 

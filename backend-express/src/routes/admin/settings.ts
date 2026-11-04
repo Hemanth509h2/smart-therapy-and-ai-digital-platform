@@ -5,6 +5,7 @@ import { audit } from '@/lib/admin/audit';
 import { SETTING_DEFAULTS, coerceSetting, isSettingKey, type SettingKey } from '@/lib/core/settings';
 import { errorResponse } from '@/lib/http/apiError';
 import { handle, send } from '@/lib/http/reply';
+import { defaultMailFrom, mailConfigured } from '@/lib/core/mail';
 
 export const router = Router();
 
@@ -97,7 +98,7 @@ function integrationStatus() {
       configured: !!(env.CASHFREE_APP_ID && env.CASHFREE_SECRET_KEY),
       mode: cashfreeEnv === 'production' || cashfreeEnv === 'prod' ? 'production' : cashfreeEnv ? 'sandbox' : null,
     },
-    smtp: { configured: !!(env.SMTP_USER && env.SMTP_PASS) },
+    smtp: { configured: mailConfigured(), from: defaultMailFrom() },
     livekit: { configured: !!(env.LIVEKIT_API_KEY && env.LIVEKIT_API_SECRET) },
     transcription: { configured: !!env.STT_TOKEN_SECRET },
     cron: { configured: !!env.CRON_SECRET },

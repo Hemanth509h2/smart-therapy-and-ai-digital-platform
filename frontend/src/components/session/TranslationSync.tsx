@@ -5,6 +5,12 @@
 // someone (re)joins — so changing captions never reconnects the call.
 //
 // Must render inside StaadVideo (needs the room).
+//
+// `settings.enabled` only turns true once both participants have consented to
+// AI features (see the session page), so the change effect below pushes the
+// languages as soon as consent completes. The backend re-checks consent and
+// answers 403 AI_CONSENT_REQUIRED until it sees both consents in Firestore;
+// that is "waiting for consent", not an error, so it gets one quiet retry.
 
 import { useEffect, useRef } from 'react'
 import { RoomEvent } from 'livekit-client'
@@ -25,7 +31,10 @@ export default function TranslationSync({
   const latest = useRef(settings)
   latest.current = settings
 
-  const push = useRef(() => {
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(retryTimer.current), [])
+
+  const push = useRef((isRetry = false) => {
     const { enabled, therapist, client } = latest.current
     apiFetch(`/api/sessions/${sessionId}/translation`, {
       method: 'POST',
@@ -33,7 +42,19 @@ export default function TranslationSync({
       body: JSON.stringify({ enabled, therapist, client }),
     })
       .then(async (res) => {
-        if (!res.ok) toast(await apiErrorMessage(res, 'update the translation settings'), 'warning')
+        if (res.ok) return
+        if (res.status === 403) {
+          const body = await res.clone().json().catch(() => null)
+          if (body?.code === 'AI_CONSENT_REQUIRED') {
+            // Consent may have just completed and not reached the server yet.
+            if (!isRetry && latest.current.enabled) {
+              clearTimeout(retryTimer.current)
+              retryTimer.current = setTimeout(() => push.current(true), 3000)
+            }
+            return
+          }
+        }
+        toast(await apiErrorMessage(res, 'update the translation settings'), 'warning')
       })
       .catch(() => {
         // Non-fatal: the next change or join retries.

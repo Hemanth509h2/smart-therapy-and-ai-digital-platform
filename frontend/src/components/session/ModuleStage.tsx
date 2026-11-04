@@ -121,7 +121,7 @@ export default function ModuleStage({
         // Scoping the overrides here fixes every one of them at once and leaves
         // the global dark values untouched everywhere else.
         ['--ink-muted' as string]: '#6b7280',
-        ['--ink-faint' as string]: '#8b9096',
+        ['--ink-faint' as string]: '#6b7076', // 5.0:1 on white (was #8b9096, 3.2:1)
         ['--glass-border' as string]: 'rgba(0,0,0,0.10)',
       } as React.CSSProperties}
     >

@@ -171,7 +171,9 @@ export default function MicroQuestBoard({ sessionId, role }: MicroQuestBoardProp
     await writeModuleState(sessionId, { 'moduleState.mqQuests': next }, { label: 'MicroQuestBoard' })
     if (!clientId) return
     try {
-      await setDoc(doc(db, 'patients', clientId), { quests: next }, { merge: true })
+      // sessionId lets firestore.rules confirm the therapist and this patient
+      // share the session; a therapist cannot touch other patients' records.
+      await setDoc(doc(db, 'patients', clientId), { quests: next, sessionId }, { merge: true })
     } catch (err) {
       console.warn('[MicroQuestBoard] Could not save quests to the patient record', err)
       toast("Could not save quests to your client's record. They'll still show in this session.", 'warning')

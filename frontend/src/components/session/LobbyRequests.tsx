@@ -422,6 +422,7 @@ export default function LobbyRequests({
       {/* Portalled to <body> so no ancestor's stacking or clipping affects it. */}
       {confirmRemove && createPortal(
         <div
+          aria-hidden="true"
           onClick={() => setConfirmRemove(null)}
           style={{
             position: 'fixed',

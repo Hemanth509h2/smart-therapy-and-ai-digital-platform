@@ -1,6 +1,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=DM+Serif+Display:ital@0;1&display=swap');
+/* DM Sans, DM Serif Display, Manrope and Sora are self-hosted (@fontsource,
+ * imported in app/fonts.ts), so no page asks Google's font CDN for them. */
 
 @tailwind base;
 @tailwind components;
@@ -53,7 +54,7 @@
   --nav-bg: rgba(245, 239, 228, 0.7);
   --ink: #2C1F0E;
   --ink-muted: #6B5843;
-  --ink-faint: rgba(107, 88, 67, 0.75);
+  --ink-faint: rgba(107, 88, 67, 0.9); /* 4.8:1 on the page background (was .75, 3.5:1) */
   --glass-shadow: 0 1px 3px rgba(139, 99, 64, 0.07), 0 6px 18px rgba(139, 99, 64, 0.06);
   --glass-shadow-lg: 0 10px 24px rgba(139, 99, 64, 0.14);
   /* `--sage` = primary accent #8B6340 (variable name kept for compatibility) */
@@ -108,7 +109,7 @@
   --glass-strong: rgba(18, 28, 25, 0.92);
   --ink: #ffffff;
   --ink-muted: rgba(255, 255, 255, 0.5);
-  --ink-faint: rgba(255, 255, 255, 0.18);
+  --ink-faint: rgba(255, 255, 255, 0.48); /* 4.8:1 on the dark background (was .18, 1.8:1) */
   --glass-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   --glass-shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.4);
   --nav-bg: rgba(18, 28, 25, 0.92);
@@ -564,4 +565,17 @@ select.ds-input {
   --sileo-state-warning: #8a5d05;
   --sileo-state-info: #345f94;
   --sileo-state-action: #4a43b8;
+}
+
+/* ---------------------------------------------------------------------------
+ * Keyboard focus (WCAG 2.4.7). Many components remove the browser outline
+ * (`outline: none` in CSS or inline styles); this puts a clearly visible ring
+ * back for keyboard users only (:focus-visible never fires on mouse clicks of
+ * buttons). !important so it also beats inline `outline: none`.
+ * ------------------------------------------------------------------------- */
+:root { --focus-ring: #1d4ed8; }
+.dark, [data-theme='dark'] { --focus-ring: #93c5fd; }
+:focus-visible {
+  outline: 3px solid var(--focus-ring) !important;
+  outline-offset: 2px !important;
 }

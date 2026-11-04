@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { updateModuleState, subscribeToModuleState } from '@/services/sessionSync';
 import { logModuleEvent } from '@/lib/sessionEvents';
 import { staadSpeak, staadCancel } from '@/lib/voice/staadVoice';
+import { evaluateArithmetic } from '@/lib/safeArithmetic';
 
 interface CalcState {
   display: string;
@@ -24,8 +25,9 @@ export default function TalkingCalculatorModule({ sessionId, isLocked }: Talking
 
   useEffect(() => {
     const unsubscribe = subscribeToModuleState(sessionId, 'talking_calculator', (syncedState) => {
-      if (syncedState) {
-        setState(syncedState);
+      // Shared state is written by the other participant: accept plain strings only.
+      if (syncedState && typeof syncedState.display === 'string' && typeof syncedState.speech === 'string') {
+        setState({ display: syncedState.display.slice(0, 200), speech: syncedState.speech.slice(0, 200) });
       }
     });
     return () => unsubscribe();
@@ -41,18 +43,20 @@ export default function TalkingCalculatorModule({ sessionId, isLocked }: Talking
       nextDisplay = '';
       nextSpeech = 'Cleared';
     } else if (val === '=') {
-      try {
-        const evalResult = eval(state.display);
-        nextDisplay = String(evalResult);
-        nextSpeech = `Equals ${evalResult}`;
+      // Never eval(): the display comes from shared session state, which the
+      // other participant can write.
+      const result = evaluateArithmetic(state.display);
+      if (result === null) {
+        nextDisplay = 'Error';
+        nextSpeech = 'Try again';
+      } else {
+        nextDisplay = String(result);
+        nextSpeech = `Equals ${result}`;
         logModuleEvent(sessionId, {
           module: 'talking_calculator',
           type: 'calculation',
-          detail: `Worked out ${state.display} = ${evalResult}`,
+          detail: `Worked out ${state.display} = ${result}`,
         });
-      } catch (err) {
-        nextDisplay = 'Error';
-        nextSpeech = 'Try again';
       }
     } else {
       nextDisplay += val;

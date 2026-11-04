@@ -5,10 +5,15 @@ import { therapistIdForUser } from '@/lib/core/links';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { requireTherapist } from '@/lib/http/progressAuth';
+import { checkAIConsent } from '@/lib/sessions/transcript-store';
+import { deliver, notify } from '@/lib/email/notify';
+import { reportReadyEmail } from '@/lib/email/templates';
+import { emailForUser } from '@/lib/email/recipients';
 import { generateSessionReport } from '@/lib/reports/generate';
 import { getReportStats } from '@/lib/reports/session-data';
 import { errorResponse } from '@/lib/http/apiError';
 import { handle, queryParams, send } from '@/lib/http/reply';
+import { rejectIfLimited } from '@/lib/http/rateLimit';
 
 export const router = Router();
 
@@ -67,6 +72,9 @@ router.post('/session-report', handle(async (req, res) => {
   try {
     const auth = await requireTherapist(req)
     if (!auth.ok) return send(res, auth.response)
+    // Each generation is a long LLM request.
+    if (await rejectIfLimited(res, { name: 'session-report', limit: 20, windowMs: 60 * 60 * 1000 }, auth.uid,
+      'You have generated many reports in the last hour. Wait a little and try again.')) return
 
     const { sessionId } = req.body
     if (!sessionId) {
@@ -84,6 +92,19 @@ router.post('/session-report', handle(async (req, res) => {
     const noPlan = await requireActivePlan({ therapistId: session.therapistId }, 'generate a session report')
     if (noPlan) return send(res, noPlan)
 
+    // The report sends the session's notes, activity and transcript to a
+    // third-party LLM, so it needs the same consent as the in-call AI features:
+    // both the therapist and the client agreed at the start of the session.
+    // Same dev-only bypass as /api/ai-insight, never in production.
+    const sttTestMode =
+      process.env.NEXT_PUBLIC_STT_TEST_MODE === 'true' &&
+      process.env.NODE_ENV !== 'production'
+    if (!sttTestMode && !(await checkAIConsent(sessionId))) {
+      return res.status(403).json({
+        error: "An AI report needs both you and the client to have allowed AI features for this session. You can still write your own notes.",
+      })
+    }
+
     const priorCount = await prisma.session.count({
       where: {
         therapistId: session.therapistId,
@@ -93,7 +114,8 @@ router.post('/session-report', handle(async (req, res) => {
     })
 
     const { content, model, stats } = await generateSessionReport(sessionId, {
-      name: `${session.client.firstName} ${session.client.lastName}`.trim(),
+      // First name only: the model doesn't need the client's full name.
+      name: session.client.firstName.trim(),
       age: ageFrom(session.client.dateOfBirth),
       conditions: session.client.diagnosis,
       sessionNumber: priorCount,
@@ -118,6 +140,13 @@ router.post('/session-report', handle(async (req, res) => {
       },
     })
 
+    // Usually requested as the call ends (keepalive), so the therapist may
+    // have left the page: tell them the draft is waiting.
+    await deliver(notify('sessions', await emailForUser(auth.uid), reportReadyEmail({
+      firstName: auth.therapist.firstName,
+      sessionDate: session.startedAt ?? session.scheduledAt,
+    })))
+
     return res.json({ report, stats })
   } catch (e: any) {
     return send(res, errorResponse(e, 'session-report generate', "We couldn't generate the report. Please try again."))
@@ -134,6 +163,9 @@ router.patch('/session-report', handle(async (req, res) => {
     const { sessionId, content } = req.body
     if (!sessionId || typeof content !== 'string') {
       return res.status(400).json({ error: "The report can't be empty. Add some text and save again." })
+    }
+    if (content.length > 100_000) {
+      return res.status(400).json({ error: 'The report is too long (at most 100,000 characters).' })
     }
     const noPlan = await requireActivePlan({ therapistId: auth.therapist.id }, 'edit session reports')
     if (noPlan) return send(res, noPlan)

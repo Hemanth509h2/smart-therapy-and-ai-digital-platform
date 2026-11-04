@@ -57,7 +57,7 @@ export default function WorryBox({ sessionId, role, isLocked }: WorryBoxProps) {
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const cRef = useRef<HTMLDivElement>(null)
-  const tmr = useRef<ReturnType<typeof setTimeout>>()
+  const tmr = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const worriesRef = useRef(worries)
   worriesRef.current = worries
 

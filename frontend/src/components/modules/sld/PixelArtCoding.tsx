@@ -511,7 +511,7 @@ export default function PixelArtCoding({ sessionId, role, isLocked }: PixelArtCo
   const isDragging = useRef(false)
   const celebIdRef = useRef(0)
   const executeRef = useRef(false)
-  const runTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
+  const runTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const cellsRef = useRef(cells)
   cellsRef.current = cells
   const cursorRef = useRef(cursorPos)

@@ -960,8 +960,8 @@ export default function BuildTogether({ sessionId, role, isLocked }: BuildTogeth
   const [shake, setShake] = useState(false)
   const [burst, setBurst] = useState(false)
   const [fqOpen, setFqOpen] = useState(true)
-  const shakeT = useRef<ReturnType<typeof setTimeout>>()
-  const burstT = useRef<ReturnType<typeof setTimeout>>()
+  const shakeT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const burstT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const write = useCallback(async (d: Record<string, unknown>) => {
     try { await updateDoc(doc(db, 'liveSessions', sessionId), { ...d, 'timestamps.updatedAt': new Date().toISOString() }) } catch {}

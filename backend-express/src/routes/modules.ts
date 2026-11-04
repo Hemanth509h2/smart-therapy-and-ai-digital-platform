@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { logError } from '@/lib/http/apiError'
 import { appDb } from '@/lib/core/db';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { handle, send } from '@/lib/http/reply';
@@ -23,7 +24,7 @@ router.get('/modules/settings', handle(async (req, res) => {
       featured: rows.filter((r) => r.enabled && r.featured).map((r) => r.moduleId),
     });
   } catch (error: any) {
-    console.error('Module settings GET error:', error);
+    logError('Module settings GET error', error);
     return res.status(500).json({ error: "We couldn't load your tool settings. Refresh the page to try again." });
   }
 }));

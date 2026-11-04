@@ -103,6 +103,10 @@ export function errorResponse(
   if (err instanceof SyntaxError) {
     status = 400;
     error = 'Invalid request body';
+  } else if (e.type === 'entity.too.large') {
+    // body-parser: the request body is over the route's size limit.
+    status = 413;
+    error = 'That is too much data to send at once. Shorten it and try again.';
   } else if (PRISMA_STATUS[e.code] && String(e.name).startsWith('PrismaClient')) {
     ({ status, error } = PRISMA_STATUS[e.code]);
   } else if (e.name === 'PrismaClientInitializationError') {

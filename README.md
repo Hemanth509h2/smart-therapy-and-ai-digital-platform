@@ -60,8 +60,8 @@ The whole platform runs on one cloud server with Docker Compose, behind Caddy
 (automatic HTTPS):
 
 ```bash
-cp .env.example .env      # domains, e-mail, feedback database password
-# plus backend-express/.env, frontend/.env, ai/.env and feedback-board/.env
+cp .env.example .env      # domains and e-mail
+# plus backend-express/.env, frontend/.env and ai/.env
 docker compose up -d --build
 ```
 
@@ -70,7 +70,6 @@ docker compose up -d --build
 | `https://APP_DOMAIN` | website (frontend) |
 | `https://APP_DOMAIN/api/...` | backend |
 | `wss://APP_DOMAIN/sarvam-stream` | ai (speech-to-text) |
-| `https://FEEDBACK_DOMAIN` | feedback board (with its own Postgres) |
 | `https://N8N_DOMAIN` | n8n |
 
 Only ports 80 and 443 are open. The step-by-step server setup (DNS, firewall,

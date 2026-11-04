@@ -9,6 +9,7 @@ import { apiErrorMessage, networkErrorMessage } from '@/lib/apiError';
 // The server refused the video token (the message says why).
 class TokenError extends Error {}
 import { toast } from '@/components/practice/ui';
+import { DeviceConsentScreen, useDeviceChoice } from '@/components/session/DeviceConsent';
 import '@livekit/components-styles'
 import { Room, RoomEvent, Track, VideoPresets, type LocalTrackPublication, type RoomOptions } from 'livekit-client'
 import { useEffect, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react'
@@ -72,6 +73,8 @@ interface StaadVideoProps {
   targetLang?: string
   /** Shown to a client while the therapist hasn't joined yet. */
   waitingScreen?: React.ReactNode
+  /** The other participant's name, for the "Before you join" device step. */
+  peerName?: string
   children: React.ReactNode
 }
 
@@ -91,8 +94,13 @@ export default function StaadVideo({
   sourceLang,
   targetLang,
   waitingScreen,
+  peerName,
   children,
 }: StaadVideoProps) {
+  // Camera and microphone are only used once the participant has chosen on the
+  // "Before you join" step (see DeviceConsent.tsx). Until then the room is not
+  // connected and no device is touched.
+  const { choice: devices } = useDeviceChoice()
   const [token, setToken] = useState<string>('')
   const [error, setError] = useState('')
   // Client only: the backend withholds the token until the therapist is in the room.
@@ -194,6 +202,13 @@ export default function StaadVideo({
     if (error) toast(error, 'error')
   }, [error])
 
+  // The browser refused a device (blocked permission, no camera, in use by
+  // another app). The call carries on without it; the controls can retry.
+  const handleMediaDeviceFailure = useCallback((failure?: unknown) => {
+    console.warn('[video] media device failure:', failure)
+    toast("We couldn't use your camera or microphone. Check your browser's permission and try again from the call controls.", 'warning')
+  }, [])
+
   const handleConnected = useCallback(() => setConnected(true), [])
   const handleDisconnected = useCallback(() => setConnected(false), [])
 
@@ -202,6 +217,8 @@ export default function StaadVideo({
       Video unavailable
     </div>
   )
+
+  if (!devices) return <DeviceConsentScreen peerName={peerName} />
 
   if (!token && waiting && waitingScreen) return <>{waitingScreen}</>
 
@@ -226,8 +243,12 @@ export default function StaadVideo({
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
         token={token}
         connect={true}
-        video={true}
-        audio={true}
+        // Exactly what the participant chose on the "Before you join" step.
+        // LiveKit applies these once, when the room connects; after that the
+        // call controls turn devices on and off.
+        video={devices.camera}
+        audio={devices.mic}
+        onMediaDeviceFailure={handleMediaDeviceFailure}
         onConnected={handleConnected}
         onDisconnected={handleDisconnected}
         style={{ width: '100%', height: '100%' }}

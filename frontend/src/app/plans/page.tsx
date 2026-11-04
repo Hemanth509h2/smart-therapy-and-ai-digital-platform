@@ -80,6 +80,22 @@ const planFeatures = (p: Plan) => Array.isArray(p.features) && p.features.length
 
 const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 
+// Billing terms shown wherever someone is about to pay. Accurate to the
+// backend: the order amount is priceMonthly × months, less any coupon
+// (lib/billing/purchase.ts), and nothing renews or charges automatically.
+function BillingNote({ style }: { style?: React.CSSProperties }) {
+  return (
+    <p className="lsub" style={style}>
+      Paid once for the term you choose. Plans <b>never renew or charge you automatically</b>; we email
+      you before your term ends. The total shown is everything you pay, with no extra fees. You can cancel
+      any time from this page.{' '}
+      <a href="/refunds" target="_blank" rel="noopener" style={{ color: 'inherit', textDecoration: 'underline' }}>
+        Refund Policy
+      </a>
+    </p>
+  );
+}
+
 export default function PlansPage() {
   useTherapistGuard();
   const { role, profile, setRoleAndProfile } = useAuthStore();
@@ -513,7 +529,7 @@ export default function PlansPage() {
                     {p.priceMonthly === 0
                       ? 'no charge'
                       : term === 1
-                        ? 'per month, billed monthly'
+                        ? 'per month · paid once, no auto-renewal'
                         : `per month · ${inr(total)} for ${term} months`}
                   </div>
                 </div>
@@ -544,6 +560,8 @@ export default function PlansPage() {
         )}
       </div>
 
+      <BillingNote style={{ margin: '4px 0 0' }} />
+
       <div className="cols">
         <div className="left">
           <Section
@@ -567,7 +585,7 @@ export default function PlansPage() {
                     <Detail label="Status" value={current.cancelledAt ? 'Cancelled' : current.status} />
                     <Detail label="Started" value={fmtDate(current.startedAt)} />
                     <Detail
-                      label={current.cancelledAt ? 'Access ends' : 'Renews / ends'}
+                      label={current.cancelledAt ? 'Access ends' : 'Ends'}
                       value={fmtDate(current.currentPeriodEnd)}
                     />
                     <Detail label="Term" value={`${current.months} month${current.months === 1 ? '' : 's'}`} />
@@ -629,7 +647,17 @@ export default function PlansPage() {
         title={current ? `Cancel ${current.planName}?` : ''}
         description={
           current
-            ? `You keep your plan and tools until ${fmtDate(current.currentPeriodEnd)}. After that it won't renew. No refund is issued for the remaining days, and you can undo this any time before then.`
+            ? (
+                <>
+                  You keep your plan and tools until {fmtDate(current.currentPeriodEnd)}, then your account
+                  moves to the free tier (your clients and notes are kept). Unused days aren&apos;t refunded,
+                  except in the cases in our{' '}
+                  <a href="/refunds" target="_blank" rel="noopener" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                    Refund Policy
+                  </a>
+                  . You can undo this any time before then.
+                </>
+              )
             : ''
         }
         footer={
@@ -807,6 +835,7 @@ export default function PlansPage() {
                   {reqTotal === 0 && ' — nothing to pay'}
                   {!payNow && reqTotal > 0 && ' — you pay after approval'}
                 </p>
+                <BillingNote style={{ marginTop: 8 }} />
               </div>
             )}
 
@@ -839,6 +868,7 @@ export default function PlansPage() {
               <b>{inr(pending.total)}</b>
               {pending.couponCode ? ` with coupon ${pending.couponCode}` : ''}
             </p>
+            <BillingNote />
             {pending.total > 0 && (
               <div>
                 <div className="eyebrow" style={{ marginBottom: 8 }}>

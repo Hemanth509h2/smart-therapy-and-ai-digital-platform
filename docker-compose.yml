@@ -6,9 +6,9 @@
 #   1. Point your domains (DNS "A" records) to this server's public IP.
 #   2. Open ports 80 and 443 in the server's firewall. Nothing else is needed.
 #   3. Copy .env.example to .env next to this file and fill it in
-#      (domains, e-mail, feedback database password).
-#   4. Copy .env.example to .env in backend-express/, frontend/, ai/ and feedback-board/
-#      and fill them in.
+#      (domains and e-mail).
+#   4. Copy .env.example to .env in backend-express/, frontend/ and ai/ and fill
+#      them in.
 #
 # Start everything (builds the images the first time):
 #   docker compose up -d --build
@@ -28,7 +28,6 @@
 #
 # Where each part is reachable (HTTPS, handled by Caddy):
 #   https://APP_DOMAIN        website, API (/api/...) and speech-to-text
-#   https://FEEDBACK_DOMAIN   anonymous feedback board
 #   https://N8N_DOMAIN        n8n automation
 #
 # How the traffic flows:
@@ -62,7 +61,6 @@ services:
     environment:
       # Read by the Caddyfile.
       APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env}
-      FEEDBACK_DOMAIN: ${FEEDBACK_DOMAIN:?Set FEEDBACK_DOMAIN in .env}
       N8N_DOMAIN: ${N8N_DOMAIN:?Set N8N_DOMAIN in .env}
       ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env}
     volumes:
@@ -74,7 +72,6 @@ services:
       - frontend
       - backend
       - ai
-      - feedback-board
       - n8n
     restart: unless-stopped
     logging: *logging
@@ -140,44 +137,6 @@ services:
     logging: *logging
 
   # ---------------------------------------------------------------------------
-  # Feedback board (Next.js). Reached at https://FEEDBACK_DOMAIN
-  # ---------------------------------------------------------------------------
-  feedback-board:
-    build:
-      context: ./feedback-board
-      args:
-        # The address encoded in the /present QR code.
-        NEXT_PUBLIC_PUBLIC_URL: https://${FEEDBACK_DOMAIN}
-        # Optional CAPTCHA (public site key).
-        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
-    # Your settings from feedback-board/.env become environment variables.
-    env_file: ./feedback-board/.env
-    environment:
-      # Use the database container below instead of the address in .env.
-      DATABASE_URL: postgres://feedback:${FEEDBACK_DB_PASSWORD}@feedback-db:5432/feedback
-    depends_on:
-      - feedback-db
-    restart: unless-stopped
-    logging: *logging
-
-  # ---------------------------------------------------------------------------
-  # The feedback board's own database. Not reachable from the internet.
-  # ---------------------------------------------------------------------------
-  feedback-db:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: feedback
-      POSTGRES_PASSWORD: ${FEEDBACK_DB_PASSWORD:?Set FEEDBACK_DB_PASSWORD in .env}
-      POSTGRES_DB: feedback
-    volumes:
-      # The database files, kept between restarts.
-      - feedback-data:/var/lib/postgresql/data
-      # Creates the tables automatically the first time the database starts.
-      - ./feedback-board/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
-    restart: unless-stopped
-    logging: *logging
-
-  # ---------------------------------------------------------------------------
   # n8n automation with the STAAD workflows. Reached at https://N8N_DOMAIN
   # ---------------------------------------------------------------------------
   n8n:
@@ -204,5 +163,4 @@ services:
 volumes:
   caddy-data:
   caddy-config:
-  feedback-data:
   n8n-data:

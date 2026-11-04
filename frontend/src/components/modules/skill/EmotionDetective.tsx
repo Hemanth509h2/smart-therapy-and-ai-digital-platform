@@ -481,7 +481,7 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
   const [facOpen, setFacOpen] = useState(false)
 
   const prevSelected = useRef<string | null>(null)
-  const confettiTimer = useRef<ReturnType<typeof setTimeout>>()
+  const confettiTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const write = useCallback(async (d: Record<string, unknown>) => {
     try { await updateDoc(doc(db, 'liveSessions', sessionId), { ...d, 'timestamps.updatedAt': new Date().toISOString() }) } catch {}
@@ -1014,7 +1014,7 @@ export default function EmotionDetective({ sessionId, role, isLocked }: EmotionD
         <>
           {facOpen && (
             <>
-              <div onClick={() => setFacOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 48 }} />
+              <div aria-hidden="true" onClick={() => setFacOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 48 }} />
               <motion.div
                 initial={{ opacity: 0, y: 8, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}

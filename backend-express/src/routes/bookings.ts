@@ -5,6 +5,8 @@ import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { errorResponse, notYourProfile } from '@/lib/http/apiError';
 import { handle, queryParams, send } from '@/lib/http/reply';
+import { clientOfTherapist } from '@/lib/core/ownership';
+import { optNumber, reqDate } from '@/lib/http/validate';
 
 export const router = Router();
 
@@ -72,6 +74,12 @@ router.post('/bookings', handle(async (req, res) => {
     if (!therapistId || !(await mayAccess(auth.uid, { therapistId }))) {
       return send(res, notYourProfile('this therapist profile'));
     }
+    const when = reqDate(dateTime, 'The booking date');
+    const minutes = optNumber(duration, 'The duration (minutes)', 5, 600);
+    // Only this therapist's own clients.
+    if (!(await clientOfTherapist(therapistId, clientId))) {
+      return res.status(404).json({ error: "We couldn't find that client. They may have been removed." });
+    }
     const noPlan = await requireActivePlan({ therapistId }, 'book a session');
     if (noPlan) return send(res, noPlan);
 
@@ -79,8 +87,8 @@ router.post('/bookings', handle(async (req, res) => {
       data: {
         therapistId,
         clientId,
-        dateTime: new Date(dateTime),
-        duration: duration || 50,
+        dateTime: when,
+        duration: minutes ? Math.round(minutes) : 50,
       },
     });
 

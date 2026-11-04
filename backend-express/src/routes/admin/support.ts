@@ -5,7 +5,7 @@ import { requireAdmin } from '@/lib/http/apiAuth';
 import { dateRange, listParams } from '@/lib/admin/adminList';
 import { errorResponse } from '@/lib/http/apiError';
 import { audit } from '@/lib/admin/audit';
-import nodemailer from 'nodemailer';
+import { mailConfigured, sendMail } from '@/lib/core/mail';
 import { getSetting } from '@/lib/core/settings';
 import { handle, reply, send } from '@/lib/http/reply';
 
@@ -173,20 +173,15 @@ router.post('/admin/support/:id/replies', handle(async (req, res) => {
     let emailError: string | null = null;
     if (!internal) {
       try {
-        const user = process.env.SMTP_USER;
-        const pass = process.env.SMTP_PASS;
-        if (!user || !pass) throw new Error("Email isn't set up on the server yet, so nothing was sent. Ask whoever manages hosting to set it up.");
-        const port = Number(process.env.SMTP_PORT || 587);
-        const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST || 'smtp.gmail.com', port, secure: port === 465, auth: { user, pass } });
-        await transporter.sendMail({
-          from: process.env.SMTP_FROM || `STAAD Helpdesk <${user}>`,
+        if (!mailConfigured()) throw new Error("Email isn't set up on the server yet, so nothing was sent. Ask whoever manages hosting to set it up.");
+        await sendMail('support', {
           to: ticket.email,
           replyTo: await getSetting('support.email'),
           subject: `Re: ${ticket.subject} [${ticket.ref}]`,
           text: `${body}\n\n— STAAD Support\nTicket ${ticket.ref}`,
           html: `<div style="font-family:system-ui,Arial,sans-serif;color:#1f2937;line-height:1.5">
             <p style="white-space:pre-wrap">${escapeHtml(body)}</p>
-            <p style="color:#6b7280">— STAAD Support<br/>Ticket ${ticket.ref}</p></div>`,
+            <p style="color:#6b7280">— STAAD Support<br/>Ticket ${escapeHtml(ticket.ref)}</p></div>`,
         });
         reply = await prisma.supportReply.update({ where: { id: reply.id }, data: { emailed: true } });
       } catch (e: any) {

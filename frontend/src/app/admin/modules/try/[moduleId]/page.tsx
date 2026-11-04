@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { RoomContext } from '@livekit/components-react';
 import { Room } from 'livekit-client';
 import { ChevronLeft, Lock, LockOpen } from 'lucide-react';
@@ -22,7 +22,9 @@ import { ALL_MODULES, isSkillModule } from '@/lib/modules';
 
 type Role = 'therapist' | 'client';
 
-export default function TryModulePage({ params }: { params: { moduleId: string } }) {
+export default function TryModulePage() {
+  // Next 15+ passes `params` as a Promise; read the route segment directly.
+  const params = useParams<{ moduleId: string }>();
   const { moduleId } = params;
   const { uid, role, can } = useAdmin();
   const router = useRouter();

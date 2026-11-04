@@ -6,6 +6,7 @@ import {
   createUserWithEmailAndPassword, 
   signInWithPopup, 
   signOut,
+  sendPasswordResetEmail,
   GoogleAuthProvider 
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -91,8 +92,16 @@ function AuthForm() {
     if (inviteToken) router.replace(`/join/${encodeURIComponent(inviteToken)}`);
   }, [inviteToken, router]);
 
+  // Firebase's own default minimum is 6; ask for 8 here. The real policy is
+  // the password policy set in the Firebase console (Authentication > Settings).
+  const MIN_PASSWORD = 8;
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isLogin && password.length < MIN_PASSWORD) {
+      toast(`Choose a password with at least ${MIN_PASSWORD} characters.`, 'error');
+      return;
+    }
     setLoading(true);
 
     // Redirect happens in the uid effect above once Firebase reports the user.
@@ -107,6 +116,36 @@ function AuthForm() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Firebase emails a single-use reset link that expires after about an hour.
+  // The same message is shown whether or not an account exists, so the form
+  // can't be used to find out which emails are registered.
+  const handleForgotPassword = async () => {
+    const target = email.trim();
+    if (!target) {
+      toast('Enter your email above, then choose "Forgot password?" again.', 'info');
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, target);
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      if (code === 'auth/invalid-email') {
+        toast('That email address doesn’t look right. Check it and try again.', 'error');
+        setLoading(false);
+        return;
+      }
+      if (code === 'auth/too-many-requests') {
+        toast('Too many attempts. Wait a few minutes and try again.', 'error');
+        setLoading(false);
+        return;
+      }
+      // auth/user-not-found and the rest: fall through to the same message.
+    }
+    setLoading(false);
+    toast(`If an account exists for ${target}, we’ve emailed a link to reset the password. It expires in about an hour.`, 'success');
   };
 
   const handleGoogleAuth = async () => {
@@ -227,11 +266,30 @@ function AuthForm() {
                 value={password} 
                 onChange={(e) => setPassword(e.target.value)} 
                 required 
+                minLength={isLogin ? undefined : MIN_PASSWORD}
+                autoComplete={isLogin ? 'current-password' : 'new-password'}
+                aria-describedby={isLogin ? undefined : 'password-hint'}
                 className="rounded-xl border focus-visible:ring-[var(--sage)]/40"
                 style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--ink)' }}
               />
+              {isLogin ? (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    disabled={loading}
+                    className="text-xs font-semibold hover:underline"
+                    style={{ color: 'var(--sage)' }}
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              ) : (
+                <p id="password-hint" className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+                  At least {MIN_PASSWORD} characters.
+                </p>
+              )}
             </div>
-            
 
             <Button 
               type="submit" 
@@ -307,6 +365,10 @@ function AuthForm() {
               {' · '}
               <a href="/terms" target="_blank" rel="noopener" className="font-semibold hover:underline" style={{ color: 'var(--sage)' }}>
                 Terms &amp; Conditions
+              </a>
+              {' · '}
+              <a href="/privacy#contact" target="_blank" rel="noopener" className="font-semibold hover:underline" style={{ color: 'var(--sage)' }}>
+                Grievances
               </a>
             </p>
           </div>

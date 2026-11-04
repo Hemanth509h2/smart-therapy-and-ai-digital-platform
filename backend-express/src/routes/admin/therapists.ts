@@ -6,7 +6,7 @@ import { daysAgo, listParams } from '@/lib/admin/adminList';
 import { resolveCurrent, serializeSubscription, addMonths } from '@/lib/billing/subscriptions';
 import { errorResponse } from '@/lib/http/apiError';
 import { audit } from '@/lib/admin/audit';
-import nodemailer from 'nodemailer';
+import { mailConfigured, sendMail } from '@/lib/core/mail';
 import { can } from '@/lib/admin/adminRoles';
 import { handle, send } from '@/lib/http/reply';
 
@@ -434,23 +434,11 @@ router.post('/admin/therapists/:id/message', handle(async (req, res) => {
     const to = (await prisma.user.findUnique({ where: { id: therapist.userId }, select: { email: true } }))?.email;
     if (!to) return res.status(400).json({ error: "This professional has no email address, so we can't email them." });
 
-    const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-    const port = Number(process.env.SMTP_PORT || 587);
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
-    if (!user || !pass) {
+    if (!mailConfigured()) {
       return res.status(503).json({ error: "Email isn't set up on the server yet, so nothing was sent. Ask whoever manages hosting to set it up." });
     }
 
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465, // true for 465, false for 587 (STARTTLS)
-      auth: { user, pass },
-    });
-
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || `STAAD <${user}>`,
+    await sendMail('account', {
       to,
       replyTo: auth.email || undefined,
       subject: subj,

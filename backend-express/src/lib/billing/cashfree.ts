@@ -10,6 +10,10 @@ import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { appDb } from '@/lib/core/db';
 import { activatePlan } from '@/lib/billing/subscriptions';
 import { closeOpenRequests } from '@/lib/billing/purchase';
+import { alertAdmins, notify } from '@/lib/email/notify';
+import { paymentFailedEmail, paymentReceiptEmail } from '@/lib/email/templates';
+import { paymentAlert } from '@/lib/email/alerts';
+import { emailForUser, therapistContact } from '@/lib/email/recipients';
 
 const API_VERSION = '2026-01-01';
 
@@ -159,6 +163,24 @@ export async function syncCashfreeOrder(orderId: string, opts: { fromWebhook?: b
   const existing = await appDb.payment.findUnique({ where: { id: orderId } });
   if (existing) {
     const orderStatus = existing.orderStatus === 'PAID' ? 'PAID' : order.order_status;
+
+    // A newly seen failed or abandoned attempt (a new cf_payment_id, or a new
+    // status for the same one) gets one email. The conditional update is the
+    // claim: when the webhook and a browser poll see it at the same moment,
+    // only one of them changes the row and sends.
+    let failedAttempt = false;
+    if (
+      latest && orderStatus !== 'PAID' && existing.planId &&
+      (latest.payment_status === 'FAILED' || latest.payment_status === 'USER_DROPPED') &&
+      !(existing.paymentStatus === latest.payment_status && existing.cfPaymentId === String(latest.cf_payment_id))
+    ) {
+      const claim = await appDb.payment.updateMany({
+        where: { id: orderId, paymentStatus: existing.paymentStatus, cfPaymentId: existing.cfPaymentId },
+        data: { paymentStatus: latest.payment_status, cfPaymentId: String(latest.cf_payment_id) },
+      });
+      failedAttempt = claim.count === 1;
+    }
+
     await appDb.payment.update({
       where: { id: orderId },
       data: {
@@ -175,7 +197,24 @@ export async function syncCashfreeOrder(orderId: string, opts: { fromWebhook?: b
         ...(opts.fromWebhook ? { lastWebhookAt: new Date() } : {}),
       },
     });
-    if (orderStatus === 'PAID') await activatePaidPlan(orderId);
+    if (orderStatus === 'PAID') {
+      // Only activate what was actually paid for: the order Cashfree holds
+      // must have the amount and currency we stored when creating it. Orders
+      // are created server-side, so a mismatch means something is wrong; it is
+      // logged and left for an admin instead of granting the plan.
+      const paidAmount = Math.round(Number(order.order_amount) * 100);
+      const expectedAmount = Math.round(Number(existing.amount) * 100);
+      if (paidAmount === expectedAmount && order.order_currency === existing.currency) {
+        const activated = await activatePaidPlan(orderId);
+        if (activated) await sendPaymentEmails(orderId, true);
+      } else {
+        console.error(
+          `[cashfree] order ${orderId} is PAID but does not match the stored order ` +
+            `(amount ${order.order_amount} ${order.order_currency} vs ${existing.amount} ${existing.currency}); plan not activated`
+        );
+      }
+    }
+    if (failedAttempt) await sendPaymentEmails(orderId, false);
   }
 
   return { order, payments, existing };
@@ -188,17 +227,17 @@ export async function syncCashfreeOrder(orderId: string, opts: { fromWebhook?: b
  * sees count 0 and returns. Any failure rolls the claim back, so the next
  * webhook retry or status check tries again.
  */
-async function activatePaidPlan(orderId: string) {
-  await appDb.$transaction(async (tx) => {
+async function activatePaidPlan(orderId: string): Promise<boolean> {
+  return appDb.$transaction(async (tx) => {
     const payment = await tx.payment.findUnique({ where: { id: orderId } });
-    if (!payment?.planId || !payment.therapistId || !payment.months || payment.subscriptionId) return;
+    if (!payment?.planId || !payment.therapistId || !payment.months || payment.subscriptionId) return false;
 
     const subscriptionId = randomUUID();
     const claimed = await tx.payment.updateMany({
       where: { id: orderId, subscriptionId: null },
       data: { subscriptionId },
     });
-    if (claimed.count === 0) return;
+    if (claimed.count === 0) return false;
 
     // Honour the purchase even if the plan was deactivated after checkout.
     const plan = await tx.plan.findUnique({ where: { id: payment.planId } });
@@ -222,5 +261,47 @@ async function activatePaidPlan(orderId: string) {
     }
     await closeOpenRequests(tx, payment.therapistId, payment.requestId);
     console.log(`[cashfree] order ${orderId} paid — activated ${plan.name} for therapist ${payment.therapistId}`);
+    return true;
   });
+}
+
+/**
+ * Receipt (or "payment not completed") to the payer, plus an admin alert.
+ * Called only by the one caller that claimed the activation or the failed
+ * attempt, so each goes out once. Never throws.
+ */
+async function sendPaymentEmails(orderId: string, ok: boolean) {
+  try {
+    const payment = await appDb.payment.findUnique({ where: { id: orderId } });
+    if (!payment?.planId) return;
+    const [plan, contact, payerEmail, subscription] = await Promise.all([
+      appDb.plan.findUnique({ where: { id: payment.planId }, select: { name: true } }),
+      therapistContact(payment.therapistId),
+      emailForUser(payment.userId),
+      payment.subscriptionId
+        ? appDb.subscription.findUnique({ where: { id: payment.subscriptionId }, select: { currentPeriodEnd: true } })
+        : null,
+    ]);
+    const planName = plan?.name ?? 'STAAD';
+    const amount = Number(payment.amount);
+    const to = payerEmail ?? contact?.email;
+    await Promise.all([
+      ok
+        ? notify('billing', to, paymentReceiptEmail({
+            firstName: contact?.firstName,
+            planName,
+            months: payment.months ?? 1,
+            amount,
+            discount: payment.discount != null ? Number(payment.discount) : null,
+            couponCode: payment.couponCode,
+            orderId: payment.id,
+            paidAt: payment.paidAt ?? new Date(),
+            periodEnd: subscription?.currentPeriodEnd ?? null,
+          }))
+        : notify('billing', to, paymentFailedEmail({ firstName: contact?.firstName, planName, amount, orderId: payment.id })),
+      alertAdmins('billing', paymentAlert({ ok, therapistName: contact?.fullName ?? 'A therapist', planName, amount, orderId: payment.id })),
+    ]);
+  } catch (e) {
+    console.error('[cashfree] payment email', e instanceof Error ? e.name : typeof e);
+  }
 }

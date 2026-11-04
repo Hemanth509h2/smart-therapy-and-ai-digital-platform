@@ -221,9 +221,13 @@ def test_internal_rejects_tokens_for_other_features(monkeypatch, scope):
     assert asyncio.run(run()) == (1008, "Unauthorized")
 
 
-def test_internal_refuses_everything_in_production_without_a_secret():
+def test_internal_refuses_everything_without_a_secret():
     assert internal.authorize({}, env={"NODE_ENV": "production"}) == "Internal auth not configured"
-    assert internal.authorize({}, env={}) is None
+    # Fails closed in development too, unless a developer opts in...
+    assert internal.authorize({}, env={}) == "Internal auth not configured"
+    assert internal.authorize({}, env={"AI_DEV_NO_AUTH": "true"}) is None
+    # ...and the opt-in is ignored in production.
+    assert internal.authorize({}, env={"AI_DEV_NO_AUTH": "true", "NODE_ENV": "production"}) == "Internal auth not configured"
 
 
 def test_internal_reports_bad_requests_and_missing_key():
@@ -244,4 +248,14 @@ def test_internal_turns_model_failures_into_an_error_reply(monkeypatch):
 
 def test_origin_less_clients_are_allowed_when_origins_are_set():
     assert server.allowed_origins({"ALLOWED_ORIGINS": "https://app.example"}) == ["https://app.example", None]
-    assert server.allowed_origins({}) is None
+
+
+def test_unset_origins_allow_only_the_local_site():
+    assert server.allowed_origins({}) == ["http://localhost:3000", "http://127.0.0.1:3000", None]
+
+
+def test_plain_http_responses_carry_security_headers():
+    raw = server.probe_response([b"GET", b"/health", b"HTTP/1.0"]).decode()
+    assert "X-Content-Type-Options: nosniff" in raw
+    assert "X-Frame-Options: DENY" in raw
+    assert "Strict-Transport-Security:" in raw

@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client';
 import type { Prisma as AppPrisma } from '.prisma/app-client';
 import { prisma, appDb } from '@/lib/core/db';
 import { usersById } from '@/lib/core/links';
-import nodemailer from 'nodemailer';
+import { mailConfigured, sendMail } from '@/lib/core/mail';
 import { requireAdmin, requireRecentLogin } from '@/lib/http/apiAuth';
 import { audit } from '@/lib/admin/audit';
 import { adminAuth } from '@/lib/core/firebaseAdmin';
@@ -11,7 +11,7 @@ import { appUrl } from '@/lib/core/app-url';
 import { dateRange, daysAgo, listParams } from '@/lib/admin/adminList';
 import { resolveCurrent } from '@/lib/billing/subscriptions';
 import { ALL_MODULE_IDS } from '@/lib/modules/modules';
-import { errorResponse } from '@/lib/http/apiError';
+import { errorResponse, logError } from '@/lib/http/apiError';
 import { handle, send } from '@/lib/http/reply';
 
 export const router = Router();
@@ -246,6 +246,14 @@ router.post('/admin/professionals', handle(async (req, res) => {
       if (await prisma.user.findUnique({ where: { id: uid }, select: { id: true } })) {
         return res.status(409).json({ error: `An account with ${email} already exists. Find it in the professionals list instead.` });
       }
+      // Someone already signed up with this email but never finished. The
+      // sign-in belongs to them, so an admin may attach a profile to it but
+      // never set or reset its password (that would hand the admin the account).
+      if (password) {
+        return res.status(409).json({
+          error: `${email} already has a STAAD sign-in. Create the profile without setting a password; they keep signing in with their own password (or "Forgot password").`,
+        });
+      }
     } else {
       uid = '';
     }
@@ -255,9 +263,7 @@ router.post('/admin/professionals', handle(async (req, res) => {
       return res.status(409).json({ error: 'This phone number is already used by another professional. Use a different number.' });
     }
 
-    if (existing) {
-      if (password) await fb.updateUser(uid, { password });
-    } else {
+    if (!existing) {
       const created = await fb.createUser({
         email,
         displayName: `${firstName} ${lastName}`.trim(),
@@ -289,19 +295,30 @@ router.post('/admin/professionals', handle(async (req, res) => {
       const record = await fb.getUser(uid);
       await fb.setCustomUserClaims(uid, { ...(record.customClaims ?? {}), role: 'THERAPIST' });
     } catch (e: any) {
-      console.error('Failed to set role claim for', uid, e?.message);
+      logError(`Failed to set role claim for ${uid}`, e);
     }
 
-    // No password chosen: send a link to set one (also returned for copying).
+    // No password chosen: send a link to set one (also returned so the admin
+    // can share it on WhatsApp). Not for a sign-in that already existed: its
+    // owner already has a password, and a reset link handed to the admin
+    // would let the admin take the account over.
     let setupLink: string | null = null;
     let emailed = false;
-    if (!password) {
-      setupLink = await fb
-        .generatePasswordResetLink(email, { url: `${appUrl(req)}/auth` })
-        .catch((e: any) => {
-          console.error('Password setup link failed:', e?.message);
-          return null;
-        });
+    if (!password && createdFirebaseUser) {
+      // The account already exists by now, so a missing APP_URL must not fail
+      // the request: no link, and the admin is told to use "Forgot password".
+      let signInUrl: string | null = null;
+      try {
+        signInUrl = `${appUrl(req)}/auth`;
+      } catch (e) {
+        logError('Password setup link skipped', e);
+      }
+      setupLink = signInUrl
+        ? await fb.generatePasswordResetLink(email, { url: signInUrl }).catch((e: any) => {
+            logError('Password setup link failed', e);
+            return null;
+          })
+        : null;
       if (setupLink) emailed = await sendWelcomeEmail(email, firstName, setupLink, auth.email);
     }
 
@@ -328,24 +345,14 @@ router.post('/admin/professionals', handle(async (req, res) => {
 // Welcome email with the set-password link (same SMTP setup as admin invites).
 // Returns false instead of throwing when SMTP isn't configured or fails.
 async function sendWelcomeEmail(to: string, firstName: string, link: string, createdBy: string | null) {
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  if (!user || !pass) {
+  if (!mailConfigured()) {
     console.warn('Professional welcome email not sent: SMTP_USER / SMTP_PASS missing');
     return false;
   }
   try {
-    const port = Number(process.env.SMTP_PORT || 587);
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-    });
     const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const by = createdBy ? ` by ${createdBy}` : '';
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || `STAAD <${user}>`,
+    await sendMail('account', {
       to,
       subject: 'Your STAAD account is ready',
       text: [
@@ -367,7 +374,7 @@ async function sendWelcomeEmail(to: string, firstName: string, link: string, cre
     });
     return true;
   } catch (e: any) {
-    console.error('Professional welcome email failed:', e?.message);
+    logError('Professional welcome email failed', e);
     return false;
   }
 }

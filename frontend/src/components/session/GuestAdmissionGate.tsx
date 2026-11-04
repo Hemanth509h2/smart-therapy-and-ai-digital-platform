@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '@/lib/api'
 import WaitingLobby from './WaitingLobby'
+import { DeviceConsentScreen, useDeviceChoice } from './DeviceConsent'
 
 type GateStatus = 'checking' | 'waiting' | 'admitted' | 'denied' | 'removed' | 'invalid'
 
@@ -35,6 +36,9 @@ export default function GuestAdmissionGate({
 }) {
   const [status, setStatus] = useState<GateStatus>('checking')
   const [therapistName, setTherapistName] = useState<string | undefined>()
+  // The guest chooses camera/microphone before the waiting room (which has a
+  // camera preview) and before the call. See DeviceConsent.tsx.
+  const { choice } = useDeviceChoice()
 
   useEffect(() => {
     let stopped = false
@@ -124,6 +128,8 @@ export default function GuestAdmissionGate({
       </main>
     )
   }
+
+  if (!choice) return <DeviceConsentScreen peerName={therapistName} />
 
   const who = therapistName || 'your therapist'
   return (

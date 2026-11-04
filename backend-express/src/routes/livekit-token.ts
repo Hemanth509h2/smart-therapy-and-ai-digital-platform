@@ -4,6 +4,7 @@ import { prisma } from '@/lib/core/db';
 import { therapistIdForUser } from '@/lib/core/links';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { getLobbyEntry } from '@/lib/sessions/lobby';
+import { checkAIConsent } from '@/lib/sessions/transcript-store';
 import { isTranslationLanguage } from '@/lib/sessions/translationLanguages';
 import { handle, queryParams, send } from '@/lib/http/reply';
 
@@ -24,9 +25,11 @@ router.get('/livekit-token', handle(async (req, res) => {
   if (!roomName || !participantName) {
     return res.status(400).json({ error: "We couldn't tell which session to join. Open the session link again." })
   }
+  // The display name shown to the other side: printable text, trimmed and
+  // capped. Never used to decide who someone is.
+  const displayName = participantName.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 80) || 'Guest'
 
-  // `identity` is the display name, which says nothing about who the person is
-  // in the session. Publishing the role as participant metadata makes it
+  // The display name says nothing about who the person is in the session. Publishing the role as participant metadata makes it
   // readable by the other side of the call, so a peer can tell the client from
   // the therapist instead of guessing "whoever isn't me".
   //
@@ -72,15 +75,30 @@ router.get('/livekit-token', handle(async (req, res) => {
   // the agent falls back to its own defaults rather than trusting free text.
   // `uid` lets the server find this participant again (identity is only the
   // display name), e.g. when the therapist removes a guest from the call.
+  //
+  // The languages switch on the translation agent (audio to speech-to-text),
+  // so they are only signed in once both participants have consented to AI
+  // features; until then the agent stays off for this person. Same dev-only
+  // bypass as /api/stt-token, never in production.
   const attributes: Record<string, string> = { role: claimedRole, uid: auth.uid }
-  if (isTranslationLanguage(sourceLang)) attributes.source_lang = sourceLang
-  if (isTranslationLanguage(targetLang)) attributes.target_lang = targetLang
+  const wantsTranslation = isTranslationLanguage(sourceLang) || isTranslationLanguage(targetLang)
+  const sttTestMode =
+    process.env.NEXT_PUBLIC_STT_TEST_MODE === 'true' &&
+    process.env.NODE_ENV !== 'production'
+  if (wantsTranslation && (sttTestMode || (await checkAIConsent(roomName)))) {
+    if (isTranslationLanguage(sourceLang)) attributes.source_lang = sourceLang
+    if (isTranslationLanguage(targetLang)) attributes.target_lang = targetLang
+  }
 
   const at = new AccessToken(
     process.env.LIVEKIT_API_KEY!,
     process.env.LIVEKIT_API_SECRET!,
     {
-      identity: participantName,
+      // The identity is the verified uid, so nobody can join under another
+      // participant's identity (LiveKit would disconnect the original holder)
+      // by choosing the same display name. The name is shown separately.
+      identity: auth.uid,
+      name: displayName,
       // Metadata is kept for backwards compatibility: attention scoring reads
       // the role from here, not from attributes.
       metadata: JSON.stringify({ role: claimedRole }),

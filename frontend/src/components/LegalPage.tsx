@@ -2,6 +2,7 @@ import React from 'react';
 import { Btn } from '@/components/staad/parts';
 import { IconArrowRightXs } from '@/components/staad/icons';
 import type { PolicyBlock, PolicySection } from '@/content/legal';
+import CookieSettingsButton from '@/components/CookieSettingsButton';
 
 const para: React.CSSProperties = { margin: '0 0 14px', fontSize: 15, lineHeight: '25px', color: 'var(--ink)' };
 
@@ -23,13 +24,20 @@ interface Props {
   updated: string;
   intro: string[];
   sections: PolicySection[];
-  // The other legal page, linked in the footer.
-  related: { href: string; label: string };
+  // This page's path, left out of the footer links to the other legal pages.
+  current: string;
 }
+
+const LEGAL_LINKS = [
+  { href: '/privacy', label: 'Privacy Policy' },
+  { href: '/terms', label: 'Terms & Conditions' },
+  { href: '/refunds', label: 'Refund Policy' },
+  { href: '/subprocessors', label: 'Sub-processors' },
+];
 
 // Public pages: reachable signed out (see AuthProvider) so they can be linked
 // from sign-up, the session consent prompt and guest invites.
-export default function LegalPage({ title, updated, intro, sections, related }: Props) {
+export default function LegalPage({ title, updated, intro, sections, current }: Props) {
   return (
     <main className="staad-ui" style={{ padding: '48px 16px 80px' }}>
       <article style={{ maxWidth: 760, margin: '0 auto' }}>
@@ -81,8 +89,11 @@ export default function LegalPage({ title, updated, intro, sections, related }: 
           }}
         >
           <Btn variant="primary" icon={<IconArrowRightXs />} href="/">Go to home</Btn>
-          <Btn variant="ghost" href={related.href}>{related.label}</Btn>
+          {LEGAL_LINKS.filter((l) => l.href !== current).map((l) => (
+            <Btn key={l.href} variant="ghost" href={l.href}>{l.label}</Btn>
+          ))}
           <Btn variant="ghost" href="/help">Help &amp; Support</Btn>
+          <CookieSettingsButton />
         </footer>
       </article>
     </main>

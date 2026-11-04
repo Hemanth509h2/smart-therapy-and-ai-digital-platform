@@ -20,7 +20,7 @@ import { db } from '@/lib/firestore'
  *
  * CURRENT STATE — only attention entries are written here.
  * Transcript entries still go to the `transcript` array on `sessions/{id}`
- * (see useSessionTranscription.writeChunk / lib/rag/transcript-store.ts) and
+ * (see useSessionTranscription.writeChunk / backend-express/src/lib/sessions/transcript-store.ts) and
  * were deliberately left untouched. So a diary read-back is NOT yet a complete
  * interleaved picture of the session. Dual-writing transcripts into this
  * collection is a tracked follow-up.

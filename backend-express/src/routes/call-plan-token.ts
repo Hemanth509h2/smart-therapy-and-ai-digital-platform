@@ -7,6 +7,7 @@ import { checkAIConsent } from '@/lib/sessions/transcript-store';
 import { getSetting } from '@/lib/core/settings';
 import { errorResponse } from '@/lib/http/apiError';
 import { handle, send } from '@/lib/http/reply';
+import { rejectIfLimited } from '@/lib/http/rateLimit';
 
 export const router = Router();
 
@@ -23,6 +24,7 @@ router.post('/call-plan-token', handle(async (req, res) => {
   try {
     const auth = await requireTherapist(req);
     if (!auth.ok) return send(res, auth.response);
+    if (await rejectIfLimited(res, { name: 'call-plan-token', limit: 30, windowMs: 10 * 60 * 1000 }, auth.uid)) return;
 
     if (!(await getSetting('features.aiInsights'))) {
       return res.status(503).json({ error: 'AI insights are turned off by an admin.' });

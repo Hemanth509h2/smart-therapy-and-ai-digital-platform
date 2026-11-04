@@ -1716,7 +1716,7 @@ export default function TreasureQuest({
 
   // At most one position packet per MOVE_SEND_MS, always carrying the latest spot.
   const pendingMove = useRef<{ x: number; z: number; rot: number } | null>(null)
-  const moveTimer = useRef<ReturnType<typeof setTimeout>>()
+  const moveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const sendMove = useCallback((x: number, z: number, rot: number) => {
     pendingMove.current = { x, z, rot }
     if (moveTimer.current) return
@@ -1727,8 +1727,8 @@ export default function TreasureQuest({
     }, MOVE_SEND_MS)
   }, [sendLive])
 
-  const advanceT = useRef<ReturnType<typeof setTimeout>>()
-  const shakeT = useRef<ReturnType<typeof setTimeout>>()
+  const advanceT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const shakeT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const write = useCallback(
     async (d: Record<string, unknown>) => {

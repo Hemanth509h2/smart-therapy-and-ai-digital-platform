@@ -14,7 +14,7 @@ import { resolveFrame, type FrameConstraints, type FrameSize } from '@/lib/video
 export function useResponsiveVideoFrame<T extends HTMLElement>(
   constraints: FrameConstraints = {},
   enabled = true
-): { ref: RefObject<T>; available: FrameSize; frame: FrameSize } {
+): { ref: RefObject<T | null>; available: FrameSize; frame: FrameSize } {
   const ref = useRef<T>(null)
   const [available, setAvailable] = useState<FrameSize>({ width: 0, height: 0 })
 
@@ -39,7 +39,7 @@ export function useResponsiveVideoFrame<T extends HTMLElement>(
  */
 export function useMainVideoFrame<T extends HTMLElement>(
   enabled = true
-): { ref: RefObject<T>; style: React.CSSProperties } {
+): { ref: RefObject<T | null>; style: React.CSSProperties } {
   const ref = useRef<T>(null)
   const [available, setAvailable] = useState<FrameSize>({ width: 0, height: 0 })
 

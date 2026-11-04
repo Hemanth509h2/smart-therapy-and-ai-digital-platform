@@ -18,13 +18,13 @@ behind Caddy, which serves everything over HTTPS with free certificates.
                  +-----------+
                  |   caddy   |  HTTPS certificates, forwards each request
                  +-----------+
-        ┌──────────────┼───────────────────┬─────────────────┐
-        |              |                   |                 |
- https://APP_DOMAIN                https://FEEDBACK_DOMAIN  https://N8N_DOMAIN
-        |                                  |                 |
-  /            -> frontend:3000      feedback-board:3100   n8n:5678
-  /api/...     -> backend:4000             |                 |
-  /sarvam-stream -> ai:4100          feedback-db:5432     (calls backend:4000)
+        ┌──────────────┴───────────────────┐
+        |                                  |
+ https://APP_DOMAIN                 https://N8N_DOMAIN
+        |                                  |
+  /            -> frontend:3000         n8n:5678
+  /api/...     -> backend:4000      (calls backend:4000)
+  /sarvam-stream -> ai:4100
 ```
 
 | Service | What it is | Public address |
@@ -33,8 +33,6 @@ behind Caddy, which serves everything over HTTPS with free certificates.
 | frontend | the website | `https://APP_DOMAIN` |
 | backend | the API | `https://APP_DOMAIN/api/...` |
 | ai | speech-to-text relay | `wss://APP_DOMAIN/sarvam-stream` |
-| feedback-board | anonymous feedback board | `https://FEEDBACK_DOMAIN` |
-| feedback-db | Postgres for the feedback board | not public |
 | n8n | automation workflows | `https://N8N_DOMAIN` |
 
 Why one domain for the website, API and speech-to-text: the browser only ever
@@ -49,15 +47,14 @@ The main database is not in Docker. The backend keeps using the Postgres in
 ## 2. What you need
 
 - **A cloud server:** Ubuntu 24.04 (or similar), with at least **4 GB RAM** and
-  **30 GB disk**. Building the two Next.js apps needs a lot of memory. With
+  **30 GB disk**. Building the Next.js website needs a lot of memory. With
   2 GB, add swap (step 3) and build one service at a time (step 7).
 - **A domain** where you can add DNS records, for example `staad.in`.
-- **Three names on that domain**, for example:
+- **Two names on that domain**, for example:
   - `app.staad.in` (main app)
-  - `feedback.staad.in` (feedback board)
   - `n8n.staad.in` (n8n)
-- **The `.env` files you already use locally** for `backend-express/`, `frontend/`,
-  `ai/` and `feedback-board/`.
+- **The `.env` files you already use locally** for `backend-express/`, `frontend/`
+  and `ai/`.
 
 ---
 
@@ -102,7 +99,6 @@ server's public IP address:
 | Type | Name | Value |
 |---|---|---|
 | A | `app` | server IP |
-| A | `feedback` | server IP |
 | A | `n8n` | server IP |
 
 Wait until they resolve (`ping app.staad.in` shows the server IP). Caddy
@@ -131,11 +127,8 @@ nano .env
 | Setting | Example | What it is |
 |---|---|---|
 | `APP_DOMAIN` | `app.staad.in` | website, API and speech-to-text |
-| `FEEDBACK_DOMAIN` | `feedback.staad.in` | feedback board |
 | `N8N_DOMAIN` | `n8n.staad.in` | n8n |
 | `ACME_EMAIL` | `you@staad.in` | Let's Encrypt expiry warnings |
-| `FEEDBACK_DB_PASSWORD` | output of `openssl rand -hex 24` | feedback database password; set it before the first start |
-| `TURNSTILE_SITE_KEY` | (optional) | feedback board CAPTCHA |
 
 ### 6b. Each service's own settings
 
@@ -146,7 +139,6 @@ from the examples:
 cp backend-express/.env.example        backend-express/.env
 cp frontend/.env.example       frontend/.env
 cp ai/.env.example             ai/.env
-cp feedback-board/.env.example feedback-board/.env
 ```
 
 You do **not** need to change localhost addresses in these files. On the
@@ -157,7 +149,6 @@ server, `docker-compose.yml` replaces them:
 | `backend-express/.env` | `APP_URL`, `ALLOWED_ORIGINS` → `https://APP_DOMAIN`; `STT_RELAY_URL` → the ai container |
 | `frontend/.env` | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_STT_RELAY_URL` → `https://APP_DOMAIN` |
 | `ai/.env` | `ALLOWED_ORIGINS` → `https://APP_DOMAIN`; `NODE_ENV` → `production` |
-| `feedback-board/.env` | `DATABASE_URL` → the feedback-db container |
 
 These must still be filled in by you:
 
@@ -167,8 +158,6 @@ These must still be filled in by you:
   `NEXT_PUBLIC_LIVEKIT_URL`.
 - **ai/.env:** `SARVAM_API_KEY`, and `STT_TOKEN_SECRET` with the **same value**
   as in `backend-express/.env`.
-- **feedback-board/.env:** `HMAC_SECRET` and `ADMIN_PASSWORD` (generate with
-  `openssl rand -hex 32`; never leave them as `change-me`).
 
 ---
 
@@ -194,7 +183,6 @@ service at a time instead:
 ```bash
 docker compose build backend
 docker compose build frontend
-docker compose build feedback-board
 docker compose up -d
 ```
 
@@ -234,14 +222,7 @@ Data kept between restarts (Docker volumes):
 | Volume | Holds | If lost |
 |---|---|---|
 | `caddy-data` | HTTPS certificates | Caddy requests new ones (Let's Encrypt has rate limits) |
-| `feedback-data` | feedback board database | all feedback is gone; back it up |
 | `n8n-data` | workflows, credentials, n8n encryption key | n8n must be set up again; back it up |
-
-Back up the feedback database:
-
-```bash
-docker compose exec feedback-db pg_dump -U feedback feedback > feedback-backup.sql
-```
 
 ---
 
@@ -251,10 +232,9 @@ docker compose exec feedback-db pg_dump -U feedback feedback > feedback-backup.s
 |---|---|
 | `docker-compose.yml` | starts all services, connects them, replaces the localhost addresses |
 | `Caddyfile` | HTTPS and which path or domain goes to which container |
-| `.env.example` | server settings: domains, e-mail, feedback database password |
+| `.env.example` | server settings: domains and e-mail |
 | `backend-express/Dockerfile` | builds the API: install, compile TypeScript to `dist/`, keep production packages only |
 | `frontend/Dockerfile` | builds the website as a small standalone Next.js server |
-| `feedback-board/Dockerfile` | builds the feedback board as a standalone Next.js server |
 | `ai/Dockerfile` | the speech-to-text relay, started by gunicorn |
 | `n8n/Dockerfile` | n8n plus a one-time import of the STAAD workflows |
 
@@ -272,8 +252,8 @@ Every container keeps at most 30 MB of logs.
    time they are used, like the OpenRouter client already was.
 2. **Frontend lockfile repaired.** `npm ci` refused the old
    `package-lock.json`, which was missing three `@emnapi/*` entries.
-3. **Standalone build, only in Docker.** `frontend/next.config.mjs` and
-   `feedback-board/next.config.mjs` build a standalone server only when
+3. **Standalone build, only in Docker.** `frontend/next.config.mjs` builds a
+   standalone server only when
    `NEXT_OUTPUT=standalone`, which the Dockerfiles set. Other hosts build as
    before.
 4. **AI service runs on gunicorn**, with one log line per request.
@@ -286,7 +266,6 @@ Every container keeps at most 30 MB of logs.
 |---|---|
 | backend | real `docker build` succeeded; the built app started and answered, and the Prisma engine loaded |
 | frontend | built and started outside Docker with the same steps; pages, JS and the MediaPipe model loaded |
-| feedback-board | built and started outside Docker; pages and CSS loaded; schema script works |
 | ai | under gunicorn: health check, token check, relaying audio and clean shutdown all worked |
 | n8n | the import-once script was tested with stand-in commands; not run in real n8n |
 | `docker-compose.yml` | `docker compose config` is valid; it stops with a clear message if the server `.env` is missing |

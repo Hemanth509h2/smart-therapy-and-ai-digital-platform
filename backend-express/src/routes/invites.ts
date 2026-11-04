@@ -2,15 +2,19 @@ import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { prisma, appDb } from '@/lib/core/db';
 import { requireAuth } from '@/lib/http/apiAuth';
-import { requireActivePlan } from '@/lib/billing/subscriptions';
-import { normalizePhoneNumber } from '@/lib/core/phone';
 import { errorResponse, notYourProfile } from '@/lib/http/apiError';
 import { adminAuth } from '@/lib/core/firebaseAdmin';
 import { provisionSessionDocs } from '@/lib/sessions/session-provisioning';
 import { createLobbyEntry } from '@/lib/sessions/lobby';
 import { handle, queryParams, send } from '@/lib/http/reply';
+import { limitByIp } from '@/lib/http/rateLimit';
 
 export const router = Router();
+
+// Invite links are opened signed out, so these are limited per IP. Tokens are
+// unguessable; this stops scripted guessing and join spam (each join creates
+// a guest account).
+const inviteLimit = limitByIp({ name: 'invite-token', limit: 30, windowMs: 10 * 60 * 1000 });
 
 // ---- /api/invites --------------------------------------------------------------
 
@@ -23,56 +27,10 @@ async function mayAccessTherapist(uid: string, therapistId: string) {
   return therapist?.userId === uid || user?.role === 'ADMIN';
 }
 
-// POST /api/invites — therapist creates a patient invite (name + diagnosis only).
-// Returns the generated token so the client can build a shareable link.
-
-router.post('/invites', handle(async (req, res) => {
-  try {
-    const auth = await requireAuth(req);
-    if (!auth.ok) return send(res, auth.response);
-    const { therapistId, firstName, lastName, diagnosis, scheduledAt, phoneNumber } = req.body;
-
-    if (!therapistId || !firstName) {
-      return res.status(400).json({
-          error: !firstName
-            ? "Enter the client's first name."
-            : "Your therapist profile hasn't loaded yet. Refresh the page and try again.",
-        });
-    }
-
-    // Ensure the therapist exists
-    const therapist = await appDb.profileTherapist.findUnique({
-      where: { id: therapistId },
-      select: { userId: true },
-    });
-    if (!therapist || therapist.userId !== auth.uid) {
-      return send(res, notYourProfile('this therapist profile'));
-    }
-    const noPlan = await requireActivePlan({ therapistId }, 'invite a client');
-    if (noPlan) return send(res, noPlan);
-
-    const normalizedPhoneNumber =
-      typeof phoneNumber === 'string' && phoneNumber.trim()
-        ? normalizePhoneNumber(phoneNumber)
-        : null;
-
-    const invite = await prisma.invite.create({
-      data: {
-        token: randomUUID(),
-        therapistId,
-        firstName,
-        lastName: lastName || '',
-        diagnosis: Array.isArray(diagnosis) ? diagnosis : [],
-        phoneNumber: normalizedPhoneNumber,
-        scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date(),
-      },
-    });
-
-    return res.json({ token: invite.token, invite });
-  } catch (error: any) {
-    return send(res, errorResponse(error, 'Invite creation error'));
-  }
-}));
+// POST /api/invites (therapist creates a bare invite) was removed: nothing
+// called it, and it bypassed the consent and date-of-birth checks that
+// POST /api/clients requires. Join links come from
+// POST /api/sessions/:sessionId/guest-link and the automation join-link route.
 
 // GET /api/invites?therapistId=... — list a therapist's invites (optional, for dashboard).
 router.get('/invites', handle(async (req, res) => {
@@ -103,7 +61,7 @@ router.get('/invites', handle(async (req, res) => {
 // ---- /api/invites/:token -------------------------------------------------------
 
 // GET /api/invites/[token] — fetch invite details for the signup banner + onboarding prefill.
-router.get('/invites/:token', handle(async (req, res) => {
+router.get('/invites/:token', inviteLimit, handle(async (req, res) => {
   try {
     const { token } = req.params;
 
@@ -140,7 +98,6 @@ router.get('/invites/:token', handle(async (req, res) => {
         token: invite.token,
         firstName: invite.firstName,
         lastName: invite.lastName,
-        diagnosis: invite.diagnosis,
         status: invite.status,
         therapistName: therapist ? `${therapist.firstName} ${therapist.lastName}`.trim() : '',
       },
@@ -166,7 +123,7 @@ router.get('/invites/:token', handle(async (req, res) => {
  * an already-CLAIMED invite simply returns the existing session again, so
  * refreshes and rejoins from the same link keep working.
  */
-router.post('/invites/:token/join', handle(async (req, res) => {
+router.post('/invites/:token/join', inviteLimit, handle(async (req, res) => {
   try {
     const body = req.body;
     // Server-generated guest id — never trust a client-supplied uid.

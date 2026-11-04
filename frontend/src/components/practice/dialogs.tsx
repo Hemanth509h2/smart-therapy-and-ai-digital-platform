@@ -500,6 +500,14 @@ export function StartSessionDialog({
 
 /* ─────────────────────────── Add client (invite) ─────────────────────────── */
 
+/** True when a YYYY-MM-DD date of birth is under 18 years ago (same rule as the server). */
+function isUnder18(dob: string) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob);
+  if (!m) return false;
+  const eighteenth = new Date(Number(m[1]) + 18, Number(m[2]) - 1, Number(m[3]));
+  return eighteenth.getTime() > Date.now();
+}
+
 export function AddClientDialog({
   open,
   onOpenChange,
@@ -517,6 +525,10 @@ export function AddClientDialog({
   const [email, setEmail] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [gender, setGender] = useState('');
+  // Consent to store the client's data; for a minor, from a parent or lawful
+  // guardian, whose name is recorded (the server enforces both).
+  const [guardianName, setGuardianName] = useState('');
+  const [consentConfirmed, setConsentConfirmed] = useState(false);
   const [link, setLink] = useState('');
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -530,14 +542,28 @@ export function AddClientDialog({
       setEmail('');
       setDateOfBirth('');
       setGender('');
+      setGuardianName('');
+      setConsentConfirmed(false);
       setLink('');
       setCopied(false);
     }
   }, [open]);
 
+  const minor = isUnder18(dateOfBirth);
+
   const submit = async () => {
     if (!profile?.id) return;
     if (!firstName.trim()) return void toast("Enter the client's first name.", 'warning');
+    if (!dateOfBirth) return void toast("Enter the client's date of birth.", 'warning');
+    if (minor && !guardianName.trim()) return void toast("Enter the parent or guardian's name.", 'warning');
+    if (!consentConfirmed) {
+      return void toast(
+        minor
+          ? "Confirm that you have consent from the child's parent or lawful guardian."
+          : "Confirm that you have the client's consent to store their information.",
+        'warning'
+      );
+    }
     setSaving(true);
     try {
       const res = await apiFetch('/api/clients', {
@@ -553,8 +579,10 @@ export function AddClientDialog({
           diagnosis: diagnosis.split(',').map((d) => d.trim()).filter(Boolean),
           phoneNumber: phone,
           email: email.trim(),
-          dateOfBirth: dateOfBirth || undefined,
+          dateOfBirth,
           gender,
+          consentConfirmed,
+          guardianName: minor ? guardianName.trim() : undefined,
         }),
       });
       if (!res.ok) throw new Error(await apiErrorMessage(res, 'add a client'));
@@ -591,7 +619,7 @@ export function AddClientDialog({
           <button className="ds-btn ds-btn-ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </button>
-          <button className="ds-btn ds-btn-clay" onClick={submit} disabled={saving}>
+          <button className="ds-btn ds-btn-clay" onClick={submit} disabled={saving || !consentConfirmed}>
             {saving && <Loader2 className="animate-spin" />}
             Add Client
           </button>
@@ -641,9 +669,11 @@ export function AddClientDialog({
                 value={dateOfBirth}
                 onChange={(e) => setDateOfBirth(e.target.value)}
                 max={toDateInput(new Date())}
+                required
+                aria-required="true"
               />
             </Field>
-            <Field label="Gender" htmlFor="client-gender">
+            <Field label="Gender (optional)" htmlFor="client-gender">
               <select id="client-gender" className="ds-input" value={gender} onChange={(e) => setGender(e.target.value)}>
                 <option value="">Select</option>
                 <option value="Female">Female</option>
@@ -654,6 +684,41 @@ export function AddClientDialog({
               </select>
             </Field>
           </div>
+          {minor && (
+            <Field
+              label="Parent or guardian's name"
+              htmlFor="client-guardian"
+              hint="This client is under 18, so consent must come from a parent or lawful guardian."
+            >
+              <input
+                id="client-guardian"
+                className="ds-input"
+                value={guardianName}
+                onChange={(e) => setGuardianName(e.target.value)}
+                autoComplete="off"
+                required
+                aria-required="true"
+              />
+            </Field>
+          )}
+          <label htmlFor="client-consent" className="flex items-start gap-2.5 text-[13.5px] leading-snug">
+            <input
+              id="client-consent"
+              type="checkbox"
+              checked={consentConfirmed}
+              onChange={(e) => setConsentConfirmed(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0"
+              required
+            />
+            <span>
+              {minor
+                ? "I have verifiable consent from this child's parent or lawful guardian to store their information in STAAD."
+                : "I have this client's consent to store their information in STAAD."}{' '}
+              <a href="/privacy#children" target="_blank" rel="noopener" className="underline">
+                Why this is needed
+              </a>
+            </span>
+          </label>
         </div>
     </DsDialog>
   );

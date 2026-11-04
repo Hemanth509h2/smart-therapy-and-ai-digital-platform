@@ -197,8 +197,8 @@ export default function VirtualMaze({ sessionId, role, isLocked }: VirtualMazePr
   const [elapsed, setElapsed] = useState(0)
   const [startTime, setStartTime] = useState<number | null>(null)
 
-  const timerRef = useRef<ReturnType<typeof setInterval>>()
-  const elapsedRef = useRef<ReturnType<typeof setInterval>>()
+  const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+  const elapsedRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
   const timeRemainingRef = useRef(timeRemaining)
   timeRemainingRef.current = timeRemaining
 

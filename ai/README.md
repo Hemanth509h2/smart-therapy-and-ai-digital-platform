@@ -94,5 +94,8 @@ lines: client IP (first `X-Forwarded-For` entry when behind a proxy), method,
 path, status, time and user agent. WebSocket closes get their own line, and so
 do requests that can't be parsed. Query strings are never logged because they
 carry the STT token. gunicorn's `accesslog` setting has no effect here, because
-the custom worker handles HTTP itself. The image sets `NODE_ENV=production`,
-which refuses all STT connections if `STT_TOKEN_SECRET` is missing.
+the custom worker handles HTTP itself. Without `STT_TOKEN_SECRET` every
+STT, call-plan and internal connection is refused (in development,
+`AI_DEV_NO_AUTH=true` lets them in without a token). Without `ALLOWED_ORIGINS`
+only `http://localhost:3000` may connect from a browser, so set it in every
+deployment.

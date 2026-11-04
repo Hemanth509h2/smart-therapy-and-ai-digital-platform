@@ -13,7 +13,7 @@ export default function PrivacyPage() {
       updated={PRIVACY_UPDATED}
       intro={PRIVACY_INTRO}
       sections={PRIVACY_SECTIONS}
-      related={{ href: '/terms', label: 'Terms & Conditions' }}
+      current="/privacy"
     />
   );
 }

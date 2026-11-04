@@ -43,12 +43,14 @@ After importing each workflow:
 2. Create a **Header Auth** credential: name `x-api-key`, value your `AUTOMATION_API_KEY`, and pick it on every HTTP node.
 3. Create your **WhatsApp Business Cloud** credentials, pick them on the WhatsApp nodes, and set `YOUR_WHATSAPP_PHONE_NUMBER_ID`.
 4. Workflow 04 also needs an **Anthropic** credential on the chat model (re-pick the model if the name is not in your list) and the WhatsApp **Trigger** credential and webhook set up in Meta.
-5. Activate the workflow. The workflow timezone is already set to Asia/Kolkata.
+5. Workflow 03's webhook is protected: create a second **Header Auth** credential named `STAAD Webhook Secret` (header name `x-staad-webhook-secret`, value a long random string, e.g. `openssl rand -hex 32`) and pick it on the Webhook node. Callers must send that header; requests without it get 403.
+6. Activate the workflow. The workflow timezone is already set to Asia/Kolkata.
 
 ## Things to know
 
 - **WhatsApp's 24-hour rule.** Plain text only reaches someone who messaged your number in the last 24 hours. The 7 AM digest, reminders and join links are messages you start, so they need **approved message templates**. Until you have them, swap the WhatsApp "Send" node for "Send template" (the backend's `message` text is a good template body). The chatbot replies are fine as plain text because the doctor messaged first.
 - **Reminders are stateless.** Each run asks for a window exactly as wide as the schedule interval (15 minutes), so each session falls into exactly one run. If n8n is down for a run, that window's reminders are missed, and if the schedule is changed from 15 minutes, change `toMinutes - fromMinutes` to match.
 - **The doctor must have a WhatsApp number** on their STAAD profile (`phoneNumber`), or the chatbot says they are not registered and the digest skips them.
+- **Lock down the n8n editor.** n8n creates its owner account on the first visit to `https://N8N_DOMAIN`, so open it and create the owner right after the first deploy, before anyone else can. Use a long password and turn on two-factor authentication in n8n's settings.
 - **Chatbot privacy.** The phone number is fixed inside each tool (taken from the incoming message), so the AI cannot ask for another doctor's data. Clinical notes and reports are not exposed.
 - These workflows were generated, not run inside n8n. Open each one after import and check the nodes show no errors; n8n node versions differ slightly between releases.

@@ -22,7 +22,7 @@ export interface AIInsight {
   steps: string[]
   module: string
   riskFlag: boolean
-  // Populated by the dedicated safety pass (src/lib/rag/safety.ts).
+  // Populated by the dedicated safety pass (the AI service, ai/copilot).
   riskLevel?: 'none' | 'watch' | 'urgent'
   riskDetail?: string
   generatedAt: number

@@ -2,11 +2,15 @@ import { Router } from 'express';
 import { prisma, appDb } from '@/lib/core/db';
 import { requireAuth } from '@/lib/http/apiAuth';
 import { resolveCurrent, serializeSubscription } from '@/lib/billing/subscriptions';
-import { errorResponse, notYourProfile } from '@/lib/http/apiError';
+import { errorResponse, logError, notYourProfile } from '@/lib/http/apiError';
 import { getSetting } from '@/lib/core/settings';
 import { ALL_MODULE_IDS } from '@/lib/modules/modules';
 import { pricePurchase } from '@/lib/billing/purchase';
 import { handle, queryParams, send } from '@/lib/http/reply';
+import { optStr, strList } from '@/lib/http/validate';
+import { alertAdmins, deliver, notify } from '@/lib/email/notify';
+import { planCancelledEmail, planRequestReceivedEmail } from '@/lib/email/templates';
+import { planCancelledAlert, planRequestAlert } from '@/lib/email/alerts';
 
 export const router = Router();
 
@@ -117,9 +121,20 @@ router.post('/subscriptions/cancel', handle(async (req, res) => {
       include: { plan: true },
     });
 
+    // Email only on a real change (cancelling twice, or undoing nothing, is silent).
+    const changed = undo ? current.cancelledAt != null : current.cancelledAt == null;
+    if (changed) {
+      const undone = Boolean(undo);
+      const name = `${therapist.firstName} ${therapist.lastName}`.trim();
+      await deliver([
+        notify('billing', auth.email, planCancelledEmail({ firstName: therapist.firstName, planName: updated.plan.name, endsAt: updated.currentPeriodEnd, undone })),
+        alertAdmins('billing', planCancelledAlert({ therapistName: name, planName: updated.plan.name, endsAt: updated.currentPeriodEnd, undone })),
+      ]);
+    }
+
     return res.json({ current: serializeSubscription(updated) });
   } catch (error: any) {
-    console.error('Subscription cancel error:', error);
+    logError('Subscription cancel error', error);
     return res.status(500).json({ error: "We couldn't update your plan cancellation. Please try again." });
   }
 }));
@@ -137,6 +152,9 @@ router.post('/subscriptions/request', handle(async (req, res) => {
     if (!auth.ok) return send(res, auth.response);
 
     const { therapistId, planId, months, modules, note, couponCode } = req.body;
+    optStr(note, 'The note', 1_000);
+    optStr(couponCode, 'The coupon code', 40);
+    strList(modules, 'Modules', 100, 100);
 
     if (!therapistId || !planId) {
       return res.status(400).json({
@@ -203,6 +221,16 @@ router.post('/subscriptions/request', handle(async (req, res) => {
         total: priced.total,
       },
     });
+
+    const needsApproval = Boolean(await getSetting('billing.approvalBeforePayment').catch(() => true));
+    const total = Number(priced.total);
+    await deliver([
+      notify('billing', auth.email, planRequestReceivedEmail({ firstName: therapist.firstName, planName: plan.name, months: months_, total, needsApproval })),
+      alertAdmins('billing', planRequestAlert({
+        therapistName: `${therapist.firstName} ${therapist.lastName}`.trim(),
+        planName: plan.name, months: months_, total, needsApproval,
+      })),
+    ]);
 
     return res.json({ success: true, req: created });
   } catch (error: any) {

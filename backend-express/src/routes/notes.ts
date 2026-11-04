@@ -6,6 +6,7 @@ import { requireTherapist } from '@/lib/http/progressAuth';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { errorResponse, notYourProfile } from '@/lib/http/apiError';
 import { handle, queryParams, send } from '@/lib/http/reply';
+import { reqStr } from '@/lib/http/validate';
 
 export const router = Router();
 
@@ -78,12 +79,13 @@ router.post('/notes', handle(async (req, res) => {
       if (noPlan) return send(res, noPlan);
     }
 
+    const noteContent = reqStr(content, 'The note', 20_000);
     const note = await prisma.therapistNote.create({
       data: {
         sessionId,
         therapistId,
-        content,
-        isPrivate: isPrivate ?? true,
+        content: noteContent,
+        isPrivate: isPrivate === false ? false : true,
       },
     });
 

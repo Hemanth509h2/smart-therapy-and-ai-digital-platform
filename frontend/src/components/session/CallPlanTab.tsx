@@ -19,6 +19,7 @@ import {
   type CallPlan,
   type CallPlanTask,
 } from '@/lib/callPlan'
+import { pressable } from '@/lib/a11y'
 
 // "Call Plan" tab of the AI Notes popup (therapist only). The therapist gives
 // the AI agent the client's previous notes; it recommends modules and a task
@@ -186,6 +187,7 @@ export default function CallPlanTab({
         {mode === 'upload' ? (
           <div
             onClick={() => !busy && fileInput.current?.click()}
+            {...pressable(() => fileInput.current?.click(), 'Choose a file to upload', busy)}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault()

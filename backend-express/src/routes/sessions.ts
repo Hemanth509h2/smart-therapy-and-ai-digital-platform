@@ -3,14 +3,63 @@ import { prisma, appDb } from '@/lib/core/db';
 import { therapistIdForUser, withTherapists } from '@/lib/core/links';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { requireAuth } from '@/lib/http/apiAuth';
-import { errorResponse, notYourProfile } from '@/lib/http/apiError';
+import { errorResponse, logError, notYourProfile } from '@/lib/http/apiError';
+import { clientOfTherapist, sessionRoleFor } from '@/lib/core/ownership';
+import { isIsoDate } from '@/lib/http/validate';
 import { provisionSessionDocs, markSessionEnded, revokeSessionUid } from '@/lib/sessions/session-provisioning';
 import { getOrCreateGuestInvite } from '@/lib/sessions/guest-invite';
+import { checkAIConsent } from '@/lib/sessions/transcript-store';
 import { removeParticipantByUid } from '@/lib/sessions/livekit-room';
 import { getLobbyEntry, listLobby, setLobbyStatus, touchLobbyEntry } from '@/lib/sessions/lobby';
 import { RoomServiceClient } from 'livekit-server-sdk';
 import { isTranslationLanguage } from '@/lib/sessions/translationLanguages';
 import { handle, queryParams, send } from '@/lib/http/reply';
+import { deliver, notify } from '@/lib/email/notify';
+import { clientSessionEmail, therapistSessionEmail, type SessionChange } from '@/lib/email/templates';
+import { clientEmails, therapistContact } from '@/lib/email/recipients';
+import type { ProfileClient, Session } from '@prisma/client';
+import { emailLink } from '@/lib/email/format';
+
+/**
+ * Session emails: the therapist's confirmation, and the same news to the
+ * client's email (the parent / guardian address the therapist entered, or the
+ * client's own login). Names and times only, never clinical details.
+ *
+ * Booked and rescheduled client emails carry the client's join link: the same
+ * link the therapist's "Copy link" and the n8n flow use. getOrCreateGuestInvite
+ * reuses the client's existing valid link and only creates one when there is
+ * none, so emailing it changes nothing the therapist wouldn't. Without
+ * APP_URL (or if the lookup fails) the email falls back to "your therapist
+ * will send you the link".
+ */
+async function sessionEmails(
+  change: SessionChange,
+  s: Session & { client: ProfileClient },
+  previous?: Date | null
+) {
+  const [therapist, toClient] = await Promise.all([
+    therapistContact(s.therapistId).catch(() => null),
+    clientEmails(s.client).catch(() => [] as string[]),
+  ]);
+  let joinUrl: string | null = null;
+  if (change !== 'cancelled' && toClient.length > 0 && emailLink('/')) {
+    joinUrl = await getOrCreateGuestInvite(s)
+      .then((invite) => emailLink(`/join/${invite.token}`))
+      .catch((e) => {
+        logError('Session email join link', e);
+        return null;
+      });
+  }
+  await deliver([
+    notify('sessions', therapist?.email, therapistSessionEmail({
+      change, firstName: therapist?.firstName, clientFirstName: s.client.firstName, when: s.scheduledAt, previous,
+      clientLinkSent: Boolean(joinUrl),
+    })),
+    ...toClient.map((to) => notify('sessions', to, clientSessionEmail({
+      change, therapistName: therapist?.fullName ?? '', when: s.scheduledAt, previous, joinUrl,
+    }))),
+  ]);
+}
 
 export const router = Router();
 
@@ -94,12 +143,18 @@ router.post('/sessions', handle(async (req, res) => {
     if (!therapistId || !(await mayAccess(auth.uid, { therapistId }))) {
       return send(res, notYourProfile('this therapist profile'));
     }
+    if (!isIsoDate(scheduledAt)) {
+      return res.status(400).json({ error: 'Choose a valid date and time for the session.' });
+    }
     const noPlan = await requireActivePlan({ therapistId }, booking ? 'book a session' : 'start a session');
     if (noPlan) return send(res, noPlan);
 
     // If clientId is a userId (firebase UID), look up the profile ID
+    if (typeof clientId !== 'string' || !clientId) {
+      return res.status(400).json({ error: 'Choose a client for this session.' });
+    }
     let finalClientId = clientId;
-    if (clientId && !clientId.includes('-')) {
+    if (!clientId.includes('-')) {
       const clientProfile = await prisma.profileClient.findUnique({
         where: { userId: clientId },
       });
@@ -108,6 +163,11 @@ router.post('/sessions', handle(async (req, res) => {
       } else {
         return res.status(404).json({ error: "We couldn't find that client. They may have been removed." });
       }
+    }
+    // Only this therapist's own clients: otherwise a session would link a
+    // stranger's client to this therapist and expose its record.
+    if (!(await clientOfTherapist(therapistId, finalClientId))) {
+      return res.status(404).json({ error: "We couldn't find that client. They may have been removed." });
     }
 
     const created = await prisma.session.create({
@@ -123,6 +183,10 @@ router.post('/sessions', handle(async (req, res) => {
     });
     const [session] = await withTherapists([created]);
 
+    // Booked for later: confirm by email. "Start a session now" sends nothing;
+    // the therapist shares the link straight away.
+    if (booking) await sessionEmails('scheduled', created);
+
     return res.json({ session });
   } catch (error: any) {
     return send(res, errorResponse(error, 'Session creation error'));
@@ -132,16 +196,34 @@ router.post('/sessions', handle(async (req, res) => {
 // ---- /api/sessions/:sessionId --------------------------------------------------
 
 // GET /api/sessions/[sessionId] — fetch a single session (with client + therapist).
+// Readable by the session's therapist, its client and admitted guests; anyone
+// else gets the same 404 as a missing session, so ids cannot be probed. Only
+// the therapist gets the full client record; the others get the names shown
+// on the "session ended" screen.
 router.get('/sessions/:sessionId', handle(async (req, res) => {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.ok) return send(res, auth.response);
+
     const found = await prisma.session.findUnique({
       where: { id: req.params.sessionId },
       include: { client: true },
     });
-    if (!found) {
+    const role = found ? await sessionRoleFor(auth.uid, found) : null;
+    if (!found || !role) {
       return res.status(404).json({ error: 'This session no longer exists. It may have been deleted.' });
     }
-    const [session] = await withTherapists([found]);
+    const [withTherapist] = await withTherapists([found]);
+    const session =
+      role === 'therapist'
+        ? withTherapist
+        : {
+            ...withTherapist,
+            client: { firstName: found.client.firstName, lastName: found.client.lastName },
+            therapist: withTherapist.therapist
+              ? { firstName: withTherapist.therapist.firstName, lastName: withTherapist.therapist.lastName }
+              : null,
+          };
     return res.json({ session });
   } catch (error: any) {
     return send(res, errorResponse(error, 'Session GET error'));
@@ -153,9 +235,14 @@ router.get('/sessions/:sessionId', handle(async (req, res) => {
 //   - 'start': SCHEDULED -> ACTIVE, records startedAt (no-op if already started/ended)
 //   - 'end':   -> COMPLETED, records endedAt (and startedAt if it was never set).
 // Idempotent: ending an already-completed session preserves the original endedAt.
+// The therapist may do everything; the client and admitted guests may only
+// 'start' (join, which re-provisions the room). Anyone else gets a 404.
 router.patch('/sessions/:sessionId', handle(async (req, res) => {
   try {
-    const { action, scheduledAt } = req.body.catch(() => ({ action: undefined, scheduledAt: undefined })) ?? {};
+    const auth = await requireAuth(req);
+    if (!auth.ok) return send(res, auth.response);
+
+    const { action, scheduledAt } = (req.body ?? {}) as { action?: string; scheduledAt?: string };
     // Browsers silently drop the body of PATCH requests sent with
     // `keepalive: true` (e.g. the end-call handler). Accept action/scheduledAt
     // from the query string as a fallback so those calls still work.
@@ -170,8 +257,12 @@ router.patch('/sessions/:sessionId', handle(async (req, res) => {
     const existing = await prisma.session.findUnique({
       where: { id: req.params.sessionId },
     });
-    if (!existing) {
+    const role = existing ? await sessionRoleFor(auth.uid, existing) : null;
+    if (!existing || !role) {
       return res.status(404).json({ error: 'This session no longer exists. It may have been deleted.' });
+    }
+    if (role !== 'therapist' && finalAction !== 'start') {
+      return res.status(403).json({ error: 'Only the therapist can change this session.' });
     }
 
     // No plan: no new or rescheduled sessions. Cancelling and ending stay open
@@ -209,10 +300,16 @@ router.patch('/sessions/:sessionId', handle(async (req, res) => {
         data:
           finalAction === 'cancel'
             ? { status: 'CANCELLED' }
-            : { status: 'SCHEDULED', scheduledAt: new Date(finalScheduledAt) },
+            : { status: 'SCHEDULED', scheduledAt: new Date(finalScheduledAt as string) },
         include: { client: true },
       });
       const [session] = await withTherapists([updated]);
+      if (finalAction === 'cancel') {
+        await sessionEmails('cancelled', updated);
+      } else if (existing.scheduledAt.getTime() !== updated.scheduledAt.getTime() || existing.status === 'CANCELLED') {
+        await sessionEmails(existing.status === 'CANCELLED' ? 'scheduled' : 'rescheduled', updated,
+          existing.status === 'CANCELLED' ? null : existing.scheduledAt);
+      }
       return res.json({ session });
     }
 
@@ -230,7 +327,7 @@ router.patch('/sessions/:sessionId', handle(async (req, res) => {
           reopen: finalAction === 'start' && existing.status !== 'COMPLETED' && existing.status !== 'CANCELLED',
         });
       } catch (e) {
-        console.error('Session provisioning failed:', e);
+        logError('Session provisioning failed', e);
         // Surfaced on 'start', not swallowed: without provisioning the
         // participants will be locked out of their own session by the rules.
         // 'end' carries on: completing the session and expiring the patient's
@@ -286,7 +383,7 @@ router.patch('/sessions/:sessionId', handle(async (req, res) => {
           },
           data: { status: 'EXPIRED', expiresAt: now },
         })
-        .catch((e) => console.warn('Invite expiry on session end failed:', e));
+        .catch((e) => logError('Invite expiry on session end failed', e));
 
       if (existing.status !== 'COMPLETED') {
         await markSessionEnded(req.params.sessionId);
@@ -474,6 +571,19 @@ router.post('/sessions/:sessionId/translation', handle(async (req, res) => {
     const client = isTranslationLanguage(body.client) ? body.client : null;
     if (enabled && (!therapist || !client)) {
       return res.status(400).json({ error: 'Choose a language for both you and your client.' });
+    }
+    // Turning translation on streams both sides' audio to speech-to-text, so it
+    // needs the same consent as captions: both participants agreed to AI
+    // features for this session. Turning it off is always allowed. Same
+    // dev-only bypass as /api/stt-token, never in production.
+    const sttTestMode =
+      process.env.NEXT_PUBLIC_STT_TEST_MODE === 'true' &&
+      process.env.NODE_ENV !== 'production';
+    if (enabled && !sttTestMode && !(await checkAIConsent(req.params.sessionId))) {
+      return res.status(403).json({
+        error: 'Both you and the client need to allow AI features before live translation can start.',
+        code: 'AI_CONSENT_REQUIRED',
+      });
     }
 
     const url = process.env.LIVEKIT_URL || process.env.NEXT_PUBLIC_LIVEKIT_URL;

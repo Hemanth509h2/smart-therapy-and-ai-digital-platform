@@ -1,4 +1,5 @@
 'use client'
+import { notFound } from 'next/navigation'
 // TEMPORARY: exports one story's scenery to a GLB (read back over CDP).
 import { useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -34,4 +35,8 @@ function Inner() {
   const Env = def.env
   return (<Canvas><Env action={q.get('action')} mood="idle" /><Exporter /></Canvas>)
 }
-export default function Page() { return <Suspense fallback={null}><div style={{ width: 400, height: 300 }}><Inner /></div></Suspense> }
+export default function Page() {
+  // Development tool only.
+  if (process.env.NODE_ENV === 'production') notFound()
+  return <Suspense fallback={null}><div style={{ width: 400, height: 300 }}><Inner /></div></Suspense>
+}

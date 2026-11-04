@@ -219,12 +219,12 @@ export default function EmotionalCharades({ sessionId, role, isLocked }: Emotion
   const [animKey, setAnimKey] = useState(0)
   const [elapsed, setElapsed] = useState(0)
 
-  const feedbackTimer = useRef<ReturnType<typeof setTimeout>>()
+  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   /* Snapshot callbacks are registered once, so they read the open card and the
      last-seen answer through refs rather than stale state. */
   const currentCardRef = useRef<string | null>(null)
   const answeredCardRef = useRef<string>('')
-  const elapsedRef = useRef<ReturnType<typeof setInterval>>()
+  const elapsedRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
 
   const writeToFirestore = useCallback(async (data: Record<string, unknown>) => {
     try {

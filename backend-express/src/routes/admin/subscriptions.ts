@@ -10,6 +10,9 @@ import { audit } from '@/lib/admin/audit';
 import { ALL_MODULE_IDS } from '@/lib/modules/modules';
 import { activateFreePurchase, pricePurchase } from '@/lib/billing/purchase';
 import { handle, send } from '@/lib/http/reply';
+import { deliver, notify } from '@/lib/email/notify';
+import { planRequestApprovedEmail, planRequestDeclinedEmail } from '@/lib/email/templates';
+import { emailForUser } from '@/lib/email/recipients';
 
 export const router = Router();
 
@@ -251,7 +254,7 @@ router.post('/admin/subscriptions/requests/:id', handle(async (request, res) => 
 
     const req = await appDb.subscriptionRequest.findUnique({
       where: { id: request.params.id },
-      include: { plan: true, therapist: { select: { userId: true } } },
+      include: { plan: true, therapist: { select: { userId: true, firstName: true } } },
     });
     if (!req) return res.status(404).json({ error: "We couldn't find this plan request. The professional may have withdrawn it." });
     const target = { type: 'SubscriptionRequest', id: req.id };
@@ -273,6 +276,8 @@ router.post('/admin/subscriptions/requests/:id', handle(async (request, res) => 
       });
       if (!count) return res.status(409).json({ error: 'This plan request is already closed. Refresh the page to see its current status.' });
       await audit(request, auth, 'subscription_request.reject', target, { before, after: { status: 'REJECTED' } });
+      await deliver(notify('billing', await emailForUser(req.therapist.userId),
+        planRequestDeclinedEmail({ firstName: req.therapist.firstName, planName: req.plan.name })));
       return res.json({ success: true });
     }
     if (req.status !== 'PENDING') {
@@ -333,6 +338,9 @@ router.post('/admin/subscriptions/requests/:id', handle(async (request, res) => 
         before,
         after: { status: 'AWAITING_PAYMENT', months: months_, modules: grant, unlimited, ...pricing },
       });
+      await deliver(notify('billing', await emailForUser(req.therapist.userId), planRequestApprovedEmail({
+        firstName: req.therapist.firstName, planName: plan.name, months: months_, total: Number(priced.total), awaitingPayment: true,
+      })));
       return res.json({ success: true, status: 'AWAITING_PAYMENT', total: priced.total });
     }
 
@@ -370,6 +378,10 @@ router.post('/admin/subscriptions/requests/:id', handle(async (request, res) => 
         supersededSubscriptionIds: created.superseded,
       },
     });
+
+    await deliver(notify('billing', await emailForUser(req.therapist.userId), planRequestApprovedEmail({
+      firstName: req.therapist.firstName, planName: plan.name, months: months_, total: 0, awaitingPayment: false,
+    })));
 
     return res.json({ success: true, status: 'APPROVED', total: 0 });
   } catch (error: any) {

@@ -7,13 +7,14 @@
  */
 
 import { SUPPORT_EMAIL } from '@/content/help';
+import { businessContactLines } from '@/content/business';
 import type { PolicySection } from '@/content/legal';
 
-export const TERMS_UPDATED = '18 October 2026';
+export const TERMS_UPDATED = '4 November 2026';
 
 export const TERMS_INTRO: string[] = [
   'These Terms & Conditions (the "Terms") govern your use of STAAD, a collaborative therapy platform for running live online sessions, interactive therapy modules and progress tracking. They form a binding agreement between you and STAAD ("STAAD", "we", "us" or "our"). Please read them carefully, together with our Privacy Policy, which explains how we handle personal data and forms part of these Terms.',
-  'These Terms apply to the STAAD web application, the session room, the therapy modules, our WhatsApp and email messages, and any other service that links to this page (together, the "Services"). By creating an account, joining a session or otherwise using the Services, you agree to these Terms. If you do not agree, do not use the Services.',
+  'These Terms apply to the STAAD web application, the session room, the therapy modules, our WhatsApp and email messages, and any other service that links to this page (together, the "Services"). Therapists accept these Terms and the Privacy Policy by ticking a box when they set up their account, and again when we make a material change; we record which version was accepted and when. Clients and guests agree to them by joining a session. If you do not agree, do not use the Services.',
 ];
 
 export const TERMS_SECTIONS: PolicySection[] = [
@@ -133,10 +134,11 @@ export const TERMS_SECTIONS: PolicySection[] = [
       'STAAD offers a free tier and paid Plans. Each Plan sets which therapy tools you can use and may limit the number of active clients, sessions per month or AI session reports per month. The features and prices of each Plan are shown on the Plans page at the time you choose it.',
       'How paid Plans work:',
       [
-        'Paid Plans are bought in advance for a fixed term — currently 1, 3, 6 or 12 months — and the price is shown in Indian Rupees before you pay. Prices include or exclude taxes as stated at checkout.',
+        'Paid Plans are bought in advance for a fixed term — currently 1, 3, 6 or 12 months — and the total price is shown in Indian Rupees before you pay.',
+        'No hidden fees: the total shown before you pay is the full amount you are charged, including any applicable taxes. There are no setup, cancellation or other extra fees. Your bank or card issuer may charge its own fees, such as for foreign-currency cards, which we do not control.',
         'Some Plan requests, such as Plans with a chosen set of tools, are reviewed by an Administrator before they take effect. We may decline a request, in which case any amount you have paid for it will be refunded.',
         'Payments are processed by our payment provider, Cashfree Payments. You agree to their terms when you pay, and STAAD never receives your card, UPI or bank details.',
-        'Plans do not renew or charge you automatically. We will email you a reminder before your term ends; to continue, you renew it yourself from the Plans page.',
+        'No auto-renewal: Plans never renew or charge you automatically, and we do not store your card or set up recurring payments. We email you 7 days and 1 day before your term ends; to continue, you renew it yourself from the Plans page.',
         'When a term ends without renewal, your account returns to the free tier. Your clients, notes and records are kept, but features outside the free tier will be locked.',
         'Coupons are subject to the conditions shown when you apply them, cannot be exchanged for cash and may be withdrawn at any time before they are used.',
       ],
@@ -155,6 +157,7 @@ export const TERMS_SECTIONS: PolicySection[] = [
         'Where the Services were materially unavailable for a significant part of your term because of a fault on our side.',
         'Where the law requires a refund.',
       ],
+      'Our full Refund Policy, with examples, is at /refunds.',
       `To ask for a refund, write to ${SUPPORT_EMAIL} within 30 days of the payment with your account email and the payment reference. Approved refunds are made to the original payment method through Cashfree Payments, normally within 7 to 10 working days of approval, although your bank may take longer to show them.`,
     ],
   },
@@ -189,7 +192,23 @@ export const TERMS_SECTIONS: PolicySection[] = [
     title: 'Availability and changes to the Services',
     body: [
       'We work to keep the Services available and reliable, but we do not promise that they will be uninterrupted, error-free or available at any particular time. Live sessions depend on your internet connection, device, browser, camera and microphone, as well as on our providers.',
+      'Our commitment: we aim to keep the Services available at least 99% of the time in each calendar month, not counting planned maintenance. This is a target we work to, not a guarantee, and it does not include service credits; if the Services are materially unavailable for a significant part of your paid term, you can ask for a refund as described in "Cancellation and refunds".',
       'We may carry out maintenance, which we will try to schedule outside normal working hours and announce in advance where it is planned. We may add, change or remove features, therapy modules or providers to improve the Services, for security, or because the law requires it. If a change materially reduces the features of a paid Plan during a term you have paid for, you may ask for a pro-rata refund for the rest of that term.',
+    ],
+  },
+  {
+    id: 'copyright',
+    title: 'Copyright and content complaints',
+    body: [
+      'We respect intellectual property rights and expect our users to do the same. If you believe that content on STAAD infringes your copyright or other rights, or is otherwise unlawful, send a notice to our Grievance Officer with:',
+      [
+        'Your name and contact details.',
+        'A description of the work or right you believe is infringed.',
+        'Where the content appears in STAAD, in enough detail for us to find it.',
+        'A statement that you believe in good faith that the use is not authorised, and that the information in your notice is accurate.',
+        'Your physical or electronic signature.',
+      ],
+      `Send notices to ${SUPPORT_EMAIL}. We acknowledge notices within 24 hours and act on them within 15 days, as the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021 require, and we remove content sooner where a court or government order requires it. If content you uploaded is removed, we will tell you and you may reply with a counter-notice. We close the accounts of users who repeatedly infringe others’ rights.`,
     ],
   },
   {
@@ -273,6 +292,7 @@ export const TERMS_SECTIONS: PolicySection[] = [
     title: 'Contact',
     body: [
       `If you have any question about these Terms, write to us at ${SUPPORT_EMAIL}. For complaints about how your personal data is handled, see "Grievances and contact" in our Privacy Policy.`,
+      businessContactLines(),
     ],
   },
 ];

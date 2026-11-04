@@ -8,6 +8,7 @@ import { staadSpeak, randomPraise } from '@/lib/voice/staadVoice'
 import type { VoiceLanguage } from '@/lib/voice/staadVoice'
 import { useVoiceLanguage } from '@/lib/voice/useVoiceLanguage'
 import VoiceLanguageToggle from '@/components/modules/VoiceLanguageToggle'
+import { pressable } from '@/lib/a11y'
 
 /* ---------------------------------------------------------------------------
    Art + audio assets. The delivered folder name contains spaces, so every path
@@ -199,7 +200,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
   const slotRefs = useRef<(HTMLDivElement | null)[]>([])
   const poolRef = useRef<HTMLDivElement>(null)
   const celebIdRef = useRef(0)
-  const timerRef = useRef<ReturnType<typeof setTimeout>>()
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const ref = useRef({ targetWord: '', tiles, slots, difficulty, wordIndex, score })
   ref.current = { targetWord, tiles, slots, difficulty, wordIndex, score }
@@ -1016,6 +1017,7 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                           key={i}
                           ref={(el) => { slotRefs.current[i] = el }}
                           onClick={() => handleSlotClick(i)}
+                          {...pressable(() => handleSlotClick(i), `Letter slot ${i + 1}${slots[i] !== null ? ' (filled)' : ''}`)}
                           style={{
                             width: 64,
                             height: 68,
@@ -1076,6 +1078,8 @@ export default function WordBuilding({ sessionId, role, isLocked }: WordBuilding
                             e.stopPropagation()
                             handleTileClick(idx)
                           }}
+                          {...pressable(() => handleTileClick(idx), undefined, !canInteract)}
+                          aria-pressed={isSelected}
                           style={{
                             width: 72,
                             height: 78,

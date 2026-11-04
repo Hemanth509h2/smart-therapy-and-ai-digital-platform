@@ -38,7 +38,13 @@ def _docx_text(data):
             info = z.getinfo("word/document.xml")
             if info.file_size > MAX_DOCX_XML_BYTES:
                 raise ExtractError("This Word file is too large to read.")
-            root = ElementTree.fromstring(z.read(info))
+            xml = z.read(info)
+            # Word never writes a DTD. One here can only be an attack on the XML
+            # parser (entity expansion, external entities): refuse it before
+            # parsing, since defusedxml isn't a dependency.
+            if b"<!DOCTYPE" in xml or b"<!ENTITY" in xml:
+                raise ExtractError("This Word file could not be read. Save it as .docx or PDF and try again.")
+            root = ElementTree.fromstring(xml)
     except (zipfile.BadZipFile, KeyError, ElementTree.ParseError) as e:
         raise ExtractError("This Word file could not be read. Save it as .docx or PDF and try again.") from e
     paragraphs = ("".join(t.text or "" for t in p.iter(f"{_W}t")) for p in root.iter(f"{_W}p"))

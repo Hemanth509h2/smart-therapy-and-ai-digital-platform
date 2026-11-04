@@ -10,17 +10,29 @@ import { handle, queryParams, send } from '@/lib/http/reply';
 
 export const router = Router();
 
+/** Under 18 on today's date. The browser sends YYYY-MM-DD, which parses as
+ *  UTC midnight, so compare in UTC. */
+function isMinor(dob: Date) {
+  const eighteenth = Date.UTC(dob.getUTCFullYear() + 18, dob.getUTCMonth(), dob.getUTCDate());
+  return eighteenth > Date.now();
+}
+
 // ---- /api/clients --------------------------------------------------------------
 
 // POST /api/clients — therapist adds a client directly (name + diagnosis +
 // phone). No invite link, no session/video room is created — the therapist
 // books or starts a session explicitly later.
+//
+// The therapist must confirm they have consent to store the client's data
+// (`consentConfirmed: true`). The date of birth is required so a minor can be
+// recognised: for a client under 18 the consent must come from a parent or
+// lawful guardian (DPDP Act s.9), whose name is recorded (`guardianName`).
 router.post('/clients', handle(async (req, res) => {
   try {
     const auth = await requireAuth(req);
     if (!auth.ok) return send(res, auth.response);
 
-    const { therapistId, firstName, lastName, diagnosis, phoneNumber, dateOfBirth, email, gender } = req.body;
+    const { therapistId, firstName, lastName, diagnosis, phoneNumber, dateOfBirth, email, gender, consentConfirmed, guardianName } = req.body;
     if (!therapistId || !firstName) {
       return res.status(400).json({
           error: !firstName
@@ -34,8 +46,23 @@ router.post('/clients', handle(async (req, res) => {
       return res.status(400).json({ error: 'Enter a valid email address, like name@example.com.' });
     }
     const dob = dateOfBirth ? new Date(dateOfBirth) : null;
-    if (dob && (Number.isNaN(dob.getTime()) || dob.getTime() > Date.now())) {
+    if (!dob) {
+      return res.status(400).json({ error: "Enter the client's date of birth. It tells STAAD whether a parent or guardian's consent is needed." });
+    }
+    if (Number.isNaN(dob.getTime()) || dob.getTime() > Date.now()) {
       return res.status(400).json({ error: 'Enter a valid date of birth. It cannot be in the future.' });
+    }
+    const minor = isMinor(dob);
+    const guardian = typeof guardianName === 'string' ? guardianName.trim().slice(0, 200) : '';
+    if (minor && !guardian) {
+      return res.status(400).json({ error: "This client is under 18. Enter the name of the parent or guardian who gave consent." });
+    }
+    if (consentConfirmed !== true) {
+      return res.status(400).json({
+        error: minor
+          ? "Confirm that you have verifiable consent from this child's parent or lawful guardian."
+          : "Confirm that you have this client's consent to store their information in STAAD.",
+      });
     }
 
     const therapist = await appDb.profileTherapist.findUnique({
@@ -67,8 +94,11 @@ router.post('/clients', handle(async (req, res) => {
             typeof phoneNumber === 'string' && phoneNumber.trim()
               ? normalizePhoneNumber(phoneNumber)
               : null,
-          dateOfBirth: dob ?? new Date(),
+          dateOfBirth: dob,
           gender: typeof gender === 'string' && gender.trim() ? gender.trim() : null,
+          consentConfirmedAt: new Date(),
+          guardianName: minor ? guardian : null,
+          guardianConsentAt: minor ? new Date() : null,
           // The client has no login yet (placeholder account), so the contact
           // address lives here — it's what the client profile shows as Email.
           parentEmail: contactEmail,

@@ -132,10 +132,10 @@ export default function SessionTopBar({
               fontSize: 12.5,
               fontWeight: 600,
             }}
-            title="End-to-end encrypted"
+            title="Encrypted in transit (TLS/DTLS) between your browser and our servers"
           >
             <ShieldCheck size={12} />
-            <span style={{ whiteSpace: 'nowrap' }}>Encrypted</span>
+            <span style={{ whiteSpace: 'nowrap' }}>Encrypted connection</span>
           </div>
         </div>
 

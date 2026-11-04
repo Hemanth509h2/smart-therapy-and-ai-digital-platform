@@ -4,6 +4,8 @@ import { requireTherapist } from '@/lib/http/progressAuth';
 import { requireActivePlan } from '@/lib/billing/subscriptions';
 import { errorResponse, notYourProfile } from '@/lib/http/apiError';
 import { handle, queryParams, send } from '@/lib/http/reply';
+import { clientOfTherapist } from '@/lib/core/ownership';
+import { optDate, optStr, reqDate, reqStr } from '@/lib/http/validate';
 
 export const router = Router();
 
@@ -68,11 +70,25 @@ router.post('/progress/metrics', handle(async (req, res) => {
     if (!clientId || !metricType || value === undefined || value === null) {
       return res.status(400).json({ error: 'Choose a metric and enter a value.' });
     }
-    if (typeof value !== 'number' || Number.isNaN(value)) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) > 1e9) {
       return res.status(400).json({ error: 'The value must be a number.' });
     }
+    if (typeof metricType !== 'string' || !/^[A-Z][A-Z0-9_]{0,39}$/.test(metricType)) {
+      return res.status(400).json({ error: 'Choose a valid metric.' });
+    }
+    const metricUnit = optStr(unit, 'The unit', 30);
+    const metricNotes = optStr(notes, 'The notes', 5_000);
+    const metricAt = optDate(recordedAt, 'The date');
+    if (sessionId) {
+      const own = await prisma.session.findFirst({
+        where: { id: String(sessionId), therapistId: auth.therapist.id, clientId: String(clientId) },
+        select: { id: true },
+      });
+      if (!own) return res.status(404).json({ error: "We couldn't find that session. It may have been deleted." });
+    }
 
-    const client = await prisma.profileClient.findUnique({ where: { id: clientId } });
+    // Only this therapist's own clients (not just any client id).
+    const client = await clientOfTherapist(auth.therapist.id, clientId);
     if (!client) {
       return res.status(404).json({ error: "We couldn't find that client. They may have been removed." });
     }
@@ -84,9 +100,9 @@ router.post('/progress/metrics', handle(async (req, res) => {
         sessionId: sessionId || null,
         metricType,
         value,
-        unit: unit || null,
-        notes: notes || null,
-        recordedAt: recordedAt ? new Date(recordedAt) : new Date(),
+        unit: metricUnit ?? null,
+        notes: metricNotes ?? null,
+        recordedAt: metricAt ?? new Date(),
       },
     });
 
@@ -212,8 +228,17 @@ router.post('/progress/notes', handle(async (req, res) => {
     if (!clientId || !content) {
       return res.status(400).json({ error: "The note can't be empty. Write something and save again." });
     }
+    const noteContent = reqStr(content, 'The note', 20_000);
+    if (reportId) {
+      const own = await prisma.progressReport.findFirst({
+        where: { id: String(reportId), therapistId: auth.therapist.id, clientId: String(clientId) },
+        select: { id: true },
+      });
+      if (!own) return res.status(404).json({ error: "We couldn't find that report. It may have been deleted." });
+    }
 
-    const client = await prisma.profileClient.findUnique({ where: { id: clientId } });
+    // Only this therapist's own clients (not just any client id).
+    const client = await clientOfTherapist(auth.therapist.id, clientId);
     if (!client) {
       return res.status(404).json({ error: "We couldn't find that client. They may have been removed." });
     }
@@ -223,7 +248,7 @@ router.post('/progress/notes', handle(async (req, res) => {
         clientId,
         therapistId: auth.therapist.id,
         reportId: reportId || null,
-        content,
+        content: noteContent,
         isPrivate: isPrivate === false ? false : true,
       },
     });
@@ -278,13 +303,16 @@ router.post('/progress/reports', handle(async (req, res) => {
       return res.status(400).json({ error: 'Choose the start and end dates and write a summary for the report.' });
     }
 
-    const client = await prisma.profileClient.findUnique({ where: { id: clientId } });
+    // Only this therapist's own clients (not just any client id).
+    const client = await clientOfTherapist(auth.therapist.id, clientId);
     if (!client) {
       return res.status(404).json({ error: "We couldn't find that client. They may have been removed." });
     }
 
-    const start = new Date(periodStart);
-    const end = new Date(periodEnd);
+    const start = reqDate(periodStart, 'The start date');
+    const end = reqDate(periodEnd, 'The end date');
+    reqStr(summary, 'The summary', 20_000);
+    optStr(title, 'The title', 200);
 
     const metricsInPeriod = await prisma.progressMetric.findMany({
       where: {

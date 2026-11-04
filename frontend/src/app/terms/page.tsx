@@ -13,7 +13,7 @@ export default function TermsPage() {
       updated={TERMS_UPDATED}
       intro={TERMS_INTRO}
       sections={TERMS_SECTIONS}
-      related={{ href: '/privacy', label: 'Privacy Policy' }}
+      current="/terms"
     />
   );
 }

@@ -6,7 +6,7 @@ import type { ReportStats } from '@/lib/report/stats'
 import { toast } from '@/components/practice/ui'
 
 // The session report is stored as a small, controlled Markdown subset produced
-// by the LLM (see src/lib/report/generate.ts): "## Section" headings, "-" /
+// by the LLM (see backend-express/src/lib/reports/generate.ts and ai/report): "## Section" headings, "-" /
 // "1." lists, and **bold** inline. We render that to a branded, read-friendly
 // document — both on screen and in a print/PDF window — without pulling in a
 // heavy markdown or PDF dependency.

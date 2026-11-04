@@ -146,7 +146,7 @@ export default function StaadWhiteboard({
   const syncedVersionRef = useRef<number>(-1)
   // A remote scene that arrived before Excalidraw finished mounting.
   const pendingRemoteRef = useRef<readonly unknown[] | null>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // The client only draws when the therapist has released control.
   const canEdit = role === 'therapist' || !isLocked

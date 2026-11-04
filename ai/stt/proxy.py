@@ -84,12 +84,18 @@ def verify_stt_token(token, sid, secret, now_ms=None, scope=None):
     return payload.get("sid") == sid and payload.get("scope") == scope and exp * 1000 > now_ms
 
 
+def no_auth_allowed(env=os.environ):
+    """Running without STT_TOKEN_SECRET is refused unless a developer opts in
+    with AI_DEV_NO_AUTH=true, and never in production. A forgotten secret must
+    fail closed, not open every session's audio and AI features to anyone."""
+    return env.get("AI_DEV_NO_AUTH") == "true" and env.get("NODE_ENV") != "production"
+
+
 def authorize(query, env=os.environ):
     """Returns None when allowed, otherwise a short close reason."""
     secret = env.get("STT_TOKEN_SECRET")
     if not secret:
-        # Fail closed in production; dev may run without a token secret.
-        return "STT auth not configured" if env.get("NODE_ENV") == "production" else None
+        return None if no_auth_allowed(env) else "STT auth not configured"
     return None if verify_stt_token(query.get("token"), query.get("sid"), secret) else "Unauthorized"
 
 

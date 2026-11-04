@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { randomBytes } from 'crypto';
-import nodemailer from 'nodemailer';
+import { mailConfigured, sendMail } from '@/lib/core/mail';
 import type { AdminRole } from '.prisma/app-client';
 import { prisma, appDb } from '@/lib/core/db';
 import { requireAdmin, requireRecentLogin } from '@/lib/http/apiAuth';
@@ -123,25 +123,15 @@ router.delete('/admin/invites', handle(async (req, res) => {
 // instead of throwing when SMTP isn't configured or sending fails — the
 // caller still gets the link to share by hand.
 async function sendInviteEmail(to: string, adminRole: AdminRole, link: string, invitedBy: string | null) {
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  if (!user || !pass) {
+  if (!mailConfigured()) {
     console.warn('Admin invite email not sent: SMTP_USER / SMTP_PASS missing');
     return false;
   }
   try {
-    const port = Number(process.env.SMTP_PORT || 587);
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-    });
     const role = ROLE_LABELS[adminRole];
     const by = invitedBy ? ` by ${invitedBy}` : '';
     const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || `STAAD <${user}>`,
+    await sendMail('account', {
       to,
       subject: 'You have been invited to the STAAD admin portal',
       text: [

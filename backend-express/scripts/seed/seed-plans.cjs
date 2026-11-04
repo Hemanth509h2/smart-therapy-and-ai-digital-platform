@@ -2,7 +2,8 @@
 // Run: node --env-file=.env scripts/seed/seed-plans.cjs
 // Idempotent — upserts by unique plan name. Payments are out of scope, so
 // priceMonthly is display-only (INR). toolQuota null = unlimited (all tools).
-const { PrismaClient } = require('@prisma/client');
+// Plans live in the app database (generated to node_modules/.prisma/app-client).
+const { PrismaClient } = require('.prisma/app-client');
 
 const PLANS = [
   {

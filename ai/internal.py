@@ -24,7 +24,7 @@ from websockets.exceptions import ConnectionClosed
 import copilot
 import openrouter
 import report
-from stt import verify_stt_token
+from stt import no_auth_allowed, verify_stt_token
 
 log = logging.getLogger("ai.internal")
 
@@ -37,7 +37,7 @@ def authorize(query, env=os.environ):
     """Returns None when allowed, otherwise a short close reason. Same rules as stt."""
     secret = env.get("STT_TOKEN_SECRET")
     if not secret:
-        return "Internal auth not configured" if env.get("NODE_ENV") == "production" else None
+        return None if no_auth_allowed(env) else "Internal auth not configured"
     ok = verify_stt_token(query.get("token"), query.get("sid"), secret, scope=TOKEN_SCOPE)
     return None if ok else "Unauthorized"
 

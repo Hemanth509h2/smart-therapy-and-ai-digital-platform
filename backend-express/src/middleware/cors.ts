@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { authBypassActive } from '@/lib/http/apiAuth';
 
 /**
  * The frontend is deployed separately, so every API response needs CORS
@@ -32,7 +33,11 @@ function corsHeaders(req: Request): Record<string, string> {
     ...(isAllowedOrigin(origin) ? { 'Access-Control-Allow-Origin': origin } : {}),
     Vary: 'Origin',
     'Access-Control-Allow-Methods': 'GET,POST,PATCH,PUT,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Cron-Secret,x-dev-uid,x-dev-email',
+    // The dev identity headers are only accepted while the local
+    // AUTH_DISABLED bypass is active (never in production).
+    'Access-Control-Allow-Headers': authBypassActive()
+      ? 'Content-Type,Authorization,X-Cron-Secret,x-dev-uid,x-dev-email'
+      : 'Content-Type,Authorization,X-Cron-Secret',
     'Access-Control-Max-Age': '86400',
   };
 }

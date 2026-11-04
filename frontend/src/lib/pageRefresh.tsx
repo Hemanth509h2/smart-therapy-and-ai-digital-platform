@@ -20,7 +20,7 @@ const PageRefreshContext = createContext<{ refresh: () => void; refreshing: bool
 export function PageRefreshProvider({ children }: { children: React.ReactNode }) {
   const [key, setKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => () => clearTimeout(timer.current), []);
 

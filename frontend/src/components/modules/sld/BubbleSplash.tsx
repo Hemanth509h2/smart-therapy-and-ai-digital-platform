@@ -6,6 +6,7 @@ import type { LucideIcon } from 'lucide-react'
 import { db } from '@/lib/firestore'
 import { logModuleEvent } from '@/lib/sessionEvents'
 import { writeModuleState } from '@/lib/modules/writeModuleState'
+import { pressable } from '@/lib/a11y'
 
 interface BubbleSplashProps {
   sessionId: string
@@ -416,7 +417,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
   // respawned without generating a different word.
   const [roundWords, setRoundWords] = useState<string[]>([])
 
-  const spawnTimerRef = useRef<ReturnType<typeof setInterval>>()
+  const spawnTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
   const gameRef = useRef({ isPlaying, wordSet, difficulty, speed, customWords, customPrompt, bubbles, correctWord, score, streak, roundWords, waitingForTap })
   gameRef.current = { isPlaying, wordSet, difficulty, speed, customWords, customPrompt, bubbles, correctWord, score, streak, roundWords, waitingForTap }
   // Guards the respawn so a round cannot be refilled twice while the delay runs.
@@ -1302,6 +1303,7 @@ export default function BubbleSplash({ sessionId, role, isLocked }: BubbleSplash
                 <div
                   key={bubble.id}
                   onClick={() => handleBubbleTap(bubble)}
+                  {...pressable(() => handleBubbleTap(bubble))}
                   style={{
                     position: 'absolute',
                     // `x` is the lane CENTRE, so half the diameter comes back off.

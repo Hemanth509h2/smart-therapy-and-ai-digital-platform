@@ -42,6 +42,7 @@ import { router as sessions } from './sessions';
 import { router as sttToken } from './stt-token';
 import { router as subscriptions } from './subscriptions';
 import { router as support } from './support';
+import { router as unsubscribe } from './unsubscribe';
 import { router as usage } from './usage';
 import { router as users } from './users';
 
@@ -92,5 +93,6 @@ apiRouter.use(sessions);
 apiRouter.use(sttToken);
 apiRouter.use(subscriptions);
 apiRouter.use(support);
+apiRouter.use(unsubscribe);
 apiRouter.use(usage);
 apiRouter.use(users);

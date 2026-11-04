@@ -50,6 +50,10 @@ def _post(messages, model, max_tokens, temperature, env):
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
+        # Session content is health data: only route to providers that don't
+        # store prompts or train on them. Requests that no such provider can
+        # serve fail with a 404 instead of falling back to one that does.
+        "provider": {"data_collection": "deny"},
     }).encode()
     req = urllib.request.Request(OPENROUTER_URL, data=body, method="POST", headers={
         "Authorization": f"Bearer {env.get('OPENROUTER_API_KEY', '')}",

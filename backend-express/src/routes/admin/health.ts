@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import nodemailer from 'nodemailer';
+import { mailConfigured, mailTransport } from '@/lib/core/mail';
 import { Prisma } from '@prisma/client';
 import { Prisma as AppPrisma } from '.prisma/app-client';
 import { prisma, appDb } from '@/lib/core/db';
@@ -192,19 +192,10 @@ async function checkAutomation(): Promise<Check> {
 
 async function checkSmtp(): Promise<Check> {
   const base = { id: 'smtp', label: 'Email (SMTP)' };
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  if (!user || !pass) return { ...base, status: 'down', latencyMs: null, message: 'SMTP user/password not configured.' };
-  const port = Number(process.env.SMTP_PORT || 587);
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port,
-    secure: port === 465,
-    auth: { user, pass },
-    connectionTimeout: 5000,
-    greetingTimeout: 5000,
-    socketTimeout: 5000,
-  });
+  if (!mailConfigured()) return { ...base, status: 'down', latencyMs: null, message: 'SMTP user/password not configured.' };
+  // The shared transport every email uses (lib/core/mail.ts): verify() signs
+  // in to the mail server without sending anything.
+  const transporter = mailTransport();
   try {
     const { ms } = await timed(() =>
       Promise.race([transporter.verify(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))])
@@ -213,8 +204,6 @@ async function checkSmtp(): Promise<Check> {
   } catch (e: any) {
     const authFailed = e?.code === 'EAUTH';
     return { ...base, status: 'down', latencyMs: null, message: isTimeout(e) ? 'No answer within 5s.' : authFailed ? 'Mail server rejected the credentials.' : 'Could not connect to the mail server.' };
-  } finally {
-    transporter.close();
   }
 }
 

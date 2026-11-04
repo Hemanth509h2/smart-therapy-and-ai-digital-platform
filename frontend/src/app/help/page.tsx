@@ -17,6 +17,7 @@ import {
 } from '@/components/staad/icons';
 import { DsDialog, toast } from '@/components/practice/ui';
 import { FAQS, GUIDES, SUPPORT_EMAIL, SUPPORT_HOURS, type HelpCategory } from '@/content/help';
+import { BUSINESS } from '@/content/business';
 import { fullName } from '@/lib/practice';
 import { apiFetch } from '@/lib/api';
 import { caughtErrorMessage, toastApiError } from '@/lib/apiError';
@@ -251,6 +252,19 @@ export default function HelpPage() {
               <span style={{ minWidth: 0, flex: 1 }}>
                 <span className="prow__t">Terms &amp; Conditions</span>
                 <span className="prow__s">The rules for using STAAD</span>
+              </span>
+            </Link>
+            {/* DPDP Act: who to complain to about personal data must be easy to find. */}
+            <Link className="prow" href="/privacy#contact">
+              <span style={{ display: 'flex', width: 38, height: 38, flex: 'none', alignItems: 'center' }}>
+                <IconRowA />
+              </span>
+              <span style={{ minWidth: 0, flex: 1 }}>
+                <span className="prow__t">Grievance Officer</span>
+                <span className="prow__s">
+                  {BUSINESS.grievanceOfficer ? `${BUSINESS.grievanceOfficer} · ` : ''}
+                  {BUSINESS.email}
+                </span>
               </span>
             </Link>
           </div>

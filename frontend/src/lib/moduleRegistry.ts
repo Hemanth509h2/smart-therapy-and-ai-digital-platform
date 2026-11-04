@@ -166,7 +166,7 @@ export const MODULE_METADATA: Record<string, {
   'bubble-splash-sld': { title: 'Bubble Splash', subtitle: 'Sight words · reading fluency', icon: '🫧', label: 'Bubbles', category: 'core' },
   'bubble_splash': { title: 'Bubble Splash', subtitle: 'Sight words · reading fluency', icon: '🫧', label: 'Bubbles', category: 'core' },
 
-  'n-back-challenge': { title: 'N-Back Challenge', subtitle: 'Working memory · clinically validated', icon: '🧠', label: 'N-Back', category: 'adhd' },
+  'n-back-challenge': { title: 'N-Back Challenge', subtitle: 'Working memory · n-back practice', icon: '🧠', label: 'N-Back', category: 'adhd' },
   'virtual-maze': { title: 'Virtual Maze', subtitle: 'Spatial navigation · attention', icon: '🧭', label: 'V-Maze', category: 'adhd' },
   'simon-says': { title: 'Simon Says', subtitle: 'Executive function · inhibitory control', icon: '🎮', label: 'Simon', category: 'adhd' },
 
@@ -182,7 +182,7 @@ export const MODULE_METADATA: Record<string, {
 
   'emotion-wheel': { title: 'Emotion Wheel', subtitle: 'Emotion identification · granular awareness', icon: '🎡', label: 'Emotion', category: 'general' },
   'defusion-river': { title: 'Defusion River', subtitle: 'Cognitive defusion · thought observation', icon: '🌊', label: 'Defusion', category: 'general' },
-  'thought-challenger': { title: 'Thought Challenger', subtitle: 'CBT · evidence-based thought restructuring', icon: '⚖️', label: 'Thoughts', category: 'general' },
+  'thought-challenger': { title: 'Thought Challenger', subtitle: 'CBT · weighing the evidence for a thought', icon: '⚖️', label: 'Thoughts', category: 'general' },
   'micro-quest-board': { title: 'Micro Quest Board', subtitle: 'Behavioral activation · micro-goals', icon: '🗺️', label: 'Quests', category: 'general' },
   'values-card-sort': { title: 'Values Card Sort', subtitle: 'ACT · values clarification & commitment', icon: '🃏', label: 'Values', category: 'general' },
   'worry-vault': { title: 'Worry Vault', subtitle: 'Worry containment · scheduled worry time', icon: '🗄️', label: 'Vault', category: 'general' },
