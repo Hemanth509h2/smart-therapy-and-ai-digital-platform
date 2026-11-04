@@ -13,7 +13,7 @@ and all app data; it sends this service only what each AI task needs.
   popup (WebSocket `/call-plan`). The therapist uploads or pastes the client's
   previous notes; the agent reads them, searches the STAAD module reports
   (`module_report_chunks` in the backend's Postgres, filled by
-  `backend/scripts/maintenance/ingest-module-reports.ts`), and returns
+  `backend-express/scripts/maintenance/ingest-module-reports.ts`), and returns
   recommended modules and a task list for the call. Later in the call it marks
   tasks covered from the live transcript. The token comes from the backend's
   `/api/call-plan-token`, which checks session ownership, plan and AI consent.
@@ -32,7 +32,7 @@ and all app data; it sends this service only what each AI task needs.
 - `internal.py`: the endpoint the backend calls for `copilot` and `report`
   (WebSocket `/internal`, not for browsers). The backend's `/api/ai-insight` and
   `/api/session-report` do their checks, send the session data, and save the
-  result (`backend/src/lib/ai-service.ts`).
+  result (`backend-express/src/lib/ai-service.ts`).
 - `openrouter.py`, `rag.py`: shared OpenRouter chat, and Postgres + NVIDIA
   embeddings for the searches.
 - `scripts/`: fill the search tables, run by hand (see below).
@@ -50,7 +50,7 @@ cd ai
 python -m venv .venv
 .venv\Scripts\activate            # macOS/Linux: source .venv/bin/activate
 pip install -r requirements-dev.txt
-cp .env.example .env              # SARVAM_API_KEY + same STT_TOKEN_SECRET as backend/.env
+cp .env.example .env              # SARVAM_API_KEY + same STT_TOKEN_SECRET as backend-express/.env
                                   # AI: OPENROUTER_API_KEY, DATABASE_URL, NVIDIA_API_KEY
 python server.py
 python -m pytest tests            # the AI model is faked
@@ -58,7 +58,7 @@ python -m pytest tests            # the AI model is faked
 
 Point the frontend at it with `NEXT_PUBLIC_STT_RELAY_URL=http://localhost:4100`
 in `frontend/.env`, and the backend with `STT_RELAY_URL=http://localhost:4100`
-in `backend/.env`, then restart them.
+in `backend-express/.env`, then restart them.
 
 ## Search tables (scripts/)
 

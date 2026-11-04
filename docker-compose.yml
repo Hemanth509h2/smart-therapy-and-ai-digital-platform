@@ -7,7 +7,7 @@
 #   2. Open ports 80 and 443 in the server's firewall. Nothing else is needed.
 #   3. Copy .env.example to .env next to this file and fill it in
 #      (domains, e-mail, feedback database password).
-#   4. Copy .env.example to .env in backend/, frontend/, ai/ and feedback-board/
+#   4. Copy .env.example to .env in backend-express/, frontend/, ai/ and feedback-board/
 #      and fill them in.
 #
 # Start everything (builds the images the first time):
@@ -80,15 +80,15 @@ services:
     logging: *logging
 
   # ---------------------------------------------------------------------------
-  # Backend API (Next.js + Prisma). Reached at https://APP_DOMAIN/api/...
+  # Backend API (Express + Prisma). Reached at https://APP_DOMAIN/api/...
   # ---------------------------------------------------------------------------
   backend:
-    build: ./backend
+    build: ./backend-express
     volumes:
-      # Your settings, read-only. server.js loads this file on start.
-      - ./backend/.env:/app/.env:ro
+      # Your settings, read-only. src/server.ts (dotenv) loads this file on start.
+      - ./backend-express/.env:/app/.env:ro
     environment:
-      # These replace the values in backend/.env on the server.
+      # These replace the values in backend-express/.env on the server.
       # Links sent to clients (invites, join links) use this address.
       APP_URL: https://${APP_DOMAIN}
       # The website's address, allowed to call the API.

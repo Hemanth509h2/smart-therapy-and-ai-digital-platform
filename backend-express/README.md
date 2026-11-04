@@ -1,13 +1,13 @@
 # STAAD backend (Express)
 
-The same API as `../backend` (Next.js route handlers), running on Express 5.
-Every endpoint, request body and response is unchanged, so the frontend can
-point at either one (`NEXT_PUBLIC_API_URL` / port 4000).
+The STAAD API on Express 5 (ported from the earlier Next.js route handlers,
+which have been removed). The frontend reaches it via `NEXT_PUBLIC_API_URL`
+(port 4000 locally).
 
 ## Run
 
 ```bash
-cp .env.example .env     # same variables as ../backend/.env
+cp .env.example .env     # fill in secrets
 npm install              # also generates both Prisma clients
 npm run dev              # tsx watch, http://localhost:4000
 npm run build && npm start   # compiled: node dist/server.js
@@ -30,10 +30,10 @@ src/
   server.ts            network tweaks, .env, listen (was server.js)
   app.ts               logging, CORS, body parsing, routers, 404 + error handler
   middleware/cors.ts   was src/middleware.ts
-  routes/              one router per API area; paths mirror ../backend/src/app/api
+  routes/              one router per API area, mounted under /api
     index.ts           mounts every router under /api
     admin/*.ts         /api/admin/<area>/...
-  lib/                 copied from ../backend/src/lib
+  lib/                 shared server code, grouped by feature
     http/reply.ts      Express helpers (new)
 ```
 

@@ -58,7 +58,7 @@ def _b64url_decode(text):
 
 
 def verify_stt_token(token, sid, secret, now_ms=None, scope=None):
-    """Token format from backend/src/lib/sessions/stt-token.ts:
+    """Token format from backend-express/src/lib/sessions/stt-token.ts:
     base64url(payload).base64url(hmac-sha256), payload = {"sid", "exp" (seconds), "scope"?}.
     `scope` must match the token's: STT tokens have none, so a token minted for
     another feature (e.g. "call-plan") can't open an STT stream, and vice versa."""

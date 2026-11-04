@@ -4,9 +4,9 @@ This document provides the exact code-level specification of the integration bet
 
 ---
 
-## 1. Analysis Bridge Specification (`backend/src/lib/rag/analysis.ts`)
+## 1. Analysis Bridge Specification (`backend-express/src/lib/rag/analysis.ts`)
 
-The primary integration touchpoint is [`analysis.ts`](../backend/src/lib/rag/analysis.ts). It bridges the Next.js API route to the new pipeline while preserving downstream parsing and safety gates.
+The primary integration touchpoint is [`analysis.ts`](../backend-express/src/lib/rag/analysis.ts). It bridges the Next.js API route to the new pipeline while preserving downstream parsing and safety gates.
 
 ### Full Modified `runAnalysis()` Implementation:
 
@@ -150,6 +150,6 @@ export interface AIInsight {
 
 ## 3. Backward Compatibility & Clean Hand-off Guarantees
 
-1. **Zero Route Drift**: The HTTP API route ([`backend/src/app/api/ai-insight/route.ts`](../backend/src/app/api/ai-insight/route.ts)) continues to invoke `runAnalysis(options)` and receives the exact same `AIInsight` contract. No frontend changes are required.
-2. **Legacy Retrieval Functions**: [`toLegacyRAGContext()`](../backend/src/lib/rag/retrieval.ts) and [`retrieveRAGContext()`](../backend/src/lib/rag/retrieval.ts) remain available in `retrieval.ts` for backward compatibility with any other callers until post-production cleanup.
+1. **Zero Route Drift**: The HTTP API route ([`backend-express/src/routes/ai-insight.ts`](../backend-express/src/routes/ai-insight.ts)) continues to invoke `runAnalysis(options)` and receives the exact same `AIInsight` contract. No frontend changes are required.
+2. **Legacy Retrieval Functions**: [`toLegacyRAGContext()`](../backend-express/src/lib/rag/retrieval.ts) and [`retrieveRAGContext()`](../backend-express/src/lib/rag/retrieval.ts) remain available in `retrieval.ts` for backward compatibility with any other callers until post-production cleanup.
 3. **Prompt Format Parity**: `DEFAULT_CLINICAL_SYSTEM_PROMPT` in `context-prompt-builder.ts` demands the exact same 6-key JSON schema as the legacy `SYSTEM_PROMPT`.

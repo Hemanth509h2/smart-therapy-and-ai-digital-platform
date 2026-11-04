@@ -14,8 +14,15 @@
 #
 # Everything (DATABASE_URL, FIREBASE_*, LIVEKIT_*, ...) comes from the
 # environment at start-up. Nothing secret is copied into the image.
-# Database schema changes are applied from your own machine; see the notes in
-# ../backend/Dockerfile (never `db push` the app database).
+# Database schema changes (from your own machine, inside backend-express/; the
+# final image does not contain the Prisma command-line tool):
+#   HIPAA database:  npx prisma db push
+#   App database:    NEVER `db push`. It still holds tables that are not in
+#                    prisma/app/schema.prisma (the feedback board, n8n), and a
+#                    push would drop them. Apply the SQL files in
+#                    scripts/maintenance/ instead:
+#                    npx prisma db execute --schema prisma/app/schema.prisma --file scripts/maintenance/<file>.sql
+#   Admin > System health shows a database as "Check" when an update is missing.
 # =============================================================================
 
 

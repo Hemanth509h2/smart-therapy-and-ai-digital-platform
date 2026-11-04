@@ -45,8 +45,8 @@ cp .env.example .env
 | Variable | Needed? | Value |
 |---|---|---|
 | `OPENROUTER_API_KEY` | **Yes**: without it Call Plan, AI insights and reports are off | Your OpenRouter key (the backend no longer needs it) |
-| `STT_TOKEN_SECRET` | **Yes** | Must be the **same** as `STT_TOKEN_SECRET` in `backend/.env` |
-| `DATABASE_URL` | Recommended | Same as `backend/.env`. Without it the agent plans from the module list only (no module-report search), and insights skip study material. |
+| `STT_TOKEN_SECRET` | **Yes** | Must be the **same** as `STT_TOKEN_SECRET` in `backend-express/.env` |
+| `DATABASE_URL` | Recommended | Same as `backend-express/.env`. Without it the agent plans from the module list only (no module-report search), and insights skip study material. |
 | `NVIDIA_API_KEY` | Recommended | Without it the module-report search is by keyword instead of by meaning, and insights skip study material. |
 | `OPENROUTER_AGENT_MODEL` | Optional | Call Plan model. Default: `nvidia/nemotron-3-ultra-550b-a55b:free` |
 | `OPENROUTER_COPILOT_MODEL` | Optional | AI insights + safety scan model. Same default |
@@ -85,13 +85,13 @@ curl http://localhost:4100/health
 
 - **`frontend/.env`**: `NEXT_PUBLIC_STT_RELAY_URL=http://localhost:4100`, then restart the frontend.
   If this isn't set, the frontend uses `http://localhost:4100` anyway.
-- **`backend/.env`**: `STT_TOKEN_SECRET` (same value as in `ai/.env`) and `STT_RELAY_URL=http://localhost:4100`
+- **`backend-express/.env`**: `STT_TOKEN_SECRET` (same value as in `ai/.env`) and `STT_RELAY_URL=http://localhost:4100`
   (where the backend sends AI insight and report requests). On Render, set `STT_RELAY_URL` on the backend to
   the AI service's URL.
 - **Admin settings**: the **AI insights** feature must be switched on. Otherwise the token request fails with
   "AI insights are turned off by an admin."
 
-Then run the backend (`npm run dev` in `backend/`) and the frontend (`npm run dev` in `frontend/`) as usual.
+Then run the backend (`npm run dev` in `backend-express/`) and the frontend (`npm run dev` in `frontend/`) as usual.
 
 ## 5. Load the module reports (once, or when reports change)
 
@@ -113,7 +113,7 @@ this step, the agent still works but only picks from the module list.
 
 1. Start a session as the **therapist**. The therapist needs an active plan.
 2. **Both** the therapist and the client must allow AI assistance in the call.
-   - Dev shortcut: set `NEXT_PUBLIC_STT_TEST_MODE=true` in `backend/.env` to skip the consent check.
+   - Dev shortcut: set `NEXT_PUBLIC_STT_TEST_MODE=true` in `backend-express/.env` to skip the consent check.
    - This shortcut never works in production.
 3. Open the **AI Notes** popup and go to the **Call Plan** tab.
 4. Upload the previous notes (`.pdf`, `.docx`, `.txt` or `.md`, max 5 MB) or paste them in.
@@ -152,8 +152,8 @@ connection is refused.
 | `callPlanConfigured: false` | `OPENROUTER_API_KEY` is missing in `ai/.env`; restart after adding it |
 | "AI insights are turned off by an admin." | Turn on AI insights in the admin settings |
 | "Both you and the client need to allow AI assistance first." | Both people must accept AI consent in the call (or use the dev test mode above) |
-| "STT_TOKEN_SECRET not configured" | Add `STT_TOKEN_SECRET` to `backend/.env` |
-| Tab connects then fails / refused | `STT_TOKEN_SECRET` differs between `backend/.env` and `ai/.env` |
+| "STT_TOKEN_SECRET not configured" | Add `STT_TOKEN_SECRET` to `backend-express/.env` |
+| Tab connects then fails / refused | `STT_TOKEN_SECRET` differs between `backend-express/.env` and `ai/.env` |
 | Can't connect at all | AI service not running, or `NEXT_PUBLIC_STT_RELAY_URL` points at the wrong place |
 | Plan ignores report details | Module reports not loaded (step 5), or `DATABASE_URL` missing in `ai/.env` |
 | "Upload a PDF, Word (.docx) or text file." | Wrong file type; only `.pdf`, `.docx`, `.txt`, `.md` work |

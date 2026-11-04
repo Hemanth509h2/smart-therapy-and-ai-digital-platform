@@ -5,10 +5,12 @@ Monorepo with three deployables that talk **only over HTTP/WebSocket**:
 ```
 ├── frontend/   # Next.js UI (pages, components, hooks, store) — port 3000
 │   └── src/lib/api.ts        # apiFetch(): prefixes NEXT_PUBLIC_API_URL
-├── backend/    # Next.js API server (app/api routes + Prisma) — port 4000
-│   ├── server.js             # custom server entry (network tweaks + request logging)
-│   ├── src/middleware.ts     # CORS headers for cross-origin frontend calls
-│   ├── src/app/api/          # route handlers (folder path = URL, so these don't move)
+├── backend-express/   # Express 5 API server (routes + Prisma) — port 4000
+│   ├── src/server.ts         # entry: network tweaks, .env loading, listener
+│   ├── src/app.ts            # logging, CORS, body parsing, routers, error handler
+│   ├── src/middleware/cors.ts # CORS headers for cross-origin frontend calls
+│   ├── src/routes/           # one Express router per API area, mounted under /api
+│   ├── api/index.js          # Vercel entry: serves the compiled app from dist/
 │   ├── src/lib/              # shared server code, grouped by feature:
 │   │   ├── core/             #   db, Firebase Admin, settings, app URL, phone
 │   │   ├── http/             #   auth guards (apiAuth, progressAuth), error responses
@@ -21,8 +23,7 @@ Monorepo with three deployables that talk **only over HTTP/WebSocket**:
 │   │   ├── ai/report/        #   end-of-session report generation (OpenRouter)
 │   │   └── automation/       #   n8n automation endpoints' logic
 │   ├── prisma/               # DB schema + migrations
-│   ├── scripts/              # seed/, maintenance/, checks/ (RAG/provider smoke tests), reports/
-│   └── _archive/             # unused code kept for reference; not built or type-checked
+│   └── scripts/              # seed/, maintenance/, checks/ (RAG/provider smoke tests), reports/
 ├── ai/         # Python AI service — port 4100
 │   ├── server.py             # entry: /health + routes WebSockets to feature packages
 │   └── stt/                  # package: Sarvam speech-to-text relay
@@ -33,7 +34,7 @@ Monorepo with three deployables that talk **only over HTTP/WebSocket**:
 
 ```bash
 # 1. Backend (API at http://localhost:4000)
-cd backend
+cd backend-express
 cp .env.example .env      # fill in secrets
 npm run dev
 
@@ -50,7 +51,7 @@ The frontend calls the backend via `apiFetch('/api/...')`, which resolves to
 `NEXT_PUBLIC_API_URL` (default `http://localhost:4000`). Live captions go
 straight from the browser to the STT relay at `NEXT_PUBLIC_STT_RELAY_URL`
 (default `http://localhost:4100`). The backend only mints the relay's token
-(`/api/stt-token`); `STT_TOKEN_SECRET` must match in `backend/.env` and
+(`/api/stt-token`); `STT_TOKEN_SECRET` must match in `backend-express/.env` and
 `ai/.env`.
 
 ## Docker (cloud server)
@@ -60,7 +61,7 @@ The whole platform runs on one cloud server with Docker Compose, behind Caddy
 
 ```bash
 cp .env.example .env      # domains, e-mail, feedback database password
-# plus backend/.env, frontend/.env, ai/.env and feedback-board/.env
+# plus backend-express/.env, frontend/.env, ai/.env and feedback-board/.env
 docker compose up -d --build
 ```
 

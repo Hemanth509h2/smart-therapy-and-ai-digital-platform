@@ -22,9 +22,9 @@
 #     SARVAM_API_KEY, SARVAM_WS_URL            speech-to-text
 #     OPENROUTER_API_KEY, OPENROUTER_*_MODEL   the AI features
 #     DATABASE_URL (app database) and
-#     DATABASE_URL_2 (HIPAA database)          searches, same values as backend/.env
+#     DATABASE_URL_2 (HIPAA database)          searches, same values as backend-express/.env
 #     NVIDIA_API_KEY                           embeddings for the searches
-#     STT_TOKEN_SECRET                         same value as in backend/.env
+#     STT_TOKEN_SECRET                         same value as in backend-express/.env
 #     ALLOWED_ORIGINS                          sites allowed to connect
 #   WEB_CONCURRENCY sets how many worker processes run (default 1).
 #

@@ -65,7 +65,7 @@ interface TicketDetail extends Omit<TicketRow, 'replies'> {
 
 const STATUS_TONE: Record<TicketStatus, Tone> = { OPEN: 'bad', PENDING: 'warn', RESOLVED: 'good' };
 const STATUS_LABEL: Record<TicketStatus, string> = { OPEN: 'Open', PENDING: 'Waiting on user', RESOLVED: 'Resolved' };
-// Same list as the help page form (backend/src/app/api/support/route.ts).
+// Same list as the help page form (backend-express/src/routes/support.ts).
 const CATEGORIES = ['Technical Issue', 'Billing', 'Account', 'Feedback', 'Other'];
 
 export default function AdminSupportPage() {

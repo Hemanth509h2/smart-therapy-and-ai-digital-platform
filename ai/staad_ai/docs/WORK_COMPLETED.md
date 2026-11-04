@@ -14,7 +14,7 @@ This document outlines the complete sequence of tasks, decisions, code updates, 
   * Compatibility: `DEFAULT_CLINICAL_SYSTEM_PROMPT` in `context-prompt-builder.ts` was 100% schema-identical to `SYSTEM_PROMPT` in `prompt.ts`. `PromptPayload.systemPrompt` and `PromptPayload.userPrompt` were directly consumable by `chatJSON()`.
   * Preserved elements: Model identifier (`COPILOT_MODEL`), tolerant parsing (`parseInsight`), parallel safety scan (`runSafetyScan`), Firestore writes, audit logs, and Prisma usage events.
 
-### Phase 2: Integration Patching (`backend/src/lib/rag/analysis.ts`)
+### Phase 2: Integration Patching (`backend-express/src/lib/rag/analysis.ts`)
 * **Goal**: Connect the new pipeline into `runAnalysis()` with the minimal possible surface area change.
 * **Changes Applied**:
   * Removed imports of `retrieveRAGContext`, `SYSTEM_PROMPT`, and `buildAnalysisPrompt`.
@@ -26,7 +26,7 @@ This document outlines the complete sequence of tasks, decisions, code updates, 
 
 ### Phase 3: Dependency Installation (`npm install`)
 * **Context**: Workspace lacked `node_modules` initially.
-* **Execution**: Ran `npm install` in `backend/`.
+* **Execution**: Ran `npm install` in `backend-express/`.
 * **Result**:
   * Exit Code: `0` (`added 1605 packages`).
   * `postinstall` script ran `prisma generate` successfully (`Generated Prisma Client v6.19.3 in 669ms`).
@@ -39,13 +39,13 @@ This document outlines the complete sequence of tasks, decisions, code updates, 
   3. `TS2339` / `TS2774`: `pipeline.test.ts` contained an invalid mock line `const { processRetrievedContext } = require ? {} : {}`.
 * **Resolution**:
   * Preserved project convention: Kept extensionless imports in accordance with Next.js standards.
-  * Systematically updated **16 files** across `backend/src/lib/rag/` to remove `.ts` extensions from relative imports.
-  * Added re-exports to `backend/src/lib/rag/context/index.ts`:
+  * Systematically updated **16 files** across `backend-express/src/lib/rag/` to remove `.ts` extensions from relative imports.
+  * Added re-exports to `backend-express/src/lib/rag/context/index.ts`:
     ```ts
     export type { RelevanceFilterOptions } from './relevance-filter'
     export type { PromptBuilderOptions } from './context-prompt-builder'
     ```
-  * Cleaned up `backend/src/lib/rag/__tests__/pipeline.test.ts` by removing the invalid require ternary.
+  * Cleaned up `backend-express/src/lib/rag/__tests__/pipeline.test.ts` by removing the invalid require ternary.
 * **Validation**:
   * Ran `npx tsc --noEmit`.
   * **Result: 0 errors (clean compilation).**
@@ -65,4 +65,4 @@ This document outlines the complete sequence of tasks, decisions, code updates, 
 * **Findings**:
   * Verified complete dataflow from `POST /api/ai-insight` through `processAIPipelineWithDetails` to LLM and persistence.
   * Confirmed zero duplicate retrieval calls and zero duplicate LLM requests.
-  * Inspected `scripts/test-analysis.ts` and identified that running live tests requires a populated `backend/.env` file with `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `DATABASE_URL`, `OPENROUTER_API_KEY`, and `NVIDIA_API_KEY`.
+  * Inspected `scripts/test-analysis.ts` and identified that running live tests requires a populated `backend-express/.env` file with `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `DATABASE_URL`, `OPENROUTER_API_KEY`, and `NVIDIA_API_KEY`.

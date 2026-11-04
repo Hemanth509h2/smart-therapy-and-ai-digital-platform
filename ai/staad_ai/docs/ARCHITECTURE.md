@@ -11,7 +11,7 @@ This document specifies the complete runtime architecture of the modernized STAA
           │
           ▼  HTTP POST /api/ai-insight
 ┌────────────────────────────────────────────────────────────────────────┐
-│  API Route: backend/src/app/api/ai-insight/route.ts                    │
+│  API Route: backend-express/src/routes/ai-insight.ts                    │
 │  1. Request body parsing & ID validation                               │
 │  2. Server-side client validation via retrieveClientContext()          │
 │  3. AI consent verification (checkAIConsent / test mode bypass)        │
@@ -20,20 +20,20 @@ This document specifies the complete runtime architecture of the modernized STAA
                                    │
                                    ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│  Analysis Bridge: backend/src/lib/rag/analysis.ts                      │
+│  Analysis Bridge: backend-express/src/lib/rag/analysis.ts                      │
 │  Calls processAIPipelineWithDetails({ sessionId, therapistId, ... })   │
 └──────────────────────────────────┬─────────────────────────────────────┘
                                    │
                                    ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│  AI Pipeline Orchestrator: backend/src/lib/rag/pipeline.ts             │
+│  AI Pipeline Orchestrator: backend-express/src/lib/rag/pipeline.ts             │
 │  Builds StructuredFilters from inputs and coordinates stages           │
 └──────────────────┬──────────────────────────────────┬──────────────────┘
                    │                                  │
                    ▼ (Stage 1: Retrieval)             │
 ┌──────────────────────────────────────────────────┐  │
 │  Unified Retrieval Layer                         │  │
-│  backend/src/lib/rag/retrieval.ts                │  │
+│  backend-express/src/lib/rag/retrieval.ts                │  │
 │                                                  │  │
 │  ├─ ClientRetriever (demographics, goals)        │  │
 │  ├─ SessionRetriever (state, turns, events)      │  │
@@ -46,7 +46,7 @@ This document specifies the complete runtime architecture of the modernized STAA
                    ▼ (Stage 2: Context Management)    │
 ┌──────────────────────────────────────────────────┐  │
 │  Context Management Engine                       │  │
-│  backend/src/lib/rag/context/index.ts            │  │
+│  backend-express/src/lib/rag/context/index.ts            │  │
 │                                                  │  │
 │  1. Context Builder (normalize & structure)      │  │
 │  2. Relevance Filter (dedup, active-mod boost)   │  │

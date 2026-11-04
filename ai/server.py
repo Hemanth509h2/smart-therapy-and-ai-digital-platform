@@ -187,7 +187,7 @@ def probe_response(parts):
 
 # CPU, memory and disk of this machine for the admin "Database & hosting" page.
 # The backend asks with a 60-second token (sid and scope "server-stats") signed
-# with STT_TOKEN_SECRET; same shape as backend/src/lib/admin/host-stats.ts.
+# with STT_TOKEN_SECRET; same shape as backend-express/src/lib/admin/host-stats.ts.
 STATS_PATH = "/server-stats"
 STATS_SID = STATS_SCOPE = "server-stats"
 

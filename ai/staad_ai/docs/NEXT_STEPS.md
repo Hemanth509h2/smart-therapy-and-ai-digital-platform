@@ -4,9 +4,9 @@ This document outlines the actionable next steps required to perform live end-to
 
 ---
 
-## 1. Configure Local Environment (`backend/.env`)
+## 1. Configure Local Environment (`backend-express/.env`)
 
-Before running live tests or booting the backend server, copy `backend/.env.example` to `backend/.env` and supply the required service keys:
+Before running live tests or booting the backend server, copy `backend-express/.env.example` to `backend-express/.env` and supply the required service keys:
 
 ```powershell
 # From the backend directory:
@@ -36,14 +36,14 @@ Once `.env` is populated:
 ```powershell
 npm run test:analysis
 ```
-* **Script**: [`backend/scripts/test-analysis.ts`](../backend/scripts/test-analysis.ts)
+* **Script**: [`backend-express/scripts/test-analysis.ts`](../backend-express/scripts/test-analysis.ts)
 * **What it tests**: Seeds transcript turns, embeds test study material into `document_chunks`, runs `runAnalysis()`, verifies LLM completion + safety scan, checks output validation assertions, and automatically cleans up all seeded rows.
 
 ### B. Run End-to-End RAG Test
 ```powershell
 npm run test:e2e
 ```
-* **Script**: [`backend/scripts/test-e2e-rag.ts`](../backend/scripts/test-e2e-rag.ts)
+* **Script**: [`backend-express/scripts/test-e2e-rag.ts`](../backend-express/scripts/test-e2e-rag.ts)
 * **What it tests**: Tests consent gating, full multi-source retrieval, latency thresholds (< 15s), Firestore write & readback, self-harm risk flag detection, and clean database purge.
 
 ---
@@ -72,7 +72,7 @@ npm run dev
 ## 4. Post-Rollout Legacy Cleanup (Optional)
 
 After live verification in staging/production, the following legacy artifacts can be safely deprecated or removed:
-1. **[`backend/src/lib/rag/prompt.ts`](../backend/src/lib/rag/prompt.ts)**:
-   * `buildAnalysisPrompt()` and `SYSTEM_PROMPT` are fully superseded by `backend/src/lib/rag/context/context-prompt-builder.ts`.
-2. **[`backend/src/lib/rag/retrieval.ts`](../backend/src/lib/rag/retrieval.ts)**:
+1. **[`backend-express/src/lib/rag/prompt.ts`](../backend-express/src/lib/rag/prompt.ts)**:
+   * `buildAnalysisPrompt()` and `SYSTEM_PROMPT` are fully superseded by `backend-express/src/lib/rag/context/context-prompt-builder.ts`.
+2. **[`backend-express/src/lib/rag/retrieval.ts`](../backend-express/src/lib/rag/retrieval.ts)**:
    * `toLegacyRAGContext()` and `retrieveRAGContext()` can be phased out once all callers have migrated to `processAIPipelineWithDetails()`.

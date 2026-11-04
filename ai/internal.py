@@ -2,7 +2,7 @@
 
 Not for browsers. The backend's routes keep auth, plan and consent checks and
 all reads and writes of app data; they send the data here and save the result
-(backend/src/lib/ai-service.ts). One request per connection, over a WebSocket so
+(backend-express/src/lib/ai-service.ts). One request per connection, over a WebSocket so
 it shares the server, port and token scheme with stt and call_plan:
 
   /internal?sid=<sessionId>&token=<token>   token scope "internal", minted by the backend

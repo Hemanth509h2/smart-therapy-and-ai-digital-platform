@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-off: copy the patient tables from the app database (DATABASE_URL) into
 # the HIPAA database (DATABASE_URL_2), then compare row counts. Run from
-# backend/ after `npx prisma db push` has created the tables in DATABASE_URL_2.
+# backend-express/ after `npx prisma db push` has created the tables in DATABASE_URL_2.
 # Nothing is deleted from DATABASE_URL; drop those tables only after checking.
 #
 #   PG_BIN=/path/to/postgresql/17/bin bash scripts/maintenance/copy-phi-to-hipaa-db.sh

@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 // 60-second token signed with SERVER_STATS_SECRET (sent as a Bearer header),
 // set to the same value here and on the backend. A secret of its own, so the
 // website holds nothing that could open the AI service (STT_TOKEN_SECRET).
-// Same shape as the backend's own report (backend/src/lib/admin/host-stats.ts).
+// Same shape as the backend's own report (backend-express/src/lib/admin/host-stats.ts).
 // Not under /api, which may be proxied to the backend (see next.config.mjs).
 //
 // The statuses tell the backend what to ask the admin to fix: 503 = secret
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 }
 
 // The backend's token: base64url(payload).base64url(hmac-sha256), payload
-// {sid, exp (seconds), scope} — see backend/src/lib/sessions/stt-token.ts.
+// {sid, exp (seconds), scope} — see backend-express/src/lib/sessions/stt-token.ts.
 function validToken(token: string, secret: string) {
   const [payloadB64, signature] = token.split('.');
   if (!payloadB64 || !signature) return false;

@@ -10,9 +10,9 @@ The automated unit and integration test suite covers 100% of the newly integrate
 
 | Suite | File Location | Tests | Status |
 | :--- | :--- | :---: | :---: |
-| **Retrieval Layer** | [`backend/src/lib/rag/__tests__/retrieval-layer.test.ts`](../backend/src/lib/rag/__tests__/retrieval-layer.test.ts) | 14 | **PASSED (14/14)** |
-| **Context Management** | [`backend/src/lib/rag/context/__tests__/context-management.test.ts`](../backend/src/lib/rag/context/__tests__/context-management.test.ts) | 12 | **PASSED (12/12)** |
-| **Pipeline Orchestrator** | [`backend/src/lib/rag/__tests__/pipeline.test.ts`](../backend/src/lib/rag/__tests__/pipeline.test.ts) | 5 | **PASSED (5/5)** |
+| **Retrieval Layer** | [`backend-express/src/lib/rag/__tests__/retrieval-layer.test.ts`](../backend-express/src/lib/rag/__tests__/retrieval-layer.test.ts) | 14 | **PASSED (14/14)** |
+| **Context Management** | [`backend-express/src/lib/rag/context/__tests__/context-management.test.ts`](../backend-express/src/lib/rag/context/__tests__/context-management.test.ts) | 12 | **PASSED (12/12)** |
+| **Pipeline Orchestrator** | [`backend-express/src/lib/rag/__tests__/pipeline.test.ts`](../backend-express/src/lib/rag/__tests__/pipeline.test.ts) | 5 | **PASSED (5/5)** |
 | **Total** | | **31** | **PASSED (31/31)** |
 
 ---
@@ -37,7 +37,7 @@ npx tsc --noEmit
 ## 3. Test Coverage Breakdown
 
 ### A. Retrieval Layer Tests (14 Tests)
-Located in [`src/lib/rag/__tests__/retrieval-layer.test.ts`](../backend/src/lib/rag/__tests__/retrieval-layer.test.ts):
+Located in [`src/lib/rag/__tests__/retrieval-layer.test.ts`](../backend-express/src/lib/rag/__tests__/retrieval-layer.test.ts):
 1. **Client Retrieval**:
    * Age calculation from `dateOfBirth` using calendar arithmetic.
    * Server-side database lookup with derived session count and goals.
@@ -65,7 +65,7 @@ Located in [`src/lib/rag/__tests__/retrieval-layer.test.ts`](../backend/src/lib/
    * Non-crashing graceful fallback on database timeout/error.
 
 ### B. Context Management Tests (12 Tests)
-Located in [`src/lib/rag/context/__tests__/context-management.test.ts`](../backend/src/lib/rag/context/__tests__/context-management.test.ts):
+Located in [`src/lib/rag/context/__tests__/context-management.test.ts`](../backend-express/src/lib/rag/context/__tests__/context-management.test.ts):
 1. **Context Builder**: Normalizes raw `RetrievedContext` without triggering any secondary queries.
 2. **Relevance Filtering**: Prunes empty sections and noisy single-character filler utterances.
 3. **Semantic Pruning**: Drops vector chunks with similarity score below threshold (< 0.25).
@@ -80,7 +80,7 @@ Located in [`src/lib/rag/context/__tests__/context-management.test.ts`](../backe
 12. **Resilience**: Safely handles empty input context and missing fields.
 
 ### C. Pipeline Orchestration Tests (5 Tests)
-Located in [`src/lib/rag/__tests__/pipeline.test.ts`](../backend/src/lib/rag/__tests__/pipeline.test.ts):
+Located in [`src/lib/rag/__tests__/pipeline.test.ts`](../backend-express/src/lib/rag/__tests__/pipeline.test.ts):
 1. **End-to-End Orchestration**: Ingests `AIPipelineInput`, runs retrieval, processes context, and returns valid `PromptPayload`.
 2. **Isolation Guarantee**: Verifies `processAIPipeline()` produces LLM-ready prompts without calling any external LLM endpoint.
 3. **Therapist Boundary Enforcement**: Rejects cross-therapist access with `ContextSecurityError`.

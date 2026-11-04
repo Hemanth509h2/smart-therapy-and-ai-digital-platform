@@ -3,7 +3,7 @@
 
 Every table read here (ProfileClient, Session, TherapistNote, ProgressNote,
 SessionReport, ProgressReport, ProgressMetric, document_chunks) is in the HIPAA
-database, DATABASE_URL_2 (backend/prisma/schema.prisma). Connections and
+database, DATABASE_URL_2 (backend-express/prisma/schema.prisma). Connections and
 embeddings go through rag.py, so study material is searched with the same
 model it was stored with. Does not modify the backend or the Prisma schema.
 """

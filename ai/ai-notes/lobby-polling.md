@@ -42,7 +42,7 @@ All 200s, so not an error. This is by design: two polling loops, one per side.
 
 ### Backend cost per request
 
-`backend/src/app/api/sessions/[sessionId]/lobby/route.ts`
+`backend-express/src/routes/sessions.ts`
 
 - `POST`: Prisma `session.findUnique` + Firestore `getLobbyEntry` + Firestore `touchLobbyEntry` write.
 - `GET`: `requireSessionTherapist` (Prisma) + `listLobby` (Firestore).

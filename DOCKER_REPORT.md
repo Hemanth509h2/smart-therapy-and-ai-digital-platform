@@ -56,7 +56,7 @@ The main database is not in Docker. The backend keeps using the Postgres in
   - `app.staad.in` (main app)
   - `feedback.staad.in` (feedback board)
   - `n8n.staad.in` (n8n)
-- **The `.env` files you already use locally** for `backend/`, `frontend/`,
+- **The `.env` files you already use locally** for `backend-express/`, `frontend/`,
   `ai/` and `feedback-board/`.
 
 ---
@@ -143,7 +143,7 @@ Copy your local files to the server (for example with `scp`), or create them
 from the examples:
 
 ```bash
-cp backend/.env.example        backend/.env
+cp backend-express/.env.example        backend-express/.env
 cp frontend/.env.example       frontend/.env
 cp ai/.env.example             ai/.env
 cp feedback-board/.env.example feedback-board/.env
@@ -154,19 +154,19 @@ server, `docker-compose.yml` replaces them:
 
 | File | Replaced automatically on the server |
 |---|---|
-| `backend/.env` | `APP_URL`, `ALLOWED_ORIGINS` → `https://APP_DOMAIN`; `STT_RELAY_URL` → the ai container |
+| `backend-express/.env` | `APP_URL`, `ALLOWED_ORIGINS` → `https://APP_DOMAIN`; `STT_RELAY_URL` → the ai container |
 | `frontend/.env` | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_STT_RELAY_URL` → `https://APP_DOMAIN` |
 | `ai/.env` | `ALLOWED_ORIGINS` → `https://APP_DOMAIN`; `NODE_ENV` → `production` |
 | `feedback-board/.env` | `DATABASE_URL` → the feedback-db container |
 
 These must still be filled in by you:
 
-- **backend/.env:** `DATABASE_URL`, `FIREBASE_*`, `LIVEKIT_*`, `STT_TOKEN_SECRET`
+- **backend-express/.env:** `DATABASE_URL`, `FIREBASE_*`, `LIVEKIT_*`, `STT_TOKEN_SECRET`
   and the API keys you use. `AUTH_DISABLED` must be `false`.
 - **frontend/.env:** the `NEXT_PUBLIC_FIREBASE_*` values and
   `NEXT_PUBLIC_LIVEKIT_URL`.
 - **ai/.env:** `SARVAM_API_KEY`, and `STT_TOKEN_SECRET` with the **same value**
-  as in `backend/.env`.
+  as in `backend-express/.env`.
 - **feedback-board/.env:** `HMAC_SECRET` and `ADMIN_PASSWORD` (generate with
   `openssl rand -hex 32`; never leave them as `change-me`).
 
@@ -226,7 +226,7 @@ These services need to know your new public address:
 | Stop everything | `docker compose down` |
 | Change a frontend `NEXT_PUBLIC_*` value | edit `frontend/.env`, then `docker compose up -d --build frontend` |
 | Change a backend or ai setting | edit its `.env`, then `docker compose up -d backend` (or `ai`) |
-| Backend database schema change | from `backend/` on your own machine: HIPAA database `npx prisma db push`; app database **never** `db push` (it would drop tables), apply the SQL in `scripts/maintenance/` with `npx prisma db execute --schema prisma/app/schema.prisma --file <file>` |
+| Backend database schema change | from `backend-express/` on your own machine: HIPAA database `npx prisma db push`; app database **never** `db push` (it would drop tables), apply the SQL in `scripts/maintenance/` with `npx prisma db execute --schema prisma/app/schema.prisma --file <file>` |
 | Free disk space from old builds | `docker image prune -f` and `docker builder prune -f` |
 
 Data kept between restarts (Docker volumes):
@@ -252,7 +252,7 @@ docker compose exec feedback-db pg_dump -U feedback feedback > feedback-backup.s
 | `docker-compose.yml` | starts all services, connects them, replaces the localhost addresses |
 | `Caddyfile` | HTTPS and which path or domain goes to which container |
 | `.env.example` | server settings: domains, e-mail, feedback database password |
-| `backend/Dockerfile` | builds the API: install, `next build`, keep production packages only |
+| `backend-express/Dockerfile` | builds the API: install, compile TypeScript to `dist/`, keep production packages only |
 | `frontend/Dockerfile` | builds the website as a small standalone Next.js server |
 | `feedback-board/Dockerfile` | builds the feedback board as a standalone Next.js server |
 | `ai/Dockerfile` | the speech-to-text relay, started by gunicorn |
@@ -300,16 +300,8 @@ step 8.
 
 ## 13. Known notes
 
-- **Backend image size:** about 1.6 GB of production packages, because the
-  backend's `dependencies` include UI packages (Excalidraw, LiveKit components,
-  MediaPipe).
-- **`[Admin overview error]` during the backend build** is harmless. The route
-  is still built as dynamic. `export const dynamic = 'force-dynamic'` in
-  `backend/src/app/api/admin/overview/route.ts` would silence it.
 - **`npm warn install-scripts` during builds:** `allowScripts` in
   `package.json` lists older versions than are installed, so those install
   scripts are skipped. Nothing depends on them.
-- **`npm audit`** reports 46 vulnerabilities in the backend's production
-  packages (2 critical). Unrelated to Docker, but worth reviewing.
 - **Local development is unchanged.** `npm run dev` and `python server.py` work
   as before; Docker is only for the server.
