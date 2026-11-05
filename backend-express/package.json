@@ -33,7 +33,7 @@
     "@types/express": "^5.0.0",
     "@types/node": "^20.19.41",
     "@types/nodemailer": "^8.0.1",
-    "firebase-tools": "^15.28.1",
+    "firebase-tools": "^13.11.2",
     "livekit-client": "^2.19.0",
     "prisma": "^6.19.3",
     "tsc-alias": "^1.8.10",
