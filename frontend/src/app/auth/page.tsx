@@ -6,7 +6,6 @@ import {
   createUserWithEmailAndPassword, 
   signInWithPopup, 
   signOut,
-  sendPasswordResetEmail,
   GoogleAuthProvider 
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -118,9 +117,10 @@ function AuthForm() {
     }
   };
 
-  // Firebase emails a single-use reset link that expires after about an hour.
-  // The same message is shown whether or not an account exists, so the form
-  // can't be used to find out which emails are registered.
+  // The backend emails a single-use reset link (through STAAD's own mail) to
+  // the website's /reset-password page; it expires after about an hour. The
+  // same message is shown whether or not an account exists, so the form can't
+  // be used to find out which emails are registered.
   const handleForgotPassword = async () => {
     const target = email.trim();
     if (!target) {
@@ -129,23 +129,22 @@ function AuthForm() {
     }
     setLoading(true);
     try {
-      await sendPasswordResetEmail(auth, target);
-    } catch (err) {
-      const code = (err as { code?: string })?.code;
-      if (code === 'auth/invalid-email') {
-        toast('That email address doesn’t look right. Check it and try again.', 'error');
-        setLoading(false);
+      const res = await apiFetch('/api/auth/password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: target }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast(data.error || "We couldn't send the reset email. Please try again, or contact support.", 'error');
         return;
       }
-      if (code === 'auth/too-many-requests') {
-        toast('Too many attempts. Wait a few minutes and try again.', 'error');
-        setLoading(false);
-        return;
-      }
-      // auth/user-not-found and the rest: fall through to the same message.
+      toast(`If an account exists for ${target}, we’ve emailed a link to reset the password. It expires in about an hour.`, 'success');
+    } catch {
+      toast('No internet connection. Check your connection and try again.', 'error');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-    toast(`If an account exists for ${target}, we’ve emailed a link to reset the password. It expires in about an hour.`, 'success');
   };
 
   const handleGoogleAuth = async () => {

@@ -8,7 +8,6 @@ import {
   deleteUser,
   reauthenticateWithCredential,
   reauthenticateWithPopup,
-  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -34,7 +33,7 @@ import {
   type Availability,
 } from '@/lib/practice';
 import { apiFetch } from '@/lib/api';
-import { apiErrorMessage, caughtErrorMessage, networkErrorMessage } from '@/lib/apiError';
+import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
 
 const SPECIALITIES = ['SLD', 'ADHD', 'Anxiety', 'Depression', 'ID', 'Autism', 'Dyslexia', 'Trauma', 'General'];
 const QUALIFICATIONS = ['BA/BSc', 'MA/MSc', 'M.Phil', 'Ph.D', 'MD', 'DM'];
@@ -170,18 +169,15 @@ export default function ProfilePage() {
     if (!email) return;
     setPwSending(true);
     try {
-      await sendPasswordResetEmail(auth, email);
+      const res = await apiFetch('/api/auth/password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'send the reset email'));
       toast(`Reset link sent to ${email}`);
     } catch (e) {
-      const code = (e as { code?: string })?.code;
-      toast(
-        code === 'auth/network-request-failed'
-          ? networkErrorMessage('send the reset email')
-          : code === 'auth/too-many-requests'
-            ? 'Too many reset emails were requested. Wait a few minutes and try again.'
-            : "We couldn't send the password reset email. Please try again.",
-        'error'
-      );
+      toast(caughtErrorMessage(e, 'send the reset email'), 'error');
     }
     setPwSending(false);
   };

@@ -34,6 +34,25 @@ export function welcomeEmail(p: { firstName?: string | null }): EmailContent {
   };
 }
 
+/** "Forgot password": a link to the website's /reset-password page. */
+export function passwordResetEmail(p: { firstName?: string | null; url: string; googleOnly: boolean }): EmailContent {
+  return {
+    tag: 'account.password_reset',
+    audience: 'account',
+    subject: 'Reset your STAAD password',
+    greeting: hi(p.firstName),
+    paragraphs: [
+      'We received a request to reset the password for your STAAD account. Use the button below to choose a new one.',
+      'The link works once and expires in about an hour.',
+      ...(p.googleOnly
+        ? ['You normally sign in with Google. You can keep doing that; setting a password here adds email-and-password sign-in as well.']
+        : []),
+    ],
+    button: { label: 'Choose a new password', url: p.url },
+    footnote: "If you didn't ask for this, you can ignore this email: your password stays the same.",
+  };
+}
+
 export function dataExportEmail(p: { firstName?: string | null; at: Date }): EmailContent {
   return {
     tag: 'account.export',

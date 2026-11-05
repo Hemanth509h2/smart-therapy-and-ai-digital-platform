@@ -104,6 +104,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         // /join/<token> is the public guest invite page — no session needed.
         // /admin/invite/<token> explains how to sign in before accepting.
         // /session-ended is where guests land after a call (they have no account).
+        // /reset-password is opened from the reset email, signed out.
         // /privacy, /terms, /refunds and /subprocessors are public legal pages,
         // linked from sign-up and the session consent prompt.
         // /unsubscribe is opened from the link in a marketing email.
@@ -111,6 +112,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           pathname.startsWith('/join') ||
           pathname.startsWith('/admin/invite/') ||
           pathname === '/session-ended' ||
+          pathname === '/reset-password' ||
           pathname === '/privacy' ||
           pathname === '/terms' ||
           pathname === '/refunds' ||
