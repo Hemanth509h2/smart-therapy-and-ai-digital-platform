@@ -802,6 +802,9 @@ function SessionRoom({ params }: { params: { sessionId: string } }) {
       // the login page. /session-ended signs the throwaway guest out.
       if (auth.currentUser?.uid?.startsWith('guest:')) {
         window.location.href = '/session-ended?left=1';
+      } else if (isTherapist) {
+        // The dashboard asks the therapist how the call went (SessionFeedbackDialog).
+        window.location.href = `/?feedback=${encodeURIComponent(sessionId)}`;
       } else {
         window.location.href = '/';
       }

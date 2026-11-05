@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useNow, usePracticeData, useTherapistGuard } from '@/hooks/usePracticeData';
@@ -20,6 +20,7 @@ import {
 import { IconArrowRightXs, IconCalendarPlus, IconModules, IconPlus, IconSchTile, IconStatA, IconStatB, IconStatE, IconStatF, IconTrendUp, IconUserPlus } from '@/components/staad/icons';
 import { AddClientDialog, BookSessionDialog, StartSessionDialog } from '@/components/practice/dialogs';
 import { useSessionActions } from '@/components/practice/useSessionActions';
+import { SessionFeedbackDialog } from '@/components/practice/SessionFeedbackDialog';
 import {
   SESSION_KIND,
   byStartAsc,
@@ -77,6 +78,16 @@ export default function DashboardPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [book, setBook] = useState<{ open: boolean; clientId?: string }>({ open: false });
   const [start, setStart] = useState<{ open: boolean; clientId?: string }>({ open: false });
+  // Set by the session room after the therapist ends a call (/?feedback=<id>).
+  const [feedbackFor, setFeedbackFor] = useState<string | null>(null);
+
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('feedback');
+    if (!id) return;
+    setFeedbackFor(id);
+    // Drop it from the address, so a reload doesn't ask again.
+    window.history.replaceState(null, '', window.location.pathname);
+  }, []);
 
   const live = useMemo(() => {
     const active = sessions.filter((s) => s.status !== 'CANCELLED');
@@ -412,6 +423,7 @@ export default function DashboardPage() {
         }}
       />
       {actions.dialogs}
+      <SessionFeedbackDialog sessionId={feedbackFor} onClose={() => setFeedbackFor(null)} />
     </StaadShell>
   );
 }

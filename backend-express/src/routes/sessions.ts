@@ -485,6 +485,49 @@ router.post('/sessions/:sessionId/email-link', handle(async (req, res) => {
   }
 }));
 
+// POST /api/sessions/[sessionId]/feedback — the therapist rates the session in
+// the dialog shown after they end a call (the admin "Bugs & feedback" page):
+//   { rating: 1-5, callQuality?: 'GOOD' | 'SOME_ISSUES' | 'POOR', comment? }
+// One answer per session; sending again replaces it.
+const CALL_QUALITY = ['GOOD', 'SOME_ISSUES', 'POOR'];
+
+router.post('/sessions/:sessionId/feedback', handle(async (req, res) => {
+  try {
+    const auth = await requireAuth(req);
+    if (!auth.ok) return send(res, auth.response);
+
+    const session = await prisma.session.findUnique({
+      where: { id: req.params.sessionId },
+      select: { id: true, therapistId: true, clientId: true },
+    });
+    if (!session) {
+      return res.status(404).json({ error: 'This session no longer exists. It may have been deleted.' });
+    }
+    const role = await sessionRoleFor(auth.uid, session);
+    if (role !== 'therapist') {
+      return res.status(403).json({ error: 'Only the therapist who ran this session can leave feedback on it.' });
+    }
+
+    const body = req.body ?? {};
+    const rating = Number(body.rating);
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Choose a rating from 1 to 5 stars.' });
+    }
+    const callQuality = typeof body.callQuality === 'string' && CALL_QUALITY.includes(body.callQuality) ? body.callQuality : null;
+    const comment = typeof body.comment === 'string' && body.comment.trim() ? body.comment.trim().slice(0, 2000) : null;
+
+    const data = { role, rating, callQuality, comment };
+    await prisma.sessionFeedback.upsert({
+      where: { sessionId_uid: { sessionId: session.id, uid: auth.uid } },
+      update: data,
+      create: { sessionId: session.id, uid: auth.uid, ...data },
+    });
+    return res.json({ ok: true });
+  } catch (error: any) {
+    return send(res, errorResponse(error, 'Session feedback error'));
+  }
+}));
+
 // ---- /api/sessions/:sessionId/lobby --------------------------------------------
 
 // Waiting room for invite-link guests (see lib/sessions/lobby.ts).

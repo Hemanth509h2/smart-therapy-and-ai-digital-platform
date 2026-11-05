@@ -162,6 +162,7 @@ model Session {
   notes            TherapistNote[]
   report           SessionReport?
   whatsAppMessages WhatsAppMessage[]
+  feedback         SessionFeedback[]
 
   @@index([therapistId, scheduledAt])
   @@index([clientId, scheduledAt])
@@ -418,4 +419,23 @@ model AccessLog {
   @@index([createdAt])
   @@index([uid, createdAt])
   @@index([resourceId, createdAt])
+}
+
+// How a video session went, asked from the therapist right after they end
+// the call. Listed on the admin "Bugs & feedback" page. One row per person per
+// session; sending again updates it. Deleted with the session.
+model SessionFeedback {
+  id          String   @id @default(uuid())
+  sessionId   String
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  uid         String // Firebase uid of who answered (the therapist)
+  role        String // therapist
+  rating      Int // 1-5, how the session went overall
+  callQuality String? // GOOD | SOME_ISSUES | POOR (audio / video)
+  comment     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([sessionId, uid])
+  @@index([createdAt])
 }

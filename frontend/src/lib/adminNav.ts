@@ -3,6 +3,7 @@
 // signed-in admin's role can't use are hidden (the backend enforces it anyway).
 import {
   Boxes,
+  Bug,
   FileDown,
   Gauge,
   HeartPulse,
@@ -39,6 +40,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin/plans', label: 'Plans', icon: Layers, permission: 'billing.read' },
   { href: '/admin/coupons', label: 'Coupons', icon: TicketPercent, permission: 'billing.read' },
   { href: '/admin/support', label: 'Support inbox', icon: Inbox, permission: 'support' },
+  { href: '/admin/feedback', label: 'Bugs & feedback', icon: Bug, permission: 'support' },
   { href: '/admin/messages', label: 'Messages', icon: MessageSquare, permission: 'support' },
   { href: '/admin/usage', label: 'Usage & cost', icon: Gauge, permission: 'people.read' },
   { href: '/admin/modules', label: 'Module library', icon: Boxes, permission: 'content' },
