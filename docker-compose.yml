@@ -1,14 +1,12 @@
 # =============================================================================
-# STAAD - run the whole platform on a cloud server with Docker Compose
+# STAAD - run the website, backend API and AI service with Docker Compose
 # =============================================================================
 #
-# Before the first start (see DOCKER_REPORT.md for the full step-by-step):
-#   1. Point your domains (DNS "A" records) to this server's public IP.
-#   2. Open ports 80 and 443 in the server's firewall. Nothing else is needed.
-#   3. Copy .env.example to .env next to this file and fill it in
-#      (domains and e-mail).
-#   4. Copy .env.example to .env in backend-express/, frontend/ and ai/ and fill
+# Before the first start:
+#   1. Copy .env.example to .env in backend-express/, frontend/ and ai/ and fill
 #      them in.
+#   2. Optional: copy .env.example to .env next to this file and set the public
+#      addresses. Without it everything runs on localhost.
 #
 # Start everything (builds the images the first time):
 #   docker compose up -d --build
@@ -26,20 +24,23 @@
 # Stop everything:
 #   docker compose down
 #
-# Where each part is reachable (HTTPS, handled by Caddy):
-#   https://APP_DOMAIN        website, API (/api/...) and speech-to-text
-#   https://N8N_DOMAIN        n8n automation
+# Where each part is reachable (defaults):
+#   http://localhost:3000     website            (frontend)
+#   http://localhost:4000     API, /api/...      (backend)
+#   http://localhost:4100     speech-to-text and AI (ai)
 #
-# How the traffic flows:
-#   internet -> caddy (ports 80/443, HTTPS) -> the right container
-#   Only caddy is open to the internet. The other containers have no public
-#   ports; they talk to each other by service name (http://backend:4000, ...).
-#   Inside a container, "localhost" means that container itself.
+# The containers talk to each other by service name (http://ai:4100, ...).
+# Inside a container, "localhost" means that container itself.
+#
+# There is no HTTPS here. On a public server, put a reverse proxy with HTTPS
+# in front of the three ports and set WEBSITE_URL, API_URL and AI_URL in .env
+# to the https:// addresses. Browsers only allow the camera and microphone on
+# https:// pages or on localhost.
 # =============================================================================
 
 
 # Shared log settings: each service keeps at most 3 log files of 10 MB, so the
-# logs can never fill the server's disk.
+# logs can never fill the disk.
 x-logging: &logging
   driver: json-file
   options:
@@ -50,68 +51,44 @@ x-logging: &logging
 services:
 
   # ---------------------------------------------------------------------------
-  # Caddy: HTTPS front door. The only container open to the internet.
-  # ---------------------------------------------------------------------------
-  caddy:
-    image: caddy:2.11.7-alpine
-    ports:
-      - "80:80"         # HTTP (Caddy redirects it to HTTPS, and uses it for certificates)
-      - "443:443"       # HTTPS
-      - "443:443/udp"   # HTTPS over HTTP/3
-    environment:
-      # Read by the Caddyfile.
-      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env}
-      N8N_DOMAIN: ${N8N_DOMAIN:?Set N8N_DOMAIN in .env}
-      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      # HTTPS certificates. Keep them, or Let's Encrypt may rate-limit you.
-      - caddy-data:/data
-      - caddy-config:/config
-    depends_on:
-      - frontend
-      - backend
-      - ai
-      - n8n
-    restart: unless-stopped
-    logging: *logging
-
-  # ---------------------------------------------------------------------------
-  # Backend API (Express + Prisma). Reached at https://APP_DOMAIN/api/...
+  # Backend API (Express + Prisma)
   # ---------------------------------------------------------------------------
   backend:
     build: ./backend-express
+    ports:
+      - "4000:4000"
     volumes:
       # Your settings, read-only. src/server.ts (dotenv) loads this file on start.
       - ./backend-express/.env:/app/.env:ro
     environment:
-      # These replace the values in backend-express/.env on the server.
-      # Links sent to clients (invites, join links) use this address.
-      APP_URL: https://${APP_DOMAIN}
+      # These replace the values in backend-express/.env.
+      # Links in emails (invites, join links, password reset) use this address.
+      APP_URL: ${WEBSITE_URL:-http://localhost:3000}
       # The website's address, allowed to call the API.
-      ALLOWED_ORIGINS: https://${APP_DOMAIN}
+      ALLOWED_ORIGINS: ${WEBSITE_URL:-http://localhost:3000}
       # The backend reaches the AI service by its service name: AI insights,
-      # session reports (its /internal endpoint, not exposed by Caddy) and the
-      # admin health check.
+      # session reports and the admin health check.
       STT_RELAY_URL: http://ai:4100
-      # n8n by its service name, for the admin health check.
-      N8N_URL: http://n8n:5678
+    depends_on:
+      - ai
     restart: unless-stopped
     logging: *logging
 
   # ---------------------------------------------------------------------------
-  # Website (Next.js). Reached at https://APP_DOMAIN
+  # Website (Next.js)
   # ---------------------------------------------------------------------------
   frontend:
     build:
       context: ./frontend
       args:
-        # The browser reaches the API and speech-to-text through the same
-        # domain as the website; Caddy forwards them. These replace the
-        # localhost addresses in frontend/.env. The rest of frontend/.env
-        # (Firebase, LiveKit) is used as it is.
-        NEXT_PUBLIC_API_URL: https://${APP_DOMAIN}
-        NEXT_PUBLIC_STT_RELAY_URL: https://${APP_DOMAIN}
+        # Built into the website's JavaScript, so the browser must be able to
+        # reach these addresses. They replace the values in frontend/.env; the
+        # rest of frontend/.env (Firebase, LiveKit) is used as it is.
+        # Changing them needs a rebuild: docker compose up -d --build frontend
+        NEXT_PUBLIC_API_URL: ${API_URL:-http://localhost:4000}
+        NEXT_PUBLIC_STT_RELAY_URL: ${AI_URL:-http://localhost:4100}
+    ports:
+      - "3000:3000"
     depends_on:
       - backend
       - ai
@@ -119,48 +96,19 @@ services:
     logging: *logging
 
   # ---------------------------------------------------------------------------
-  # AI service: all AI work (Python + gunicorn): speech-to-text relay, call-plan
-  # agent, AI insights and session reports. Browsers reach it at
-  # wss://APP_DOMAIN/sarvam-stream and wss://APP_DOMAIN/call-plan; the backend
-  # at http://ai:4100.
+  # AI service (Python + gunicorn): speech-to-text relay, call-plan agent,
+  # AI insights and session reports.
   # ---------------------------------------------------------------------------
   ai:
     build: ./ai
+    ports:
+      - "4100:4100"
     # Your settings from ai/.env become environment variables.
     env_file: ./ai/.env
     environment:
       # Always production, whatever ai/.env says, so the token check stays on.
       NODE_ENV: production
       # Only the website may open speech-to-text connections.
-      ALLOWED_ORIGINS: https://${APP_DOMAIN}
+      ALLOWED_ORIGINS: ${WEBSITE_URL:-http://localhost:3000}
     restart: unless-stopped
     logging: *logging
-
-  # ---------------------------------------------------------------------------
-  # n8n automation with the STAAD workflows. Reached at https://N8N_DOMAIN
-  # ---------------------------------------------------------------------------
-  n8n:
-    build: ./n8n
-    environment:
-      # The workflows call the backend directly by its service name.
-      STAAD_BACKEND_URL: http://backend:4000
-      # n8n's public address, used for its editor links and webhook URLs.
-      N8N_HOST: ${N8N_DOMAIN}
-      N8N_PROTOCOL: https
-      WEBHOOK_URL: https://${N8N_DOMAIN}/
-      # n8n sits behind one proxy (Caddy).
-      N8N_PROXY_HOPS: 1
-    volumes:
-      # Workflows, credentials and n8n's encryption key, kept between restarts.
-      - n8n-data:/home/node/.n8n
-    depends_on:
-      - backend
-    restart: unless-stopped
-    logging: *logging
-
-
-# Named volumes: Docker keeps these when containers are removed.
-volumes:
-  caddy-data:
-  caddy-config:
-  n8n-data:
