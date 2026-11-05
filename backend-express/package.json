@@ -7,6 +7,8 @@
     "db:generate": "prisma generate && prisma generate --schema prisma/app/schema.prisma",
     "predev": "npm run db:generate",
     "dev": "tsx watch src/server.ts",
+    "dev:local": "npm run db:generate && tsx watch --env-file=.env.localdb src/server.ts",
+    "db:push:local": "node --env-file=.env.localdb node_modules/prisma/build/index.js db push --skip-generate && node --env-file=.env.localdb node_modules/prisma/build/index.js db push --skip-generate --schema prisma/app/schema.prisma",
     "build": "npm run db:generate && tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
     "postinstall": "npm run db:generate",
     "start": "node dist/server.js",

@@ -26,7 +26,8 @@ export default function SchedulePage() {
   useTherapistGuard();
   const now = useNow(60_000);
   const { profile } = useAuthStore();
-  const { sessions, bookings, clients, loading, error, refresh } = usePracticeData();
+  const { sessions, bookings, clients, ready, error, refresh } = usePracticeData();
+  const loading = !(ready.sessions && ready.bookings);
   useErrorToast(error, refresh);
   const actions = useSessionActions(refresh);
 

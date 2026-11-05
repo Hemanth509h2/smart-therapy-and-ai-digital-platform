@@ -43,3 +43,6 @@ Thumbs.db
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local Postgres data (docker container staad-db)
+local-db/

@@ -13,7 +13,8 @@ export const router = Router();
 
 // ---- /api/support --------------------------------------------------------------
 
-const CATEGORIES = ['Technical Issue', 'Billing', 'Account', 'Feedback', 'Other'];
+// 'Bug report' comes from the "Report a problem" button in the top bar.
+const CATEGORIES = ['Technical Issue', 'Bug report', 'Billing', 'Account', 'Feedback', 'Other'];
 
 // POST /api/support — a user raises a helpdesk ticket.
 // The ticket is stored (admin Support inbox) and then emailed to the support

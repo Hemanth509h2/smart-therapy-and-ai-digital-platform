@@ -17,6 +17,9 @@ export interface PracticeClient {
   gender?: string | null;
   phoneNumber?: string | null;
   parentEmail?: string | null;
+  therapistId?: string | null;
+  guardianName?: string | null;
+  guardianConsentAt?: string | null;
   sessionCount?: number;
   lastSession?: string | null;
   nextSession?: { id: string; scheduledAt: string } | null;

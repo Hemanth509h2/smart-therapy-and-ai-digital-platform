@@ -42,7 +42,8 @@ const QUALIFICATIONS = ['BA/BSc', 'MA/MSc', 'M.Phil', 'Ph.D', 'MD', 'DM'];
 export default function ProfilePage() {
   const router = useRouter();
   const { uid, role, email, profile, setRoleAndProfile, clearAuth } = useAuthStore();
-  const { sessions, bookings, clients, loading } = usePracticeData();
+  const { sessions, bookings, clients, ready } = usePracticeData();
+  const loading = !(ready.sessions && ready.clients);
 
   const isTherapist = role === 'THERAPIST';
 

@@ -27,13 +27,13 @@ import {
   IconSessions,
   IconTick,
 } from '@/components/staad/icons';
-import { AddClientDialog, StartSessionDialog } from '@/components/practice/dialogs';
+import { AddClientDialog, ConfirmDialog, StartSessionDialog, isEditableClient } from '@/components/practice/dialogs';
 import { useSessionActions } from '@/components/practice/useSessionActions';
 import { toast } from '@/components/practice/ui';
 import SessionReportDrawer from '@/components/report/SessionReportDrawer';
-import { apiFetchCached } from '@/lib/api';
+import { apiFetch, apiFetchCached } from '@/lib/api';
 import { apiErrorMessage, caughtErrorMessage } from '@/lib/apiError';
-import { Sparkles } from 'lucide-react';
+import { Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { MODULE_CATEGORIES, type ModuleItem } from '@/lib/modules';
 import {
   createNote,
@@ -144,12 +144,14 @@ export default function ClientProfilePage() {
   const params = useParams<{ clientId: string }>();
   const clientId = params.clientId;
   const now = useNow(30_000);
-  const { sessions, bookings, clients, loading, error, refresh } = usePracticeData();
+  const { sessions, bookings, clients, ready, error, refresh } = usePracticeData();
   useErrorToast(error, refresh);
   const actions = useSessionActions(refresh);
 
   const [tab, setTab] = useState<Tab>('overview');
   const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
   const [savingNote, setSavingNote] = useState(false);
@@ -268,6 +270,15 @@ export default function ClientProfilePage() {
     }
   };
 
+  const deleteClient = async () => {
+    if (!client) return;
+    const res = await apiFetch(`/api/clients/${encodeURIComponent(client.id)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(await apiErrorMessage(res, 'delete this client'));
+    toast(`${fullName(client) || 'The client'} was deleted.`);
+    refresh();
+    router.push('/clients');
+  };
+
   const startSession = () => {
     if (live) actions.enter(live);
     else if (next?.status === 'ACTIVE') actions.enter(next);
@@ -289,7 +300,7 @@ export default function ClientProfilePage() {
         )}
       </Link>
 
-      {loading && !client ? (
+      {!ready.clients && !client ? (
         <SkeletonCard height={220} />
       ) : !client ? (
         <EmptyCard
@@ -320,6 +331,16 @@ export default function ClientProfilePage() {
               </div>
             </div>
             <div className="chead__acts">
+              {isEditableClient(client) && (
+                <>
+                  <Btn icon={<Pencil size={16} />} onClick={() => setEditOpen(true)}>
+                    Edit
+                  </Btn>
+                  <Btn icon={<Trash2 size={16} />} onClick={() => setDeleteOpen(true)}>
+                    Delete
+                  </Btn>
+                </>
+              )}
               <Btn icon={<IconChat />} onClick={() => messageClient(client)}>
                 Message
               </Btn>
@@ -669,6 +690,22 @@ export default function ClientProfilePage() {
       )}
 
       <AddClientDialog open={addOpen} onOpenChange={setAddOpen} onCreated={refresh} />
+      <AddClientDialog open={editOpen} onOpenChange={setEditOpen} onCreated={refresh} client={client} />
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete this client?"
+        body={
+          <>
+            This permanently deletes {client ? fullName(client) || 'this client' : 'this client'} and everything
+            recorded about them: sessions, session reports and notes, transcripts, bookings and progress. It
+            cannot be undone.
+          </>
+        }
+        confirmLabel="Delete client"
+        danger
+        onConfirm={deleteClient}
+      />
       <StartSessionDialog
         open={startOpen}
         onOpenChange={setStartOpen}

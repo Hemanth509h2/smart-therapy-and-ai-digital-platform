@@ -66,7 +66,11 @@ export default function DashboardPage() {
   useTherapistGuard();
   const { profile } = useAuthStore();
   const now = useNow(30_000);
-  const { sessions, bookings, clients, loading, error, refresh } = usePracticeData();
+  const { sessions, bookings, clients, ready, error, refresh } = usePracticeData();
+  // Each section shows as soon as the data it needs has arrived.
+  const statsReady = ready.sessions && ready.clients;
+  const scheduleReady = ready.sessions && ready.bookings;
+  const focusReady = scheduleReady && ready.clients;
   useErrorToast(error, refresh);
   const actions = useSessionActions(refresh);
 
@@ -183,7 +187,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="stats">
-        {loading ? (
+        {!statsReady ? (
           <>
             <SkeletonCard />
             <SkeletonCard />
@@ -258,7 +262,7 @@ export default function DashboardPage() {
               sub="Your appointments for today"
               link={{ href: '/schedule', label: 'View Full Schedule' }}
             >
-              {loading ? (
+              {!scheduleReady ? (
                 <SkeletonCard height={300} />
               ) : live.featured ? (
                 <SessionCard
@@ -289,7 +293,7 @@ export default function DashboardPage() {
             </Section>
 
             <Section title="Next Session">
-              {loading ? (
+              {!scheduleReady ? (
                 <SkeletonCard height={300} />
               ) : live.next ? (
                 <NextSession
@@ -349,7 +353,7 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          {loading ? (
+          {!focusReady ? (
             <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
               <SkeletonCard height={120} />
               <SkeletonCard height={120} />

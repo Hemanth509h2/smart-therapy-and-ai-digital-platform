@@ -15,6 +15,7 @@ import {
   sessionState,
   type PracticeSession,
 } from '@/lib/practice';
+import { ReportProblem } from './ReportProblem';
 import { IconArrowUpRight, IconCalendarSm, IconChevronDown, IconThemeA, IconThemeB } from './icons';
 
 const fmtChipDate = (d: Date) =>
@@ -77,6 +78,8 @@ export function TopBar({ sessions = [] }: { sessions?: PracticeSession[] }) {
           <IconArrowUpRight />
         </Link>
       </div>
+
+      <ReportProblem />
 
       <button
         type="button"

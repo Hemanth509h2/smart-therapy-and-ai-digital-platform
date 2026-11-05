@@ -13,7 +13,6 @@ import {
   EmptyCard,
   Notch,
   SearchBox,
-  SkeletonCard,
   cx,
 } from '@/components/staad/parts';
 import { IconArrowRightXs, IconModules, IconPlus } from '@/components/staad/icons';
@@ -106,7 +105,7 @@ function ModulesInner() {
   const router = useRouter();
   const params = useSearchParams();
   const { uid, role } = useAuthStore();
-  const { profile, sessions, clients, loading, error, refresh } = usePracticeData();
+  const { profile, sessions, clients, error, refresh } = usePracticeData();
   useErrorToast(error, refresh);
 
   useEffect(() => {
@@ -210,13 +209,7 @@ function ModulesInner() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="grid3">
-          <SkeletonCard height={230} />
-          <SkeletonCard height={230} />
-          <SkeletonCard height={230} />
-        </div>
-      ) : filtered.length === 0 ? (
+      {filtered.length === 0 ? (
         <EmptyCard
           mark={<IconModules />}
           title={filter === 'Saved' ? 'Nothing saved yet' : 'No modules match that'}

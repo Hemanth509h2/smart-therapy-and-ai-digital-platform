@@ -293,6 +293,26 @@ export function clientSessionEmail(p: {
   };
 }
 
+/** The join link, sent when the therapist picks "Send by email" for a session. */
+export function sessionLinkEmail(p: { therapistName: string; when: Date; joinUrl: string }): EmailContent {
+  const therapist = p.therapistName.trim() || 'Your therapist';
+  return {
+    tag: 'sessions.client_link',
+    audience: 'session',
+    subject: `Your session link with ${therapist}`,
+    greeting: 'Hello,',
+    paragraphs: [
+      `${therapist} has sent you the link to your online STAAD therapy session.`,
+      'Use the button below to join. You will not need an account or password.',
+      'Before you join: use a phone or laptop with a working camera and microphone, open the link in Chrome or Safari and allow camera and microphone access, and sit somewhere quiet and private.',
+      'Keep this link private: it is only for you and this session, and it stops working when the session ends.',
+    ],
+    details: [['With', therapist], ['When', formatDateTimeIST(p.when)]],
+    button: { label: 'Join the session', url: p.joinUrl },
+    footnote: 'You are receiving this because your therapist entered this email address for session updates. If this reached you by mistake, please let us know.',
+  };
+}
+
 // ── Sessions: to the therapist ────────────────────────────────────────────────
 
 export function therapistSessionEmail(p: {

@@ -46,7 +46,8 @@ function SessionsInner() {
   useTherapistGuard();
   const now = useNow(30_000);
   const params = useSearchParams();
-  const { sessions, bookings, clients, loading, error, refresh } = usePracticeData();
+  const { sessions, bookings, clients, ready, error, refresh } = usePracticeData();
+  const loading = !(ready.sessions && ready.bookings);
   useErrorToast(error, refresh);
   const actions = useSessionActions(refresh);
 

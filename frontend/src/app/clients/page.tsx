@@ -34,7 +34,8 @@ export default function ClientsPage() {
   useTherapistGuard();
   const router = useRouter();
   const now = useNow(30_000);
-  const { sessions, bookings, clients, loading, error, refresh } = usePracticeData();
+  const { sessions, bookings, clients, ready, error, refresh } = usePracticeData();
+  const loading = !(ready.clients && ready.sessions);
   useErrorToast(error, refresh);
 
   const [tab, setTab] = useState<Tab>('all');

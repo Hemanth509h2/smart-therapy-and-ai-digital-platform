@@ -14,8 +14,10 @@ import { getLobbyEntry, listLobby, setLobbyStatus, touchLobbyEntry } from '@/lib
 import { RoomServiceClient } from 'livekit-server-sdk';
 import { isTranslationLanguage } from '@/lib/sessions/translationLanguages';
 import { handle, queryParams, send } from '@/lib/http/reply';
-import { deliver, notify } from '@/lib/email/notify';
-import { clientSessionEmail, therapistSessionEmail, type SessionChange } from '@/lib/email/templates';
+import { deliver, notify, sendServiceEmail } from '@/lib/email/notify';
+import { clientSessionEmail, sessionLinkEmail, therapistSessionEmail, type SessionChange } from '@/lib/email/templates';
+import { mailConfigured } from '@/lib/core/mail';
+import { hit } from '@/lib/http/rateLimit';
 import { clientEmails, therapistContact } from '@/lib/email/recipients';
 import type { ProfileClient, Session } from '@prisma/client';
 import { emailLink } from '@/lib/email/format';
@@ -426,6 +428,60 @@ router.post('/sessions/:sessionId/guest-link', handle(async (req, res) => {
     return res.json({ token: invite.token });
   } catch (error: any) {
     return send(res, errorResponse(error, 'Guest link error'));
+  }
+}));
+
+// POST /api/sessions/[sessionId]/email-link — emails the client's join link
+// (the same one guest-link returns) to the client's email on file: the
+// address the therapist entered, plus their own login email if they have one.
+// The server builds the link and picks the recipients, so this can only ever
+// send this session's link to this client.
+const EMAIL_LINK_LIMIT = { name: 'session-email-link', limit: 5, windowMs: 10 * 60 * 1000 };
+
+router.post('/sessions/:sessionId/email-link', handle(async (req, res) => {
+  try {
+    const auth = await requireAuth(req);
+    if (!auth.ok) return send(res, auth.response);
+
+    const [session, therapistId] = await Promise.all([
+      prisma.session.findUnique({ where: { id: req.params.sessionId }, include: { client: true } }),
+      therapistIdForUser(auth.uid),
+    ]);
+    if (!session) {
+      return res.status(404).json({ error: 'This session no longer exists. It may have been deleted.' });
+    }
+    if (session.therapistId !== therapistId) {
+      return send(res, notYourProfile('this session'));
+    }
+    if (session.status === 'COMPLETED' || session.status === 'CANCELLED') {
+      return res.status(409).json({ error: 'This session has ended, so its link no longer works. Start a new session instead.' });
+    }
+    const noPlan = await requireActivePlan({ therapistId: session.therapistId }, 'send a session link');
+    if (noPlan) return send(res, noPlan);
+
+    if (!mailConfigured()) {
+      return res.status(503).json({ error: 'Email is not set up on this server yet. Copy the link or send it on WhatsApp instead.' });
+    }
+    const recipients = await clientEmails(session.client);
+    if (!recipients.length) {
+      return res.status(400).json({ error: "This client has no email address. Add one with Edit on the client's page, or send the link on WhatsApp." });
+    }
+    if (hit(EMAIL_LINK_LIMIT, session.id).limited) {
+      return res.status(429).json({ error: 'The link was emailed several times just now. Wait a few minutes before sending it again.' });
+    }
+
+    const invite = await getOrCreateGuestInvite(session);
+    const joinUrl = emailLink(`/join/${invite.token}`);
+    if (!joinUrl) {
+      return res.status(503).json({ error: "The app's address (APP_URL) is not set on this server, so the email can't include the link. Copy the link instead." });
+    }
+    const therapist = await therapistContact(session.therapistId).catch(() => null);
+    const content = sessionLinkEmail({ therapistName: therapist?.fullName ?? '', when: session.scheduledAt, joinUrl });
+    for (const to of recipients) await sendServiceEmail('sessions', to, content);
+
+    return res.json({ sentTo: recipients });
+  } catch (error: any) {
+    return send(res, errorResponse(error, 'Session link email error'));
   }
 }));
 

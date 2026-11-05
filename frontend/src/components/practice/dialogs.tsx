@@ -2,13 +2,14 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, MessageCircle, Send } from 'lucide-react';
+import { Loader2, Mail, MessageCircle, Send } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { auth } from '@/lib/firebase';
 import { DsDialog, Drawer, Field, Spinner, toast } from './ui';
 import {
   DAY_NAMES,
   DEFAULT_DURATION,
+  clientEmail,
   createSession,
   describeAvailability,
   fmtDayTime,
@@ -210,6 +211,7 @@ export function StartSessionDialog({
   // When the started session is (or was) scheduled for, for the WhatsApp message.
   const [sessionAt, setSessionAt] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [emailing, setEmailing] = useState(false);
   const [pickedModule, setPickedModule] = useState('');
   // '' = auto (reuse a due session or open a new one), 'new' = force a new room, else a session id.
   const [pickedSession, setPickedSession] = useState('');
@@ -268,7 +270,7 @@ export function StartSessionDialog({
       setSessionAt(existing?.scheduledAt ?? new Date().toISOString());
       setPatientLink(`${window.location.origin}/join/${data.token}`);
       setStarting(false);
-      toast('Session link is ready. Send it to the client on WhatsApp or copy it.');
+      toast('Session link is ready. Send it to the client on WhatsApp or by email, or copy it.');
     } catch (e) {
       toast(caughtErrorMessage(e, 'start the session'), 'error');
       setStarting(false);
@@ -325,6 +327,24 @@ export function StartSessionDialog({
       therapist ? `– ${therapist}, STAAD` : '– STAAD',
     ].join('\n');
     window.open(whatsappLink(text, client?.phoneNumber), '_blank', 'noopener');
+  };
+
+  // The server emails the link to the client's address on file (it builds the
+  // link and picks the recipient itself).
+  const sendByEmail = async () => {
+    if (!sessionId) return;
+    setEmailing(true);
+    try {
+      const res = await apiFetch(`/api/sessions/${sessionId}/email-link`, { method: 'POST' });
+      if (!res.ok) throw new Error(await apiErrorMessage(res, 'email the session link'));
+      const data = await res.json().catch(() => ({}));
+      const to: string[] = data.sentTo ?? [];
+      toast(to.length ? `Session link emailed to ${to.join(', ')}.` : 'Session link emailed.');
+    } catch (e) {
+      toast(caughtErrorMessage(e, 'email the session link'), 'error');
+    } finally {
+      setEmailing(false);
+    }
   };
 
   const copyLink = async () => {
@@ -385,10 +405,48 @@ export function StartSessionDialog({
               {copied ? 'Copied' : 'Copy'}
             </button>
           </div>
-          <button className="ds-btn ds-btn-ghost w-full" onClick={sendOnWhatsApp}>
-            <MessageCircle />
-            Send on WhatsApp
-          </button>
+          {(() => {
+            const client = clients.find((c) => c.id === clientId);
+            const email = clientEmail(client);
+            // WhatsApp first: the browser only allows opening a new tab
+            // straight from the click, not after waiting for the email request.
+            const sendBoth = () => {
+              sendOnWhatsApp();
+              void sendByEmail();
+            };
+            return (
+              <div className="space-y-2.5">
+                <p className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: 'var(--ds-muted)' }}>
+                  Send to {client?.firstName || 'the client'}
+                </p>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button className="ds-btn ds-btn-outline" onClick={sendOnWhatsApp}>
+                    <MessageCircle />
+                    WhatsApp
+                  </button>
+                  <button
+                    className="ds-btn ds-btn-outline"
+                    onClick={sendByEmail}
+                    disabled={emailing || !email}
+                    title={email ? `Email the link to ${email}` : 'Add an email address for this client first (Edit on their page).'}
+                  >
+                    {emailing ? <Loader2 className="animate-spin" /> : <Mail />}
+                    Email
+                  </button>
+                </div>
+                {email ? (
+                  <button className="ds-btn ds-btn-clay-outline w-full" onClick={sendBoth} disabled={emailing}>
+                    <Send />
+                    Send on both
+                  </button>
+                ) : (
+                  <p className="ds-muted text-[12.5px]">
+                    No email address on file. Add one with Edit on the client&apos;s page to send the link by email too.
+                  </p>
+                )}
+              </div>
+            );
+          })()}
         </div>
       ) : clients.length === 0 ? (
         <NoClients onAddClient={onAddClient} />
@@ -498,7 +556,7 @@ export function StartSessionDialog({
   );
 }
 
-/* ─────────────────────────── Add client (invite) ─────────────────────────── */
+/* ─────────────────────────── Add / edit client ─────────────────────────── */
 
 /** True when a YYYY-MM-DD date of birth is under 18 years ago (same rule as the server). */
 function isUnder18(dob: string) {
@@ -508,15 +566,25 @@ function isUnder18(dob: string) {
   return eighteenth.getTime() > Date.now();
 }
 
+/** True for clients the therapist added (or invite guests): their profile is
+ *  the therapist's to edit or delete. Clients with their own sign-in own theirs. */
+export function isEditableClient(c: PracticeClient | null | undefined) {
+  return !!c && (c.userId.startsWith('client:') || c.userId.startsWith('guest:'));
+}
+
+/** Adds a client, or edits one when `client` is given. */
 export function AddClientDialog({
   open,
   onOpenChange,
   onCreated,
+  client,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
+  client?: PracticeClient | null;
 }) {
+  const editing = !!client;
   const { profile } = useAuthStore();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -535,28 +603,33 @@ export function AddClientDialog({
 
   useEffect(() => {
     if (open) {
-      setFirstName('');
-      setLastName('');
-      setDiagnosis('');
-      setPhone('');
-      setEmail('');
-      setDateOfBirth('');
-      setGender('');
-      setGuardianName('');
+      setFirstName(client?.firstName ?? '');
+      setLastName(client?.lastName ?? '');
+      setDiagnosis((client?.diagnosis ?? []).join(', '));
+      setPhone(client?.phoneNumber ?? '');
+      setEmail(client?.parentEmail ?? '');
+      // Stored as UTC midnight of the date the therapist picked.
+      setDateOfBirth(client?.dateOfBirth ? client.dateOfBirth.slice(0, 10) : '');
+      setGender(client?.gender ?? '');
+      setGuardianName(client?.guardianName ?? '');
       setConsentConfirmed(false);
       setLink('');
       setCopied(false);
     }
-  }, [open]);
+  }, [open, client]);
 
   const minor = isUnder18(dateOfBirth);
+  // When editing, consent was already confirmed when the client was added; it
+  // is asked again only for a minor whose guardian is new or not yet on record.
+  const needsConsent =
+    !editing || (minor && (!client?.guardianConsentAt || guardianName.trim() !== (client?.guardianName ?? '')));
 
   const submit = async () => {
     if (!profile?.id) return;
     if (!firstName.trim()) return void toast("Enter the client's first name.", 'warning');
     if (!dateOfBirth) return void toast("Enter the client's date of birth.", 'warning');
     if (minor && !guardianName.trim()) return void toast("Enter the parent or guardian's name.", 'warning');
-    if (!consentConfirmed) {
+    if (needsConsent && !consentConfirmed) {
       return void toast(
         minor
           ? "Confirm that you have consent from the child's parent or lawful guardian."
@@ -566,8 +639,8 @@ export function AddClientDialog({
     }
     setSaving(true);
     try {
-      const res = await apiFetch('/api/clients', {
-        method: 'POST',
+      const res = await apiFetch(editing ? `/api/clients/${client!.id}` : '/api/clients', {
+        method: editing ? 'PATCH' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${await auth.currentUser?.getIdToken()}`,
@@ -585,12 +658,14 @@ export function AddClientDialog({
           guardianName: minor ? guardianName.trim() : undefined,
         }),
       });
-      if (!res.ok) throw new Error(await apiErrorMessage(res, 'add a client'));
-      toast(`${[firstName.trim(), lastName.trim()].filter(Boolean).join(' ')} was added to your clients.`);
+      const action = editing ? 'save the client' : 'add a client';
+      if (!res.ok) throw new Error(await apiErrorMessage(res, action));
+      const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
+      toast(editing ? `${name}'s details were saved.` : `${name} was added to your clients.`);
       onCreated?.();
       onOpenChange(false);
     } catch (e) {
-      toast(caughtErrorMessage(e, 'add a client'), 'error');
+      toast(caughtErrorMessage(e, editing ? 'save the client' : 'add a client'), 'error');
     } finally {
       setSaving(false);
     }
@@ -612,16 +687,20 @@ export function AddClientDialog({
     <DsDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Add a new client"
-      description="Add the client to your caseload. No session or invite link is created."
+      title={editing ? 'Edit client' : 'Add a new client'}
+      description={
+        editing
+          ? "Update this client's details."
+          : 'Add the client to your caseload. No session or invite link is created.'
+      }
       footer={
         <>
           <button className="ds-btn ds-btn-ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </button>
-          <button className="ds-btn ds-btn-clay" onClick={submit} disabled={saving || !consentConfirmed}>
+          <button className="ds-btn ds-btn-clay" onClick={submit} disabled={saving || (needsConsent && !consentConfirmed)}>
             {saving && <Loader2 className="animate-spin" />}
-            Add Client
+            {editing ? 'Save changes' : 'Add Client'}
           </button>
         </>
       }
@@ -701,6 +780,7 @@ export function AddClientDialog({
               />
             </Field>
           )}
+          {needsConsent && (
           <label htmlFor="client-consent" className="flex items-start gap-2.5 text-[13.5px] leading-snug">
             <input
               id="client-consent"
@@ -719,6 +799,7 @@ export function AddClientDialog({
               </a>
             </span>
           </label>
+          )}
         </div>
     </DsDialog>
   );

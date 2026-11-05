@@ -32,13 +32,22 @@ async function supportEmail(): Promise<string> {
   }
 }
 
+/**
+ * Sends one service email and throws when it can't: for actions whose whole
+ * point is the email (e.g. "Send by email"), so the user hears it failed.
+ * Callers check mailConfigured() and the address first.
+ */
+export async function sendServiceEmail(kind: MailKind, to: string, content: EmailContent): Promise<void> {
+  const message = renderEmail(content, await supportEmail());
+  await sendMail(kind, { to: to.trim(), subject: message.subject, html: message.html, text: message.text });
+}
+
 /** Sends one service email. Resolves (never rejects) once sent, skipped or failed. */
 export async function notify(kind: MailKind, to: string | null | undefined, content: EmailContent): Promise<void> {
   try {
     if (!mailConfigured()) return;
     if (!isEmailAddress(to)) return;
-    const message = renderEmail(content, await supportEmail());
-    await sendMail(kind, { to: to.trim(), subject: message.subject, html: message.html, text: message.text });
+    await sendServiceEmail(kind, to, content);
   } catch (e) {
     logError(`email ${content.tag} not sent`, e);
   }
