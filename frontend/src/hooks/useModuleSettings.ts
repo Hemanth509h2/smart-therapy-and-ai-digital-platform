@@ -8,7 +8,7 @@ import { apiFetch } from '@/lib/api';
 // per page load and shared by every caller. On failure nothing is hidden.
 // This is a UI switch only; launches are not blocked server-side.
 
-export interface ModuleSettings {
+interface ModuleSettings {
   disabled: Set<string>;
   featured: Set<string>;
 }

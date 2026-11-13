@@ -3,7 +3,7 @@
 import { apiFetch } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/apiError';
 
-export class AdminApiError extends Error {
+class AdminApiError extends Error {
   status: number;
   code?: string;
   constructor(message: string, status: number, code?: string) {

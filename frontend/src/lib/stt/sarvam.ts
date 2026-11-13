@@ -9,9 +9,9 @@
 //   - Server messages: { type: "data" | "events" | "error", data: {...} }
 
 export const STT_SAMPLE_RATE = 16000
-export const STT_INPUT_CODEC = 'pcm_s16le'
-export const STT_MODEL = 'saaras:v3'
-export const STT_MODE = 'translate'
+const STT_INPUT_CODEC = 'pcm_s16le'
+const STT_MODEL = 'saaras:v3'
+const STT_MODE = 'translate'
 
 /** Query params shared by the browser URL and (via an allow-list) the backend proxy. */
 export const STT_STREAM_PARAMS: Record<string, string> = {
@@ -24,7 +24,7 @@ export const STT_STREAM_PARAMS: Record<string, string> = {
 }
 
 /** Float32 [-1, 1] -> signed 16-bit little-endian PCM bytes. */
-export function floatToPcm16(float32: Float32Array): Uint8Array {
+function floatToPcm16(float32: Float32Array): Uint8Array {
   const out = new Uint8Array(float32.length * 2)
   const view = new DataView(out.buffer)
   for (let i = 0; i < float32.length; i++) {
@@ -34,7 +34,7 @@ export function floatToPcm16(float32: Float32Array): Uint8Array {
   return out
 }
 
-export function bytesToBase64(bytes: Uint8Array): string {
+function bytesToBase64(bytes: Uint8Array): string {
   let binary = ''
   const block = 0x8000
   for (let i = 0; i < bytes.length; i += block) {
@@ -53,7 +53,7 @@ export function buildAudioMessage(float32: Float32Array): string {
   })
 }
 
-export type SarvamMessage =
+type SarvamMessage =
   | { kind: 'transcript'; text: string; requestId?: string }
   | { kind: 'speech'; signal: 'START_SPEECH' | 'END_SPEECH' }
   | { kind: 'error'; message: string; code?: string }

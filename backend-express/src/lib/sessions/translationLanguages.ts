@@ -42,14 +42,6 @@ export function isTranslationLanguage(v: unknown): v is string {
   return typeof v === 'string' && CODES.has(v)
 }
 
-export function languageLabel(code: string): string {
-  return TRANSLATION_LANGUAGES.find((l) => l.code === code)?.label ?? code
-}
-
-export function languageNative(code: string): string {
-  return TRANSLATION_LANGUAGES.find((l) => l.code === code)?.native ?? code
-}
-
 export function sttSupported(code: string): boolean {
   return TRANSLATION_LANGUAGES.find((l) => l.code === code)?.sttSupported ?? false
 }

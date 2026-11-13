@@ -50,15 +50,6 @@ export async function usersById<S extends UserSelect = undefined>(
   return new Map(rows.map((r) => [r.id, r as unknown as UserOf<S>]));
 }
 
-/** Adds `user` (or null) to each row, looked up by its userId. */
-export async function withUsers<R extends { userId: string }, S extends UserSelect = undefined>(
-  rows: R[],
-  select?: S
-): Promise<(R & { user: UserOf<S> | null })[]> {
-  const map = await usersById(rows.map((r) => r.userId), select);
-  return rows.map((r) => ({ ...r, user: map.get(r.userId) ?? null }));
-}
-
 /** The therapist profile for a Firebase uid, or null. */
 export async function therapistForUser<S extends TherapistSelect = undefined>(
   userId: string,

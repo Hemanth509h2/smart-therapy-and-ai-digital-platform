@@ -116,14 +116,6 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
   },
 ]
 
-// Skill Development modules render in the dedicated full-canvas SkillDevLayout
-// instead of the normal session room layout. Every other module is unaffected.
-export const SKILL_MODULE_IDS: string[] =
-  MODULE_CATEGORIES.find((c) => c.id === 'skill')?.modules.map((m) => m.id) ?? []
-
-export const isSkillModule = (id: string | null | undefined): boolean =>
-  !!id && SKILL_MODULE_IDS.includes(id)
-
 export const ALL_MODULES: ModuleItem[] = MODULE_CATEGORIES.flatMap((c) => c.modules)
 export const ALL_MODULE_IDS: string[] = ALL_MODULES.map((m) => m.id)
 
@@ -150,14 +142,3 @@ const RETIRED_MODULE_NAMES: Record<string, string> = {
 
 export const moduleName = (id: string): string =>
   MODULE_NAME_BY_ID[id] ?? RETIRED_MODULE_NAMES[id] ?? id
-
-// Resolve a therapist's effective allowed module ids.
-// `allModulesAllowed` true (default) means unrestricted -> every module.
-export function resolveAllowedModuleIds(therapist: {
-  allModulesAllowed?: boolean
-  moduleAccess?: string[]
-} | null | undefined): string[] {
-  if (!therapist) return ALL_MODULE_IDS
-  if (therapist.allModulesAllowed !== false) return ALL_MODULE_IDS
-  return therapist.moduleAccess ?? []
-}

@@ -20,7 +20,7 @@ const ALL: AdminPermission[] = [
   'support', 'content', 'settings', 'audit.read', 'admins.manage',
 ];
 
-export const ADMIN_PERMISSIONS: Record<AdminRole, AdminPermission[]> = {
+const ADMIN_PERMISSIONS: Record<AdminRole, AdminPermission[]> = {
   SUPER_ADMIN: ALL,
   BILLING: ['people.read', 'billing.read', 'billing.write'],
   SUPPORT: ['people.read', 'phi.read', 'billing.read', 'support'],

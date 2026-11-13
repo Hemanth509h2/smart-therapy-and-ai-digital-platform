@@ -962,7 +962,7 @@ export function CancelSessionDialog({
 
 /* ─────────────────────────── Availability ─────────────────────────── */
 
-export function AvailabilityDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function AvailabilityDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { profile } = useAuthStore();
   const [av, setAv] = useState<Availability>(() => loadAvailability());
 

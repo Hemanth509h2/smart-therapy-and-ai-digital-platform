@@ -14,7 +14,7 @@
 import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firestore'
 
-export interface WriteModuleStateOptions {
+interface WriteModuleStateOptions {
   /** Module name used to attribute warnings, e.g. 'BubbleSplash'. */
   label?: string
 }

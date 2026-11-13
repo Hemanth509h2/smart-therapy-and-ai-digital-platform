@@ -6,7 +6,7 @@ import { db } from '@/lib/firestore'
 // These accumulate on the persistent `sessions/{id}` doc (alongside the
 // transcript) so the end-of-session report generator can describe what
 // actually happened in each activity — not just what was said.
-export interface ModuleEvent {
+interface ModuleEvent {
   module: string // module id, e.g. 'virtual-shop'
   type: string // short machine label, e.g. 'purchase_completed'
   detail: string // human-readable summary for the report

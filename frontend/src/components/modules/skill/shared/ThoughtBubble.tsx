@@ -3,7 +3,7 @@
 import { motion } from 'motion/react'
 
 /* Comic thought bubble — overshoot pop-in, gentle wiggle, trailing dots. */
-export interface ThoughtBubbleProps {
+interface ThoughtBubbleProps {
   text: string
   triggerAt: number
   position: { top: string; right?: string; left?: string }

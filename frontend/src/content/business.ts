@@ -9,7 +9,7 @@
 
 import { SUPPORT_EMAIL, SUPPORT_HOURS } from '@/content/help';
 
-export interface BusinessDetails {
+interface BusinessDetails {
   /** Trading name used throughout the product. */
   brand: string;
   /** Registered legal name, e.g. "STAAD Technologies Private Limited". */

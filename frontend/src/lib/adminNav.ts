@@ -24,14 +24,14 @@ import {
 } from 'lucide-react';
 import { adminRoleOf, canAdmin, type AdminPermission } from '@/lib/adminRoles';
 
-export interface AdminNavItem {
+interface AdminNavItem {
   href: string;
   label: string;
   icon: LucideIcon;
   permission?: AdminPermission;
 }
 
-export const ADMIN_NAV: AdminNavItem[] = [
+const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/professionals', label: 'Professionals', icon: Users, permission: 'people.read' },
   { href: '/admin/clients', label: 'Clients', icon: User, permission: 'people.read' },

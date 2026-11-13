@@ -5,7 +5,7 @@ import type { TrackReference } from '@livekit/components-react'
 import type { Track } from 'livekit-client'
 import { RemoteVideoTrack } from 'livekit-client'
 
-export interface VideoDimensions {
+interface VideoDimensions {
   width: number
   height: number
   aspectRatio: number

@@ -10,7 +10,7 @@ import type { RemoteParticipant } from 'livekit-client'
  */
 
 /** Rolling window the score is computed over. Step 4 calls for 10-15s. */
-export const WINDOW_MS = 12_000
+const WINDOW_MS = 12_000
 
 /**
  * Head-pose tolerance for "forward-facing", in degrees. Generous on purpose:
@@ -18,8 +18,8 @@ export const WINDOW_MS = 12_000
  * shifting in their seat is not inattentive. Better to under-report distraction
  * than to hand a therapist a score that punishes normal movement.
  */
-export const MAX_YAW_DEG = 25
-export const MAX_PITCH_DEG = 20
+const MAX_YAW_DEG = 25
+const MAX_PITCH_DEG = 20
 
 export interface AttentionSample {
   t: number

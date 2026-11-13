@@ -17,9 +17,9 @@
 // cloud TTS provider that returns audio we control.
 
 export type VoiceLanguage = 'en-IN' | 'hi-IN' | 'te-IN'
-export type SpeechType = 'instruction' | 'praise' | 'feedback'
+type SpeechType = 'instruction' | 'praise' | 'feedback'
 
-export interface SpeakOptions {
+interface SpeakOptions {
   text: string
   language: VoiceLanguage
   type: SpeechType
@@ -93,7 +93,7 @@ const MATCH_CHAIN: Record<VoiceLanguage, { langPrefixes: string[]; nameHints: st
 }
 
 /** Resolution outcome, cached per language for the rest of the session. */
-export interface ResolvedVoice {
+interface ResolvedVoice {
   voice: SpeechSynthesisVoice | null
   /** true when we got a genuinely region-appropriate voice. */
   exact: boolean

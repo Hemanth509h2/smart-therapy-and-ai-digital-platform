@@ -17,7 +17,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import { Camera, Mic, VideoOff } from 'lucide-react'
 
-export interface DeviceChoice {
+interface DeviceChoice {
   camera: boolean
   mic: boolean
 }

@@ -33,14 +33,6 @@ export function strList(value: unknown, label: string, maxItems: number, maxLen:
   return value.map((v) => reqStr(v, `Each item in ${label.toLowerCase()}`, maxLen));
 }
 
-/** A value from a fixed set. */
-export function oneOf<T extends string>(value: unknown, label: string, allowed: readonly T[]): T {
-  if (typeof value !== 'string' || !(allowed as readonly string[]).includes(value)) {
-    throw new PublicError(`${label} is not valid.`);
-  }
-  return value as T;
-}
-
 export function isIsoDate(value: unknown): value is string {
   return typeof value === 'string' && value.length <= 40 && !Number.isNaN(Date.parse(value));
 }

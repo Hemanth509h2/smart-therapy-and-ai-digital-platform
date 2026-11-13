@@ -7,7 +7,7 @@ import { apiErrorMessage } from '@/lib/apiError';
  * `Authorization: Bearer <token>`. All /api/progress/* routes require this.
  * Throws a plain-language reason naming `action` (e.g. "save the note").
  */
-export async function progressFetch(input: string, init: RequestInit = {}, action = 'load progress tracking') {
+async function progressFetch(input: string, init: RequestInit = {}, action = 'load progress tracking') {
   const user = auth.currentUser;
   if (!user) {
     throw new Error('Your sign-in has expired. Please sign in again.');
@@ -86,7 +86,7 @@ export const createMetric = (payload: {
     body: JSON.stringify(payload),
   }, 'save the measurement').then((d) => d.metric as ProgressMetric);
 
-export const updateMetric = (
+const updateMetric = (
   id: string,
   payload: Partial<Pick<ProgressMetric, 'value' | 'unit' | 'notes' | 'metricType' | 'recordedAt'>>
 ) =>
@@ -111,7 +111,7 @@ export const fetchClientReports = (clientId: string) =>
     (d) => d.reports as ProgressReport[]
   );
 
-export const createReport = (payload: {
+const createReport = (payload: {
   clientId: string;
   title?: string;
   periodStart: string;

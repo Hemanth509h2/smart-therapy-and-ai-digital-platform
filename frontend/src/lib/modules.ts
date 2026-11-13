@@ -10,7 +10,7 @@ export interface ModuleItem {
   desc: string
 }
 
-export interface ModuleCategory {
+interface ModuleCategory {
   id: string
   name: string
   desc: string
@@ -118,7 +118,7 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
 
 // Skill Development modules render in the dedicated full-canvas SkillDevLayout
 // instead of the normal session room layout. Every other module is unaffected.
-export const SKILL_MODULE_IDS: string[] =
+const SKILL_MODULE_IDS: string[] =
   MODULE_CATEGORIES.find((c) => c.id === 'skill')?.modules.map((m) => m.id) ?? []
 
 export const isSkillModule = (id: string | null | undefined): boolean =>

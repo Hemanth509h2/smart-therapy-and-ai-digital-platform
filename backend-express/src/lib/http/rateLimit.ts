@@ -157,8 +157,3 @@ export function limitByIp(opts: LimitOptions, message?: string) {
     next();
   };
 }
-
-/** For tests only. */
-export function resetRateLimits() {
-  buckets.clear();
-}

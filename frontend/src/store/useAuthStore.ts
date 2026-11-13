@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 type Role = 'THERAPIST' | 'CLIENT' | 'ADMIN';
 
-export interface UserState {
+interface UserState {
   uid: string | null;
   email: string | null;
   role: Role | null;
@@ -18,7 +18,7 @@ export interface UserState {
 // and AuthProvider replaces it with the fresh profile moments later.
 const CACHE_KEY = 'staad:auth';
 
-export interface CachedAuth {
+interface CachedAuth {
   uid: string;
   email: string | null;
   role: Role;

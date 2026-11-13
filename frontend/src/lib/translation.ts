@@ -17,12 +17,8 @@ import { isTranslationLanguage } from '@/lib/translationLanguages'
 
 export {
   TRANSLATION_LANGUAGES,
-  isTranslationLanguage,
-  languageLabel,
-  languageNative,
   sttSupported,
 } from '@/lib/translationLanguages'
-export type { TranslationLanguage } from '@/lib/translationLanguages'
 
 export interface TranslationSettings {
   /** Captions are only produced while this is true. */
@@ -33,7 +29,7 @@ export interface TranslationSettings {
   client: string
 }
 
-export const DEFAULT_TRANSLATION: TranslationSettings = {
+const DEFAULT_TRANSLATION: TranslationSettings = {
   enabled: false,
   therapist: 'en',
   client: 'hi',

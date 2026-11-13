@@ -128,7 +128,7 @@ async function ask(
 }
 
 /** The modules this therapist may launch, with their category, for the agent to choose from. */
-export function agentModuleCatalogue(allowedIds: string[]) {
+function agentModuleCatalogue(allowedIds: string[]) {
   const allowed = new Set(allowedIds)
   return MODULE_CATEGORIES.flatMap((c) =>
     c.modules

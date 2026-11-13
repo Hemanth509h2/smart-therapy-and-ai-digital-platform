@@ -29,7 +29,7 @@ function inline(text: string): string {
 
 // Convert the controlled Markdown subset into HTML. Shared by the on-screen
 // view and the print window so they always match.
-export function reportMarkdownToHtml(md: string): string {
+function reportMarkdownToHtml(md: string): string {
   const lines = (md || '').replace(/\r\n/g, '\n').split('\n')
   const out: string[] = []
   let listType: 'ul' | 'ol' | null = null
@@ -76,7 +76,7 @@ export function reportMarkdownToHtml(md: string): string {
   return out.join('\n')
 }
 
-export interface ReportMeta {
+interface ReportMeta {
   clientName?: string
   dateLabel?: string
   sessionLabel?: string
@@ -175,7 +175,7 @@ export default function SessionReportView({
 // Opens a clean, branded print window for the report and triggers the browser's
 // print dialog (which can "Save as PDF"). Self-contained so it never prints the
 // surrounding app chrome.
-export function printSessionReport(
+function printSessionReport(
   content: string,
   meta?: ReportMeta,
   stats?: ReportStats | null

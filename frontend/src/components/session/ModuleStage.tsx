@@ -51,7 +51,7 @@ function moduleIdentity(moduleId: string | null) {
   return null
 }
 
-export interface ModuleStageProps {
+interface ModuleStageProps {
   activeModule: string | null
   /** No longer rendered (feeds moved to the page's participants popup); kept so callers don't break. */
   selfName?: string

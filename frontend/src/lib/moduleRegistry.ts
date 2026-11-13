@@ -206,7 +206,7 @@ export const MODULE_CATEGORIES = [
 ] as const
 
 // Skill development modules (use full-canvas SkillDevLayout)
-export const SKILL_MODULE_IDS = new Set([
+const SKILL_MODULE_IDS = new Set([
   'story-choice-adventure',
   'emotion-detective',
   'build-together',

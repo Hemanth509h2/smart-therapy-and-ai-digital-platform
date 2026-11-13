@@ -8,7 +8,7 @@
 // Codes are the 2-letter form the translation agent expects; it maps them to
 // IndicTrans2's FLORES codes internally.
 
-export interface TranslationLanguage {
+interface TranslationLanguage {
   code: string
   label: string
   native: string
@@ -46,7 +46,7 @@ export function languageLabel(code: string): string {
   return TRANSLATION_LANGUAGES.find((l) => l.code === code)?.label ?? code
 }
 
-export function languageNative(code: string): string {
+function languageNative(code: string): string {
   return TRANSLATION_LANGUAGES.find((l) => l.code === code)?.native ?? code
 }
 

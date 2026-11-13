@@ -42,10 +42,10 @@ export function evalPose(p: Pose, t: number, since: number) {
   }
 }
 
-export const WAVE: Pose = { r: [-2.6, -0.25], l: [-0.2, 0.08], waveR: 0.3, tilt: 0.08 }
-export const OPEN_HANDS: Pose = { r: [-1.1, -0.5], l: [-1.1, 0.5], tilt: 0.14, nodWob: 0.05 }
-export const HAND_UP: Pose = { r: [-3.05, -0.12], l: [-0.2, 0.08] }
-export const CHEER_ARMS: Pose = { r: [-2.9, -0.35], l: [-2.9, 0.35] }
+const WAVE: Pose = { r: [-2.6, -0.25], l: [-0.2, 0.08], waveR: 0.3, tilt: 0.08 }
+const OPEN_HANDS: Pose = { r: [-1.1, -0.5], l: [-1.1, 0.5], tilt: 0.14, nodWob: 0.05 }
+const HAND_UP: Pose = { r: [-3.05, -0.12], l: [-0.2, 0.08] }
+const CHEER_ARMS: Pose = { r: [-2.9, -0.35], l: [-2.9, 0.35] }
 
 /** What she does at each step (hand-tuned arm angles; the brush and spoon
     steps of the school story have their own, in Kid). */
@@ -129,10 +129,10 @@ export interface StoryData {
   shots?: Record<string, V3>
 }
 
-export const spotAt = (x: number, by: number): SpotDef => ({ stand: [x, 0, -0.45], bubble: [x, by, -0.45] })
+const spotAt = (x: number, by: number): SpotDef => ({ stand: [x, 0, -0.45], bubble: [x, by, -0.45] })
 /** She always walks along the path facing right (+x), toward whoever is there. */
 export const PARK_FACING = Math.PI / 2
-export const NPC_FACES_KID = -Math.PI / 2
+const NPC_FACES_KID = -Math.PI / 2
 
 const MUM_POSES: Record<string, Pose> = { s3p1: { tilt: 0.1 }, s3p4: { nod: 0.1, l: [-0.5, 0.3] }, s3p5: { tilt: 0.08, nodWob: 0.04 } }
 

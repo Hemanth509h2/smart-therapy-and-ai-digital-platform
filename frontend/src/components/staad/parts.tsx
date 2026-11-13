@@ -129,7 +129,7 @@ export function NotchLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-export function NotchButton({
+function NotchButton({
   onClick,
   label,
   arrow,
@@ -307,7 +307,7 @@ export function Chips<T extends string | number>({
 
 /* ── states ─────────────────────────────────────────────────────────────── */
 
-export function InlineError({ message, onRetry }: { message: string; onRetry?: () => void }) {
+function InlineError({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="inline-err" role="alert">
       <span style={{ flex: 1 }}>{message}</span>
@@ -350,7 +350,7 @@ export function SkeletonCard({ height = 186 }: { height?: number }) {
   return <div className="sk--card" style={{ minHeight: height }} aria-hidden />;
 }
 
-export function SkeletonLines({ rows = 3 }: { rows?: number }) {
+function SkeletonLines({ rows = 3 }: { rows?: number }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }} aria-hidden>
       {Array.from({ length: rows }).map((_, i) => (

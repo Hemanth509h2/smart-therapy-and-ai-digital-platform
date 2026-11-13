@@ -26,9 +26,9 @@ import { db } from '@/lib/firestore'
  * collection is a tracked follow-up.
  */
 
-export type SessionLogEntryType = 'transcript' | 'attention'
+type SessionLogEntryType = 'transcript' | 'attention'
 
-export interface SessionLogEntry {
+interface SessionLogEntry {
   /** Server-assigned; the ordering key for interleaving. */
   timestamp: unknown
   type: SessionLogEntryType

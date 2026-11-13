@@ -3,7 +3,7 @@ import { db } from '@/lib/firestore';
 import { SessionState } from '@/types';
 
 // Listen to session synchronization
-export function subscribeToSession(sessionId: string, onUpdate: (session: SessionState) => void) {
+function subscribeToSession(sessionId: string, onUpdate: (session: SessionState) => void) {
   const docRef = doc(db, 'liveSessions', sessionId);
   return onSnapshot(docRef, (snapshot) => {
     if (snapshot.exists()) {
@@ -13,7 +13,7 @@ export function subscribeToSession(sessionId: string, onUpdate: (session: Sessio
 }
 
 // Update the session room's active therapy module
-export async function updateSessionModule(sessionId: string, moduleId: string | null) {
+async function updateSessionModule(sessionId: string, moduleId: string | null) {
   const docRef = doc(db, 'liveSessions', sessionId);
   await updateDoc(docRef, {
     activeModuleId: moduleId,
@@ -41,7 +41,7 @@ export async function updateModuleState(sessionId: string, moduleId: string, sta
 }
 
 // Initialize liveSession document if not exists
-export async function initLiveSession(sessionId: string, therapistUid: string, clientUid: string) {
+async function initLiveSession(sessionId: string, therapistUid: string, clientUid: string) {
   const docRef = doc(db, 'liveSessions', sessionId);
   const snap = await getDoc(docRef);
   if (!snap.exists()) {

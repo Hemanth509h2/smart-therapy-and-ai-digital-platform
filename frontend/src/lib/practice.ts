@@ -93,7 +93,7 @@ export const fmtTime = (d: Date | string) =>
 export const fmtDate = (d: Date | string) =>
   new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-export const fmtShortDate = (d: Date | string) =>
+const fmtShortDate = (d: Date | string) =>
   new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
 /** "Today" / "Tomorrow" / "Yesterday" / "Wed, Sep 9". */
@@ -109,7 +109,7 @@ export function fmtDay(d: Date | string, now = new Date()) {
 export const fmtDayTime = (d: Date | string, now = new Date()) => `${fmtDay(d, now)}, ${fmtTime(d)}`;
 
 /** Human countdown/elapsed label for a session start time. */
-export function fmtRelative(d: Date | string, now = new Date(), durationMin = DEFAULT_DURATION) {
+function fmtRelative(d: Date | string, now = new Date(), durationMin = DEFAULT_DURATION) {
   const mins = Math.round((new Date(d).getTime() - now.getTime()) / MIN);
   if (mins > 0) {
     if (mins < 60) return `Starts in ${mins} min`;
@@ -183,7 +183,7 @@ export function clientAge(dob?: string | Date | null) {
   return age >= 1 && age < 120 ? age : null;
 }
 
-export const isPlaceholderEmail = (email?: string | null) =>
+const isPlaceholderEmail = (email?: string | null) =>
   !email || /@(?:client\.)?staad\.local$/i.test(email);
 
 export const clientEmail = (c?: PracticeClient | null) => {
@@ -309,7 +309,7 @@ export const fmtListDate = (d: Date | string) =>
   new Date(d).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 /** Non-cancelled sessions per week for the last `weeks` weeks, oldest first. */
-export function weeklyCounts(sessions: PracticeSession[], weeks = 6, now = new Date()) {
+function weeklyCounts(sessions: PracticeSession[], weeks = 6, now = new Date()) {
   const thisWeek = startOfWeek(now).getTime();
   const counts: number[] = Array(weeks).fill(0);
   for (const s of sessions) {
@@ -345,7 +345,7 @@ export function sessionIcs(items: { s: PracticeSession; minutes: number }[]) {
 
 /* ─────────────────────────── clients ─────────────────────────── */
 
-export type ClientStatus = 'upcoming' | 'active' | 'follow-up';
+type ClientStatus = 'upcoming' | 'active' | 'follow-up';
 
 export const CLIENT_STATUS_META: Record<ClientStatus, { label: string; tone: Tone }> = {
   upcoming: { label: 'Upcoming', tone: 'amber' },
@@ -353,7 +353,7 @@ export const CLIENT_STATUS_META: Record<ClientStatus, { label: string; tone: Ton
   'follow-up': { label: 'Needs Follow-up', tone: 'red' },
 };
 
-export function clientSessions(clientId: string, sessions: PracticeSession[]) {
+function clientSessions(clientId: string, sessions: PracticeSession[]) {
   return sessions.filter((s) => sessionClientId(s) === clientId);
 }
 
@@ -476,7 +476,7 @@ export function toCsv(rows: (string | number)[][]) {
 }
 
 /** iCalendar feed — imports into Google Calendar, Outlook and Apple Calendar. */
-export function buildIcs(
+function buildIcs(
   events: { uid: string; start: Date; minutes: number; title: string; description?: string }[]
 ) {
   const stamp = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');

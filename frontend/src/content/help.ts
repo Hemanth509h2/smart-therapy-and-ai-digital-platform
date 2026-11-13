@@ -12,7 +12,7 @@ export const SUPPORT_HOURS = 'Weekdays, 09:00 — 18:00 IST';
 
 export type HelpCategory = 'Sessions' | 'Billing' | 'Privacy' | 'Clients';
 
-export interface Faq {
+interface Faq {
   q: string;
   a: string;
   category: HelpCategory;
@@ -86,7 +86,7 @@ export const FAQS: Faq[] = [
   },
 ];
 
-export interface Guide {
+interface Guide {
   title: string;
   body: string;
   minutes: number;

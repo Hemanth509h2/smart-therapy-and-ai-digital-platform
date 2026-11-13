@@ -2,7 +2,7 @@ import type { Pose } from './sceneTypes'
 
 /* Character pose lookup — each pose maps to eyebrow curve, eye size and mouth
    path. (Right-arm gesture stays fixed in the validated SVG.) */
-export const POSE_CONFIG: Record<Pose, {
+const POSE_CONFIG: Record<Pose, {
   browL: string; browR: string; eyeRy: number; mouth: string
 }> = {
   neutral: { browL: 'M38 21 Q43 17 48 20', browR: 'M62 20 Q67 17 72 21', eyeRy: 5, mouth: 'M47 41 Q55 38 63 41' },
@@ -12,7 +12,7 @@ export const POSE_CONFIG: Record<Pose, {
   sad: { browL: 'M38 22 Q43 19 48 23', browR: 'M62 23 Q67 19 72 22', eyeRy: 5, mouth: 'M47 42 Q55 38 63 42' },
 }
 
-export function shade(hex: string, amt: number) {
+function shade(hex: string, amt: number) {
   const n = parseInt(hex.replace('#', ''), 16)
   const r = Math.max(0, Math.min(255, (n >> 16) + amt))
   const g = Math.max(0, Math.min(255, ((n >> 8) & 255) + amt))
@@ -20,7 +20,7 @@ export function shade(hex: string, amt: number) {
   return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')
 }
 
-export interface SceneCharacterProps { pose: Pose; shirtColor?: string; id: string }
+interface SceneCharacterProps { pose: Pose; shirtColor?: string; id: string }
 
 export function SceneCharacter({ pose, shirtColor = '#4a7c6f', id }: SceneCharacterProps) {
   const p = POSE_CONFIG[pose]

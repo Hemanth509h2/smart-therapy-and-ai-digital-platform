@@ -109,7 +109,7 @@ const TOOL_MAP: Record<
   eraser: { tool: 'eraser' },
 }
 
-export interface StaadWhiteboardProps {
+interface StaadWhiteboardProps {
   sessionId: string
   role: 'therapist' | 'client'
   /** From the "Share Whiteboard?" choice. false -> nothing is synced. */

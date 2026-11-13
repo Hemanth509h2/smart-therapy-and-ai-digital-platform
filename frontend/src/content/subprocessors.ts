@@ -8,7 +8,7 @@
 
 export const SUBPROCESSORS_UPDATED = '4 November 2026';
 
-export interface Subprocessor {
+interface Subprocessor {
   name: string;
   purpose: string;
   data: string;

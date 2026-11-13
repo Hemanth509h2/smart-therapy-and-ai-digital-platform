@@ -1,4 +1,4 @@
-export interface TherapyModule {
+interface TherapyModule {
   id: string;
   name: string;
   init(sendStateUpdate: (state: any) => void): void;

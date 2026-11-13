@@ -6,7 +6,7 @@ import { adminFetch } from '@/lib/adminApi';
 import { caughtErrorMessage } from '@/lib/apiError';
 import { toast } from '@/components/practice/ui';
 
-export interface RemoveTarget {
+interface RemoveTarget {
   userId: string;
   name: string | null;
   email: string;

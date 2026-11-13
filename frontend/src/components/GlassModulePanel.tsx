@@ -467,6 +467,3 @@ export default function GlassModulePanel({
     </div>
   )
 }
-
-// Re-export for SkillDevLayout
-export { isSkillModule } from '@/lib/moduleRegistry'

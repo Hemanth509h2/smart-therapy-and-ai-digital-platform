@@ -76,7 +76,7 @@ function compress(buckets: TimelineBucket[], maxBuckets = 20): TimelineBucket[] 
   return out
 }
 
-export function computeReportStats(inputs: ReportInputs): ReportStats {
+function computeReportStats(inputs: ReportInputs): ReportStats {
   const { transcript, moduleEvents, therapistNotes } = inputs
 
   let therapistLines = 0

@@ -9,7 +9,7 @@
  * again instead of an old "accept" silently covering it.
  */
 
-export const CONSENT_VERSION = 1;
+const CONSENT_VERSION = 1;
 const STORAGE_KEY = 'staad-cookie-consent';
 
 /** Dispatch on window to open the cookie settings again (e.g. a footer link). */
@@ -17,7 +17,7 @@ export const COOKIE_SETTINGS_EVENT = 'staad:cookie-settings';
 /** Fired on window after the visitor saves a choice. */
 export const COOKIE_CHANGE_EVENT = 'staad:cookie-consent-change';
 
-export interface CookieChoice {
+interface CookieChoice {
   v: number;
   analytics: boolean;
   at: string; // ISO time the choice was made
@@ -53,6 +53,6 @@ export function analyticsAllowed(): boolean {
 }
 
 /** Re-open the cookie banner so the visitor can change their choice. */
-export function openCookieSettings(): void {
+function openCookieSettings(): void {
   window.dispatchEvent(new Event(COOKIE_SETTINGS_EVENT));
 }

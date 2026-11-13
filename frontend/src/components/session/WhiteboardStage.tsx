@@ -88,7 +88,7 @@ function VideoTile({
   )
 }
 
-export interface WhiteboardStageProps {
+interface WhiteboardStageProps {
   selfName: string
   otherName: string
   onClose: () => void

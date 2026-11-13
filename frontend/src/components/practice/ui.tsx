@@ -13,11 +13,11 @@ type Icon = React.ComponentType<{ className?: string; style?: React.CSSPropertie
 
 /* ─────────────────────────── surfaces ─────────────────────────── */
 
-export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return <div className={cx('ds-card', className)} {...props} />;
 }
 
-export function PageHeader({
+function PageHeader({
   title,
   subtitle,
   icon,
@@ -49,7 +49,7 @@ export function PageHeader({
   );
 }
 
-export function SectionTitle({
+function SectionTitle({
   title,
   subtitle,
   action,
@@ -71,7 +71,7 @@ export function SectionTitle({
 
 /* ─────────────────────────── chips ─────────────────────────── */
 
-export function Pill({
+function Pill({
   tone,
   dot,
   children,
@@ -91,15 +91,15 @@ export function Pill({
   );
 }
 
-export const StatusPill = ({ state }: { state: SessionState }) => (
+const StatusPill = ({ state }: { state: SessionState }) => (
   <Pill tone={STATE_META[state].tone} dot>
     {STATE_META[state].label}
   </Pill>
 );
 
-export const Tag = ({ label }: { label: string }) => <Pill tone={tagTone(label)}>{label}</Pill>;
+const Tag = ({ label }: { label: string }) => <Pill tone={tagTone(label)}>{label}</Pill>;
 
-export function Avatar({
+function Avatar({
   first,
   last,
   size = 44,
@@ -122,7 +122,7 @@ export function Avatar({
   );
 }
 
-export function IconBubble({
+function IconBubble({
   tone = 'clay',
   size = 50,
   children,
@@ -144,7 +144,7 @@ export function IconBubble({
 
 /* ─────────────────────────── data viz ─────────────────────────── */
 
-export function ProgressRing({
+function ProgressRing({
   value,
   size = 68,
   stroke = 7,
@@ -187,7 +187,7 @@ export function ProgressRing({
 }
 
 /** Tiny bar sparkline. `values` are raw counts; bars are scaled to the max. */
-export function MiniBars({
+function MiniBars({
   values,
   color = 'var(--ds-green)',
   height = 40,
@@ -230,7 +230,7 @@ export function MiniBars({
   );
 }
 
-export function StatCard({
+function StatCard({
   icon: IconCmp,
   tone = 'clay',
   label,
@@ -283,7 +283,7 @@ export const Spinner = ({ className }: { className?: string }) => (
   <Loader2 className={cx('animate-spin', className ?? 'h-5 w-5')} style={{ color: 'var(--ds-clay)' }} />
 );
 
-export const LoadingBlock = ({ label = 'Loading…' }: { label?: string }) => (
+const LoadingBlock = ({ label = 'Loading…' }: { label?: string }) => (
   <div className="flex flex-col items-center justify-center gap-3 py-16" role="status">
     <Spinner className="h-7 w-7" />
     <span className="ds-muted text-[13px]">{label}</span>
@@ -316,7 +316,7 @@ export function EmptyState({
 // Errors are shown as Sileo toasts, not inline. Kept as a component so any
 // remaining `<ErrorBanner message onRetry />` still surfaces its message: it
 // toasts once per new message (with Retry as the toast button) and renders nothing.
-export function ErrorBanner({ message, onRetry }: { message: string; onRetry?: () => void }) {
+function ErrorBanner({ message, onRetry }: { message: string; onRetry?: () => void }) {
   const retry = useRef(onRetry);
   retry.current = onRetry;
   useEffect(() => {
@@ -328,7 +328,7 @@ export function ErrorBanner({ message, onRetry }: { message: string; onRetry?: (
 
 /* ─────────────────────────── inputs ─────────────────────────── */
 
-export function SearchInput({
+function SearchInput({
   value,
   onChange,
   placeholder,
@@ -433,7 +433,7 @@ export interface MenuItem {
 }
 
 /** "⋮" overflow menu. Renders nothing when every item is hidden. */
-export function Menu({ items, label = 'More actions' }: { items: MenuItem[]; label?: string }) {
+function Menu({ items, label = 'More actions' }: { items: MenuItem[]; label?: string }) {
   const visible = items.filter((i) => !i.hidden);
   if (visible.length === 0) return null;
   return (

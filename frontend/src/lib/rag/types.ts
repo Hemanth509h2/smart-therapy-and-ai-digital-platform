@@ -6,7 +6,7 @@ export interface TranscriptChunk {
   isFinal: boolean
 }
 
-export interface SessionTranscript {
+interface SessionTranscript {
   sessionId: string
   therapistId: string
   clientId: string
